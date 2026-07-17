@@ -43,3 +43,8 @@ export async function setItem(name: string, value: string) {
     localStorage.setItem(name ,value);
     await updatePersistentData();
 }
+
+export async function removeItem(name: string) {
+    localStorage.removeItem(name);
+    await updatePersistentData();
+}

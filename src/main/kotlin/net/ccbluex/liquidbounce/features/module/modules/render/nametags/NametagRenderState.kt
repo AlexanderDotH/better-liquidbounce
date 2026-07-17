@@ -22,7 +22,7 @@ import net.ccbluex.liquidbounce.features.module.modules.render.nametags.NametagE
 import net.ccbluex.liquidbounce.render.gui.ItemStackListRenderer.SingleItemStackRenderer
 import net.ccbluex.liquidbounce.render.engine.type.Vec3f
 import net.ccbluex.liquidbounce.utils.client.player
-import net.ccbluex.liquidbounce.utils.entity.interpolateCurrentPosition
+import net.ccbluex.liquidbounce.utils.render.PlayerModelNametagHook
 import net.ccbluex.liquidbounce.utils.render.WorldToScreen
 import net.ccbluex.liquidbounce.utils.text.PlainText
 import net.minecraft.network.chat.Component
@@ -43,6 +43,11 @@ internal class NametagRenderState {
      */
     @JvmField var text: Component = PlainText.EMPTY
 
+    /**
+     * Scoreboard text rendered below the name (health, ping, etc.)
+     */
+    @JvmField var scoreText: Component? = null
+
     @JvmField val equipments = Equipments()
 
     /**
@@ -54,6 +59,7 @@ internal class NametagRenderState {
         this.entity = entity
         this.scale = scale
         this.text = NametagTextFormatter.format(entity)
+        this.scoreText = (entity as? LivingEntity)?.belowNameDisplay()
         this.equipments.update(entity)
     }
 
@@ -61,13 +67,13 @@ internal class NametagRenderState {
         this.entity = null
         this.scale = 0F
         this.text = PlainText.EMPTY
+        this.scoreText = null
         this.equipments.reset()
     }
 
     fun calculateScreenPos(tickDelta: Float): Vec3f? {
         val entity = this.entity ?: return null
-        val nametagPos = entity.interpolateCurrentPosition(tickDelta)
-            .add(0.0, entity.getEyeHeight(entity.pose) + 0.55, 0.0)
+        val nametagPos = PlayerModelNametagHook.getNametagAnchorPosition(entity, tickDelta)
 
         screenPos = WorldToScreen.calculateScreenPos(nametagPos)
         return screenPos

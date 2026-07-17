@@ -8,6 +8,8 @@ import type {
     ConfigurableSetting,
     FileSelectDialog,
     FileSelectResult,
+    FritzBoxReconnectRequest,
+    FritzBoxReconnectResult,
     GameWindow,
     GeneratorResult,
     HitResult,
@@ -24,6 +26,7 @@ import type {
     Server,
     Session,
     Theme,
+    TheAlteningGenerationResult,
     VirtualScreen,
     World
 } from "./types";
@@ -32,6 +35,7 @@ import {isLoggingIn} from "../routes/menu/altmanager/altmanager_store";
 import {replace} from "svelte-spa-router";
 
 const API_BASE = `${REST_BASE}/api/v1`;
+const ALTENING_GENERATION_REQUEST_TIMEOUT_MS = 25_000;
 
 export async function getMetadata(): Promise<Metadata> {
     const response = await fetch(`metadata.json`);
@@ -342,6 +346,28 @@ export async function setSelectedProtocol(protocol: Protocol) {
     });
 }
 
+export async function reconnectFritzBox(password?: string): Promise<FritzBoxReconnectResult> {
+    const request: FritzBoxReconnectRequest = {};
+    if (password !== undefined) {
+        request.password = password;
+    }
+
+    const response = await fetch(`${API_BASE}/client/fritzbox/reconnect`, {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json"
+        },
+        body: JSON.stringify(request)
+    });
+
+    if (!response.ok) {
+        const message = await response.text();
+        throw new Error(message || `FritzBox reconnect failed with HTTP ${response.status}`);
+    }
+
+    return await response.json();
+}
+
 export async function restoreSession() {
     isLoggingIn.set(true);
     await fetch(`${API_BASE}/client/account/restore`, {
@@ -388,6 +414,37 @@ export async function addAlteningAccount(token: string) {
         },
         body: JSON.stringify({token})
     });
+}
+
+export async function generateAlteningAccount(apiToken: string): Promise<TheAlteningGenerationResult> {
+    const controller = new AbortController();
+    const timeout = window.setTimeout(() => controller.abort(), ALTENING_GENERATION_REQUEST_TIMEOUT_MS);
+
+    try {
+        const response = await fetch(`${API_BASE}/client/accounts/new/altening/generate`, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify({apiToken}),
+            signal: controller.signal
+        });
+
+        return await response.json();
+    } catch (error) {
+        return {
+            status: "ERROR",
+            message: isAbortError(error)
+                ? "TheAltening authentication server is not responding. Try again later."
+                : "Failed to generate TheAltening account."
+        };
+    } finally {
+        window.clearTimeout(timeout);
+    }
+}
+
+function isAbortError(error: unknown) {
+    return error instanceof DOMException && error.name === "AbortError";
 }
 
 export async function addMicrosoftAccount() {
@@ -727,6 +784,12 @@ export async function setTyping(typing: boolean) {
         },
         body: JSON.stringify({typing})
     });
+}
+
+export async function getClipboardText(): Promise<string> {
+    const response = await fetch(`${API_BASE}/client/clipboard`);
+    const data: { text?: string } = await response.json();
+    return data.text ?? "";
 }
 
 export async function getClientUser(): Promise<ClientUser | null> {

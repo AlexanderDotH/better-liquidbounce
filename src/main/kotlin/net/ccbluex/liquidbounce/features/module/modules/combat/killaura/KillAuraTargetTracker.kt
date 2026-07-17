@@ -27,7 +27,7 @@ import net.ccbluex.liquidbounce.utils.item.isAxe
 import net.minecraft.world.entity.LivingEntity
 import net.minecraft.world.entity.player.Player
 
-object KillAuraTargetTracker : TargetTracker() {
+object KillAuraTargetTracker : TargetTracker(fovRange = 0f..365f) {
 
     /**
      * Allows to ignore when the target is holding a shield,

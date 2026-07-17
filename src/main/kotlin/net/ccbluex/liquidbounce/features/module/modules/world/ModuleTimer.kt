@@ -33,6 +33,7 @@ import net.ccbluex.liquidbounce.utils.entity.moving
 import net.ccbluex.liquidbounce.utils.kotlin.Priority
 import net.minecraft.client.gui.screens.inventory.ContainerScreen
 import net.minecraft.client.gui.screens.inventory.InventoryScreen
+import net.minecraft.util.Mth
 import kotlin.math.abs
 import kotlin.math.ceil
 
@@ -43,7 +44,7 @@ import kotlin.math.ceil
  */
 object ModuleTimer : ClientModule("Timer", ModuleCategories.WORLD, disableOnQuit = true) {
 
-    val modes = choices("Mode", Classic, arrayOf(Classic, Pulse, Boost)).apply { tagBy(this) }
+    val modes = choices("Mode", Classic, arrayOf(Classic, Pulse, SmoothPulse, Boost)).apply { tagBy(this) }
 
     object Classic : Mode("Classic") {
 
@@ -100,6 +101,97 @@ object ModuleTimer : ClientModule("Timer", ModuleCategories.WORLD, disableOnQuit
 
         enum class TimerState {
             NORMAL_SPEED, BOOST_SPEED
+        }
+
+    }
+
+    object SmoothPulse : Mode("SmoothPulse") {
+
+        override val parent: ModeValueGroup<Mode>
+            get() = modes
+
+        private val targetSpeed by float("TargetSpeed", 1.15f, 0.1f..20f)
+        private val baseSpeed by float("BaseSpeed", 1.0f, 0.1f..20f)
+        private val delayTicks by int("DelayTicks", 40, 0..500, "ticks")
+        private val rampUpTicks by int("RampUpTicks", 8, 1..100, "ticks")
+        private val holdTicks by int("HoldTicks", 4, 0..100, "ticks")
+        private val rampDownTicks by int("RampDownTicks", 8, 1..100, "ticks")
+        private val onMove by boolean("OnMove", true)
+
+        private enum class Phase {
+            Delay, RampUp, Hold, RampDown
+        }
+
+        private var phase = Phase.Delay
+        private var phaseTick = 0
+
+        override fun enable() {
+            phase = initialPhase()
+            phaseTick = 0
+        }
+
+        override fun disable() {
+            phase = Phase.Delay
+            phaseTick = 0
+        }
+
+        private fun initialPhase(): Phase =
+            if (delayTicks == 0) Phase.RampUp else Phase.Delay
+
+        private fun phaseDuration(phase: Phase): Int = when (phase) {
+            Phase.Delay -> delayTicks
+            Phase.RampUp -> rampUpTicks
+            Phase.Hold -> holdTicks
+            Phase.RampDown -> rampDownTicks
+        }
+
+        private fun nextPhase(current: Phase): Phase = when (current) {
+            Phase.Delay -> Phase.RampUp
+            Phase.RampUp -> if (holdTicks == 0) Phase.RampDown else Phase.Hold
+            Phase.Hold -> Phase.RampDown
+            Phase.RampDown -> if (delayTicks == 0) Phase.RampUp else Phase.Delay
+        }
+
+        private fun advancePhase() {
+            phaseTick = 0
+            do {
+                phase = nextPhase(phase)
+            } while (phaseDuration(phase) == 0)
+        }
+
+        private fun smoothStep(t: Float): Float = t * t * (3f - 2f * t)
+
+        private fun speedForPhase(phase: Phase, phaseTick: Int): Float = when (phase) {
+            Phase.Delay -> baseSpeed
+            Phase.Hold -> targetSpeed
+            Phase.RampUp -> {
+                val t = smoothStep(((phaseTick + 1).toFloat() / rampUpTicks).coerceIn(0f, 1f))
+                Mth.lerp(t, baseSpeed, targetSpeed)
+            }
+            Phase.RampDown -> {
+                val t = smoothStep(((phaseTick + 1).toFloat() / rampDownTicks).coerceIn(0f, 1f))
+                Mth.lerp(t, targetSpeed, baseSpeed)
+            }
+        }
+
+        val repeatable = tickHandler {
+            if (onMove && !ModuleTimer.player.moving) {
+                phase = initialPhase()
+                phaseTick = 0
+                Timer.requestTimerSpeed(baseSpeed, Priority.IMPORTANT_FOR_USAGE_1, ModuleTimer)
+                return@tickHandler
+            }
+
+            Timer.requestTimerSpeed(
+                speedForPhase(phase, phaseTick),
+                Priority.IMPORTANT_FOR_USAGE_1,
+                ModuleTimer
+            )
+
+            phaseTick++
+            if (phaseTick >= phaseDuration(phase)) {
+                advancePhase()
+            }
         }
 
     }

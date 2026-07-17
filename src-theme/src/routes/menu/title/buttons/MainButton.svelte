@@ -3,6 +3,11 @@
     import {createEventDispatcher} from "svelte";
     import {backIn, backOut} from "svelte/easing";
     import TitleButtonIcon from "./TitleButtonIcon.svelte";
+    import {
+        TITLE_BUTTON_OFFSET_PX,
+        TITLE_BUTTON_STAGGER_MS,
+        TITLE_BUTTON_TRANSITION_MS,
+    } from "../../common/menuMotion";
 
     export let title: string;
     export let icon: string;
@@ -16,8 +21,19 @@
 <!-- svelte-ignore a11y-no-static-element-interactions -->
 <!-- svelte-ignore a11y-click-events-have-key-events -->
 <div class="main-button" on:mouseenter={() => hovered = true} on:mouseleave={() => hovered = false} on:click={() => hovered = false}
-     on:click={() => dispatch("click")} out:fly|global={{duration: 400, x: -500, delay: index * 100, easing: backIn}}
-     in:fly|global={{duration: 400, x: -500, delay: index * 100, easing: backOut}}>
+     on:click={() => dispatch("click")}
+     out:fly|global={{
+         duration: TITLE_BUTTON_TRANSITION_MS,
+         x: -TITLE_BUTTON_OFFSET_PX,
+         delay: index * TITLE_BUTTON_STAGGER_MS,
+         easing: backIn,
+     }}
+     in:fly|global={{
+         duration: TITLE_BUTTON_TRANSITION_MS,
+         x: -TITLE_BUTTON_OFFSET_PX,
+         delay: index * TITLE_BUTTON_STAGGER_MS,
+         easing: backOut,
+     }}>
     <div class="icon">
         <TitleButtonIcon {icon} />
     </div>

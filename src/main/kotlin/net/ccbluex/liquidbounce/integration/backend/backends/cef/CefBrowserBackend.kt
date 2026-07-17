@@ -23,6 +23,7 @@ import net.ccbluex.liquidbounce.config.ConfigSystem
 import net.ccbluex.liquidbounce.event.EventListener
 import net.ccbluex.liquidbounce.integration.backend.BrowserAccelerationFlags
 import net.ccbluex.liquidbounce.integration.backend.BrowserBackend
+import net.ccbluex.liquidbounce.integration.backend.isBrowserAccelerationDisabled
 import net.ccbluex.liquidbounce.integration.backend.browser.BrowserSettings
 import net.ccbluex.liquidbounce.integration.backend.browser.BrowserState
 import net.ccbluex.liquidbounce.integration.backend.browser.BrowserViewport
@@ -35,20 +36,25 @@ import net.ccbluex.liquidbounce.utils.client.error.ErrorHandler
 import net.ccbluex.liquidbounce.utils.client.error.QuickFix
 import net.ccbluex.liquidbounce.utils.client.error.errors.JcefIsntCompatible
 import net.ccbluex.liquidbounce.utils.text.formatAsCapacity
+import net.ccbluex.liquidbounce.utils.client.env
 import net.ccbluex.liquidbounce.utils.client.logger
 import net.ccbluex.liquidbounce.utils.client.mc
 import net.ccbluex.liquidbounce.utils.kotlin.sortedInsert
 import net.ccbluex.liquidbounce.utils.validation.HashValidator
+import net.minecraft.util.Util
 import org.cef.browser.CefFrame
 import org.cef.handler.CefLifeSpanHandlerAdapter
 import org.cef.handler.CefLoadHandler
 import org.cef.handler.CefLoadHandlerAdapter
 import org.cef.network.CefRequest
+import java.nio.file.Path
 
 /**
  * The time threshold for cleaning up old cache directories.
  */
 private const val CACHE_CLEANUP_THRESHOLD = 1000 * 60 * 60 * 24 * 7 // 7 days
+
+private val CEF_SINGLETON_FILES = arrayOf("SingletonLock", "SingletonCookie", "SingletonSocket")
 
 /**
  * Uses a modified fork of the JCEF library browser backend made for Minecraft.
@@ -80,13 +86,16 @@ class CefBrowserBackend : BrowserBackend, EventListener {
         if (!MCEF.INSTANCE.isInitialized) {
             MCEF.INSTANCE.settings.apply {
                 userAgent = HttpClient.DEFAULT_AGENT
-                cacheDirectory = cacheFolder.resolve(System.currentTimeMillis().toString(16)).apply {
-                    deleteOnExit()
-                }
+                cacheDirectory = prepareCacheDirectory()
                 librariesDirectory = librariesFolder
 
-                // CEF Switches
-                appendCefSwitches("--no-proxy-server")
+                val disableGpuAcceleration = shouldDisableGpuAcceleration()
+                val cefSwitches = CefSwitches.forConfiguration(disableGpuAcceleration)
+                appendCefSwitches(*cefSwitches.toTypedArray())
+                logger.info("Starting JCEF with switches: ${cefSwitches.joinToString(" ")}")
+                if (disableGpuAcceleration) {
+                    logger.warn("Starting JCEF with Chromium GPU acceleration disabled.")
+                }
             }
 
             val resourceManager = MCEF.INSTANCE.newResourceManager()
@@ -96,6 +105,7 @@ class CefBrowserBackend : BrowserBackend, EventListener {
                 throw JcefIsntCompatible()
             }
 
+            resourceManager.ensureNativeLibrariesPatched()
             HashValidator.validateFolder(resourceManager.commitDirectory)
 
             if (resourceManager.requiresDownload()) {
@@ -120,34 +130,66 @@ class CefBrowserBackend : BrowserBackend, EventListener {
     }
 
     /**
-     * Cleans up old cache directories.
-     *
-     * TODO: Check if we have an active PID using the cache directory, if so, check if the LiquidBounce
-     *   process attached to the JCEF PID is still running or not. If not, we could kill the JCEF process
-     *   and clean up the cache directory.
+     * Store CEF profile data outside the instance folder. Chromium's SingletonLock breaks when the
+     * Minecraft directory contains spaces (e.g. "Performium 21.1").
      */
+    private fun prepareCacheDirectory(): java.io.File {
+        val instanceId = mc.gameDirectory.absolutePath.hashCode().toUInt().toString(16)
+        val sessionId = System.currentTimeMillis().toString(16)
+        val cacheDir = Path.of(
+            System.getProperty("user.home"),
+            ".cache",
+            "liquidbounce-mcef",
+            instanceId,
+            sessionId,
+        ).toFile()
+        cacheDir.mkdirs()
+        for (name in CEF_SINGLETON_FILES) {
+            cacheDir.resolve(name).delete()
+        }
+        cacheDir.deleteOnExit()
+        logger.info("Using JCEF cache directory: ${cacheDir.absolutePath}")
+        return cacheDir
+    }
+
+    private fun shouldDisableGpuAcceleration() = CefSwitches.shouldDisableGpuAcceleration(
+        isLinux = Util.getPlatform() == Util.OS.LINUX,
+        disableGpuAcceleration = isBrowserAccelerationDisabled,
+        disableDmabufRenderer = System.getenv("WEBKIT_DISABLE_DMABUF_RENDERER") == "1",
+        forceGpuAcceleration = env(
+            "LB_BROWSER_FORCE_ACCELERATION",
+            "net.ccbluex.liquidbounce.browser.forceAcceleration"
+        )?.toBoolean() == true,
+    )
+
     fun cleanup() {
-        if (cacheFolder.exists()) {
-            runCatching {
-                cacheFolder.listFiles { file ->
-                    file.isDirectory && System.currentTimeMillis() - file.lastModified() > CACHE_CLEANUP_THRESHOLD
-                }?.sumOf { file ->
-                    try {
-                        val fileSize = file.walkTopDown().sumOf { uFile -> uFile.length() }
-                        file.deleteRecursively()
-                        fileSize
-                    } catch (e: Exception) {
-                        logger.error("Failed to clean up old cache directory", e)
-                        0
-                    }
-                } ?: 0
-            }.onFailure {
-                // Not a big deal, not fatal.
-                logger.error("Failed to clean up old JCEF cache directories", it)
-            }.onSuccess { size ->
-                if (size > 0) {
-                    logger.info("Cleaned up ${size.formatAsCapacity()} JCEF cache directories")
+        cleanupCacheRoot(Path.of(System.getProperty("user.home"), ".cache", "liquidbounce-mcef"))
+        cleanupCacheRoot(cacheFolder.toPath())
+    }
+
+    private fun cleanupCacheRoot(root: Path) {
+        if (!root.toFile().exists()) {
+            return
+        }
+
+        runCatching {
+            root.toFile().listFiles { file ->
+                file.isDirectory && System.currentTimeMillis() - file.lastModified() > CACHE_CLEANUP_THRESHOLD
+            }?.sumOf { file ->
+                try {
+                    val fileSize = file.walkTopDown().sumOf { uFile -> uFile.length() }
+                    file.deleteRecursively()
+                    fileSize
+                } catch (e: Exception) {
+                    logger.error("Failed to clean up old cache directory", e)
+                    0
                 }
+            } ?: 0
+        }.onFailure {
+            logger.error("Failed to clean up old JCEF cache directories under $root", it)
+        }.onSuccess { size ->
+            if (size > 0) {
+                logger.info("Cleaned up ${size.formatAsCapacity()} JCEF cache directories under $root")
             }
         }
     }
@@ -196,6 +238,11 @@ class CefBrowserBackend : BrowserBackend, EventListener {
             })
         }
 
+        if (shouldDisableGpuAcceleration()) {
+            accelerationFlags = BrowserAccelerationFlags.UNSUPPORTED
+            return
+        }
+
         val support = MCEFAccelerationSupport.getAccelerationSupport()
         accelerationFlags = if (support.isSupported) {
             BrowserAccelerationFlags(isSupported = true, isBeta = support.isBeta)
@@ -213,8 +260,22 @@ class CefBrowserBackend : BrowserBackend, EventListener {
         if (MCEF.INSTANCE.isInitialized) {
             try {
                 MCEF.INSTANCE.app.handle.N_DoMessageLoopWork()
+                syncPendingBrowserInitialization()
             } catch (e: Exception) {
                 logger.error("Failed to draw browser globally", e)
+            }
+        }
+    }
+
+    private fun syncPendingBrowserInitialization() {
+        for (browser in browsers) {
+            if (browser.isInitialized) {
+                continue
+            }
+
+            val identifier = browser.browserApi.identifier
+            if (identifier != -1) {
+                browser.isInitialized = true
             }
         }
     }
@@ -226,7 +287,10 @@ class CefBrowserBackend : BrowserBackend, EventListener {
         priority: Short,
         inputAcceptor: InputAcceptor?
     ) = CefBrowser(this, url, position, settings, priority, inputAcceptor)
-        .apply(::addBrowser)
+
+    internal fun registerBrowser(browser: CefBrowser) {
+        addBrowser(browser)
+    }
 
     private fun addBrowser(browser: CefBrowser) {
         browsers.sortedInsert(browser, CefBrowser::priority)
@@ -236,7 +300,10 @@ class CefBrowserBackend : BrowserBackend, EventListener {
         browsers.remove(browser)
     }
 
-    fun getBrowserByApi(apiInstance: org.cef.browser.CefBrowser) = browsers.find { it.browserApi == apiInstance }
+    fun getBrowserByApi(apiInstance: org.cef.browser.CefBrowser) = browsers.find { browser ->
+        browser.browserApi == apiInstance
+            || (apiInstance.identifier != -1 && browser.browserApi.identifier == apiInstance.identifier)
+    }
 
     private fun markInitialized(apiInstance: org.cef.browser.CefBrowser) {
         val browser = getBrowserByApi(apiInstance)

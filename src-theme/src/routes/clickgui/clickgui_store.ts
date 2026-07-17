@@ -5,6 +5,7 @@ export interface TDescription {
     anchor: "left" | "right",
     x: number;
     y: number;
+    variant?: "extended";
 }
 
 export const os: Writable<string | null> = writable<string | null>(null);
@@ -16,6 +17,8 @@ export const maxPanelZIndex: Writable<number> = writable(0);
 export const highlightModuleName: Writable<string | null> = writable(null);
 
 export const scaleFactor: Writable<number> = writable(2);
+
+export const shiftHeld: Writable<boolean> = writable(false);
 
 export const showGrid: Writable<boolean> = writable(false);
 

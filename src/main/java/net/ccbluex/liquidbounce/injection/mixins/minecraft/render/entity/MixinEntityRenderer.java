@@ -31,6 +31,7 @@ import net.ccbluex.liquidbounce.features.module.modules.render.nametags.ModuleNa
 import net.ccbluex.liquidbounce.interfaces.EntityRenderStateAddition;
 import net.ccbluex.liquidbounce.render.engine.type.Color4b;
 import net.ccbluex.liquidbounce.utils.combat.CombatExtensionsKt;
+import net.ccbluex.liquidbounce.utils.render.PlayerModelNametagHook;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.renderer.SubmitNodeCollector;
@@ -123,7 +124,29 @@ public abstract class MixinEntityRenderer<T extends Entity, S extends EntityRend
 
     @WrapWithCondition(method = "submitNameDisplay(Lnet/minecraft/client/renderer/entity/state/EntityRenderState;Lcom/mojang/blaze3d/vertex/PoseStack;Lnet/minecraft/client/renderer/SubmitNodeCollector;Lnet/minecraft/client/renderer/state/level/CameraRenderState;I)V", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/renderer/SubmitNodeCollector;submitNameTag(Lcom/mojang/blaze3d/vertex/PoseStack;Lnet/minecraft/world/phys/Vec3;ILnet/minecraft/network/chat/Component;ZILnet/minecraft/client/renderer/state/level/CameraRenderState;)V"))
     private boolean disableVanillaNametag(SubmitNodeCollector instance, PoseStack poseStack, Vec3 vec3, int i, Component component, boolean b, int j, CameraRenderState cameraRenderState, @Local(argsOnly = true, name = "state") S state) {
+        if (PlayerModelNametagHook.shouldSuppressVanillaNameDisplay(state)) {
+            return false;
+        }
+
         return ModuleNametags.INSTANCE.shouldRenderVanillaNametag(state);
+    }
+
+    @Inject(
+        method = "submitNameDisplay(Lnet/minecraft/client/renderer/entity/state/EntityRenderState;Lcom/mojang/blaze3d/vertex/PoseStack;Lnet/minecraft/client/renderer/SubmitNodeCollector;Lnet/minecraft/client/renderer/state/level/CameraRenderState;I)V",
+        at = @At("HEAD"),
+        cancellable = true
+    )
+    private void hookSuppressAmnesiaVanillaNameDisplay(
+        S state,
+        PoseStack poseStack,
+        SubmitNodeCollector queue,
+        CameraRenderState cameraRenderState,
+        int lightCoords,
+        CallbackInfo ci
+    ) {
+        if (PlayerModelNametagHook.shouldSuppressVanillaNameDisplay(state)) {
+            ci.cancel();
+        }
     }
 
     @Inject(method = "extractRenderState", at = @At("HEAD"))

@@ -36,6 +36,7 @@ import net.ccbluex.liquidbounce.render.engine.type.Color4b;
 import net.ccbluex.liquidbounce.utils.aiming.RotationManager;
 import net.ccbluex.liquidbounce.utils.aiming.data.Rotation;
 import net.ccbluex.liquidbounce.utils.combat.CombatExtensionsKt;
+import net.ccbluex.liquidbounce.utils.render.PlayerModelDelayHook;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.model.EntityModel;
 import net.minecraft.client.model.Model;
@@ -58,6 +59,8 @@ import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
+import org.spongepowered.asm.mixin.injection.Inject;
+import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 @NullMarked
 @Mixin(LivingEntityRenderer.class)
@@ -70,14 +73,22 @@ public abstract class MixinLivingEntityRenderer<T extends LivingEntity, S extend
     public abstract Identifier getTextureLocation(S state);
 
     @Unique
-    private @Nullable Pair<Rotation, Rotation> getOverwriteRotation(ModuleRotations.BodyPart bodyPart) {
-        if (ModuleRotations.INSTANCE.getRunning() && ModuleRotations.INSTANCE.isPartAllowed(bodyPart)) {
-            var rotation = ModuleRotations.INSTANCE.getModelRotation();
-            var prevRotation = ModuleRotations.INSTANCE.getPrevModelRotation();
+    private @Nullable Pair<Rotation, Rotation> getOverwriteRotation(ModulePlayerModel.BodyPart bodyPart) {
+        if (ModulePlayerModel.INSTANCE.getRunning()) {
+            if (ModulePlayerModel.INSTANCE.getDisplayMode() != ModulePlayerModel.Display.REPLACE
+                || !ModulePlayerModel.INSTANCE.isStateEnabled(ModulePlayerModel.State.ROTATION)
+                || !ModulePlayerModel.INSTANCE.isPartAllowed(bodyPart)) {
+                return null;
+            }
+
+            var rotation = ModulePlayerModel.INSTANCE.getModelRotation();
+            var prevRotation = ModulePlayerModel.INSTANCE.getPrevModelRotation();
 
             if (rotation != null && prevRotation != null) {
                 return new Pair<>(prevRotation, rotation);
             }
+
+            return null;
         }
 
         if (ModuleFreeCam.INSTANCE.getRunning()) {
@@ -94,7 +105,7 @@ public abstract class MixinLivingEntityRenderer<T extends LivingEntity, S extend
             return original;
         }
 
-        var overwriteRotation = getOverwriteRotation(ModuleRotations.BodyPart.BODY);
+        var overwriteRotation = getOverwriteRotation(ModulePlayerModel.BodyPart.BODY);
         if (overwriteRotation != null) {
             return Mth.rotLerp(tickDelta, overwriteRotation.getFirst().yRot(), overwriteRotation.getSecond().yRot());
         }
@@ -108,7 +119,7 @@ public abstract class MixinLivingEntityRenderer<T extends LivingEntity, S extend
             return original;
         }
 
-        var overwriteRotation = getOverwriteRotation(ModuleRotations.BodyPart.HEAD);
+        var overwriteRotation = getOverwriteRotation(ModulePlayerModel.BodyPart.HEAD);
         if (overwriteRotation != null) {
             return Mth.rotLerp(tickDelta, overwriteRotation.getFirst().yRot(), overwriteRotation.getSecond().yRot());
         }
@@ -122,7 +133,7 @@ public abstract class MixinLivingEntityRenderer<T extends LivingEntity, S extend
             return original;
         }
 
-        var overwriteRotation = getOverwriteRotation(ModuleRotations.BodyPart.HEAD);
+        var overwriteRotation = getOverwriteRotation(ModulePlayerModel.BodyPart.HEAD);
         if (overwriteRotation != null) {
             return Mth.rotLerp(tickDelta, overwriteRotation.getFirst().xRot(), overwriteRotation.getSecond().xRot());
         }
@@ -223,5 +234,13 @@ public abstract class MixinLivingEntityRenderer<T extends LivingEntity, S extend
     @ModifyExpressionValue(method = "shouldShowName(Lnet/minecraft/world/entity/LivingEntity;D)Z", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/Minecraft;getCameraEntity()Lnet/minecraft/world/entity/Entity;"))
     private @Nullable Entity hasLabelGetCameraEntityProxy(@Nullable Entity cameraEntity) {
         return ModuleFreeCam.INSTANCE.getRunning() ? null : cameraEntity;
+    }
+
+    @Inject(
+        method = "extractRenderState(Lnet/minecraft/world/entity/LivingEntity;Lnet/minecraft/client/renderer/entity/state/LivingEntityRenderState;F)V",
+        at = @At("RETURN")
+    )
+    private void hookDelayPlayerModel(LivingEntity entity, S state, float tickDelta, CallbackInfo ci) {
+        PlayerModelDelayHook.applyDelayedTransform(entity, state);
     }
 }

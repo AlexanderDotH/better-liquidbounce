@@ -48,11 +48,15 @@ import java.util.function.Predicate
  */
 open class TargetTracker(
     defaultPriority: TargetPriority = TargetPriority.HEALTH,
-    rangeValue: RangedValueProvider = NoneRangedValueProvider
-) : TargetSelector(defaultPriority, rangeValue) {
+    rangeValue: RangedValueProvider = NoneRangedValueProvider,
+    fovRange: ClosedFloatingPointRange<Float> = DEFAULT_FOV_RANGE
+) : TargetSelector(defaultPriority, rangeValue, fovRange) {
 
-    constructor(defaultPriority: TargetPriority = TargetPriority.HEALTH, range: RangedValue<*>) :
-        this(defaultPriority, DummyRangedValueProvider(range))
+    constructor(
+        defaultPriority: TargetPriority = TargetPriority.HEALTH,
+        range: RangedValue<*>,
+        fovRange: ClosedFloatingPointRange<Float> = DEFAULT_FOV_RANGE
+    ) : this(defaultPriority, DummyRangedValueProvider(range), fovRange)
 
     var target: LivingEntity? = null
 
@@ -90,17 +94,21 @@ open class TargetTracker(
 
 open class TargetSelector(
     defaultPriority: TargetPriority = TargetPriority.HEALTH,
-    rangeValue: RangedValueProvider = NoneRangedValueProvider
+    rangeValue: RangedValueProvider = NoneRangedValueProvider,
+    fovRange: ClosedFloatingPointRange<Float> = DEFAULT_FOV_RANGE
 ) : ValueGroup("Target") {
 
-    constructor(defaultPriority: TargetPriority = TargetPriority.HEALTH, range: RangedValue<*>) :
-        this(defaultPriority, DummyRangedValueProvider(range))
+    constructor(
+        defaultPriority: TargetPriority = TargetPriority.HEALTH,
+        range: RangedValue<*>,
+        fovRange: ClosedFloatingPointRange<Float> = DEFAULT_FOV_RANGE
+    ) : this(defaultPriority, DummyRangedValueProvider(range), fovRange)
 
     var closestSquaredEnemyDistance: Double = 0.0
         private set
 
     private val range = rangeValue.register(this)
-    private val fov by float("FOV", 180f, 0f..180f)
+    private val fov by float("FOV", DEFAULT_FOV.coerceIn(fovRange), fovRange)
     private val hurtTime by int("HurtTime", 10, 0..10)
 
     @Suppress("unused", "UnusedPrivateProperty")
@@ -188,6 +196,9 @@ open class TargetSelector(
         }
 
 }
+
+private const val DEFAULT_FOV = 180f
+private val DEFAULT_FOV_RANGE = 0f..DEFAULT_FOV
 
 enum class TargetPriority(override val tag: String) : Tagged, Comparator<LivingEntity> {
     /**

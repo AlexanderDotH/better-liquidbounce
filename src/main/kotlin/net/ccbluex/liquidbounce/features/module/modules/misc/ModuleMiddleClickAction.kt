@@ -21,12 +21,14 @@ package net.ccbluex.liquidbounce.features.module.modules.misc
 import net.ccbluex.liquidbounce.config.types.group.Mode
 import net.ccbluex.liquidbounce.config.types.group.ModeValueGroup
 import net.ccbluex.liquidbounce.event.events.GameTickEvent
+import net.ccbluex.liquidbounce.event.events.MouseButtonEvent
 import net.ccbluex.liquidbounce.event.events.NotificationEvent
 import net.ccbluex.liquidbounce.event.events.WorldChangeEvent
 import net.ccbluex.liquidbounce.event.handler
 import net.ccbluex.liquidbounce.features.misc.FriendManager
 import net.ccbluex.liquidbounce.features.module.ClientModule
 import net.ccbluex.liquidbounce.features.module.ModuleCategories
+import net.ccbluex.liquidbounce.features.module.modules.`fun`.ModuleAmnesia
 import net.ccbluex.liquidbounce.utils.client.SilentHotbar
 import net.ccbluex.liquidbounce.utils.client.notification
 import net.ccbluex.liquidbounce.utils.entity.rotation
@@ -36,6 +38,7 @@ import net.ccbluex.liquidbounce.utils.raytracing.findEntityInCrosshair
 import net.ccbluex.liquidbounce.utils.raytracing.isLookingAtEntity
 import net.minecraft.world.entity.player.Player
 import net.minecraft.world.item.Items
+import org.lwjgl.glfw.GLFW
 
 /**
  * MiddleClickAction module
@@ -52,7 +55,7 @@ object ModuleMiddleClickAction : ClientModule(
         doNotIncludeAlways()
     }
 
-    private val mode = modes(this, "Mode", FriendClicker, arrayOf(FriendClicker, Pearl))
+    private val mode = modes(this, "Mode", FriendClicker, arrayOf(FriendClicker, Pearl, AmnesiaTarget))
 
     override fun onDisabled() {
         SilentHotbar.resetSlot(Pearl)
@@ -152,6 +155,46 @@ object ModuleMiddleClickAction : ClientModule(
             }
 
             clicked = pickup
+        }
+
+        override val parent: ModeValueGroup<*>
+            get() = mode
+
+    }
+
+    object AmnesiaTarget : Mode("AmnesiaTarget", aliases = listOf("Amnesia Target")) {
+
+        private val pickUpRange by float("PickUpRange", 3.0f, 1f..100f)
+
+        @Suppress("unused")
+        private val middleClickHandler = handler<MouseButtonEvent> { event ->
+            if (mc.gui.screen() != null) {
+                return@handler
+            }
+
+            if (event.action != GLFW.GLFW_PRESS || event.button != GLFW.GLFW_MOUSE_BUTTON_MIDDLE) {
+                return@handler
+            }
+
+            val rotation = player.rotation
+
+            val entity = (findEntityInCrosshair(pickUpRange.toDouble(), rotation) { it is Player }
+                ?: return@handler).entity as Player
+
+            val entityHitResult = isLookingAtEntity(
+                toEntity = entity,
+                rotation = rotation,
+                range = pickUpRange.toDouble(),
+                throughWallsRange = 0.0,
+            ) ?: return@handler
+
+            val name = entity.gameProfile.name ?: return@handler
+            ModuleAmnesia.setTargetName(name)
+            notification(
+                "MiddleClickAction",
+                message("amnesiaTargetSet", name),
+                NotificationEvent.Severity.INFO,
+            )
         }
 
         override val parent: ModeValueGroup<*>

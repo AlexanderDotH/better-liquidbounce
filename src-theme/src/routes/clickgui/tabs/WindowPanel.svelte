@@ -8,9 +8,11 @@
         icon?: string;
         children: Snippet;
     }>();
+
+    const WINDOW_FADE_MS = 120;
 </script>
 
-<div class="window" transition:fade|global={{duration: 200, easing: quintOut}}>
+<div class="window" transition:fade|global={{duration: WINDOW_FADE_MS, easing: quintOut}}>
     <div class="title">
         {#if icon}
             <img

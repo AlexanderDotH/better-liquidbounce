@@ -21,8 +21,10 @@ package net.ccbluex.liquidbounce.features.module.modules.render.nametags
 import it.unimi.dsi.fastutil.objects.ObjectLinkedOpenHashSet
 import net.ccbluex.liquidbounce.config.types.group.ValueGroup
 import net.ccbluex.liquidbounce.config.types.list.Tagged
+import net.ccbluex.liquidbounce.features.module.modules.`fun`.ModuleAmnesia
 import net.ccbluex.liquidbounce.features.module.modules.misc.antibot.ModuleAntiBot
 import net.ccbluex.liquidbounce.features.module.modules.render.ModuleCombineMobs
+import net.ccbluex.liquidbounce.render.engine.type.Color4b
 import net.ccbluex.liquidbounce.utils.text.asPlainText
 import net.ccbluex.liquidbounce.utils.text.joinToText
 import net.ccbluex.liquidbounce.utils.client.player
@@ -62,6 +64,13 @@ internal object NametagTextFormatter : ValueGroup("Text") {
         ObjectLinkedOpenHashSet(Part.entries),
         canBeNone = false
     )
+    private val colorMode by enumChoice("ColorMode", NameColorMode.DEFAULT)
+    private val amnesiaTargetColor by color("AmnesiaTargetColor", Color4b(64, 180, 255, 255))
+
+    private enum class NameColorMode(override val tag: String) : Tagged {
+        DEFAULT("Default"),
+        AMNESIA_TARGET("AmnesiaTarget"),
+    }
 
     private enum class Part(override val tag: String) : Tagged {
         DISTANCE("Distance") {
@@ -98,7 +107,12 @@ internal object NametagTextFormatter : ValueGroup("Text") {
                 val isBaby = entity is LivingEntity && entity.isBaby
 
                 // Optimized entity.getDisplayName()
-                val displayName = entity.team?.getFormattedName(entity.name) ?: entity.name
+                val entityName = entity.name
+                val displayName = if (entity is Player && ModuleAmnesia.hasSpoofedAppearance(entity)) {
+                    entityName
+                } else {
+                    entity.team?.getFormattedName(entityName) ?: entityName
+                }
 
                 val coloredName = entity.nameColor?.let { nameColor ->
                     displayName.copy().withColor(nameColor)
@@ -165,17 +179,32 @@ internal object NametagTextFormatter : ValueGroup("Text") {
         return parts.mapNotNull { it.apply(entity) }.joinToText(PlainText.SPACE)
     }
 
+    fun nameColor(entity: Entity): TextColor? {
+        if (colorMode == NameColorMode.AMNESIA_TARGET
+            && entity is LivingEntity
+            && ModuleAmnesia.isAmnesiaTarget(entity)
+        ) {
+            return amnesiaTargetColor.toTextColor()
+        }
+
+        return defaultNameColor(entity)
+    }
+
+    private fun defaultNameColor(entity: Entity): TextColor? {
+        return when {
+            entity.isBot -> ChatFormatting.DARK_AQUA.toTextColor()
+            entity.isInvisible -> ChatFormatting.GOLD.toTextColor()
+            entity.isShiftKeyDown -> ChatFormatting.DARK_RED.toTextColor()
+            else -> EntityTaggingManager.getTag(entity).color?.toTextColor()
+        }
+    }
+
 }
 
 private val Entity.isBot get() = ModuleAntiBot.isBot(this)
 
 private val Entity.nameColor: TextColor?
-    get() = when {
-        isBot -> ChatFormatting.DARK_AQUA.toTextColor()
-        isInvisible -> ChatFormatting.GOLD.toTextColor()
-        isShiftKeyDown -> ChatFormatting.DARK_RED.toTextColor()
-        else -> EntityTaggingManager.getTag(this).color?.toTextColor()
-    }
+    get() = NametagTextFormatter.nameColor(this)
 
 private fun ChatFormatting.toTextColor(): TextColor {
     return TextColor.fromLegacyFormat(this)!!

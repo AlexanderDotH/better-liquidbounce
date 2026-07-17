@@ -24,12 +24,13 @@ import com.llamalad7.mixinextras.injector.ModifyReturnValue;
 import com.llamalad7.mixinextras.injector.v2.WrapWithCondition;
 import net.ccbluex.liquidbounce.event.EventManager;
 import net.ccbluex.liquidbounce.event.events.PlayerSafeWalkEvent;
-import net.ccbluex.liquidbounce.features.command.commands.ingame.fakeplayer.FakePlayer;
 import net.ccbluex.liquidbounce.features.module.modules.combat.ModuleAutoWeapon;
 import net.ccbluex.liquidbounce.features.module.modules.combat.ModuleKeepSprint;
 import net.ccbluex.liquidbounce.features.module.modules.combat.criticals.modes.CriticalsNoGround;
 import net.ccbluex.liquidbounce.features.module.modules.exploit.ModuleAntiReducedDebugInfo;
+import net.ccbluex.liquidbounce.features.module.modules.exploit.ModuleNoAdventure;
 import net.ccbluex.liquidbounce.features.module.modules.movement.ModuleNoClip;
+import net.ccbluex.liquidbounce.features.module.modules.movement.ModulePose;
 import net.ccbluex.liquidbounce.features.module.modules.movement.ModuleSprint;
 import net.ccbluex.liquidbounce.features.module.modules.player.ModuleReach;
 import net.ccbluex.liquidbounce.features.module.modules.player.nofall.modes.NoFallNoGround;
@@ -37,12 +38,18 @@ import net.ccbluex.liquidbounce.features.module.modules.render.hitfx.ModuleHitFX
 import net.ccbluex.liquidbounce.features.module.modules.world.ModuleNoSlowBreak;
 import net.ccbluex.liquidbounce.utils.aiming.RotationManager;
 import net.ccbluex.liquidbounce.utils.aiming.features.MovementCorrection;
+import net.ccbluex.liquidbounce.utils.render.PlayerModelAppearanceHook;
+import net.minecraft.core.BlockPos;
+import net.minecraft.network.chat.Component;
 import net.minecraft.sounds.SoundEvent;
 import net.minecraft.sounds.SoundEvents;
 import net.minecraft.sounds.SoundSource;
 import net.minecraft.world.damagesource.DamageSource;
 import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.Pose;
 import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.level.GameType;
+import net.minecraft.world.level.Level;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.Unique;
@@ -56,11 +63,34 @@ import org.spongepowered.asm.mixin.injection.invoke.arg.Args;
 @Mixin(Player.class)
 public abstract class MixinPlayer extends MixinLivingEntity {
 
+    @Unique
+    private static final String LIQUID_BOUNCE$FAKE_PLAYER_CLASS_NAME =
+        "net.ccbluex.liquidbounce.features.command.commands.ingame.fakeplayer.FakePlayer";
+
     @Shadow
     public abstract void tick();
 
     @Shadow
     public abstract SoundSource getSoundSource();
+
+    @ModifyReturnValue(method = "getName", at = @At("RETURN"))
+    private Component hookAmnesiaName(Component original) {
+        return PlayerModelAppearanceHook.replaceName((Player) (Object) this, original);
+    }
+
+    @ModifyReturnValue(method = {"getPlainTextName", "getScoreboardName"}, at = @At("RETURN"))
+    private String hookAmnesiaPlainName(String original) {
+        return PlayerModelAppearanceHook.replacePlainName((Player) (Object) this, original);
+    }
+
+    @ModifyReturnValue(method = "getDesiredPose", at = @At("RETURN"))
+    private Pose hookDesiredPose(Pose original) {
+        if (!liquid_bounce$isClientPlayer()) {
+            return original;
+        }
+
+        return ModulePose.INSTANCE.modifyDesiredPose(original);
+    }
 
     /**
      * Hook safe walk event
@@ -99,6 +129,33 @@ public abstract class MixinPlayer extends MixinLivingEntity {
         if (ModuleAntiReducedDebugInfo.INSTANCE.getRunning()) {
             callbackInfoReturnable.setReturnValue(false);
         }
+    }
+
+    @ModifyReturnValue(method = "mayBuild", at = @At("RETURN"))
+    private boolean hookNoAdventureMayBuild(boolean original) {
+        if (liquid_bounce$isClientPlayer() && ModuleNoAdventure.bypassesRestrictions()) {
+            return true;
+        }
+
+        return original;
+    }
+
+    @ModifyReturnValue(method = "blockActionRestricted", at = @At("RETURN"))
+    private boolean hookNoAdventureBlockActionRestricted(boolean original, Level level, BlockPos pos, GameType gameType) {
+        if (liquid_bounce$isClientPlayer() && ModuleNoAdventure.bypassesRestrictions(gameType)) {
+            return false;
+        }
+
+        return original;
+    }
+
+    @ModifyReturnValue(method = "mayUseItemAt", at = @At("RETURN"))
+    private boolean hookNoAdventureMayUseItemAt(boolean original) {
+        if (liquid_bounce$isClientPlayer() && ModuleNoAdventure.bypassesRestrictions()) {
+            return true;
+        }
+
+        return original;
     }
 
     @Inject(method = "isMobilityRestricted", at = @At("HEAD"), cancellable = true)
@@ -263,8 +320,22 @@ public abstract class MixinPlayer extends MixinLivingEntity {
      */
     @Unique
     private void liquid_bounce$playSoundIfFakePlayer(Entity target, SoundEvent soundEvent) {
-        if (target instanceof FakePlayer) {
+        if (liquid_bounce$isFakePlayer(target)) {
             level().playSound(Player.class.cast(this), getX(), getY(), getZ(), soundEvent, getSoundSource(), 1F, 1F);
         }
+    }
+
+    @Unique
+    private boolean liquid_bounce$isFakePlayer(Entity target) {
+        Class<?> type = target.getClass();
+        while (type != null) {
+            if (LIQUID_BOUNCE$FAKE_PLAYER_CLASS_NAME.equals(type.getName())) {
+                return true;
+            }
+
+            type = type.getSuperclass();
+        }
+
+        return false;
     }
 }

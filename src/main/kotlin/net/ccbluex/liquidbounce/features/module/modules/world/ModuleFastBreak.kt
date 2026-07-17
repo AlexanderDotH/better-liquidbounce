@@ -27,6 +27,8 @@ import net.ccbluex.liquidbounce.event.handler
 import net.ccbluex.liquidbounce.features.module.ClientModule
 import net.ccbluex.liquidbounce.features.module.ModuleCategories
 import net.ccbluex.liquidbounce.utils.item.isMiningTool
+import net.minecraft.core.BlockPos
+import net.minecraft.core.Direction
 import net.minecraft.network.protocol.game.ServerboundPlayerActionPacket
 
 /**
@@ -41,7 +43,7 @@ object ModuleFastBreak : ClientModule("FastBreak", ModuleCategories.WORLD) {
     private val breakDamage by float("BreakDamage", 0.8f, 0.1f..1f)
     private val onlyTool by boolean("OnlyTool", false)
 
-    private val modeChoice = choices("Mode", 0) { arrayOf(NoneMode(it), AbortAnother) }.apply(::tagBy)
+    private val modeChoice = choices("Mode", 0) { arrayOf(NoneMode(it), AbortAnother, Intave) }.apply(::tagBy)
 
     val repeatable = handler<GameTickEvent> {
         if (onlyTool && !player.mainHandItem.isMiningTool) {
@@ -93,6 +95,65 @@ object ModuleFastBreak : ClientModule("FastBreak", ModuleCategories.WORLD) {
             }
         }
 
+    }
+
+    /**
+     * Uses the Intave phase packet pattern for block breaking without moving the player into blocks.
+     */
+    object Intave : Mode("Intave") {
+
+        override val parent: ModeValueGroup<Mode>
+            get() = modeChoice
+
+        private var miningTarget: MiningTarget? = null
+
+        @Suppress("unused")
+        private val packetHandler = handler<PacketEvent> {
+            val packet = it.packet as? ServerboundPlayerActionPacket ?: return@handler
+
+            when (packet.action) {
+                ServerboundPlayerActionPacket.Action.START_DESTROY_BLOCK -> {
+                    miningTarget = MiningTarget(packet.pos, packet.direction)
+                }
+
+                ServerboundPlayerActionPacket.Action.ABORT_DESTROY_BLOCK -> {
+                    if (miningTarget?.pos == packet.pos) {
+                        miningTarget = null
+                    }
+                }
+
+                else -> Unit
+            }
+        }
+
+        @Suppress("unused")
+        private val tickHandler = handler<GameTickEvent> {
+            val target = miningTarget ?: return@handler
+
+            if (!canSpoofIntaveBreak() || world.getBlockState(target.pos).isAir) {
+                miningTarget = null
+                return@handler
+            }
+
+            network.send(
+                ServerboundPlayerActionPacket(
+                    ServerboundPlayerActionPacket.Action.STOP_DESTROY_BLOCK,
+                    target.pos,
+                    target.direction
+                )
+            )
+        }
+
+        override fun disable() {
+            miningTarget = null
+        }
+
+        private fun canSpoofIntaveBreak(): Boolean {
+            return mc.options.keyAttack.isDown &&
+                (!onlyTool || player.mainHandItem.isMiningTool)
+        }
+
+        private data class MiningTarget(val pos: BlockPos, val direction: Direction)
     }
 
 }

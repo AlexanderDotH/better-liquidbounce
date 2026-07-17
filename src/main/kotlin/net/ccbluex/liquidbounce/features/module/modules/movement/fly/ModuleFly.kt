@@ -35,13 +35,21 @@ import net.ccbluex.liquidbounce.features.module.modules.movement.fly.modes.grim.
 import net.ccbluex.liquidbounce.features.module.modules.movement.fly.modes.grim.FlyGrim2859V
 import net.ccbluex.liquidbounce.features.module.modules.movement.fly.modes.hypixel.FlyHypixel
 import net.ccbluex.liquidbounce.features.module.modules.movement.fly.modes.hypixel.FlyHypixelFlat
+import net.ccbluex.liquidbounce.features.module.modules.movement.fly.modes.intave.FlyIntave
+import net.ccbluex.liquidbounce.features.module.modules.movement.fly.modes.megacraft.FlyMegacraft
+import net.ccbluex.liquidbounce.features.module.modules.movement.fly.modes.megacraft.FlyMegacraftNoDown
 import net.ccbluex.liquidbounce.features.module.modules.movement.fly.modes.polar.FlyHycraftDamage
+import net.ccbluex.liquidbounce.features.module.modules.movement.fly.modes.sentinel.FlyCubecraftDamage
+import net.ccbluex.liquidbounce.features.module.modules.movement.fly.modes.sentinel.FlySentinelNoDown
 import net.ccbluex.liquidbounce.features.module.modules.movement.fly.modes.sentinel.FlySentinel10thMar
 import net.ccbluex.liquidbounce.features.module.modules.movement.fly.modes.sentinel.FlySentinel20thApr
 import net.ccbluex.liquidbounce.features.module.modules.movement.fly.modes.sentinel.FlySentinel26thDec
 import net.ccbluex.liquidbounce.features.module.modules.movement.fly.modes.sentinel.FlySentinel27thJan
+import net.ccbluex.liquidbounce.features.module.modules.movement.fly.modes.sentry.FlySentry
 import net.ccbluex.liquidbounce.features.module.modules.movement.fly.modes.spartan.FlySpartan524
 import net.ccbluex.liquidbounce.features.module.modules.movement.fly.modes.specific.FlyNcpClip
+import net.ccbluex.liquidbounce.features.module.modules.movement.fly.modes.detector.FlyDetectorBypass
+import net.ccbluex.liquidbounce.features.module.modules.movement.fly.modes.vanilla.FlyAntiKickFly
 import net.ccbluex.liquidbounce.features.module.modules.movement.fly.modes.verus.FlyVerusB3869Flat
 import net.ccbluex.liquidbounce.features.module.modules.movement.fly.modes.verus.FlyVerusB3896Damage
 import net.ccbluex.liquidbounce.features.module.modules.movement.fly.modes.vulcan.FlyVulcan277
@@ -71,6 +79,9 @@ object ModuleFly : ClientModule("Fly", ModuleCategories.MOVEMENT, aliases = list
             FlyExplosion,
             FlyFireball,
 
+            // Bypass our own PlayerCheatDetector observer checks
+            FlyDetectorBypass,
+
             // Anti-cheat specific fly modes
             FlyVulcan277,
             FlyVulcan286,
@@ -79,16 +90,23 @@ object ModuleFly : ClientModule("Fly", ModuleCategories.MOVEMENT, aliases = list
             FlyGrim2859V,
             FlyGrim2373Jan15,
             FlySpartan524,
+            FlyIntave,
+            FlySentinelNoDown,
 
             // Server specific fly modes
+            FlyCubecraftDamage,
             FlySentinel20thApr,
             FlySentinel27thJan,
             FlySentinel10thMar,
             FlySentinel26thDec,
+            FlySentry,
+            FlyMegacraft,
+            FlyMegacraftNoDown,
 
             FlyVerusB3896Damage,
             FlyVerusB3869Flat,
             FlyNcpClip,
+            FlyAntiKickFly,
 
             FlyHypixel,
             FlyHypixelFlat,

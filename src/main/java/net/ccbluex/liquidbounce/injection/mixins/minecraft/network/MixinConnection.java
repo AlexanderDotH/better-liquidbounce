@@ -18,11 +18,13 @@
  */
 package net.ccbluex.liquidbounce.injection.mixins.minecraft.network;
 
+import io.netty.channel.ChannelFutureListener;
 import io.netty.channel.ChannelPipeline;
 import net.ccbluex.liquidbounce.event.EventManager;
 import net.ccbluex.liquidbounce.event.events.PacketEvent;
 import net.ccbluex.liquidbounce.event.events.PipelineEvent;
 import net.ccbluex.liquidbounce.event.events.TransferOrigin;
+import net.ccbluex.liquidbounce.features.module.modules.render.playermodel.ServerPlayerModelStateTracker;
 import net.minecraft.network.BandwidthDebugMonitor;
 import net.minecraft.network.Connection;
 import net.minecraft.network.PacketListener;
@@ -58,6 +60,13 @@ public abstract class MixinConnection {
         if (event.isCancelled()) {
             callbackInfo.cancel();
         }
+    }
+
+    @Inject(method = "doSendPacket", at = @At("HEAD"))
+    private void trackActuallySentPlayerState(
+        Packet<?> packet, ChannelFutureListener listener, boolean flush, CallbackInfo callbackInfo
+    ) {
+        ServerPlayerModelStateTracker.onPacketSent(packet);
     }
 
     /**

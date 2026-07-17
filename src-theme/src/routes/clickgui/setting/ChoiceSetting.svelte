@@ -15,6 +15,9 @@
 
     const dispatch = createEventDispatcher();
     const options = Object.keys(cSetting.choices);
+    const extendedDescriptions = Object.fromEntries(
+        options.map((option) => [option, cSetting.choices[option]?.extendedDescription]),
+    );
     let expanded = localStorage.getItem(thisPath) === "true";
 
     let nestedSettings = cSetting.choices[cSetting.active]
@@ -41,6 +44,7 @@
             <Dropdown
                 bind:value={cSetting.active}
                 {options}
+                {extendedDescriptions}
                 name={$spaceSeperatedNames ? convertToSpacedString(cSetting.name) : cSetting.name}
                 on:change={handleChange}
             />
@@ -51,6 +55,7 @@
             <Dropdown
                 bind:value={cSetting.active}
                 {options}
+                {extendedDescriptions}
                 name={$spaceSeperatedNames ? convertToSpacedString(cSetting.name) : cSetting.name}
                 on:change={handleChange}
             />

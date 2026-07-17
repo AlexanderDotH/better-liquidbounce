@@ -20,6 +20,7 @@
         getSpooferSettings,
         openScreen,
         orderServers,
+        reconnectFritzBox,
         removeServer as removeServerRest,
         setModuleEnabled,
         setSelectedProtocol,
@@ -34,6 +35,7 @@
     import AddServerModal from "./AddServerModal.svelte";
     import DirectConnectModal from "./DirectConnectModal.svelte";
     import EditServerModal from "./EditServerModal.svelte";
+    import FritzBoxPasswordModal from "./FritzBoxPasswordModal.svelte";
     import type {ServerPingedEvent} from "../../../integration/events";
     import ButtonSetting from "../common/setting/ButtonSetting.svelte";
     import Divider from "../common/optionbar/Divider.svelte";
@@ -61,6 +63,9 @@
 
     let clientInfo: ClientInfo | null = null;
     let autoConfig = false;
+    let fritzBoxReconnectLoading = false;
+    let fritzBoxPasswordModalVisible = false;
+    let fritzBoxStatus: string | null = null;
     let spooferConfigurable: ConfigurableSetting | null = null;
     let servers: Server[] = [];
     let renderedServers: Server[] = [];
@@ -164,6 +169,49 @@
     async function updateAutoConfigState() {
         await setModuleEnabled("AutoConfig", autoConfig);
     }
+
+    function openFritzBoxPasswordPrompt() {
+        if (fritzBoxReconnectLoading) {
+            return;
+        }
+
+        fritzBoxStatus = null;
+        fritzBoxPasswordModalVisible = true;
+    }
+
+    async function changeFritzBoxIp(e: CustomEvent<{ password: string }>) {
+        if (fritzBoxReconnectLoading) {
+            return;
+        }
+
+        fritzBoxReconnectLoading = true;
+        fritzBoxStatus = null;
+
+        try {
+            const result = await reconnectFritzBox(e.detail.password);
+            fritzBoxStatus = result.newIp && result.newIp !== result.oldIp ? "Changed" : "Done";
+        } catch (error) {
+            fritzBoxStatus = formatFritzBoxError(error);
+        } finally {
+            fritzBoxReconnectLoading = false;
+        }
+    }
+
+    function formatFritzBoxError(error: unknown): string {
+        if (!(error instanceof Error)) {
+            return "Failed";
+        }
+
+        if (error.message.includes("login failed")) {
+            return "Login failed";
+        }
+
+        if (error.message.includes("HTTP")) {
+            return "HTTP failed";
+        }
+
+        return "Failed";
+    }
 </script>
 
 <AddServerModal bind:visible={addServerModalVisible} on:serverAdd={refreshServers}/>
@@ -173,6 +221,7 @@
                      resourcePackPolicy={currentEditServer.resourcePackPolicy}/>
 {/if}
 <DirectConnectModal bind:visible={directConnectModalVisible}/>
+<FritzBoxPasswordModal bind:visible={fritzBoxPasswordModalVisible} on:reconnect={changeFritzBoxIp}/>
 <Menu>
     <OptionBar>
         <Search on:search={handleSearch}/>
@@ -180,6 +229,8 @@
         <SwitchSetting title="Online only" bind:value={onlineOnly}/>
         <Divider/>
         <SwitchSetting title="Auto Config" bind:value={autoConfig} on:change={updateAutoConfigState}/>
+        <ButtonSetting title={fritzBoxStatus ?? "FritzBox IP"} loading={fritzBoxReconnectLoading}
+                       disabled={fritzBoxReconnectLoading} on:click={openFritzBoxPasswordPrompt}/>
         {#if spooferConfigurable}
             <WrappedSetting bind:value={spooferConfigurable} on:change={updateSpooferSettings} path="multiplayer.spoofer"/>
         {/if}

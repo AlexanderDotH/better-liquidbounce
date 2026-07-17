@@ -50,6 +50,7 @@ export type ModuleSetting =
     | TogglableSetting
     | ColorSetting
     | TextSetting
+    | PlayerSetting
     | BindSetting
     | Vec2Setting
     | Vec3Setting
@@ -75,6 +76,7 @@ export interface Setting<V> {
     name: string;
     value: V;
     description: string | undefined;
+    extendedDescription?: string | undefined;
     key: string | undefined;
 }
 
@@ -106,6 +108,10 @@ export interface BindSetting extends Setting<InputBind> {
 }
 
 export interface TextSetting extends Setting<string> {
+}
+
+export interface PlayerSetting extends Setting<string> {
+    registry: string;
 }
 
 export interface Vec2Setting extends Setting<Vec2> {
@@ -198,6 +204,12 @@ export interface PersistentStorageItem {
     key: string;
     value: string;
 }
+
+export type TheAlteningGenerationResult =
+    | { status: "SUCCESS"; username: string; message?: undefined }
+    | { status: "CREDENTIALS_REQUIRED"; message: string; username?: undefined }
+    | { status: "ACCESS_DENIED"; message: string; username?: undefined }
+    | { status: "ERROR"; message: string; username?: undefined };
 
 export interface VirtualScreen {
     name: string;
@@ -322,6 +334,15 @@ export interface TextComponent {
 export interface Protocol {
     name: string;
     version: number;
+}
+
+export interface FritzBoxReconnectResult {
+    oldIp: string | null;
+    newIp: string | null;
+}
+
+export interface FritzBoxReconnectRequest {
+    password?: string;
 }
 
 export interface Account {

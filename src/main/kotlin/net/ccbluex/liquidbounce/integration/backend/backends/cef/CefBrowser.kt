@@ -51,9 +51,14 @@ class CefBrowser(
 
     internal val browserApi: MCEFBrowser
     private val logger: Logger
+    private var lastPaintSizeMismatch: Pair<Int, Int>? = null
 
     init {
         require(url.isNotEmpty()) { "URL cannot be empty." }
+        // Register before native browser creation so synchronous onAfterCreated callbacks
+        // can resolve the browser instance.
+        backend.registerBrowser(this)
+
         val quality = GlobalBrowserSettings.quality
         val (width, height) = viewport.getScaledDimensions(quality)
         browserApi = MCEF.INSTANCE.createBrowser(
@@ -243,7 +248,7 @@ class CefBrowser(
     override fun keyPressed(keyCode: Int, scanCode: Int, modifiers: Int) {
         browserApi.setFocus(true)
 
-        if (InputQuirks.REPLACE_CTRL_KEY_WITH_CMD_KEY && handleMacClipboardShortcut(keyCode, modifiers)) {
+        if (handleClipboardShortcut(keyCode, modifiers)) {
             return
         }
 
@@ -261,42 +266,58 @@ class CefBrowser(
     }
 
     // TODO: Temporary fix. Should be removed after fix in JCEF
-    private fun handleMacClipboardShortcut(keyCode: Int, modifiers: Int): Boolean {
-        val isCommandPressed = modifiers and GLFW.GLFW_MOD_SUPER != 0
-        if (!isCommandPressed) {
-            return false
+    private fun handleClipboardShortcut(keyCode: Int, modifiers: Int): Boolean {
+        val shortcutPressed = if (InputQuirks.REPLACE_CTRL_KEY_WITH_CMD_KEY) {
+            modifiers and GLFW.GLFW_MOD_SUPER != 0
+        } else {
+            modifiers and GLFW.GLFW_MOD_CONTROL != 0
         }
 
-        val frame = browserApi.focusedFrame
-        return when (keyCode) {
-            GLFW.GLFW_KEY_C -> {
-                frame.copy()
-                true
+        if (shortcutPressed) {
+            val frame = browserApi.focusedFrame
+            return when (keyCode) {
+                GLFW.GLFW_KEY_C -> {
+                    frame.copy()
+                    true
+                }
+                GLFW.GLFW_KEY_V -> {
+                    frame.paste()
+                    true
+                }
+                GLFW.GLFW_KEY_X -> {
+                    frame.cut()
+                    true
+                }
+                GLFW.GLFW_KEY_A -> {
+                    frame.selectAll()
+                    true
+                }
+                else -> false
             }
-            GLFW.GLFW_KEY_V -> {
-                frame.paste()
-                true
-            }
-            GLFW.GLFW_KEY_X -> {
-                frame.cut()
-                true
-            }
-            GLFW.GLFW_KEY_A -> {
-                frame.selectAll()
-                true
-            }
-            else -> false
         }
+
+        if (keyCode == GLFW.GLFW_KEY_INSERT && modifiers and GLFW.GLFW_MOD_SHIFT != 0) {
+            browserApi.focusedFrame.paste()
+            return true
+        }
+
+        return false
     }
 
     private fun comparePaintWithViewpoint(width: Int, height: Int) {
         val (scaledWidth, scaledHeight) = viewport.getScaledDimensions(GlobalBrowserSettings.quality)
 
         if (scaledWidth != width || scaledHeight != height) {
-            logger.warn("Browser $this viewport size mismatch: " +
-                "expected $scaledWidth x $scaledHeight, but got $width x $height. ")
-            invalidate()
+            val mismatch = width to height
+            if (lastPaintSizeMismatch != mismatch) {
+                logger.debug("Browser $this viewport size mismatch: " +
+                    "expected $scaledWidth x $scaledHeight, but got $width x $height. ")
+                lastPaintSizeMismatch = mismatch
+            }
+            return
         }
+
+        lastPaintSizeMismatch = null
     }
 
 }

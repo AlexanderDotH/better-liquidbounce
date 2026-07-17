@@ -20,6 +20,7 @@
 package net.ccbluex.liquidbounce.integration.screen.impl
 
 import net.ccbluex.liquidbounce.additions.setPosition
+import net.ccbluex.liquidbounce.integration.interop.protocol.rest.v1.game.isTyping
 import net.ccbluex.liquidbounce.integration.screen.CustomScreenType
 import net.ccbluex.liquidbounce.integration.screen.ScreenManager
 import net.ccbluex.liquidbounce.integration.theme.ThemeManager
@@ -58,6 +59,7 @@ class CustomStandaloneMinecraftScreen(
 
     override fun onClose() {
         browser.visible = false
+        isTyping = false
 
         mouseX = mc.mouseHandler.xpos()
         mouseY = mc.mouseHandler.ypos()

@@ -28,6 +28,7 @@ import net.ccbluex.liquidbounce.features.module.modules.movement.NoPushBy;
 import net.ccbluex.liquidbounce.features.module.modules.render.DoRender;
 import net.ccbluex.liquidbounce.features.module.modules.render.ModuleAntiBlind;
 import net.ccbluex.liquidbounce.features.module.modules.render.ModuleTrueSight;
+import net.ccbluex.liquidbounce.utils.render.PlayerModelParticleHook;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.particles.ExplosionParticleInfo;
@@ -64,7 +65,69 @@ public abstract class MixinClientLevel {
         var type = parameters.getType();
         if (!ModuleAntiBlind.canRender(DoRender.EXPLOSION_PARTICLES) && (type == ParticleTypes.EXPLOSION || type == ParticleTypes.EXPLOSION_EMITTER)) {
             ci.cancel();
+            return;
         }
+
+        redirectAmnesiaParticle(parameters, x, y, z, velocityX, velocityY, velocityZ, ci);
+    }
+
+    @Inject(method = "addParticle(Lnet/minecraft/core/particles/ParticleOptions;ZZDDDDDD)V", at = @At("HEAD"), cancellable = true)
+    private void hookAmnesiaParticleRedirectForced(
+        ParticleOptions parameters,
+        boolean overrideLimiter,
+        boolean alwaysShow,
+        double x,
+        double y,
+        double z,
+        double velocityX,
+        double velocityY,
+        double velocityZ,
+        CallbackInfo ci
+    ) {
+        var offset = PlayerModelParticleHook.getParticleRedirectOffset(x, y, z);
+        if (offset == null) {
+            return;
+        }
+
+        ci.cancel();
+        ((ClientLevel) (Object) this).addParticle(
+            parameters,
+            overrideLimiter,
+            alwaysShow,
+            x + offset.x,
+            y + offset.y,
+            z + offset.z,
+            velocityX,
+            velocityY,
+            velocityZ
+        );
+    }
+
+    private void redirectAmnesiaParticle(
+        ParticleOptions parameters,
+        double x,
+        double y,
+        double z,
+        double velocityX,
+        double velocityY,
+        double velocityZ,
+        CallbackInfo ci
+    ) {
+        var offset = PlayerModelParticleHook.getParticleRedirectOffset(x, y, z);
+        if (offset == null) {
+            return;
+        }
+
+        ci.cancel();
+        ((ClientLevel) (Object) this).addParticle(
+            parameters,
+            x + offset.x,
+            y + offset.y,
+            z + offset.z,
+            velocityX,
+            velocityY,
+            velocityZ
+        );
     }
 
     @Inject(method = "removeEntity", at = @At(value = "INVOKE", target = "Lnet/minecraft/world/entity/Entity;onClientRemoval()V"))

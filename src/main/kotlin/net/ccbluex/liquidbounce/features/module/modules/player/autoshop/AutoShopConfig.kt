@@ -78,11 +78,15 @@ object AutoShopConfig {
  * Represents the locally available shop configurations
  */
 @Suppress("unused")
-enum class ShopConfigPreset(override val tag: String, private val localFileName: String) : Tagged {
+enum class ShopConfigPreset(
+    override val tag: String,
+    private val localFileName: String,
+    override val tagAliases: List<String> = emptyList(),
+) : Tagged {
 
     PIKA_NETWORK("PikaNetwork", "pika-network"),
     BLOCKSMC("BlocksMC", "blocksmc"),
-    CUBECRAFT("CubeCraft", "cubecraft"),
+    CUBECRAFT("Cubecraft", "cubecraft", listOf("Cube Craft")),
     TEAMHOLY("TeamHoly", "teamholy"),
     FUNNYMC("FunnyMC", "funnymc"),
     DEXLAND("Dexland", "dexland");

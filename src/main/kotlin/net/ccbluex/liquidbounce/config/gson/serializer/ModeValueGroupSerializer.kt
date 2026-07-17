@@ -24,6 +24,8 @@ import com.google.gson.JsonSerializationContext
 import com.google.gson.JsonSerializer
 import net.ccbluex.liquidbounce.config.types.group.Mode
 import net.ccbluex.liquidbounce.config.types.group.ModeValueGroup
+import net.ccbluex.liquidbounce.lang.LanguageManager
+import net.ccbluex.liquidbounce.lang.translation
 import java.lang.reflect.Type
 
 class ModeValueGroupSerializer private constructor(
@@ -42,7 +44,14 @@ class ModeValueGroupSerializer private constructor(
         val choices = JsonObject()
 
         for (choice in src.modes) {
-            choices.add(choice.name, context.serialize(choice))
+            val serializedChoice = context.serialize(choice).asJsonObject
+            val extendedDescription = extendedDescription(choice)
+
+            if (withValueType && extendedDescription != null) {
+                serializedChoice.addProperty("extendedDescription", extendedDescription)
+            }
+
+            choices.add(choice.name, serializedChoice)
         }
 
         obj.add("choices", choices)
@@ -59,6 +68,14 @@ class ModeValueGroupSerializer private constructor(
 
         @JvmField
         val FILE_SERIALIZER = ModeValueGroupSerializer(withValueType = false)
+    }
+
+    private fun extendedDescription(mode: Mode): String? {
+        val key = mode.key?.let { "$it.extendedDescription" } ?: return null
+
+        return key
+            .takeIf(LanguageManager::hasFallbackTranslation)
+            ?.let { translation(it).string }
     }
 
 }

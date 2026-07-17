@@ -44,6 +44,7 @@ import net.ccbluex.liquidbounce.features.module.modules.combat.ModuleHitbox
 import net.ccbluex.liquidbounce.features.module.modules.combat.ModuleKeepSprint
 import net.ccbluex.liquidbounce.features.module.modules.combat.ModuleMaceKill
 import net.ccbluex.liquidbounce.features.module.modules.combat.ModuleNoMissCooldown
+import net.ccbluex.liquidbounce.features.module.modules.combat.ModuleSuperHit
 import net.ccbluex.liquidbounce.features.module.modules.combat.ModuleSuperKnockback
 import net.ccbluex.liquidbounce.features.module.modules.combat.ModuleSwordBlock
 import net.ccbluex.liquidbounce.features.module.modules.combat.ModuleTickBase
@@ -69,6 +70,7 @@ import net.ccbluex.liquidbounce.features.module.modules.exploit.ModuleKick
 import net.ccbluex.liquidbounce.features.module.modules.exploit.ModuleMoreCarry
 import net.ccbluex.liquidbounce.features.module.modules.exploit.ModuleMultiActions
 import net.ccbluex.liquidbounce.features.module.modules.exploit.ModuleNameCollector
+import net.ccbluex.liquidbounce.features.module.modules.exploit.ModuleNoAdventure
 import net.ccbluex.liquidbounce.features.module.modules.exploit.ModuleNoPitchLimit
 import net.ccbluex.liquidbounce.features.module.modules.exploit.ModulePingSpoof
 import net.ccbluex.liquidbounce.features.module.modules.exploit.ModulePlugins
@@ -83,6 +85,7 @@ import net.ccbluex.liquidbounce.features.module.modules.exploit.dupe.ModuleDupe
 import net.ccbluex.liquidbounce.features.module.modules.exploit.phase.ModulePhase
 import net.ccbluex.liquidbounce.features.module.modules.exploit.servercrasher.ModuleServerCrasher
 import net.ccbluex.liquidbounce.features.module.modules.`fun`.ModuleDankBobbing
+import net.ccbluex.liquidbounce.features.module.modules.`fun`.ModuleAmnesia
 import net.ccbluex.liquidbounce.features.module.modules.`fun`.ModuleDerp
 import net.ccbluex.liquidbounce.features.module.modules.`fun`.ModuleHandDerp
 import net.ccbluex.liquidbounce.features.module.modules.`fun`.ModuleSkinDerp
@@ -115,6 +118,7 @@ import net.ccbluex.liquidbounce.features.module.modules.misc.antibot.ModuleAntiB
 import net.ccbluex.liquidbounce.features.module.modules.misc.betterchat.ModuleBetterChat
 import net.ccbluex.liquidbounce.features.module.modules.misc.debugrecorder.ModuleDebugRecorder
 import net.ccbluex.liquidbounce.features.module.modules.misc.nameprotect.ModuleNameProtect
+import net.ccbluex.liquidbounce.features.module.modules.misc.playercheatdetector.ModulePlayerCheatDetector
 import net.ccbluex.liquidbounce.features.module.modules.misc.reporthelper.ModuleReportHelper
 import net.ccbluex.liquidbounce.features.module.modules.movement.ModuleAirJump
 import net.ccbluex.liquidbounce.features.module.modules.movement.ModuleAnchor
@@ -131,6 +135,7 @@ import net.ccbluex.liquidbounce.features.module.modules.movement.ModuleNoJumpDel
 import net.ccbluex.liquidbounce.features.module.modules.movement.ModuleNoPose
 import net.ccbluex.liquidbounce.features.module.modules.movement.ModuleNoPush
 import net.ccbluex.liquidbounce.features.module.modules.movement.ModuleParkour
+import net.ccbluex.liquidbounce.features.module.modules.movement.ModulePose
 import net.ccbluex.liquidbounce.features.module.modules.movement.ModuleSafeWalk
 import net.ccbluex.liquidbounce.features.module.modules.movement.ModuleSneak
 import net.ccbluex.liquidbounce.features.module.modules.movement.ModuleSprint
@@ -220,7 +225,7 @@ import net.ccbluex.liquidbounce.features.module.modules.render.ModuleProphuntESP
 import net.ccbluex.liquidbounce.features.module.modules.render.ModuleProtectionZones
 import net.ccbluex.liquidbounce.features.module.modules.render.ModuleQuickPerspectiveSwap
 import net.ccbluex.liquidbounce.features.module.modules.render.ModuleRadar
-import net.ccbluex.liquidbounce.features.module.modules.render.ModuleRotations
+import net.ccbluex.liquidbounce.features.module.modules.render.ModulePlayerModel
 import net.ccbluex.liquidbounce.features.module.modules.render.ModuleSilentHotbar
 import net.ccbluex.liquidbounce.features.module.modules.render.ModuleSkinChanger
 import net.ccbluex.liquidbounce.features.module.modules.render.ModuleSmoothCamera
@@ -282,6 +287,7 @@ object ModuleManager : EventListener, Collection<ClientModule> by modules {
     val modulesConfig = ConfigSystem.root("modules", modules)
 
     private const val SMART_MOUSE_HOLD_THRESHOLD_MS = 200L
+
 
     private enum class SmartBindKeyboardState {
         PENDING_ENABLED, PENDING_DISABLED, HOLDING,
@@ -472,6 +478,7 @@ object ModuleManager : EventListener, Collection<ClientModule> by modules {
             ModuleHitbox,
             ModuleKillAura,
             ModuleTpAura,
+            ModuleSuperHit,
             ModuleSuperKnockback,
             ModuleTimerRange,
             ModuleTickBase,
@@ -498,6 +505,7 @@ object ModuleManager : EventListener, Collection<ClientModule> by modules {
             ModuleMultiActions,
             ModuleNewChunks,
             ModuleNameCollector,
+            ModuleNoAdventure,
             ModuleNoPitchLimit,
             ModulePingSpoof,
             ModulePlugins,
@@ -513,6 +521,7 @@ object ModuleManager : EventListener, Collection<ClientModule> by modules {
             ModuleYggdrasilSignatureFix,
 
             // Fun
+            ModuleAmnesia,
             ModuleDankBobbing,
             ModuleDerp,
             ModuleNotebot,
@@ -549,6 +558,7 @@ object ModuleManager : EventListener, Collection<ClientModule> by modules {
             ModulePacketLogger,
             ModuleDebugRecorder,
             ModuleAntiCheatDetect,
+            ModulePlayerCheatDetector,
             ModuleEasyPearl,
 
             // Movement
@@ -574,6 +584,7 @@ object ModuleManager : EventListener, Collection<ClientModule> by modules {
             ModuleNoSlow,
             ModuleNoWeb,
             ModuleParkour,
+            ModulePose,
             ModuleEntityControl,
             ModuleSafeWalk,
             ModuleSneak,
@@ -660,7 +671,7 @@ object ModuleManager : EventListener, Collection<ClientModule> by modules {
             ModuleProphuntESP,
             ModuleQuickPerspectiveSwap,
             ModuleRadar,
-            ModuleRotations,
+            ModulePlayerModel,
             ModuleSilentHotbar,
             ModuleStorageESP,
             ModuleTNTTimer,
@@ -751,5 +762,4 @@ object ModuleManager : EventListener, Collection<ClientModule> by modules {
     fun getModuleByName(module: String) = find { it.name.equals(module, true) }
 
     operator fun get(moduleName: String) = modules.find { it.name.equals(moduleName, true) }
-
 }

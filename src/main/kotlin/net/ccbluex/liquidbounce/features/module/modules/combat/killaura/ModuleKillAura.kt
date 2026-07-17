@@ -37,6 +37,7 @@ import net.ccbluex.liquidbounce.features.module.modules.combat.killaura.ModuleKi
 import net.ccbluex.liquidbounce.features.module.modules.combat.killaura.ModuleKillAura.RaycastMode.TRACE_ONLYENEMY
 import net.ccbluex.liquidbounce.features.module.modules.combat.killaura.ModuleKillAura.waitTicks
 import net.ccbluex.liquidbounce.features.module.modules.combat.killaura.features.KillAuraAutoBlock
+import net.ccbluex.liquidbounce.features.module.modules.combat.killaura.features.KillAuraVelocityHit
 import net.ccbluex.liquidbounce.features.module.modules.combat.killaura.features.KillAuraFailSwing
 import net.ccbluex.liquidbounce.features.module.modules.combat.killaura.features.KillAuraFailSwing.dealWithFakeSwing
 import net.ccbluex.liquidbounce.features.module.modules.combat.killaura.features.KillAuraFightBot
@@ -115,6 +116,7 @@ object ModuleKillAura : ClientModule("KillAura", ModuleCategories.COMBAT) {
 
     init {
         tree(KillAuraAutoBlock)
+        tree(KillAuraVelocityHit)
         tree(TargetRenderer(this) {
             targetTracker.target?.takeUnless { ModuleElytraTarget.isSameTargetRendering(it) }
         })
@@ -123,10 +125,18 @@ object ModuleKillAura : ClientModule("KillAura", ModuleCategories.COMBAT) {
         tree(KillAuraRangeIndicator)
     }
 
+    val extendedInteractionRange: Float
+        get() = if (KillAuraVelocityHit.isVelocityHitPossible) {
+            range.interactionRange + KillAuraVelocityHit.extendRange
+        } else {
+            range.interactionRange
+        }
+
     override fun onDisabled() {
         targetTracker.reset()
         failedHits.clear()
         KillAuraNotifyWhenFail.failedHitsIncrement = 0
+        KillAuraVelocityHit.reset()
     }
 
     @Suppress("unused")
@@ -242,7 +252,7 @@ object ModuleKillAura : ClientModule("KillAura", ModuleCategories.COMBAT) {
         val attackHitResult = isLookingAtEntity(
             toEntity = target,
             rotation = rotation,
-            range = range.interactionRange.toDouble(),
+            range = extendedInteractionRange.toDouble(),
             throughWallsRange = range.interactionThroughWallsRange.toDouble()
         )
 
@@ -309,7 +319,7 @@ object ModuleKillAura : ClientModule("KillAura", ModuleCategories.COMBAT) {
         val maximumRange = if (targetTracker.closestSquaredEnemyDistance > range.interactionRange.sq()) {
             range.scanRange
         } else {
-            range.interactionRange
+            extendedInteractionRange
         }
 
         debugParameter("Maximum Range") { maximumRange }

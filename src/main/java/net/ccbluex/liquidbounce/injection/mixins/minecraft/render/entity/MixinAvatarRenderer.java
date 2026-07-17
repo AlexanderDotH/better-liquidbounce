@@ -19,17 +19,24 @@
 package net.ccbluex.liquidbounce.injection.mixins.minecraft.render.entity;
 
 import net.ccbluex.liquidbounce.features.module.modules.combat.ModuleSwordBlock;
+import net.ccbluex.liquidbounce.features.module.modules.render.playermodel.PlayerModelRenderStateApplier;
+import net.ccbluex.liquidbounce.utils.render.PlayerModelActionHook;
+import net.ccbluex.liquidbounce.utils.render.PlayerModelAppearanceHook;
+import net.ccbluex.liquidbounce.utils.render.PlayerModelDelayHook;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.model.HumanoidModel;
 import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.client.renderer.entity.player.AvatarRenderer;
+import net.minecraft.client.renderer.entity.state.AvatarRenderState;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.entity.Avatar;
+import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.item.ItemStack;
 import org.jspecify.annotations.NullMarked;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
+import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 @NullMarked
@@ -54,6 +61,21 @@ public abstract class MixinAvatarRenderer {
                         cir.setReturnValue(HumanoidModel.ArmPose.EMPTY);
                     }
                 }
+            }
+        }
+    }
+
+    @Inject(
+        method = "extractRenderState(Lnet/minecraft/world/entity/Avatar;Lnet/minecraft/client/renderer/entity/state/AvatarRenderState;F)V",
+        at = @At("RETURN")
+    )
+    private void hookAmnesiaFakeSneak(Avatar entity, AvatarRenderState state, float tickDelta, CallbackInfo ci) {
+        if (entity instanceof LivingEntity livingEntity) {
+            PlayerModelDelayHook.applyDelayedTransform(livingEntity, state);
+            PlayerModelActionHook.applyAmnesiaActions(livingEntity, state);
+            PlayerModelAppearanceHook.applyAppearance(livingEntity, state);
+            if (livingEntity instanceof LocalPlayer localPlayer) {
+                PlayerModelRenderStateApplier.applyReplacement(localPlayer, state, tickDelta);
             }
         }
     }

@@ -92,7 +92,7 @@ object ModuleFucker : ClientModule("Fucker", ModuleCategories.WORLD, aliases = l
      * If this condition is true, it will override the wall range to range
      * and act as if we were breaking normally.
      *
-     * Useful for Hypixel and CubeCraft
+     * Useful for Hypixel and Cubecraft
      */
     private object FuckerEntrance : ToggleableValueGroup(this, "Entrance", false) {
         /**

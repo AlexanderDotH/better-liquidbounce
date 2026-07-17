@@ -7,6 +7,9 @@
     import {onMount} from "svelte";
     import {getModules} from "../../integration/rest";
     import {groupByCategory} from "../../integration/util";
+    import {shiftHeld} from "./clickgui_store";
+
+    const CLICKGUI_FADE_MS = 120;
 
     let categories = $state<GroupedModules>({});
     let modules = $state<Module[]>([]);
@@ -15,9 +18,29 @@
         modules = await getModules();
         categories = groupByCategory(modules);
     });
+
+    function handleShiftKeyDown(event: KeyboardEvent) {
+        if (event.key === "Shift" || event.shiftKey) {
+            shiftHeld.set(true);
+        }
+    }
+
+    function handleShiftKeyUp(event: KeyboardEvent) {
+        shiftHeld.set(event.getModifierState("Shift"));
+    }
+
+    function handleWindowBlur() {
+        shiftHeld.set(false);
+    }
 </script>
 
-<div class="clickgui" transition:fade|global={{ duration: 200 }}>
+<svelte:window
+        on:keydown={handleShiftKeyDown}
+        on:keyup={handleShiftKeyUp}
+        on:blur={handleWindowBlur}
+/>
+
+<div class="clickgui" transition:fade|global={{ duration: CLICKGUI_FADE_MS }}>
     <Description/>
     <Search modules={structuredClone($state.snapshot(modules))}/>
 

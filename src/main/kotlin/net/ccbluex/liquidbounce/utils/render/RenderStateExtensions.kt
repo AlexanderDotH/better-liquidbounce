@@ -59,3 +59,9 @@ fun LivingEntityRenderState.setRotation(xRot: Float, yRot: Float) {
     this.yRot = Mth.wrapDegrees(yRot - this.bodyRot)
     this.xRot = xRot
 }
+
+fun LivingEntityRenderState.setPlayerRotation(bodyYaw: Float, headYaw: Float, pitch: Float) {
+    this.bodyRot = bodyYaw
+    this.yRot = Mth.wrapDegrees(headYaw - bodyYaw)
+    this.xRot = pitch
+}

@@ -29,7 +29,7 @@
         <div transition:fly|global={{duration: 200, x: anchor === "right" ? -15 : 15}} class="description-wrapper"
              style="top: {data.y}px; left: {left}px;" bind:this={element}>
             <div class="description" class:right={anchor === "left"}>
-                <div class="text">{data.description}</div>
+                <div class="text" class:extended={data.variant === "extended"}>{data.description}</div>
             </div>
         </div>
     {/if}
@@ -41,6 +41,7 @@
     position: fixed;
     z-index: 999999999999;
     transform: translateY(-50%);
+    pointer-events: none;
   }
 
   .description {
@@ -76,5 +77,10 @@
     font-size: 12px;
     padding: 10px;
     color: var(--clickgui-text-color);
+
+    &.extended {
+      max-width: 300px;
+      white-space: pre-wrap;
+    }
   }
 </style>

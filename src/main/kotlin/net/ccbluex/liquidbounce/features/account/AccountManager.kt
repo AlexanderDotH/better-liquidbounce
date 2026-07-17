@@ -21,6 +21,13 @@ package net.ccbluex.liquidbounce.features.account
 
 import com.mojang.authlib.yggdrasil.YggdrasilEnvironment
 import com.mojang.authlib.yggdrasil.YggdrasilUserApiService
+import kotlinx.coroutines.TimeoutCancellationException
+import kotlinx.coroutines.withTimeout
+import net.ccbluex.liquidbounce.api.thirdparty.TheAlteningApi
+import net.ccbluex.liquidbounce.api.thirdparty.TheAlteningApiException
+import net.ccbluex.liquidbounce.api.thirdparty.TheAlteningGenerationResult
+import net.ccbluex.liquidbounce.api.thirdparty.toGenerationResult
+import net.ccbluex.liquidbounce.authlib.Authlib
 import net.ccbluex.liquidbounce.authlib.account.AlteningAccount
 import net.ccbluex.liquidbounce.authlib.account.CrackedAccount
 import net.ccbluex.liquidbounce.authlib.account.MicrosoftAccount
@@ -40,9 +47,12 @@ import net.ccbluex.liquidbounce.utils.client.logger
 import net.ccbluex.liquidbounce.utils.client.mc
 import net.ccbluex.liquidbounce.utils.client.with
 import net.minecraft.client.multiplayer.ProfileKeyPairManager
+import okhttp3.OkHttpClient
+import java.io.InterruptedIOException
 import java.net.Proxy
 import java.util.Optional
 import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.TimeUnit
 
 @Suppress("TooManyFunctions")
 object AccountManager : Config("Accounts"), EventListener {
@@ -52,6 +62,13 @@ object AccountManager : Config("Accounts"), EventListener {
     private var initialSession: SessionBundle
 
     private val loggingIn = AtomicBoolean(false)
+
+    private const val THE_ALTENING_GENERATE_TIMEOUT_MS = 12_000L
+    private const val GENERATED_ALTENING_ACCOUNT_AUTH_TIMEOUT_SECONDS = 8L
+    private const val GENERATED_ALTENING_ACCOUNT_RESOLVE_TIMEOUT_MESSAGE =
+        "TheAltening authentication server is not responding. Try again later."
+
+    private val authlibClientLock = Any()
 
     init {
         ConfigSystem.root(this)
@@ -73,15 +90,21 @@ object AccountManager : Config("Accounts"), EventListener {
 
         val account = accounts.getOrNull(id) ?: run {
             EventManager.callEvent(AccountManagerLoginResultEvent(error = "Account not found!"))
+            loggingIn.set(false)
             return
         }
-        loginDirectAccount(account)
-        loggingIn.set(false)
+        try {
+            if (loginDirectAccount(account)) {
+                ConfigSystem.store(this@AccountManager)
+            }
+        } finally {
+            loggingIn.set(false)
+        }
     }
 
     fun loginDirectAccount(account: MinecraftAccount) = try {
         logger.info("Start logging in with username '${account.profile?.username}'")
-        val (compatSession, service) = account.login()
+        val (compatSession, service) = loginAccountSession(account)
         val session = SessionWithService(
             compatSession.username, compatSession.uuid, compatSession.token,
             Optional.empty(),
@@ -108,9 +131,11 @@ object AccountManager : Config("Accounts"), EventListener {
 
         EventManager.callEvent(SessionEvent(session))
         EventManager.callEvent(AccountManagerLoginResultEvent(username = account.profile?.username))
+        true
     } catch (e: Exception) {
         logger.error("Failed to login into account", e)
-        EventManager.callEvent(AccountManagerLoginResultEvent(error = e.message ?: "Unknown error"))
+        EventManager.callEvent(AccountManagerLoginResultEvent(error = e.accountLoginErrorMessage()))
+        false
     }
 
     /**
@@ -285,30 +310,73 @@ object AccountManager : Config("Accounts"), EventListener {
         EventManager.callEvent(AccountManagerAdditionResultEvent(error = it.message ?: "Unknown error"))
     }
 
-    fun generateAlteningAccount(apiToken: String) = runCatching {
-        if (apiToken.isEmpty()) {
-            error("Altening API Token is empty!")
+    suspend fun generateAlteningAccount(apiToken: String): TheAlteningGenerationResult {
+        return try {
+            val generatedAccount = withTimeout(THE_ALTENING_GENERATE_TIMEOUT_MS) {
+                TheAlteningApi.generate(apiToken)
+            }
+            val account = createPendingAlteningAccount(generatedAccount)
+            val username = checkNotNull(account.profile).username
+
+            accounts += account
+            ConfigSystem.store(this@AccountManager)
+            EventManager.callEvent(AccountManagerAdditionResultEvent(username = username))
+            TheAlteningGenerationResult.success(username)
+        } catch (exception: TheAlteningApiException) {
+            logger.error("Failed to generate altening account", exception)
+            EventManager.callEvent(AccountManagerAdditionResultEvent(error = exception.userMessage))
+            exception.toGenerationResult()
+        } catch (exception: TimeoutCancellationException) {
+            logger.error("Failed to generate altening account", exception)
+            generationError(exception.generationErrorMessage())
+        } catch (exception: Exception) {
+            logger.error("Failed to generate altening account", exception)
+            generationError(exception.generationErrorMessage())
+        }
+    }
+
+    private fun loginAccountSession(account: MinecraftAccount) =
+        if (account is AlteningAccount && account.profile?.uuid == null) {
+            synchronized(authlibClientLock) {
+                withTemporaryAuthlibClient(buildGeneratedAlteningAccountAuthClient()) {
+                    account.login()
+                }
+            }
+        } else {
+            account.login()
         }
 
-        val account = AlteningAccount.generateAccount(apiToken)
-        accounts += account
+    private fun buildGeneratedAlteningAccountAuthClient(): OkHttpClient = Authlib.client.newBuilder()
+        .connectTimeout(GENERATED_ALTENING_ACCOUNT_AUTH_TIMEOUT_SECONDS, TimeUnit.SECONDS)
+        .readTimeout(GENERATED_ALTENING_ACCOUNT_AUTH_TIMEOUT_SECONDS, TimeUnit.SECONDS)
+        .writeTimeout(GENERATED_ALTENING_ACCOUNT_AUTH_TIMEOUT_SECONDS, TimeUnit.SECONDS)
+        .callTimeout(GENERATED_ALTENING_ACCOUNT_AUTH_TIMEOUT_SECONDS, TimeUnit.SECONDS)
+        .build()
 
-        // Store configurable
-        ConfigSystem.store(this@AccountManager)
+    private inline fun <T> withTemporaryAuthlibClient(client: OkHttpClient, block: () -> T): T {
+        val previousClient = Authlib.client
+        Authlib.client = client
 
-        account
-    }.onFailure {
-        logger.error("Failed to generate altening account", it)
-        EventManager.callEvent(AccountManagerAdditionResultEvent(error = it.message ?: "Unknown error"))
-    }.onSuccess {
-        val profile = it.profile
-
-        if (profile == null) {
-            EventManager.callEvent(AccountManagerAdditionResultEvent(error = "Failed to get profile"))
-            return@onSuccess
+        return try {
+            block()
+        } finally {
+            Authlib.client = previousClient
         }
+    }
 
-        EventManager.callEvent(AccountManagerAdditionResultEvent(username = profile.username))
+    private fun Exception.accountLoginErrorMessage(): String = when (this) {
+        is InterruptedIOException -> GENERATED_ALTENING_ACCOUNT_RESOLVE_TIMEOUT_MESSAGE
+        else -> message ?: "Unknown error"
+    }
+
+    private fun Exception.generationErrorMessage(): String = when (this) {
+        is TimeoutCancellationException -> "Failed to contact TheAltening. Try again later."
+        else -> message ?: "Unknown error"
+    }
+
+    private fun generationError(message: String): TheAlteningGenerationResult {
+        EventManager.callEvent(AccountManagerAdditionResultEvent(error = message))
+        return TheAlteningGenerationResult.error(message)
     }
 
     fun restoreInitial() {

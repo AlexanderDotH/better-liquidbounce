@@ -26,6 +26,8 @@ import com.google.gson.JsonObject
 import it.unimi.dsi.fastutil.objects.Object2ObjectOpenHashMap
 import net.ccbluex.liquidbounce.config.gson.interopGson
 import net.ccbluex.liquidbounce.features.module.ModuleManager
+import net.ccbluex.liquidbounce.features.module.modules.misc.antibot.ModuleAntiBot
+import net.minecraft.client.player.RemotePlayer
 import net.ccbluex.liquidbounce.integration.interop.ClientInteropServer
 import net.ccbluex.liquidbounce.utils.client.logger
 import net.ccbluex.liquidbounce.utils.client.mc
@@ -37,7 +39,6 @@ import net.ccbluex.netty.http.util.httpServiceUnavailable
 import net.minecraft.core.BlockPos
 import net.minecraft.core.DefaultedRegistry
 import net.minecraft.core.Registry
-import net.minecraft.core.component.DataComponents
 import net.minecraft.core.registries.BuiltInRegistries
 import net.minecraft.core.registries.Registries
 import net.minecraft.network.protocol.PacketFlow
@@ -215,7 +216,7 @@ private fun Routing.getRegistry() = get {
 
         "items", "item" -> {
             BuiltInRegistries.ITEM.buildOutput(
-                name = { id, item -> item.components()[DataComponents.ITEM_NAME]?.string ?: id.toString() },
+                name = { id, item -> item.descriptionId ?: id.toString() },
                 iconUrl = ::itemIconUrl,
             )
         }
@@ -266,6 +267,23 @@ private fun Routing.getRegistry() = get {
         "client_module" -> {
             ModuleManager.associate {
                 it.name to RegistryItemOutput(it.name, null)
+            }
+        }
+
+        "world_players" -> {
+            val level = mc.level
+            if (level == null) {
+                emptyMap()
+            } else {
+                level.players()
+                    .asSequence()
+                    .filterIsInstance<RemotePlayer>()
+                    .filter { it !== mc.player }
+                    .filterNot { ModuleAntiBot.isBot(it) }
+                    .associate { player ->
+                        val name = player.gameProfile.name
+                        name to RegistryItemOutput(name, null)
+                    }
             }
         }
 

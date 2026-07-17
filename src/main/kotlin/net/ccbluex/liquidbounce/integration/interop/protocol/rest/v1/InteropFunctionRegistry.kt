@@ -33,6 +33,7 @@ import net.ccbluex.liquidbounce.integration.interop.protocol.rest.v1.client.spoo
 import net.ccbluex.liquidbounce.integration.interop.protocol.rest.v1.client.themeRoutes
 import net.ccbluex.liquidbounce.integration.interop.protocol.rest.v1.client.userRoutes
 import net.ccbluex.liquidbounce.integration.interop.protocol.rest.v1.features.browserRoutes
+import net.ccbluex.liquidbounce.integration.interop.protocol.rest.v1.features.fritzBoxRoutes
 import net.ccbluex.liquidbounce.integration.interop.protocol.rest.v1.features.protocolRoutes
 import net.ccbluex.liquidbounce.integration.interop.protocol.rest.v1.features.reconnectRoutes
 import net.ccbluex.liquidbounce.integration.interop.protocol.rest.v1.game.inputRoutes
@@ -55,6 +56,7 @@ internal fun Routing.registerInteropFunctions() = route("/api/v1/client") {
     accountRoutes()
     proxyRoutes()
     browserRoutes()
+    fritzBoxRoutes()
     protocolRoutes()
     reconnectRoutes()
     spooferRoutes()

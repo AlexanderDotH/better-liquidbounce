@@ -22,7 +22,6 @@
     import RegistryListSetting from "../list/RegistryListSetting.svelte";
     import CurveSetting from "../CurveSetting.svelte";
     import RegistryMutableListSetting from "../list/RegistryMutableListSetting.svelte";
-
     export let setting: ModuleSetting;
     export let path: string;
 </script>
@@ -53,7 +52,7 @@
         <ConfigurableSetting {path} bind:setting={setting} on:change/>
     {:else if setting.valueType === "COLOR"}
         <ColorSetting bind:setting={setting} on:change/>
-    {:else if setting.valueType === "TEXT"}
+    {:else if setting.valueType === "TEXT" || setting.valueType === "PLAYER"}
         <TextSetting bind:setting={setting} on:change/>
     {:else if setting.valueType === "MUTABLE_LIST" }
         <MutableListSetting bind:setting={setting} on:change/>

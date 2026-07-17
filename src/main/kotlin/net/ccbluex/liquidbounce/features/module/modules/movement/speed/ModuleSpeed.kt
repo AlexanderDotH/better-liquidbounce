@@ -33,24 +33,42 @@ import net.ccbluex.liquidbounce.features.module.modules.movement.speed.ModuleSpe
 import net.ccbluex.liquidbounce.features.module.modules.movement.speed.modes.SpeedCustom
 import net.ccbluex.liquidbounce.features.module.modules.movement.speed.modes.SpeedLegitHop
 import net.ccbluex.liquidbounce.features.module.modules.movement.speed.modes.SpeedPiercingAttack
+import net.ccbluex.liquidbounce.features.module.modules.movement.speed.modes.SpeedPulse
 import net.ccbluex.liquidbounce.features.module.modules.movement.speed.modes.SpeedSpeedYPort
+import net.ccbluex.liquidbounce.features.module.modules.movement.speed.modes.SpeedStrafe
+import net.ccbluex.liquidbounce.features.module.modules.movement.speed.modes.aac.SpeedAAC332
+import net.ccbluex.liquidbounce.features.module.modules.movement.speed.modes.aac.SpeedAAC4310FastHop
+import net.ccbluex.liquidbounce.features.module.modules.movement.speed.modes.detector.SpeedDetectorBypass
+import net.ccbluex.liquidbounce.features.module.modules.movement.speed.modes.aac.SpeedAAC4312LowHop
+import net.ccbluex.liquidbounce.features.module.modules.movement.speed.modes.blockdrop.SpeedBlockdrop
+import net.ccbluex.liquidbounce.features.module.modules.movement.speed.modes.blockdrop.SpeedBlockdropHop
 import net.ccbluex.liquidbounce.features.module.modules.movement.speed.modes.blocksmc.SpeedBlocksMC
 import net.ccbluex.liquidbounce.features.module.modules.movement.speed.modes.grim.SpeedGrimCollide
+import net.ccbluex.liquidbounce.features.module.modules.movement.speed.modes.gwen.SpeedGWENBHop
+import net.ccbluex.liquidbounce.features.module.modules.movement.speed.modes.gwen.SpeedGWENHighHop
 import net.ccbluex.liquidbounce.features.module.modules.movement.speed.modes.hylex.SpeedHylexGround
 import net.ccbluex.liquidbounce.features.module.modules.movement.speed.modes.hylex.SpeedHylexLowHop
+import net.ccbluex.liquidbounce.features.module.modules.movement.speed.modes.intave.SpeedIntave
 import net.ccbluex.liquidbounce.features.module.modules.movement.speed.modes.intave.SpeedIntave14
 import net.ccbluex.liquidbounce.features.module.modules.movement.speed.modes.intave.SpeedIntave14Fast
+import net.ccbluex.liquidbounce.features.module.modules.movement.speed.modes.intave.SpeedIntaveInBlock
+import net.ccbluex.liquidbounce.features.module.modules.movement.speed.modes.intave.SpeedIntaveInstant
 import net.ccbluex.liquidbounce.features.module.modules.movement.speed.modes.matrix.SpeedMatrix7
 import net.ccbluex.liquidbounce.features.module.modules.movement.speed.modes.ncp.SpeedNCP
 import net.ccbluex.liquidbounce.features.module.modules.movement.speed.modes.sentinel.SpeedSentinelDamage
+import net.ccbluex.liquidbounce.features.module.modules.movement.speed.modes.sentinel.SpeedSentinelFastHop
+import net.ccbluex.liquidbounce.features.module.modules.movement.speed.modes.sentinel.SpeedSentinelOnGround
 import net.ccbluex.liquidbounce.features.module.modules.movement.speed.modes.spartan.SpeedSpartanV4043
 import net.ccbluex.liquidbounce.features.module.modules.movement.speed.modes.spartan.SpeedSpartanV4043FastFall
+import net.ccbluex.liquidbounce.features.module.modules.movement.speed.modes.vanilla.SpeedGround
 import net.ccbluex.liquidbounce.features.module.modules.movement.speed.modes.verus.SpeedVerusB3882
+import net.ccbluex.liquidbounce.features.module.modules.movement.speed.modes.venom.SpeedVenomGround
 import net.ccbluex.liquidbounce.features.module.modules.movement.speed.modes.vulcan.SpeedVulcan286
 import net.ccbluex.liquidbounce.features.module.modules.movement.speed.modes.vulcan.SpeedVulcan288
 import net.ccbluex.liquidbounce.features.module.modules.movement.speed.modes.vulcan.SpeedVulcanGround286
 import net.ccbluex.liquidbounce.features.module.modules.movement.speed.modes.watchdog.SpeedHypixelBHop
 import net.ccbluex.liquidbounce.features.module.modules.movement.speed.modes.watchdog.SpeedHypixelLowHop
+import net.ccbluex.liquidbounce.features.module.modules.movement.speed.modes.watchdog.SpeedWatchdog
 import net.ccbluex.liquidbounce.features.module.modules.world.scaffold.ModuleScaffold
 import net.ccbluex.liquidbounce.utils.client.inGame
 import net.ccbluex.liquidbounce.utils.combat.CombatManager
@@ -71,8 +89,13 @@ object ModuleSpeed : ClientModule("Speed", ModuleCategories.MOVEMENT) {
     private fun initializeSpeeds(modeValueGroup: ModeValueGroup<*>) = arrayOf(
         SpeedLegitHop(modeValueGroup),
         SpeedCustom(modeValueGroup),
+        SpeedStrafe(modeValueGroup),
+        SpeedPulse(modeValueGroup),
         SpeedSpeedYPort(modeValueGroup),
         SpeedPiercingAttack(modeValueGroup),
+
+        // Bypass our own PlayerCheatDetector observer checks
+        SpeedDetectorBypass(modeValueGroup),
 
         SpeedVerusB3882(modeValueGroup),
 
@@ -93,6 +116,21 @@ object ModuleSpeed : ClientModule("Speed", ModuleCategories.MOVEMENT) {
 
         SpeedIntave14(modeValueGroup),
         SpeedIntave14Fast(modeValueGroup),
+        SpeedIntaveInBlock(modeValueGroup),
+        SpeedIntave(modeValueGroup),
+        SpeedIntaveInstant(modeValueGroup),
+        SpeedAAC332(modeValueGroup),
+        SpeedAAC4310FastHop(modeValueGroup),
+        SpeedAAC4312LowHop(modeValueGroup),
+        SpeedBlockdrop(modeValueGroup),
+        SpeedBlockdropHop(modeValueGroup),
+        SpeedGWENBHop(modeValueGroup),
+        SpeedGWENHighHop(modeValueGroup),
+        SpeedGround(modeValueGroup),
+        SpeedSentinelFastHop(modeValueGroup),
+        SpeedSentinelOnGround(modeValueGroup),
+        SpeedVenomGround(modeValueGroup),
+        SpeedWatchdog(modeValueGroup),
 
         SpeedHylexLowHop(modeValueGroup),
         SpeedHylexGround(modeValueGroup),

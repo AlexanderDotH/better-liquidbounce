@@ -30,6 +30,7 @@ import net.ccbluex.fastutil.toEnumSet
 import net.ccbluex.liquidbounce.config.ConfigSystem
 import net.ccbluex.liquidbounce.config.gson.publicGson
 import net.ccbluex.liquidbounce.config.types.BindValue
+import net.ccbluex.liquidbounce.config.types.PlayerValue
 import net.ccbluex.liquidbounce.config.types.Config
 import net.ccbluex.liquidbounce.config.types.CurveValue
 import net.ccbluex.liquidbounce.config.types.CurveValue.Axis
@@ -441,6 +442,10 @@ open class ValueGroup(
         value(name, default, ValueType.KEY)
 
     fun text(name: String, default: String) = value(name, default, ValueType.TEXT)
+
+    fun player(name: String, default: String) = PlayerValue(name, defaultValue = default).apply {
+        this@ValueGroup.inner.add(this)
+    }
 
     fun regex(name: String, default: Regex) = value(name, default, ValueType.TEXT)
 

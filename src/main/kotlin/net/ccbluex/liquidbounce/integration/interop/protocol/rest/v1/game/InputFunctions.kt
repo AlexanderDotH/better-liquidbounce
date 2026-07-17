@@ -24,6 +24,7 @@ import com.google.gson.JsonObject
 import com.mojang.blaze3d.platform.InputConstants
 import net.ccbluex.liquidbounce.utils.client.mc
 import net.ccbluex.netty.http.routing.Routing
+import org.lwjgl.glfw.GLFW
 
 // GET /api/v1/client/input
 private fun Routing.getInputInfo() = get("/input") {
@@ -74,9 +75,18 @@ private fun Routing.getIsTyping() = get("/typing") {
     call.respond(TypingState(isTyping))
 }
 
+// GET /api/v1/client/clipboard
+private fun Routing.getClipboard() = get("/clipboard") {
+    val text = GLFW.glfwGetClipboardString(mc.window.handle()) ?: ""
+    call.respond(JsonObject().apply {
+        addProperty("text", text)
+    })
+}
+
 internal fun Routing.inputRoutes() {
     getInputInfo()
     getKeybinds()
     isTyping()
     getIsTyping()
+    getClipboard()
 }

@@ -33,6 +33,7 @@ import net.ccbluex.liquidbounce.features.module.modules.render.ModuleAntiBlind;
 import net.ccbluex.liquidbounce.features.module.modules.render.hitfx.ModuleHitFX;
 import net.ccbluex.liquidbounce.features.module.modules.world.scaffold.ModuleScaffold;
 import net.ccbluex.liquidbounce.features.module.modules.world.scaffold.tower.ScaffoldTowerNone;
+import net.ccbluex.liquidbounce.interfaces.LivingEntityAddition;
 import net.ccbluex.liquidbounce.utils.aiming.RotationManager;
 import net.ccbluex.liquidbounce.utils.aiming.features.MovementCorrection;
 import net.ccbluex.liquidbounce.utils.client.SilentHotbar;
@@ -64,10 +65,23 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 @Mixin(LivingEntity.class)
-public abstract class MixinLivingEntity extends MixinEntity {
+public abstract class MixinLivingEntity extends MixinEntity implements LivingEntityAddition {
+
+    @Shadow
+    protected boolean dead;
 
     @Shadow
     public boolean jumping;
+
+    @Override
+    public boolean liquid_bounce$getDeadState() {
+        return dead;
+    }
+
+    @Override
+    public void liquid_bounce$setDeadState(boolean dead) {
+        this.dead = dead;
+    }
 
     @Shadow
     public int noJumpDelay;

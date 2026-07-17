@@ -1,6 +1,7 @@
 <script lang="ts">
     import {
         deleteScreen,
+        generateAlteningAccount,
         getAccounts,
         loginToAccount as loginToAccountRest,
         orderAccounts,
@@ -8,6 +9,7 @@
         restoreSession,
         setAccountFavorite
     } from "../../../integration/rest.js";
+    import {removeItem, setItem} from "../../../integration/persistent_storage";
     import BottomButtonWrapper from "../common/buttons/BottomButtonWrapper.svelte";
     import SwitchSetting from "../common/setting/SwitchSetting.svelte";
     import OptionBar from "../common/optionbar/OptionBar.svelte";
@@ -30,6 +32,9 @@
         AccountManagerLoginEvent,
     } from "../../../integration/events.js";
     import DirectLoginModal from "./directLogin/DirectLoginModal.svelte";
+    import TheAlteningApiKeyModal from "./TheAlteningApiKeyModal.svelte";
+
+    const THE_ALTENING_API_KEY_STORAGE_KEY = "altmanager_thealtening_api_key";
 
     let premiumOnly = false;
     let favoritesOnly = false;
@@ -40,6 +45,8 @@
 
     let addAccountModalVisible = false;
     let directLoginModalVisible = false;
+    let alteningApiKeyModalVisible = false;
+    let generatingAltening = false;
 
     $: {
         let filteredAccounts = accounts;
@@ -106,6 +113,63 @@
         await loginToAccountRest(id);
     }
 
+    async function handleGenerateTheAlteningClick() {
+        if (generatingAltening) {
+            return;
+        }
+
+        const apiKey = localStorage.getItem(THE_ALTENING_API_KEY_STORAGE_KEY)?.trim();
+        if (!apiKey) {
+            alteningApiKeyModalVisible = true;
+            return;
+        }
+
+        await generateTheAlteningAccount(apiKey, false);
+    }
+
+    async function handleGenerateTheAlteningWithApiKey(e: CustomEvent<{ apiKey: string }>) {
+        await generateTheAlteningAccount(e.detail.apiKey, true);
+    }
+
+    async function generateTheAlteningAccount(apiKey: string, persistOnSuccess: boolean) {
+        if (generatingAltening) {
+            return;
+        }
+
+        generatingAltening = true;
+        try {
+            const result = await generateAlteningAccount(apiKey);
+            switch (result.status) {
+                case "SUCCESS":
+                    if (persistOnSuccess) {
+                        await setItem(THE_ALTENING_API_KEY_STORAGE_KEY, apiKey);
+                    }
+                    alteningApiKeyModalVisible = false;
+                    await refreshAccounts();
+                    break;
+                case "CREDENTIALS_REQUIRED":
+                case "ACCESS_DENIED":
+                    await removeItem(THE_ALTENING_API_KEY_STORAGE_KEY);
+                    alteningApiKeyModalVisible = true;
+                    showTheAlteningError(result.message);
+                    break;
+                case "ERROR":
+                    showTheAlteningError(result.message);
+                    break;
+            }
+        } finally {
+            generatingAltening = false;
+        }
+    }
+
+    function showTheAlteningError(message: string) {
+        notification.set({
+            title: "AltManager",
+            message,
+            error: true
+        });
+    }
+
     listen("accountManagerAddition", (e: AccountManagerAdditionEvent) => {
         addAccountModalVisible = false;
         refreshAccounts();
@@ -113,11 +177,16 @@
 
     listen("accountManagerLogin", (e: AccountManagerLoginEvent) => {
         directLoginModalVisible = false;
+        refreshAccounts();
     });
 </script>
 
 <DirectLoginModal bind:visible={directLoginModalVisible}/>
 <AddAccountModal bind:visible={addAccountModalVisible}/>
+<TheAlteningApiKeyModal
+        bind:visible={alteningApiKeyModalVisible}
+        loading={generatingAltening}
+        on:generate={handleGenerateTheAlteningWithApiKey}/>
 <Menu>
     <OptionBar>
         <Search on:search={handleSearch}/>
@@ -164,6 +233,11 @@
             <IconTextButton icon="icon-random.svg" disabled={renderedAccounts.length === 0} title="Random"
                             on:click={loginToRandomAccount}/>
             <IconTextButton icon="icon-refresh.svg" title="Restore" on:click={restoreSession}/>
+        </ButtonContainer>
+
+        <ButtonContainer>
+            <IconTextButton icon="altmanager/icon-thealtening-white.svg" title="Generate" disabled={generatingAltening}
+                            on:click={handleGenerateTheAlteningClick}/>
         </ButtonContainer>
 
         <ButtonContainer>

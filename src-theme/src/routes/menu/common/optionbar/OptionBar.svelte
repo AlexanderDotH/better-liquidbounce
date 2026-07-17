@@ -1,8 +1,9 @@
 <script lang="ts">
     import {fly} from "svelte/transition";
+    import {MENU_HORIZONTAL_OFFSET_PX, MENU_TRANSITION_MS} from "../menuMotion";
 </script>
 
-<div class="option-bar" transition:fly|global={{duration: 700, x: 1000}}>
+<div class="option-bar" transition:fly|global={{duration: MENU_TRANSITION_MS, x: MENU_HORIZONTAL_OFFSET_PX}}>
     <slot />
 </div>
 
@@ -15,6 +16,8 @@
       border-radius: 5px;
       align-items: center;
       column-gap: 30px;
+      row-gap: 15px;
+      flex-wrap: wrap;
       margin-bottom: 25px;
     }
 </style>

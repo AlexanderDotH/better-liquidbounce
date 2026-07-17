@@ -88,6 +88,7 @@ object ModuleNametags : ClientModule("Nametags", ModuleCategories.RENDER) {
         for (nametagInfo in nametagsToRender) {
             val (x, y) = nametagInfo.calculateScreenPos(tickDelta) ?: continue
 
+            drawNametagScoreText(nametagInfo, x, y)
             drawNametag(nametagInfo, x, y)
         }
     }

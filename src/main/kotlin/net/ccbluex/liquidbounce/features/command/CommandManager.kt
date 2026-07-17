@@ -48,6 +48,7 @@ import net.ccbluex.liquidbounce.features.command.commands.ingame.CommandCenter
 import net.ccbluex.liquidbounce.features.command.commands.ingame.CommandCoordinates
 import net.ccbluex.liquidbounce.features.command.commands.ingame.CommandPing
 import net.ccbluex.liquidbounce.features.command.commands.ingame.CommandRemoteView
+import net.ccbluex.liquidbounce.features.command.commands.ingame.CommandResync
 import net.ccbluex.liquidbounce.features.command.commands.ingame.CommandSay
 import net.ccbluex.liquidbounce.features.command.commands.ingame.CommandServerInfo
 import net.ccbluex.liquidbounce.features.command.commands.ingame.CommandTps
@@ -138,6 +139,7 @@ object CommandManager : Collection<Command> by commandSet {
             CommandValue,
             CommandPing,
             CommandRemoteView,
+            CommandResync,
             CommandXRay,
             CommandTargets,
             CommandConfig,

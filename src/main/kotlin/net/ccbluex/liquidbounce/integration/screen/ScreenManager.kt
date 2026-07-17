@@ -35,6 +35,7 @@ import net.ccbluex.liquidbounce.event.waitMatchesWithTimeout
 import net.ccbluex.liquidbounce.features.misc.HideAppearance
 import net.ccbluex.liquidbounce.features.module.modules.render.ModuleClickGui
 import net.ccbluex.liquidbounce.features.module.modules.render.ModuleHud
+import net.ccbluex.liquidbounce.integration.interop.protocol.rest.v1.game.isTyping
 import net.ccbluex.liquidbounce.integration.backend.BrowserBackendManager
 import net.ccbluex.liquidbounce.integration.backend.browser.Browser
 import net.ccbluex.liquidbounce.integration.backend.browser.BrowserState
@@ -106,6 +107,7 @@ object ScreenManager : EventListener {
         // We currently proceed to go to the Minecraft Title Screen
         //   until this times out. [ErrorHandler.fatal] will kill the game anyway.
         if (waitMatchesWithTimeout<GameTickEvent>(timeout = 30.seconds) {
+                BrowserBackendManager.backend?.update()
                 browser.isInitialized && browser.state.isCompleted
             } == null) {
             ErrorHandler.fatal(
@@ -179,6 +181,7 @@ object ScreenManager : EventListener {
         val virtualScreen = screen ?: return
 
         screen = null
+        isTyping = false
         screenAcknowledgement.reset()
         EventManager.callEvent(
             VirtualScreenEvent(

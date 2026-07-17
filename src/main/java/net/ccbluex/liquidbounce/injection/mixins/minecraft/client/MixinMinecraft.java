@@ -37,6 +37,7 @@ import net.ccbluex.liquidbounce.features.module.modules.misc.ModuleMiddleClickAc
 import net.ccbluex.liquidbounce.features.module.modules.player.ModuleAutoBreak;
 import net.ccbluex.liquidbounce.features.module.modules.player.ModuleNoBlockInteract;
 import net.ccbluex.liquidbounce.features.module.modules.player.ModuleReach;
+import net.ccbluex.liquidbounce.features.module.modules.render.playermodel.ServerPlayerModelStateTracker;
 import net.ccbluex.liquidbounce.integration.backend.BrowserBackendManager;
 import net.ccbluex.liquidbounce.integration.backend.browser.GlobalBrowserSettings;
 import net.ccbluex.liquidbounce.integration.screen.ScreenManager;
@@ -414,6 +415,7 @@ public abstract class MixinMinecraft {
 
     @Inject(method = "clearDownloadedResourcePacks", at = @At("HEAD"))
     private void handleDisconnection(CallbackInfo ci) {
+        ServerPlayerModelStateTracker.reset();
         EventManager.INSTANCE.callEvent(DisconnectEvent.INSTANCE);
     }
 

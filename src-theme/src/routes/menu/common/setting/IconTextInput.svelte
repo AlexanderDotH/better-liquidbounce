@@ -1,10 +1,18 @@
 <script lang="ts">
+    import {cefTextInput} from "../../../clickgui/setting/common/cefTextInput";
+
+    const MENU_TEXT_INPUT_SCREEN_NAMES = ["altmanager", "proxymanager", "multiplayer"];
+
     export let icon: string;
     export let title: string;
     export let type = "text";
     export let value = "";
     export let maxLength: number | null = null;
     export let pattern: string | null = null;
+
+    function handleChange(nextValue: string) {
+        value = maxLength === null ? nextValue : nextValue.slice(0, maxLength);
+    }
 </script>
 
 <div class="icon-text-input">
@@ -12,9 +20,38 @@
         <img src="img/menu/icon-{icon}.svg" alt={icon}>
     </div>
     {#if type === "text"}
-        <input {pattern} maxlength={maxLength} class="input" spellcheck="false" type="text" placeholder={title} bind:value={value} autocomplete="off">
+        <input
+                {pattern}
+                maxlength={maxLength}
+                class="input"
+                spellcheck="false"
+                type="text"
+                placeholder={title}
+                value={value}
+                autocomplete="off"
+                readonly
+                use:cefTextInput={{
+                    getValue: () => value,
+                    onChange: handleChange,
+                    screenNames: MENU_TEXT_INPUT_SCREEN_NAMES,
+                }}
+        >
     {:else if type === "password"}
-        <input {pattern} maxlength={maxLength} class="input" type="password" placeholder={title} bind:value={value} autocomplete="off">
+        <input
+                {pattern}
+                maxlength={maxLength}
+                class="input"
+                type="password"
+                placeholder={title}
+                value={value}
+                autocomplete="off"
+                readonly
+                use:cefTextInput={{
+                    getValue: () => value,
+                    onChange: handleChange,
+                    screenNames: MENU_TEXT_INPUT_SCREEN_NAMES,
+                }}
+        >
     {/if}
     <div class="button-container">
         <slot />

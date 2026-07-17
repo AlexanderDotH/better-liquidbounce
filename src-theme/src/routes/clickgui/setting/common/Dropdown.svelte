@@ -1,10 +1,12 @@
 <script lang="ts">
     import {createEventDispatcher} from "svelte";
     import {convertToSpacedString, spaceSeperatedNames} from "../../../../theme/theme_config";
+    import {shiftDescription} from "./shiftDescription";
 
     export let name: string | null;
     export let options: string[];
     export let value: string;
+    export let extendedDescriptions: Record<string, string | undefined> | undefined = undefined;
 
     const dispatch = createEventDispatcher();
 
@@ -27,7 +29,11 @@
 <!-- svelte-ignore a11y-click-events-have-key-events -->
 <!-- svelte-ignore a11y-no-static-element-interactions -->
 <div class="dropdown" class:expanded on:click={() => (expanded = !expanded)}>
-    <div class="head" bind:this={dropdownHead}>
+    <div
+            class="head"
+            bind:this={dropdownHead}
+            use:shiftDescription={{ getText: () => extendedDescriptions?.[value] }}
+    >
         {#if name !== null}
             <span class="text">{$spaceSeperatedNames ? convertToSpacedString(name) : name}
                 &bull; {$spaceSeperatedNames ? convertToSpacedString(value) : value}</span>
@@ -42,6 +48,7 @@
                 <div
                         class="option"
                         class:active={o === value}
+                        use:shiftDescription={{ getText: () => extendedDescriptions?.[o] }}
                         on:click={() => updateValue(o)}
                 >
                     {$spaceSeperatedNames ? convertToSpacedString(o) : o}

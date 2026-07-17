@@ -22,6 +22,7 @@ import net.ccbluex.liquidbounce.render.FontManager
 import net.ccbluex.liquidbounce.render.gui.ItemStackListRenderer.drawItemStackList
 import net.ccbluex.liquidbounce.render.drawRoundedRect
 import net.ccbluex.liquidbounce.render.engine.type.Color4b
+import net.ccbluex.liquidbounce.utils.client.mc
 import net.minecraft.client.gui.GuiGraphicsExtractor
 
 private const val NAMETAG_PADDING: Int = 15
@@ -31,6 +32,34 @@ private const val BACKGROUND_X_OFFSET = 0.1f * FONT_SIZE
 private const val BACKGROUND_Y_OFFSET_TOP = -0.1f
 private const val BACKGROUND_Y_OFFSET_BOTTOM = 1.1f
 private const val BACKGROUND_X_PADDING = 0.2f * FONT_SIZE
+
+internal fun GuiGraphicsExtractor.drawNametagScoreText(nametag: NametagRenderState, posX: Float, posY: Float) {
+    val score = nametag.scoreText ?: return
+
+    val vanillaFont = mc.font
+    val scale = nametag.scale
+    val scoreWidth = vanillaFont.width(score).toFloat()
+    val lineHeight = vanillaFont.lineHeight * scale
+
+    val equipmentOffset = if (!nametag.equipments.equipment.isEmpty) {
+        NAMETAG_PADDING * scale
+    } else {
+        0f
+    }
+
+    val fontRenderer = ModuleNametags.fontRenderer
+    val textHeight = fontRenderer.height * fontRenderer.scaleToVanillaFont * scale
+    val scoreY = posY - equipmentOffset - textHeight * 0.55f - lineHeight
+
+    text(
+        vanillaFont,
+        score,
+        (posX - scoreWidth * 0.5f).toInt(),
+        scoreY.toInt(),
+        Color4b.WHITE.argb,
+        true,
+    )
+}
 
 internal fun GuiGraphicsExtractor.drawNametag(nametag: NametagRenderState, posX: Float, posY: Float) {
     if (nametag.entity == null) {

@@ -32,6 +32,7 @@ import net.ccbluex.liquidbounce.features.module.modules.misc.betterchat.ModuleBe
 import net.ccbluex.liquidbounce.features.module.modules.player.Limit;
 import net.ccbluex.liquidbounce.features.module.modules.player.ModuleAntiExploit;
 import net.ccbluex.liquidbounce.features.module.modules.player.ModuleNoRotateSet;
+import net.ccbluex.liquidbounce.features.module.modules.render.playermodel.ServerPlayerModelStateTracker;
 import net.ccbluex.liquidbounce.utils.aiming.RotationManager;
 import net.ccbluex.liquidbounce.utils.aiming.data.Rotation;
 import net.ccbluex.liquidbounce.utils.kotlin.Priority;
@@ -65,6 +66,16 @@ public abstract class MixinClientPacketListener extends ClientCommonPacketListen
 
     protected MixinClientPacketListener(Minecraft client, Connection connection, CommonListenerCookie connectionState) {
         super(client, connection, connectionState);
+    }
+
+    @Inject(method = "<init>", at = @At("RETURN"))
+    private void resetPlayerModelStateForNewSession(CallbackInfo ci) {
+        ServerPlayerModelStateTracker.reset();
+    }
+
+    @Inject(method = "handleRespawn", at = @At("HEAD"))
+    private void resetPlayerModelStateOnRespawn(ClientboundRespawnPacket packet, CallbackInfo ci) {
+        ServerPlayerModelStateTracker.reset();
     }
 
     @Inject(method = "handleLevelChunkWithLight", at = @At("RETURN"))
@@ -240,6 +251,8 @@ public abstract class MixinClientPacketListener extends ClientCommonPacketListen
 
     @Inject(method = "handleMovePlayer", at = @At("RETURN"))
     private void injectNoRotateSet(ClientboundPlayerPositionPacket packet, CallbackInfo ci, @Local(name = "player") Player player) {
+        ServerPlayerModelStateTracker.correct(player.position(), player.getYRot(), player.getXRot());
+
         if (!ModuleNoRotateSet.INSTANCE.getRunning() || Minecraft.getInstance().gui.screen() instanceof LevelLoadingScreen) {
             return;
         }

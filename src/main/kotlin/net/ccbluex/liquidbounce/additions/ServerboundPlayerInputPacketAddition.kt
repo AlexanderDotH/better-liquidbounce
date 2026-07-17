@@ -26,6 +26,7 @@ import net.minecraft.world.entity.player.Input
 
 interface ServerboundPlayerInputPacketAddition {
     var `liquidBounce$forceSneak`: Boolean
+    var `liquidBounce$forceSprint`: Boolean
 
     fun `liquidBounce$getRawInput`(): Input
 }
@@ -37,6 +38,12 @@ inline var ServerboundPlayerInputPacket.forceSneak: Boolean
     get() = (this as ServerboundPlayerInputPacketAddition).`liquidBounce$forceSneak`
     set(value) {
         (this as ServerboundPlayerInputPacketAddition).`liquidBounce$forceSneak` = value
+    }
+
+inline var ServerboundPlayerInputPacket.forceSprint: Boolean
+    get() = (this as ServerboundPlayerInputPacketAddition).`liquidBounce$forceSprint`
+    set(value) {
+        (this as ServerboundPlayerInputPacketAddition).`liquidBounce$forceSprint` = value
     }
 
 inline val ServerboundPlayerInputPacket.rawInput: Input

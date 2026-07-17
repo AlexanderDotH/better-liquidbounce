@@ -17,6 +17,11 @@
     import {onMount} from "svelte";
     import {notification} from "../common/header/notification_store";
     import {isAnniversary} from "../../../util/utils";
+    import {
+        MENU_TRANSITION_MS,
+        MENU_VERTICAL_OFFSET_PX,
+        TITLE_BUTTON_SWITCH_DELAY_MS,
+    } from "../common/menuMotion";
 
     let regularButtonsShown = true;
     let clientButtonsShown = false;
@@ -41,12 +46,12 @@
             clientButtonsShown = false;
             setTimeout(() => {
                 regularButtonsShown = true;
-            }, 750);
+            }, TITLE_BUTTON_SWITCH_DELAY_MS);
         } else {
             regularButtonsShown = false;
             setTimeout(() => {
                 clientButtonsShown = true;
-            }, 750);
+            }, TITLE_BUTTON_SWITCH_DELAY_MS);
         }
     }
 </script>
@@ -79,7 +84,7 @@
                 {/if}
             </div>
 
-            <div class="additional-buttons" transition:fly|global={{duration: 700, y: 100}}>
+            <div class="additional-buttons" transition:fly|global={{duration: MENU_TRANSITION_MS, y: MENU_VERTICAL_OFFSET_PX}}>
                 <ButtonContainer>
                     <IconTextButton icon="icon-exit.svg" title="Exit" on:click={exitClient}/>
                     <IconTextButton icon="icon-change-background.svg" title="Toggle Shader"
@@ -87,7 +92,7 @@
                 </ButtonContainer>
             </div>
 
-            <div class="social-buttons" transition:fly|global={{duration: 700, y: 100}}>
+            <div class="social-buttons" transition:fly|global={{duration: MENU_TRANSITION_MS, y: MENU_VERTICAL_OFFSET_PX}}>
                 <ButtonContainer>
                     <IconButton title="Forum" icon="nodebb" on:click={() => browse("MAINTAINER_FORUM")}/>
                     <IconButton title="GitHub" icon="github" on:click={() => browse("MAINTAINER_GITHUB")}/>

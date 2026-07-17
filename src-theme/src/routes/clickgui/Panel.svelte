@@ -30,6 +30,8 @@
 
     let scrollPositionSaveTimeout: number | undefined;
 
+    const PANEL_FADE_MS = 120;
+
     const panelConfig = loadPanelConfig();
 
     let ignoreGrid = false;
@@ -194,7 +196,7 @@
         class="panel"
         style="left: {panelConfig.left}px; top: {panelConfig.top}px; z-index: {panelConfig.zIndex};"
         bind:this={panelElement}
-        transition:fade|global={{duration: 200, easing: quintOut}}
+        transition:fade|global={{duration: PANEL_FADE_MS, easing: quintOut}}
 >
     <!-- svelte-ignore a11y-no-static-element-interactions -->
     <div

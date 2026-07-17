@@ -436,6 +436,15 @@ fun Entity.interpolateCurrentRotation(tickDelta: Float): Rotation {
     )
 }
 
+fun LivingEntity.interpolateBodyYaw(tickDelta: Float): Float =
+    Mth.rotLerp(tickDelta, yBodyRotO, yBodyRot)
+
+fun LivingEntity.interpolateHeadYaw(tickDelta: Float): Float =
+    Mth.rotLerp(tickDelta, yHeadRotO, yHeadRot)
+
+fun LivingEntity.interpolatePitch(tickDelta: Float): Float =
+    Mth.lerp(tickDelta, xRotO, xRot)
+
 /**
  * Mirrors the vanilla damage-reduction pipeline after the base amount is known.
  *

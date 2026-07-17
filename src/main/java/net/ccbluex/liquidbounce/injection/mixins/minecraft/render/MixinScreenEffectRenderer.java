@@ -23,6 +23,9 @@ import com.llamalad7.mixinextras.injector.wrapmethod.WrapMethod;
 import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.VertexConsumer;
+import net.ccbluex.liquidbounce.features.module.modules.exploit.phase.modes.PhaseIntaveBlock;
+import net.ccbluex.liquidbounce.features.module.modules.movement.fly.modes.intave.FlyIntave;
+import net.ccbluex.liquidbounce.features.module.modules.movement.speed.modes.intave.SpeedIntaveInBlock;
 import net.ccbluex.liquidbounce.features.module.modules.render.DoRender;
 import net.ccbluex.liquidbounce.features.module.modules.render.ModuleAntiBlind;
 import net.minecraft.client.renderer.ScreenEffectRenderer;
@@ -61,9 +64,16 @@ public abstract class MixinScreenEffectRenderer {
     @Inject(method = "submitBlockSprite", at = @At("HEAD"), cancellable = true)
     private static void hookWallOverlay(TextureAtlasSprite sprite, PoseStack poseStack,
         SubmitNodeCollector submitNodeCollector, int color, CallbackInfo ci) {
-        if (!ModuleAntiBlind.canRender(DoRender.WALL_OVERLAY)) {
+        if (!ModuleAntiBlind.canRender(DoRender.WALL_OVERLAY) || shouldSuppressIntaveBlockOverlay()) {
             ci.cancel();
         }
+    }
+
+    @Unique
+    private static boolean shouldSuppressIntaveBlockOverlay() {
+        return PhaseIntaveBlock.shouldSuppressWallOverlay()
+            || FlyIntave.shouldSuppressWallOverlay()
+            || SpeedIntaveInBlock.shouldSuppressWallOverlay();
     }
 
 }

@@ -25,6 +25,7 @@ import net.ccbluex.liquidbounce.features.module.modules.exploit.disabler.ModuleD
 import net.ccbluex.liquidbounce.features.module.modules.exploit.disabler.disablers.DisablerVulcanScaffold;
 import net.ccbluex.liquidbounce.features.module.modules.render.ModuleNoFov;
 import net.ccbluex.liquidbounce.features.module.modules.render.ModuleSkinChanger;
+import net.ccbluex.liquidbounce.utils.render.PlayerModelAppearanceHook;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.player.AbstractClientPlayer;
 import net.minecraft.world.entity.player.Player;
@@ -77,5 +78,7 @@ public abstract class MixinAbstractClientPlayer extends Player {
                 ));
             }
         }
+
+        cir.setReturnValue(PlayerModelAppearanceHook.replaceSkin((AbstractClientPlayer) (Object) this, cir.getReturnValue()));
     }
 }

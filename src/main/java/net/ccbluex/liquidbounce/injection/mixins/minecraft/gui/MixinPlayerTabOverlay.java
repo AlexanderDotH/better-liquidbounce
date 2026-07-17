@@ -30,6 +30,7 @@ import net.ccbluex.liquidbounce.features.misc.FriendManager;
 import net.ccbluex.liquidbounce.features.module.modules.misc.ModuleAntiStaff;
 import net.ccbluex.liquidbounce.features.module.modules.misc.ModuleBetterTab;
 import net.ccbluex.liquidbounce.features.module.modules.misc.Visibility;
+import net.ccbluex.liquidbounce.utils.render.PlayerModelAppearanceHook;
 import net.ccbluex.liquidbounce.utils.text.PlainText;
 import net.ccbluex.liquidbounce.utils.text.TextBuilder;
 import net.minecraft.client.Minecraft;
@@ -104,7 +105,9 @@ public abstract class MixinPlayerTabOverlay {
             return original;
         }
 
-        return ModuleBetterTab.isVisible(Visibility.NAME_ONLY) ? Component.nullToEmpty(entry.getProfile().name()) : original;
+        return ModuleBetterTab.isVisible(Visibility.NAME_ONLY)
+                ? PlayerModelAppearanceHook.replacePlayerInfoName(entry, Component.nullToEmpty(entry.getProfile().name()))
+                : original;
 
     }
 
@@ -114,7 +117,9 @@ public abstract class MixinPlayerTabOverlay {
             return original;
         }
 
-        return ModuleBetterTab.isVisible(Visibility.NAME_ONLY) ? Component.nullToEmpty(entry.getProfile().name()) : original;
+        return ModuleBetterTab.isVisible(Visibility.NAME_ONLY)
+                ? PlayerModelAppearanceHook.replacePlayerInfoName(entry, Component.nullToEmpty(entry.getProfile().name()))
+                : original;
     }
 
     @Inject(method = "extractRenderState", at = @At(value = "INVOKE", target = "Ljava/lang/Math;min(II)I", shift = At.Shift.BEFORE))
@@ -185,7 +190,7 @@ public abstract class MixinPlayerTabOverlay {
 
     @ModifyReturnValue(method = "getNameForDisplay", at = @At("RETURN"))
     private Component modifyPlayerName(Component original, PlayerInfo entry) {
-        var components = new TextBuilder(original);
+        var components = new TextBuilder(PlayerModelAppearanceHook.replacePlayerInfoName(entry, original));
 
         if (ModuleBetterTab.INSTANCE.getRunning() && ModuleBetterTab.INSTANCE.getShowGameMode()) {
             var playerGameMode = entry.getGameMode();

@@ -43,7 +43,7 @@ private fun Routing.getAccounts() = get {
         accounts.add(JsonObject().apply {
             addProperty("id", i)
             addProperty("username", profile.username)
-            addProperty("uuid", profile.uuid.toString())
+            addProperty("uuid", profile.uuid?.toString().orEmpty())
             addProperty("avatar", formatAvatarUrl(profile.uuid, profile.username))
             add("bans", interopGson.toJsonTree(account.bans))
             addProperty("type", account.type.commonName)
@@ -108,8 +108,8 @@ private fun Routing.postGenerateAlteningAccount() = post("/generate") {
 
     val accountForm = call.receive<AlteningGenForm>()
 
-    AccountManager.generateAlteningAccount(accountForm.apiToken)
-    call.respondNoContent()
+    val result = AccountManager.generateAlteningAccount(accountForm.apiToken)
+    call.respond(result, interopGson)
 }
 
 // POST /api/v1/client/accounts/swap
@@ -200,7 +200,7 @@ private fun Routing.deleteAccount() = delete {
 
         val profile = account.profile ?: return@apply
         addProperty("username", profile.username)
-        addProperty("uuid", profile.uuid.toString())
+        addProperty("uuid", profile.uuid?.toString().orEmpty())
         addProperty("avatar", formatAvatarUrl(profile.uuid, profile.username))
 
         addProperty("type", account.type.commonName)

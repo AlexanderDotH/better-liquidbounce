@@ -18,13 +18,16 @@
  */
 package net.ccbluex.liquidbounce.injection.mixins.minecraft.item;
 
+import com.llamalad7.mixinextras.injector.ModifyReturnValue;
 import net.ccbluex.liquidbounce.event.EventManager;
 import net.ccbluex.liquidbounce.event.events.ItemLoreQueryEvent;
+import net.ccbluex.liquidbounce.features.module.modules.exploit.ModuleNoAdventure;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.Item.TooltipContext;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.TooltipFlag;
+import net.minecraft.world.level.block.state.pattern.BlockInWorld;
 import org.jspecify.annotations.Nullable;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
@@ -48,6 +51,24 @@ public abstract class MixinItemStack {
         ItemLoreQueryEvent event = new ItemLoreQueryEvent(ItemStack.class.cast(this), (ArrayList<Component>) lore);
         EventManager.INSTANCE.callEvent(event);
         cir.setReturnValue(event.getLore());
+    }
+
+    @ModifyReturnValue(method = "canBreakBlockInAdventureMode", at = @At("RETURN"))
+    private boolean hookNoAdventureCanBreak(boolean original, BlockInWorld blockInWorld) {
+        if (ModuleNoAdventure.bypassesRestrictions()) {
+            return true;
+        }
+
+        return original;
+    }
+
+    @ModifyReturnValue(method = "canPlaceOnBlockInAdventureMode", at = @At("RETURN"))
+    private boolean hookNoAdventureCanPlace(boolean original, BlockInWorld blockInWorld) {
+        if (ModuleNoAdventure.bypassesRestrictions()) {
+            return true;
+        }
+
+        return original;
     }
 
 }

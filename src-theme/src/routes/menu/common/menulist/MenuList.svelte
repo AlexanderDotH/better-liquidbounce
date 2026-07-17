@@ -3,6 +3,7 @@
     import {SortableList} from "@jhubbardsf/svelte-sortablejs";
     import "./menulist.scss";
     import {createEventDispatcher} from "svelte";
+    import {MENU_HORIZONTAL_OFFSET_PX, MENU_TRANSITION_MS} from "../menuMotion";
 
     export let sortable = false;
     export let elementCount = -1;
@@ -31,7 +32,7 @@
     }
 </script>
 
-<div class="menu-list" transition:fly|global={{duration: 700, x: 1000}}>
+<div class="menu-list" transition:fly|global={{duration: MENU_TRANSITION_MS, x: MENU_HORIZONTAL_OFFSET_PX}}>
     {#if sortable && elementCount > -1}
         <SortableList class="menu-list-items" onSort={handleChange} forceFallback={true} animation={150}>
             <slot/>

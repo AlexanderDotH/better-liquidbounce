@@ -37,6 +37,7 @@ import net.ccbluex.liquidbounce.utils.client.chat
 import net.ccbluex.liquidbounce.utils.entity.withStrafe
 import net.ccbluex.liquidbounce.utils.math.sq
 import net.ccbluex.liquidbounce.utils.math.withLength
+import net.minecraft.client.player.LocalPlayer
 import net.minecraft.network.protocol.game.ClientboundExplodePacket
 import net.minecraft.network.protocol.game.ClientboundSetEntityMotionPacket
 import net.minecraft.network.protocol.game.ServerboundMovePlayerPacket
@@ -95,10 +96,40 @@ internal object FlyVanilla : Mode("Vanilla") {
 
 }
 
+private data class FlightAbilitiesSnapshot(
+    val mayfly: Boolean,
+    val flying: Boolean,
+    val flyingSpeed: Float
+)
+
+private fun LocalPlayer.flightAbilitiesSnapshot() = FlightAbilitiesSnapshot(
+    abilities.mayfly,
+    abilities.flying,
+    abilities.flyingSpeed
+)
+
+private fun LocalPlayer.restoreFlightAbilities(snapshot: FlightAbilitiesSnapshot) {
+    val hasVanillaFlight = isCreative || isSpectator
+
+    abilities.mayfly = snapshot.mayfly || hasVanillaFlight
+    abilities.flyingSpeed = snapshot.flyingSpeed
+
+    if (!abilities.mayfly) {
+        abilities.flying = false
+        return
+    }
+
+    if (!hasVanillaFlight) {
+        abilities.flying = snapshot.flying
+    }
+}
+
 internal object FlyCreative : Mode("Creative") {
 
     override val parent: ModeValueGroup<*>
         get() = ModuleFly.modes
+
+    private var previousAbilities = FlightAbilitiesSnapshot(mayfly = false, flying = false, flyingSpeed = 0.05f)
 
     private val speed by float("Speed", 0.1f, 0.1f..5f)
 
@@ -117,6 +148,7 @@ internal object FlyCreative : Mode("Creative") {
     private val forceFlight by boolean("ForceFlight", true)
 
     override fun enable() {
+        previousAbilities = player.flightAbilitiesSnapshot()
         player.abilities.mayfly = true
     }
 
@@ -154,8 +186,7 @@ internal object FlyCreative : Mode("Creative") {
     }
 
     override fun disable() {
-        player.abilities.mayfly = false
-        player.abilities.flying = false
+        player.restoreFlightAbilities(previousAbilities)
     }
 
 }

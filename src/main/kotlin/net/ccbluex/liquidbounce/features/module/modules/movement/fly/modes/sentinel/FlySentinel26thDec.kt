@@ -29,6 +29,7 @@ import net.ccbluex.liquidbounce.event.tickHandler
 import net.ccbluex.liquidbounce.event.waitTicks
 import net.ccbluex.liquidbounce.features.blink.BlinkManager
 import net.ccbluex.liquidbounce.features.module.modules.movement.fly.ModuleFly
+import net.ccbluex.liquidbounce.features.module.modules.movement.sentinel.isSentinelOutgoingMovementPacket
 import net.ccbluex.liquidbounce.features.module.modules.movement.speed.ModuleSpeed
 import net.ccbluex.liquidbounce.lang.translation
 import net.ccbluex.liquidbounce.utils.client.Timer
@@ -157,11 +158,14 @@ internal object FlySentinel26thDec : Mode("Sentinel26thDec") {
 
     @Suppress("unused")
     private val fakeLagHandler = handler<BlinkPacketEvent> { event ->
-        val packet = event.packet
         if (!hasBeenHurt || player.isDeadOrDying) {
             return@handler
         }
 
-        event.action = BlinkManager.Action.QUEUE
+        event.action = if (isSentinelOutgoingMovementPacket(event.origin, event.packet)) {
+            BlinkManager.Action.QUEUE
+        } else {
+            BlinkManager.Action.PASS
+        }
     }
 }

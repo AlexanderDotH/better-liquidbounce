@@ -37,6 +37,7 @@ enum class ValueType(
     INT(HumanInputDeserializer.intDeserializer, AutoCompletionProvider.rangedCompleter),
     INT_RANGE(HumanInputDeserializer.intRangeDeserializer, AutoCompletionProvider.rangedCompleter),
     TEXT(HumanInputDeserializer.textDeserializer),
+    PLAYER(HumanInputDeserializer.textDeserializer),
     COLOR(HumanInputDeserializer.colorDeserializer),
 
     // Registry Types

@@ -24,13 +24,19 @@ import net.ccbluex.liquidbounce.config.types.group.ModeValueGroup
 import net.ccbluex.liquidbounce.config.types.group.ToggleableValueGroup
 import net.ccbluex.liquidbounce.config.types.list.Tagged
 import net.ccbluex.liquidbounce.event.events.MovementInputEvent
+import net.ccbluex.liquidbounce.event.events.PacketEvent
 import net.ccbluex.liquidbounce.event.events.PlayerMoveEvent
+import net.ccbluex.liquidbounce.event.events.TransferOrigin
 import net.ccbluex.liquidbounce.event.events.WorldRenderEvent
 import net.ccbluex.liquidbounce.event.handler
+import net.ccbluex.liquidbounce.event.tickHandler
+import net.ccbluex.liquidbounce.event.waitTicks
 import net.ccbluex.liquidbounce.features.module.ClientModule
 import net.ccbluex.liquidbounce.features.module.ModuleCategories
 import net.ccbluex.liquidbounce.features.module.modules.combat.ModuleAimbot
 import net.ccbluex.liquidbounce.features.module.modules.combat.killaura.ModuleKillAura
+import net.ccbluex.liquidbounce.features.module.modules.exploit.ModuleClickTp
+import net.ccbluex.liquidbounce.features.module.modules.exploit.clickTpStandingCollisionBox
 import net.ccbluex.liquidbounce.features.module.modules.movement.speed.ModuleSpeed
 import net.ccbluex.liquidbounce.features.module.modules.movement.speed.modes.watchdog.SpeedHypixelLowHop
 import net.ccbluex.liquidbounce.render.drawCircleOutline
@@ -38,6 +44,7 @@ import net.ccbluex.liquidbounce.render.drawGradientCircle
 import net.ccbluex.liquidbounce.render.engine.type.Color4b
 import net.ccbluex.liquidbounce.render.renderEnvironmentForWorld
 import net.ccbluex.liquidbounce.render.withPositionRelativeToCamera
+import net.ccbluex.liquidbounce.utils.block.canStandOn
 import net.ccbluex.liquidbounce.utils.combat.TargetSelector
 import net.ccbluex.liquidbounce.utils.entity.anyHorizontal
 import net.ccbluex.liquidbounce.utils.entity.horizontalSpeed
@@ -47,13 +54,17 @@ import net.ccbluex.liquidbounce.utils.entity.untransformed
 import net.ccbluex.liquidbounce.utils.entity.withStrafe
 import net.ccbluex.liquidbounce.utils.entity.wouldFallIntoVoid
 import net.ccbluex.liquidbounce.utils.kotlin.EventPriorityConvention.MODEL_STATE
+import net.ccbluex.liquidbounce.utils.math.bottomCenter
 import net.ccbluex.liquidbounce.utils.math.horizontalDistanceTo
 import net.ccbluex.liquidbounce.utils.movement.DirectionalInput
 import net.ccbluex.liquidbounce.utils.movement.getDegreesRelativeToView
 import net.ccbluex.liquidbounce.utils.movement.getDirectionalInputForDegrees
+import net.minecraft.core.BlockPos
+import net.minecraft.network.protocol.game.ClientboundDamageEventPacket
 import net.minecraft.util.Mth
 import net.minecraft.world.entity.LivingEntity
 import net.minecraft.world.entity.MoverType
+import net.minecraft.world.entity.Pose
 import net.minecraft.world.phys.Vec3
 import net.ccbluex.liquidbounce.utils.math.yaw
 import kotlin.math.atan2
@@ -93,7 +104,11 @@ object ModuleTargetStrafe : ClientModule("TargetStrafe", ModuleCategories.MOVEME
     private var direction = 1
 
     // Configuration options
-    private val modes = choices("Mode", MotionMode, arrayOf(MotionMode, InputMode)).apply { tagBy(this) }
+    private val modes = choices(
+        "Mode",
+        MotionMode,
+        arrayOf(MotionMode, StrafeMode, InputMode, CubeCraftMode),
+    ).apply { tagBy(this) }
     private val range = float("Range", 2.95f, 0.0f..8.0f)
     private val targetSelector = TargetSelector(range = range)
     private val followRangeValue = float("FollowRange", 4f, 0.0f..10.0f).onChange {
@@ -232,13 +247,16 @@ object ModuleTargetStrafe : ClientModule("TargetStrafe", ModuleCategories.MOVEME
             }
 
             private fun validateCollision(point: Vec3, expand: Double = 0.0): Boolean {
-                val hitbox = player.dimensions.makeBoundingBox(point).inflate(expand, 0.0, expand)
+                val hitbox = clickTpStandingCollisionBox(
+                    point,
+                    player.getDimensions(Pose.STANDING),
+                ).inflate(expand, 0.0, expand)
                 return world.noCollision(player, hitbox)
             }
 
             private fun isCloseToFall(position: Vec3): Boolean {
                 position.y = floor(position.y)
-                val hitbox = player.dimensions
+                val hitbox = player.getDimensions(Pose.STANDING)
                     .makeBoundingBox(position)
                     .inflate(-0.05, 0.0, -0.05)
                     .move(0.0, -EdgeCheck.maxFallHeight.toDouble(), 0.0)
@@ -261,53 +279,19 @@ object ModuleTargetStrafe : ClientModule("TargetStrafe", ModuleCategories.MOVEME
         // Event handler for player movement
         @Suppress("unused")
         private val moveHandler = handler<PlayerMoveEvent>(priority = MODEL_STATE) { event ->
-            if (event.type != MoverType.SELF) {
-                return@handler
-            }
+            handleMotionStrafe(event, speed = player.horizontalSpeed, hypixel = hypixel)
+        }
+    }
 
-            if (!player.input.initial.anyHorizontal) {
-                renderState.reset()
-                return@handler
-            }
+    object StrafeMode : Mode("Strafe") {
+        override val parent: ModeValueGroup<Mode>
+            get() = modes
 
-            val strafePlan = computeStrafePlan(
-                speed = player.horizontalSpeed,
-                controlInput = DirectionalInput(player.input.untransformed)
-            ) ?: return@handler
+        private val speed by float("Speed", 0.35f, 0.1f..5f)
 
-            if (!strafePlan.pointValid) {
-                return@handler
-            }
-
-            // Perform the strafing movement
-            if (hypixel && ModuleSpeed.running) {
-                val minSpeed = if (player.onGround()) {
-                    0.48
-                } else {
-                    0.281
-                }
-
-                if (SpeedHypixelLowHop.shouldStrafe) {
-                    event.movement = event.movement.withStrafe(
-                        yaw = strafePlan.strafeVec.yaw,
-                        speed = player.horizontalSpeed.coerceAtLeast(minSpeed),
-                        input = null
-                    )
-                } else {
-                    event.movement = event.movement.withStrafe(
-                        yaw = strafePlan.strafeVec.yaw,
-                        speed = player.horizontalSpeed.coerceAtLeast(minSpeed),
-                        strength = 0.02,
-                        input = null
-                    )
-                }
-            } else {
-                event.movement = event.movement.withStrafe(
-                    yaw = strafePlan.strafeVec.yaw,
-                    speed = player.horizontalSpeed,
-                    input = null
-                )
-            }
+        @Suppress("unused")
+        private val moveHandler = handler<PlayerMoveEvent>(priority = MODEL_STATE) { event ->
+            handleMotionStrafe(event, speed = speed.toDouble())
         }
     }
 
@@ -317,27 +301,244 @@ object ModuleTargetStrafe : ClientModule("TargetStrafe", ModuleCategories.MOVEME
 
         @Suppress("unused")
         private val inputHandler = handler<MovementInputEvent>(priority = MODEL_STATE) { event ->
-            if (!event.directionalInput.isMoving) {
-                renderState.reset()
-                return@handler
-            }
-
-            val strafePlan = computeStrafePlan(
-                speed = player.horizontalSpeed,
-                controlInput = event.directionalInput
-            ) ?: return@handler
-
-            if (!strafePlan.pointValid) {
-                return@handler
-            }
-
-            val movementDegrees = getDegreesRelativeToView(strafePlan.strafeVec, player.yRot)
-            event.directionalInput = getDirectionalInputForDegrees(
-                directionalInput = DirectionalInput.NONE,
-                dgs = movementDegrees
-            )
+            handleInputStrafe(event)
         }
     }
+
+    object CubeCraftMode : Mode("Cubecraft", aliases = listOf("CubePerfect")) {
+        override val parent: ModeValueGroup<Mode>
+            get() = modes
+
+        private val behindDistance by float("BehindDistance", 2f, 0.5f..5f, "blocks")
+        private val searchRadius by int("SearchRadius", 2, 0..5, "blocks")
+        private val retryDelay by int("RetryDelay", 10, 0..40, "ticks")
+
+        private val tracker = CubeCraftTargetStrafeTracker()
+        private var damageConfirmed = false
+        private var wasHurt = false
+
+        override fun enable() {
+            resetTracking()
+            super.enable()
+        }
+
+        override fun disable() {
+            resetTracking()
+            renderState.reset()
+            super.disable()
+        }
+
+        @Suppress("unused")
+        private val tickHandler = tickHandler {
+            val target = currentTarget() ?: return@tickHandler
+
+            lockDestination(target)
+            if (!revalidateLockedDestination()) {
+                updateLockedRenderState(target)
+                return@tickHandler
+            }
+            updateLockedRenderState(target)
+            tracker.updatePosition(player.position(), ARRIVAL_DISTANCE)
+            if (tracker.teleported) {
+                return@tickHandler
+            }
+
+            val hurt = player.hurtTime > 0
+            if (damageConfirmed || hurt && !wasHurt) {
+                tracker.confirmDamage()
+            }
+            damageConfirmed = false
+            wasHurt = hurt
+
+            val destination = tracker.takeTeleportRequest() ?: return@tickHandler
+            val success = ModuleClickTp.teleportCubeCraftPacket(destination)
+            tracker.completeTeleport(success)
+            updateLockedRenderState(target)
+
+            if (!success) {
+                waitTicks(retryDelay)
+            }
+        }
+
+        @Suppress("unused")
+        private val packetHandler = handler<PacketEvent> { event ->
+            val packet = event.packet
+            if (!event.isCancelled && event.origin == TransferOrigin.INCOMING &&
+                packet is ClientboundDamageEventPacket && packet.entityId == player.id) {
+                damageConfirmed = true
+            }
+        }
+
+        @Suppress("unused")
+        private val inputHandler = handler<MovementInputEvent>(priority = MODEL_STATE) { event ->
+            if (!tracker.useInputFallback) {
+                return@handler
+            }
+
+            handleInputStrafe(event)
+            firstTarget()?.takeIf { tracker.hasLockFor(it.id) }?.let(::updateLockedRenderState)
+        }
+
+        private fun currentTarget(): LivingEntity? {
+            if (!requirementsMet) {
+                resetTracking()
+                renderState.reset()
+                return null
+            }
+
+            val target = firstTarget()
+            if (target == null || target.isRemoved ||
+                player.position().horizontalDistanceTo(target.position()) > followRange) {
+                resetTracking()
+                renderState.reset()
+                return null
+            }
+
+            return target
+        }
+
+        private fun lockDestination(target: LivingEntity) {
+            if (tracker.hasLockFor(target.id)) {
+                return
+            }
+
+            if (!tracker.tracksTarget(target.id)) {
+                tracker.reset()
+                damageConfirmed = false
+                wasHurt = player.hurtTime > 0
+            }
+
+            findTeleportDestination(target)?.let { tracker.lock(target.id, it) }
+        }
+
+        private fun revalidateLockedDestination(): Boolean {
+            val destination = tracker.lockedDestination ?: return false
+            if (Planner.Validation.validatePoint(destination)) {
+                return true
+            }
+
+            tracker.invalidateLock()
+            damageConfirmed = false
+            wasHurt = player.hurtTime > 0
+            return false
+        }
+
+        private fun findTeleportDestination(target: LivingEntity): Vec3? {
+            val ideal = cubeCraftPositionBehind(
+                targetPosition = target.position(),
+                targetYaw = target.yHeadRot,
+                distance = behindDistance.toDouble(),
+            )
+            val center = BlockPos.containing(ideal.x, floor(target.y) - 1.0, ideal.z)
+
+            for ((offsetX, offsetZ) in cubeCraftSearchOffsets(searchRadius)) {
+                for (offsetY in searchYOffsetCandidates) {
+                    val ground = center.offset(offsetX, offsetY, offsetZ)
+                    if (!ground.canStandOn()) {
+                        continue
+                    }
+
+                    val destination = ground.bottomCenter(yOffset = 1.0)
+                    if (Planner.Validation.validatePoint(destination)) {
+                        return destination
+                    }
+                }
+            }
+
+            return null
+        }
+
+        private fun updateLockedRenderState(target: LivingEntity) {
+            val lockedDestination = tracker.lockedDestination
+            renderState.target = target
+            renderState.orbitRadius = behindDistance
+            renderState.nextPoint = lockedDestination ?: cubeCraftPositionBehind(
+                targetPosition = target.position(),
+                targetYaw = target.yHeadRot,
+                distance = behindDistance.toDouble(),
+            )
+            renderState.nextPointValid = lockedDestination != null
+        }
+
+        private fun resetTracking() {
+            tracker.reset()
+            damageConfirmed = false
+            wasHurt = player.hurtTime > 0
+        }
+
+        private val searchYOffsetCandidates = intArrayOf(0, -1, 1, -2, 2)
+        private const val ARRIVAL_DISTANCE = 0.5
+    }
+
+    private fun handleInputStrafe(event: MovementInputEvent) {
+        if (!event.directionalInput.isMoving) {
+            renderState.reset()
+            return
+        }
+
+        val strafePlan = computeStrafePlan(
+            speed = player.horizontalSpeed,
+            controlInput = event.directionalInput
+        ) ?: return
+
+        if (!strafePlan.pointValid) {
+            return
+        }
+
+        val movementDegrees = getDegreesRelativeToView(strafePlan.strafeVec, player.yRot)
+        event.directionalInput = getDirectionalInputForDegrees(
+            directionalInput = DirectionalInput.NONE,
+            dgs = movementDegrees
+        )
+    }
+
+    private fun handleMotionStrafe(event: PlayerMoveEvent, speed: Double, hypixel: Boolean = false) {
+        if (event.type != MoverType.SELF) {
+            return
+        }
+
+        if (!player.input.initial.anyHorizontal) {
+            renderState.reset()
+            return
+        }
+
+        val strafePlan = computeStrafePlan(
+            speed = speed,
+            controlInput = DirectionalInput(player.input.untransformed)
+        ) ?: return
+
+        if (!strafePlan.pointValid) {
+            return
+        }
+
+        event.movement = event.movement.withStrafe(
+            yaw = strafePlan.strafeVec.yaw,
+            speed = effectiveMotionSpeed(speed, hypixel),
+            strength = hypixelStrafeStrength(hypixel),
+            input = null
+        )
+    }
+
+    private fun effectiveMotionSpeed(speed: Double, hypixel: Boolean): Double {
+        if (!hypixel || !ModuleSpeed.running) {
+            return speed
+        }
+
+        val minSpeed = if (player.onGround()) {
+            0.48
+        } else {
+            0.281
+        }
+
+        return speed.coerceAtLeast(minSpeed)
+    }
+
+    private fun hypixelStrafeStrength(hypixel: Boolean) =
+        if (hypixel && ModuleSpeed.running && !SpeedHypixelLowHop.shouldStrafe) {
+            0.02
+        } else {
+            1.0
+        }
 
     /**
      * Computes the shared target-strafe plan used by both movement and input modes.
@@ -456,4 +657,114 @@ object ModuleTargetStrafe : ClientModule("TargetStrafe", ModuleCategories.MOVEME
             player.onGround()
         });
     }
+}
+
+internal fun cubeCraftPositionBehind(
+    targetPosition: Vec3,
+    targetYaw: Float,
+    distance: Double,
+): Vec3 {
+    val yawRadians = Math.toRadians(targetYaw.toDouble())
+    return targetPosition.add(
+        sin(yawRadians) * distance,
+        0.0,
+        -cos(yawRadians) * distance,
+    )
+}
+
+internal fun cubeCraftSearchOffsets(radius: Int): List<Pair<Int, Int>> {
+    require(radius >= 0) { "radius must not be negative" }
+    return (-radius..radius).flatMap { x ->
+        (-radius..radius).map { z -> x to z }
+    }.sortedBy { (x, z) -> x * x + z * z }
+}
+
+internal class CubeCraftTargetStrafeTracker {
+
+    private enum class State {
+        WAITING_DAMAGE,
+        READY,
+        TELEPORTING,
+        FALLBACK,
+        TELEPORTED,
+    }
+
+    private var state = State.WAITING_DAMAGE
+    private var targetId: Int? = null
+
+    var lockedDestination: Vec3? = null
+        private set
+
+    val useInputFallback: Boolean
+        get() = state != State.TELEPORTING && state != State.TELEPORTED
+
+    val teleported: Boolean
+        get() = state == State.TELEPORTED
+
+    fun tracksTarget(targetId: Int): Boolean {
+        return this.targetId == targetId
+    }
+
+    fun hasLockFor(targetId: Int): Boolean {
+        return tracksTarget(targetId) && lockedDestination != null
+    }
+
+    fun lock(targetId: Int, destination: Vec3) {
+        if (hasLockFor(targetId)) {
+            return
+        }
+
+        this.targetId = targetId
+        lockedDestination = destination
+        state = State.WAITING_DAMAGE
+    }
+
+    fun invalidateLock() {
+        lockedDestination = null
+        state = State.WAITING_DAMAGE
+    }
+
+    fun confirmDamage() {
+        if (lockedDestination == null || state == State.TELEPORTING || state == State.TELEPORTED) {
+            return
+        }
+
+        state = State.READY
+    }
+
+    fun takeTeleportRequest(): Vec3? {
+        if (state != State.READY) {
+            return null
+        }
+
+        state = State.TELEPORTING
+        return lockedDestination
+    }
+
+    fun completeTeleport(success: Boolean) {
+        if (state != State.TELEPORTING) {
+            return
+        }
+
+        state = if (success) State.TELEPORTED else State.FALLBACK
+    }
+
+    fun updatePosition(position: Vec3, arrivalDistance: Double) {
+        require(arrivalDistance >= 0.0) { "arrivalDistance must not be negative" }
+        if (state != State.FALLBACK) {
+            return
+        }
+
+        val destination = lockedDestination ?: return
+        if (position.distanceToSqr(destination) <= arrivalDistance * arrivalDistance) {
+            state = State.TELEPORTED
+        }
+    }
+
+    fun reset() {
+        state = State.WAITING_DAMAGE
+        targetId = null
+        lockedDestination = null
+    }
+
 }
