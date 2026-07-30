@@ -57,6 +57,9 @@ class ClickGuiScaleChangeEvent(val value: Float) : Event(), WebSocketEvent
 @Tag("clickGuiValueChange")
 class ClickGuiValueChangeEvent(val configurable: ValueGroup) : Event(), WebSocketEvent
 
+@Tag("hudValueChange")
+class HudValueChangeEvent(val configurable: ValueGroup) : Event(), WebSocketEvent
+
 @Tag("spaceSeperatedNamesChange")
 class SpaceSeperatedNamesChangeEvent(val value: Boolean) : Event(), WebSocketEvent
 
@@ -238,4 +241,3 @@ object UserLoggedInEvent : Event(), WebSocketEvent
 
 @Tag("userLoggedOut")
 object UserLoggedOutEvent : Event(), WebSocketEvent
-

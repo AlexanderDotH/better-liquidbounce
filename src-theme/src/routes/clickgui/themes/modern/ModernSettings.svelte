@@ -7,6 +7,7 @@
     import type {ConfigurableSetting as ConfigurableSettingData} from "../../../../integration/types";
     import ConfigurableSetting from "../../setting/ConfigurableSetting.svelte";
     import {createLatestValueSaveQueue} from "../../theme/latestValueSaveQueue";
+    import HudThemeSelector from "../../../hud/theme/HudThemeSelector.svelte";
     import {productionGlobalSettingsDataSource} from "./model/clickGuiDataSource";
     import {
         MODERN_SETTING_STAGGER_LIMIT,
@@ -112,7 +113,7 @@
                 <p class="overline">ClickGUI</p>
                 <h1>Settings</h1>
                 <p class="heading-copy">
-                    Choose how the interface feels, then tune shared client behavior.
+                    Choose how the ClickGUI and in-game HUD feel, then tune shared client behavior.
                 </p>
             </div>
 
@@ -133,7 +134,7 @@
             <section class="settings-section" aria-labelledby="appearance-heading">
                 <div class="section-heading">
                     <div>
-                        <h2 id="appearance-heading">Appearance</h2>
+                        <h2 id="appearance-heading">ClickGUI Appearance</h2>
                         <p>Switch the entire ClickGUI layout without changing your color theme.</p>
                     </div>
                     <span class="section-label">Interface theme</span>
@@ -185,6 +186,10 @@
                     </div>
                 {/if}
             </section>
+
+            <div class="settings-section hud-appearance-section">
+                <HudThemeSelector variant="card" />
+            </div>
 
             <section class="settings-section" aria-labelledby="global-heading">
                 <div class="section-heading">
@@ -352,8 +357,19 @@
     animation-delay: 94ms;
   }
 
+  .settings-section:nth-child(3) {
+    animation-delay: 134ms;
+  }
+
   .settings-section + .settings-section {
     border-top: 1px solid rgba(255, 255, 255, 0.07);
+  }
+
+  .hud-appearance-section :global(.hud-theme-selector--card) {
+    padding: 0;
+    background: transparent;
+    border: 0;
+    border-radius: 0;
   }
 
   .section-heading {

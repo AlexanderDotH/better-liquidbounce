@@ -21,6 +21,7 @@
     import {type Alignment, HorizontalAlignment, VerticalAlignment} from "../../../integration/types.js";
 
     export let alignment: Alignment;
+    export let componentName: string;
 
     $: styleString = generateStyleString(alignment);
 
@@ -69,7 +70,7 @@
     }
 </script>
 
-<div class="draggable-element" style={styleString}>
+<div class="draggable-element" data-component={componentName} style={styleString}>
     <!-- svelte-ignore a11y-no-static-element-interactions -->
     <div class="contained-element">
         <slot/>

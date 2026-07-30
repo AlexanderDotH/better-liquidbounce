@@ -25,7 +25,10 @@ import net.ccbluex.liquidbounce.config.types.list.Tagged
 import net.ccbluex.liquidbounce.event.events.OverlayRenderEvent
 import net.ccbluex.liquidbounce.event.handler
 import net.ccbluex.liquidbounce.features.misc.HideAppearance
+import net.ccbluex.liquidbounce.features.module.modules.render.ModuleHud
 import net.ccbluex.liquidbounce.features.module.modules.render.esp.ModuleESP
+import net.ccbluex.liquidbounce.integration.screen.CustomScreenType
+import net.ccbluex.liquidbounce.integration.theme.ThemeManager
 import net.ccbluex.liquidbounce.integration.theme.component.components.NativeHudComponent
 import net.ccbluex.liquidbounce.render.getBounds
 import net.ccbluex.liquidbounce.render.drawCustomElement
@@ -233,17 +236,27 @@ object MinimapHudComponent : NativeHudComponent("Minimap", false, Alignment(
                 element.render(this, boundingBox)
             }
 
-            val from = Color4b.DEFAULT_BG_COLOR
-            val to = Color4b.TRANSPARENT
+            val chrome = resolveMinimapHudChrome(
+                hudTheme = ModuleHud.theme,
+                bundledHud = isBundledHudRendered(),
+            )
+            drawShadowForBB(
+                boundingBox = boundingBox,
+                bounds = bounds,
+                from = chrome.shadowColor,
+                to = Color4b.TRANSPARENT,
+                offset = chrome.shadowOffset,
+                width = chrome.shadowWidth,
+            )
 
-            drawShadowForBB(boundingBox, bounds, from, to)
-
-            val lines = floatArrayOf(
+            val crosshairLines = floatArrayOf(
                 // Cursor
                 boundingBox.xMin, centerBB.y,
                 boundingBox.xMax, centerBB.y,
                 centerBB.x, boundingBox.yMin,
                 centerBB.x, boundingBox.yMax,
+            )
+            val borderLines = floatArrayOf(
                 // Border
                 boundingBox.xMin, boundingBox.yMin,
                 boundingBox.xMax, boundingBox.yMin,
@@ -256,9 +269,14 @@ object MinimapHudComponent : NativeHudComponent("Minimap", false, Alignment(
                 boundingBox.xMax, boundingBox.yMax,
             )
 
-            drawLines(lines, Color4b.WHITE.argb, bounds)
+            drawLines(crosshairLines, chrome.crosshairColor.argb, bounds)
+            drawLines(borderLines, chrome.borderColor.argb, bounds)
         }
     }
+
+    private fun isBundledHudRendered(): Boolean = runCatching {
+        ThemeManager.getScreenLocation(CustomScreenType.HUD).theme === ThemeManager.includedTheme
+    }.getOrDefault(false)
 
     private fun GuiGraphicsExtractor.drawShadowForBB(
         boundingBox: BoundingBox2f,

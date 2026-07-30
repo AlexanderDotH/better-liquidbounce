@@ -1,0 +1,497 @@
+.hud-theme--modern {
+  --modern-hud-motion: 180ms;
+  --modern-hud-easing: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --modern-hud-surface: rgba(15, 18, 23, 0.9);
+  --modern-hud-surface-soft: rgba(15, 18, 23, 0.84);
+  --modern-hud-surface-muted: rgba(15, 18, 23, 0.78);
+  --modern-hud-border: rgba(255, 255, 255, 0.1);
+  --modern-hud-border-soft: rgba(255, 255, 255, 0.07);
+  --modern-hud-text: #eef1f5;
+  --modern-hud-text-muted: #919aa6;
+  --modern-hud-shadow: 0 12px 30px rgba(0, 0, 0, 0.24);
+
+  --arraylist-background-color: var(--modern-hud-surface-soft);
+  --arraylist-text-color: var(--modern-hud-text);
+  --arraylist-tag-color: var(--modern-hud-text-muted);
+  --arraylist-border-color: var(--accent-color);
+  --blockcounter-background-color: var(--modern-hud-surface);
+  --effects-amplifier-color: var(--accent-color);
+  --effects-background-color: var(--modern-hud-surface);
+  --effects-duration-color: var(--modern-hud-text-muted);
+  --effects-name-color: var(--modern-hud-text);
+  --hotbar-item-name-background-color: var(--modern-hud-surface);
+  --hotbar-slot-background-color: var(--modern-hud-surface-soft);
+  --hotbar-status-background-color: var(--modern-hud-surface-muted);
+  --hotbar-text-color: var(--modern-hud-text);
+  --inventory-background-color: var(--modern-hud-surface);
+  --keybinds-accent-color: var(--accent-color);
+  --keybinds-background-color: var(--modern-hud-surface);
+  --keybinds-enabled-color: var(--accent-color);
+  --keybinds-header-background-color: var(--modern-hud-surface-soft);
+  --keybinds-text-color: var(--modern-hud-text);
+  --keybinds-text-muted-color: var(--modern-hud-text-muted);
+  --keystrokes-background-color: var(--modern-hud-surface);
+  --keystrokes-text-color: var(--modern-hud-text);
+  --notification-background-color: var(--modern-hud-surface);
+  --notification-message-color: var(--modern-hud-text-muted);
+  --notification-title-color: var(--modern-hud-text);
+  --scoreboard-body-background-color: var(--modern-hud-surface-soft);
+  --scoreboard-header-background-color: var(--modern-hud-surface);
+  --tabgui-category-background-color: var(--modern-hud-surface-soft);
+  --tabgui-icon-background-color: var(--modern-hud-surface);
+  --tabgui-module-selected-background-color: rgba(255, 255, 255, 0.065);
+  --tabgui-modules-background-color: var(--modern-hud-surface);
+  --tabgui-text-color: var(--modern-hud-text);
+  --tabgui-text-dimmed-color: var(--modern-hud-text-muted);
+  --targethud-armor-point-background-color: rgba(255, 255, 255, 0.09);
+  --targethud-background-color: var(--modern-hud-surface);
+  --targethud-text-color: var(--modern-hud-text);
+  --targethud-text-dimmed-color: var(--modern-hud-text-muted);
+
+  color: var(--modern-hud-text);
+  background: transparent;
+}
+
+.hud-theme--modern :global([data-component="ArrayList"] .arraylist) {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.hud-theme--modern :global([data-component="ArrayList"] .module) {
+  padding: 5px 9px;
+  color: var(--modern-hud-text);
+  font-size: 12px;
+  font-weight: 550;
+  background: var(--modern-hud-surface-soft);
+  border: 1px solid var(--modern-hud-border-soft);
+  border-left: 3px solid var(--accent-color);
+  border-radius: 8px;
+  box-shadow: 0 7px 18px rgba(0, 0, 0, 0.18);
+  transition:
+    color var(--modern-hud-motion) var(--modern-hud-easing),
+    background-color var(--modern-hud-motion) var(--modern-hud-easing),
+    border-color var(--modern-hud-motion) var(--modern-hud-easing);
+}
+
+.hud-theme--modern :global([data-component="ArrayList"] .tag) {
+  color: var(--modern-hud-text-muted);
+  font-weight: 500;
+}
+
+.hud-theme--modern :global([data-component="TabGui"] .categories),
+.hud-theme--modern :global([data-component="TabGui"] .modules) {
+  background: var(--modern-hud-surface);
+  border: 1px solid var(--modern-hud-border);
+  border-radius: 10px;
+  box-shadow: var(--modern-hud-shadow);
+}
+
+.hud-theme--modern :global([data-component="TabGui"] .categories) {
+  background-clip: border-box;
+}
+
+.hud-theme--modern :global([data-component="TabGui"] .category:not(:last-child)) {
+  border-bottom: 1px solid var(--modern-hud-border-soft);
+}
+
+.hud-theme--modern :global([data-component="TabGui"] .category .icon) {
+  width: 38px;
+  color: var(--modern-hud-text-muted);
+  background: rgba(255, 255, 255, 0.025);
+  transition:
+    color var(--modern-hud-motion) var(--modern-hud-easing),
+    background-color var(--modern-hud-motion) var(--modern-hud-easing);
+}
+
+.hud-theme--modern :global([data-component="TabGui"] .category .name) {
+  padding: 7px 11px;
+  color: var(--modern-hud-text);
+  font-size: 12px;
+  background: linear-gradient(
+    to left,
+    transparent 50%,
+    color-mix(in srgb, var(--accent-color) 18%, transparent) 50%
+  );
+  background-size: 200% 100%;
+  background-position: right bottom;
+  transition: background-position var(--modern-hud-motion) var(--modern-hud-easing);
+}
+
+.hud-theme--modern :global([data-component="TabGui"] .category.selected .icon) {
+  color: var(--accent-color);
+}
+
+.hud-theme--modern :global([data-component="TabGui"] .modules) {
+  min-width: 112px;
+  margin-left: 7px;
+  background-clip: border-box;
+}
+
+.hud-theme--modern :global([data-component="TabGui"] .modules .module) {
+  padding: 6px 12px;
+  color: var(--modern-hud-text-muted);
+  font-size: 11px;
+  border-left: 2px solid transparent;
+  transition:
+    color var(--modern-hud-motion) var(--modern-hud-easing),
+    background-color var(--modern-hud-motion) var(--modern-hud-easing),
+    border-color var(--modern-hud-motion) var(--modern-hud-easing);
+}
+
+.hud-theme--modern :global([data-component="TabGui"] .modules .module.selected) {
+  background: rgba(255, 255, 255, 0.055);
+  border-left-color: var(--accent-color);
+}
+
+.hud-theme--modern :global([data-component="TabGui"] .modules .module.enabled) {
+  color: var(--modern-hud-text);
+}
+
+.hud-theme--modern :global([data-component="Notifications"] .notification) {
+  width: 288px;
+  padding: 9px;
+  column-gap: 9px;
+  color: var(--modern-hud-text);
+  background: var(--modern-hud-surface);
+  border: 1px solid var(--modern-hud-border);
+  border-radius: 11px;
+  box-shadow: var(--modern-hud-shadow);
+}
+
+.hud-theme--modern :global([data-component="Notifications"] .notification .icon) {
+  width: 36px;
+  height: 36px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 9px;
+  transition: background-color var(--modern-hud-motion) var(--modern-hud-easing);
+}
+
+.hud-theme--modern :global([data-component="Notifications"] .notification .title) {
+  color: var(--modern-hud-text);
+  font-size: 12px;
+  font-weight: 650;
+}
+
+.hud-theme--modern :global([data-component="Notifications"] .notification .message) {
+  color: var(--modern-hud-text-muted);
+  font-size: 11px;
+  line-height: 1.35;
+}
+
+.hud-theme--modern :global([data-component="TargetHud"] .targethud) {
+  color: var(--modern-hud-text);
+  background: var(--modern-hud-surface);
+  border: 1px solid var(--modern-hud-border);
+  border-radius: 12px;
+  box-shadow: var(--modern-hud-shadow);
+}
+
+.hud-theme--modern :global([data-component="TargetHud"] .main-wrapper) {
+  column-gap: 10px;
+  padding: 9px 12px;
+}
+
+.hud-theme--modern :global([data-component="TargetHud"] .avatar) {
+  width: 46px;
+  height: 46px;
+  border: 1px solid var(--modern-hud-border);
+  border-radius: 9px;
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.2);
+}
+
+.hud-theme--modern :global([data-component="TargetHud"] .name) {
+  color: var(--modern-hud-text);
+  font-size: 13px;
+  font-weight: 650;
+}
+
+.hud-theme--modern :global([data-component="TargetHud"] .health-stats .stat .value) {
+  color: var(--modern-hud-text-muted);
+  font-size: 11px;
+}
+
+.hud-theme--modern :global([data-component="TargetHud"] .armor-stats) {
+  column-gap: 8px;
+}
+
+.hud-theme--modern :global([data-component="TargetHud"] .armor-status .point) {
+  transition: background-color var(--modern-hud-motion) var(--modern-hud-easing);
+}
+
+.hud-theme--modern :global([data-component="TargetHud"] .health-progress) {
+  padding: 0 4px 4px;
+}
+
+.hud-theme--modern :global([data-component="TargetHud"] .health-progress .thumb) {
+  height: 4px;
+  border-radius: 999px;
+  transition: width var(--modern-hud-motion) var(--modern-hud-easing);
+}
+
+.hud-theme--modern :global([data-component="BlockCounter"] .counter) {
+  padding: 6px 9px;
+  font-size: 12px;
+  font-weight: 650;
+  background: var(--modern-hud-surface);
+  border: 1px solid var(--modern-hud-border);
+  border-radius: 10px;
+  box-shadow: var(--modern-hud-shadow);
+}
+
+.hud-theme--modern :global([data-component="BlockCounter"] .counter .icon) {
+  width: 22px;
+  height: 22px;
+}
+
+.hud-theme--modern :global([data-component="Hotbar"] .hotbar-elements) {
+  background: var(--modern-hud-surface-soft);
+  border: 1px solid var(--modern-hud-border);
+  border-radius: 10px;
+  box-shadow: var(--modern-hud-shadow);
+}
+
+.hud-theme--modern :global([data-component="Hotbar"] .slots) {
+  display: flex;
+}
+
+.hud-theme--modern :global([data-component="Hotbar"] .slot) {
+  width: 45px;
+  height: 45px;
+  border-right: 1px solid rgba(255, 255, 255, 0.035);
+}
+
+.hud-theme--modern :global([data-component="Hotbar"] .slot:last-child) {
+  border-right: 0;
+}
+
+.hud-theme--modern :global([data-component="Hotbar"] .slider) {
+  width: 45px;
+  height: 45px;
+  border: 2px solid color-mix(in srgb, var(--accent-color) 82%, white 8%);
+  border-radius: 9px;
+  background: color-mix(in srgb, var(--accent-color) 10%, transparent);
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.06),
+    0 0 13px color-mix(in srgb, var(--accent-color) 22%, transparent);
+}
+
+.hud-theme--modern :global([data-component="Hotbar"] .offhand-slot) {
+  width: 45px;
+  height: 45px;
+  background: var(--modern-hud-surface-soft);
+  border: 1px solid var(--modern-hud-border);
+  border-radius: 10px;
+  box-shadow: var(--modern-hud-shadow);
+}
+
+.hud-theme--modern :global([data-component="Hotbar"] .progress) {
+  overflow: hidden;
+  background: var(--modern-hud-surface-muted);
+  border: 1px solid var(--modern-hud-border-soft);
+  border-radius: 7px;
+}
+
+.hud-theme--modern :global([data-component="Hotbar"] .progress-bar) {
+  height: 20px;
+  border-radius: 6px;
+  transition: width var(--modern-hud-motion) var(--modern-hud-easing);
+}
+
+.hud-theme--modern :global([data-component="Hotbar"] .item-name) {
+  color: var(--modern-hud-text);
+  font-size: 12px;
+  background: var(--modern-hud-surface);
+  border: 1px solid var(--modern-hud-border);
+  border-radius: 8px;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.2);
+}
+
+.hud-theme--modern :global([data-component="Hotbar"] .overlay-message) {
+  color: var(--modern-hud-text);
+  font-size: 12px;
+  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.65);
+}
+
+.hud-theme--modern :global([data-component="Scoreboard"] .scoreboard) {
+  color: var(--modern-hud-text);
+  font-size: 12px;
+  background: var(--modern-hud-surface-soft);
+  border: 1px solid var(--modern-hud-border);
+  border-radius: 10px;
+  box-shadow: var(--modern-hud-shadow);
+}
+
+.hud-theme--modern :global([data-component="Scoreboard"] .header) {
+  padding: 7px 10px;
+  background: var(--modern-hud-surface);
+  border-bottom: 1px solid var(--modern-hud-border-soft);
+  font-weight: 650;
+}
+
+.hud-theme--modern :global([data-component="Scoreboard"] .entries) {
+  padding: 7px 9px;
+  background: transparent;
+}
+
+.hud-theme--modern :global([data-component="Scoreboard"] .row) {
+  min-height: 18px;
+  column-gap: 18px;
+}
+
+.hud-theme--modern :global([data-component="ArmorItems"] .inventory),
+.hud-theme--modern :global([data-component="InventoryStatistics"] .inventory),
+.hud-theme--modern :global([data-component="Inventory"] .inventory),
+.hud-theme--modern :global([data-component="CraftingInventory"] .inventory),
+.hud-theme--modern :global([data-component="EnderChestInventory"] .inventory) {
+  background: var(--modern-hud-surface) !important;
+  border: 1px solid var(--modern-hud-border);
+  border-radius: 10px;
+  box-shadow: var(--modern-hud-shadow);
+}
+
+.hud-theme--modern :global([data-component="ArmorItems"] .inventory),
+.hud-theme--modern :global([data-component="InventoryStatistics"] .inventory) {
+  gap: 2px !important;
+}
+
+.hud-theme--modern :global([data-component="Inventory"] .item-stack),
+.hud-theme--modern :global([data-component="ArmorItems"] .item-stack),
+.hud-theme--modern :global([data-component="InventoryStatistics"] .item-stack),
+.hud-theme--modern :global([data-component="CraftingInventory"] .item-stack),
+.hud-theme--modern :global([data-component="EnderChestInventory"] .item-stack) {
+  width: 32px;
+  height: 32px;
+}
+
+.hud-theme--modern :global([data-component="Inventory"] .durability),
+.hud-theme--modern :global([data-component="ArmorItems"] .durability),
+.hud-theme--modern :global([data-component="InventoryStatistics"] .durability),
+.hud-theme--modern :global([data-component="CraftingInventory"] .durability),
+.hud-theme--modern :global([data-component="EnderChestInventory"] .durability) {
+  transition: width var(--modern-hud-motion) var(--modern-hud-easing);
+}
+
+.hud-theme--modern :global([data-component="Keystrokes"] .key) {
+  color: var(--modern-hud-text);
+  font-size: 12px;
+  background: var(--modern-hud-surface);
+  border: 1px solid var(--modern-hud-border);
+  border-radius: 10px;
+  box-shadow:
+    inset 0 0 0 0 var(--keystrokes-active-color),
+    0 8px 18px rgba(0, 0, 0, 0.18);
+  transition:
+    box-shadow var(--modern-hud-motion) var(--modern-hud-easing),
+    border-color var(--modern-hud-motion) var(--modern-hud-easing),
+    color var(--modern-hud-motion) var(--modern-hud-easing);
+}
+
+.hud-theme--modern :global([data-component="Keystrokes"] .key.active) {
+  color: white;
+  border-color: color-mix(in srgb, var(--accent-color) 70%, white 10%);
+  box-shadow:
+    inset 0 0 0 25px var(--keystrokes-active-color),
+    0 8px 18px rgba(0, 0, 0, 0.2);
+}
+
+.hud-theme--modern :global([data-component="Effects"] .effects) {
+  gap: 3px;
+  min-width: 150px;
+  padding: 6px;
+  background: var(--modern-hud-surface);
+  border: 1px solid var(--modern-hud-border);
+  border-radius: 10px;
+  box-shadow: var(--modern-hud-shadow);
+}
+
+.hud-theme--modern :global([data-component="Effects"] .effect) {
+  gap: 7px;
+  min-height: 23px;
+  padding: 2px 4px;
+  color: var(--modern-hud-text);
+  font-size: 12px;
+  border-radius: 6px;
+}
+
+.hud-theme--modern :global([data-component="Effects"] .effect:not(:last-child)) {
+  border-bottom: 1px solid var(--modern-hud-border-soft);
+}
+
+.hud-theme--modern :global([data-component="Effects"] .effect .duration) {
+  color: var(--modern-hud-text-muted);
+  font-size: 10px;
+}
+
+.hud-theme--modern :global([data-component="KeyBinds"] .keybinds) {
+  min-width: 160px;
+  color: var(--modern-hud-text);
+  font-size: 12px;
+  background: var(--modern-hud-surface-soft);
+  border: 1px solid var(--modern-hud-border);
+  border-radius: 10px;
+  box-shadow: var(--modern-hud-shadow);
+}
+
+.hud-theme--modern :global([data-component="KeyBinds"] .header) {
+  padding: 7px 9px;
+  background: var(--modern-hud-surface);
+  border-bottom: 1px solid var(--modern-hud-border-soft);
+}
+
+.hud-theme--modern :global([data-component="KeyBinds"] .header .title) {
+  color: var(--modern-hud-text);
+  font-size: 12px;
+  font-weight: 650;
+}
+
+.hud-theme--modern :global([data-component="KeyBinds"] .entries) {
+  padding: 7px 9px;
+  color: var(--modern-hud-text);
+  background: transparent;
+}
+
+.hud-theme--modern :global([data-component="KeyBinds"] .row) {
+  margin-bottom: 4px;
+}
+
+.hud-theme--modern :global([data-component="KeyBinds"] .row .module-name) {
+  color: var(--modern-hud-text);
+  font-size: 11px;
+}
+
+.hud-theme--modern :global([data-component="KeyBinds"] .row .key-bind) {
+  color: var(--accent-color);
+  font-size: 10px;
+}
+
+.hud-theme--modern :global([data-component="Text"]) {
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+}
+
+.hud-theme--modern :global([data-component="Image"]) {
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+}
+
+.hud-theme--modern :global([data-component="Taco"]) {
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hud-theme--modern {
+    --modern-hud-motion: 0ms;
+  }
+
+  .hud-theme--modern :global([data-component] *),
+  .hud-theme--modern :global([data-component] *::before),
+  .hud-theme--modern :global([data-component] *::after) {
+    scroll-behavior: auto !important;
+    transition-duration: 0ms !important;
+  }
+}

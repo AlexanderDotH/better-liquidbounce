@@ -23,6 +23,7 @@ export interface EventMap {
     themeColorChange: ThemeColorChangeEvent;
     clickGuiScaleChange: ClickGuiScaleChangeEvent;
     clickGuiValueChange: ClickGuiValueChangeEvent;
+    hudValueChange: HudValueChangeEvent;
     spaceSeperatedNamesChange: SpaceSeperatedNamesChangeEvent;
     clientLanguageChanged: void;
     valueChanged: ValueChangedEvent;
@@ -85,6 +86,10 @@ export interface ThemeColorChangeEvent {
 }
 
 export interface ClickGuiValueChangeEvent {
+    configurable: ConfigurableSetting;
+}
+
+export interface HudValueChangeEvent {
     configurable: ConfigurableSetting;
 }
 

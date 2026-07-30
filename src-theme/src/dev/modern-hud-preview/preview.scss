@@ -1,0 +1,96 @@
+html,
+body,
+#preview-app {
+    width: 100%;
+    height: 100%;
+}
+
+body {
+    background: #7da7c7;
+}
+
+.preview-world {
+    position: fixed;
+    inset: 0;
+    overflow: hidden;
+    background:
+        linear-gradient(180deg, #789ebd 0 45%, #9fb4bf 45% 51%, #53664c 51% 100%);
+    pointer-events: none;
+}
+
+.preview-world::before {
+    content: "";
+    position: absolute;
+    inset: 0 0 49%;
+    background:
+        radial-gradient(circle at 76% 18%, #f7e2a2 0 4.5%, transparent 4.7%),
+        linear-gradient(13deg, transparent 0 42%, rgba(255, 255, 255, 0.24) 42.3% 45%, transparent 45.3%),
+        linear-gradient(-9deg, transparent 0 56%, rgba(255, 255, 255, 0.18) 56.3% 59%, transparent 59.3%);
+}
+
+.preview-world::after {
+    content: "";
+    position: absolute;
+    inset: 49% 0 0;
+    background:
+        linear-gradient(135deg, transparent 0 47%, rgba(29, 39, 31, 0.34) 47% 52%, transparent 52%) 0 0 / 96px 96px,
+        linear-gradient(45deg, rgba(255, 255, 255, 0.055) 25%, transparent 25% 75%, rgba(0, 0, 0, 0.07) 75%) 0 0 / 48px 48px,
+        linear-gradient(180deg, #5f7554, #33402f);
+    box-shadow: inset 0 16px 40px rgba(20, 27, 23, 0.24);
+}
+
+.preview-ridge {
+    position: absolute;
+    left: -4%;
+    right: -4%;
+    bottom: 36%;
+    height: 22%;
+    background:
+        linear-gradient(145deg, transparent 0 26%, #46564b 26.4% 51%, transparent 51.4%) 0 100% / 360px 210px repeat-x;
+    filter: drop-shadow(0 12px 14px rgba(21, 27, 24, 0.18));
+}
+
+#preview-app {
+    position: fixed;
+    inset: 0;
+    z-index: 2;
+}
+
+#preview-app [data-preview-resource="skin"] {
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    scale: 1;
+}
+
+.preview-notice {
+    position: fixed;
+    right: 14px;
+    bottom: 12px;
+    z-index: 100000;
+    padding: 7px 10px;
+    color: rgba(238, 241, 245, 0.72);
+    background: rgba(9, 11, 15, 0.8);
+    border: 1px solid rgba(255, 255, 255, 0.09);
+    border-radius: 999px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.24);
+    font: 500 10px/1.35 "Inter", sans-serif;
+    letter-spacing: 0.02em;
+    pointer-events: none;
+}
+
+.preview-notice strong {
+    color: #eef1f5;
+    font-weight: 650;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .preview-world *,
+    #preview-app * {
+        scroll-behavior: auto !important;
+        transition-duration: 0.01ms !important;
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+    }
+}

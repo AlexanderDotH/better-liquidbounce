@@ -646,6 +646,7 @@
   "liquidbounce.module.holeESP.description": "Detects and displays safe spots for crystal PvP.",
   "liquidbounce.module.holeFiller.description": "Automatically fills safe spots for crystal PvP.",
   "liquidbounce.module.hud.description": "Shows an in-game overlay with various useful tools.",
+  "liquidbounce.module.hud.theme.description": "Selects the visual style used by the in-game HUD.",
   "liquidbounce.module.hud.messages.hidingAppearance": "The client appearance is currently hidden. Use '.client appearance show' to re-enable it.",
   "liquidbounce.module.autoTrap.description": "Automatically sets targets on fire or traps them in cobwebs.",
   "liquidbounce.module.blockTrap.description": "Traps enemies in blocks.",

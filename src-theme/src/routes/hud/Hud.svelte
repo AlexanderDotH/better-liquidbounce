@@ -21,12 +21,16 @@
     import GenericPlayerInventory from "./elements/inventory/GenericPlayerInventory.svelte";
     import {os} from "../clickgui/clickgui_store";
     import InventoryStatistics from "./elements/inventory/InventoryStatistics.svelte";
+    import ModernWatermark from "./themes/modern/ModernWatermark.svelte";
+    import {hudThemeSession} from "./theme/themeSession";
+    import type {HudValueChangeEvent} from "../../integration/events";
 
     let zoom = 100;
     let metadata: Metadata;
     let components: HudComponent[] = [];
 
     onMount(async () => {
+        void hudThemeSession.load();
         $os = (await getClientInfo()).os;
 
         const gameWindow = await getGameWindow();
@@ -50,14 +54,29 @@
         components = [];
         components = data.components;
     });
+
+    listen("hudValueChange", (event: HudValueChangeEvent) => {
+        if (event.configurable.name === "HUD") {
+            hudThemeSession.synchronize(event.configurable);
+        }
+    });
 </script>
 
-<div class="hud" style="zoom: {zoom}%">
+<div
+        class="hud"
+        class:hud-theme--classic={$hudThemeSession.theme === "Classic"}
+        class:hud-theme--modern={$hudThemeSession.theme === "Modern"}
+        style="zoom: {zoom}%"
+>
     {#each components as c}
         {#if c.settings.enabled}
-            <DraggableComponent alignment={c.settings.alignment} >
+            <DraggableComponent alignment={c.settings.alignment} componentName={c.name}>
                 {#if c.name === "Watermark"}
-                    <Watermark/>
+                    {#if $hudThemeSession.theme === "Modern"}
+                        <ModernWatermark/>
+                    {:else}
+                        <Watermark/>
+                    {/if}
                 {:else if c.name === "ArrayList"}
                     <ArrayList settings={c.settings}/>
                 {:else if c.name === "TabGui"}
@@ -106,8 +125,11 @@
 </div>
 
 <style lang="scss">
+  @use "./themes/modern/modernHud";
+
   .hud {
     height: 100vh;
     width: 100vw;
+    background: transparent;
   }
 </style>

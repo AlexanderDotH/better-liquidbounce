@@ -21,9 +21,11 @@ package net.ccbluex.liquidbounce.features.module.modules.render
 import net.ccbluex.liquidbounce.config.ConfigSystem
 import net.ccbluex.liquidbounce.config.types.group.ToggleableValueGroup
 import net.ccbluex.liquidbounce.config.types.group.ValueGroup
+import net.ccbluex.liquidbounce.config.types.list.Tagged
 import net.ccbluex.liquidbounce.event.EventManager
 import net.ccbluex.liquidbounce.event.events.BrowserReadyEvent
 import net.ccbluex.liquidbounce.event.events.DisconnectEvent
+import net.ccbluex.liquidbounce.event.events.HudValueChangeEvent
 import net.ccbluex.liquidbounce.event.events.ScreenEvent
 import net.ccbluex.liquidbounce.event.events.SpaceSeperatedNamesChangeEvent
 import net.ccbluex.liquidbounce.event.handler
@@ -49,6 +51,18 @@ import net.minecraft.client.gui.screens.LevelLoadingScreen
  * The client in-game dashboard.
  */
 
+enum class HudTheme(override val tag: String) : Tagged {
+    CLASSIC("Classic"),
+    MODERN("Modern"),
+}
+
+internal fun ValueGroup.hudThemeChoice() = enumChoice("Theme", HudTheme.MODERN).apply {
+    val hud = this@hudThemeChoice
+    onChanged {
+        EventManager.callEvent(HudValueChangeEvent(hud))
+    }
+}
+
 object ModuleHud : ClientModule("HUD", ModuleCategories.RENDER, state = true, hide = true) {
 
     override val running
@@ -58,6 +72,8 @@ object ModuleHud : ClientModule("HUD", ModuleCategories.RENDER, state = true, hi
 
     private val isVisible: Boolean
         get() = !isHidingNow && inGame
+
+    val theme by hudThemeChoice()
 
     private var overlay = CustomOverlay(
         screenType = CustomScreenType.HUD,

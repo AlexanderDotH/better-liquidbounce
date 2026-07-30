@@ -1,6 +1,7 @@
 <script lang="ts">
     import {onMount} from "svelte";
     import type {ConfigurableSetting as ConfigurableSettingData} from "../../../integration/types";
+    import HudThemeSelector from "../../hud/theme/HudThemeSelector.svelte";
     import ConfigurableSetting from "../setting/ConfigurableSetting.svelte";
     import WindowPanel from "./WindowPanel.svelte";
     import {
@@ -120,6 +121,8 @@
             <span class="theme-save-status" role="status">Saving theme…</span>
         {/if}
     </section>
+
+    <HudThemeSelector variant="compact" />
 
     {#if globalLoading && !globalSettings}
         <div class="global-status" role="status">Loading global settings…</div>

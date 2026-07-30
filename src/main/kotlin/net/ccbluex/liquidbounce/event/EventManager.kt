@@ -72,6 +72,7 @@ import net.ccbluex.liquidbounce.event.events.GameRenderEvent
 import net.ccbluex.liquidbounce.event.events.GameRenderTaskQueueEvent
 import net.ccbluex.liquidbounce.event.events.GameTickEvent
 import net.ccbluex.liquidbounce.event.events.HealthUpdateEvent
+import net.ccbluex.liquidbounce.event.events.HudValueChangeEvent
 import net.ccbluex.liquidbounce.event.events.InputHandleEvent
 import net.ccbluex.liquidbounce.event.events.ItemLoreQueryEvent
 import net.ccbluex.liquidbounce.event.events.KeyEvent
@@ -260,6 +261,7 @@ internal val ALL_EVENT_CLASSES: Array<Class<out Event>> = arrayOf(
     ItemLoreQueryEvent::class.java,
     EntityEquipmentChangeEvent::class.java,
     ClickGuiValueChangeEvent::class.java,
+    HudValueChangeEvent::class.java,
     BlockAttackEvent::class.java,
     BlinkPacketEvent::class.java,
     AllowAutoJumpEvent::class.java,
