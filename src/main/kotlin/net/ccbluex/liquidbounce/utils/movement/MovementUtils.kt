@@ -32,10 +32,20 @@ import net.ccbluex.liquidbounce.utils.math.rangeTo
 import net.minecraft.client.player.LocalPlayer
 import net.minecraft.core.BlockPos
 import net.minecraft.util.Mth
+import net.minecraft.world.effect.MobEffects
 import net.minecraft.world.entity.Pose
 import net.minecraft.world.phys.AABB
 import net.minecraft.world.phys.Vec3
 
+/**
+ * Returns the movement speed of the player including the potion speed amplifier
+ * Mostly used for backwards compatibility from movement modules of old hacked clients
+ */
+internal fun LocalPlayer.getCalculatedBaseMovementSpeed(): Double {
+    val baseMoveSpeed = 0.2873
+    val speedLevel = (getEffect(MobEffects.SPEED)?.amplifier ?: -1) + 1
+    return baseMoveSpeed * (1.0 + 0.2 * speedLevel.coerceAtLeast(0))
+}
 
 /**
  * Returns the yaw difference the position is from the player position

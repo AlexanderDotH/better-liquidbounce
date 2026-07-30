@@ -150,6 +150,7 @@ export interface IntRangeSetting extends Setting<Range> {
 export interface ChoiceSetting extends Setting<ModuleSetting[]> {
     active: string;
     choices: { [name: string]: ModuleSetting }
+    categories?: { [name: string]: string[] }
 }
 
 export interface ChooseSetting extends Setting<string> {
@@ -347,11 +348,19 @@ export interface FritzBoxReconnectRequest {
 
 export interface Account {
     avatar: string;
+    bans: Record<string, AccountBan>;
+    workingServers: string[];
     favorite: boolean;
     id: number;
     type: string;
     username: string;
     uuid: string;
+}
+
+export interface AccountBan {
+    serverName: string;
+    reason: string;
+    bannedUntil: number;
 }
 
 export interface World {

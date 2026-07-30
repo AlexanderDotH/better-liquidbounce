@@ -57,7 +57,9 @@ import net.ccbluex.liquidbounce.features.module.modules.movement.speed.modes.mat
 import net.ccbluex.liquidbounce.features.module.modules.movement.speed.modes.ncp.SpeedNCP
 import net.ccbluex.liquidbounce.features.module.modules.movement.speed.modes.sentinel.SpeedSentinelDamage
 import net.ccbluex.liquidbounce.features.module.modules.movement.speed.modes.sentinel.SpeedSentinelFastHop
+import net.ccbluex.liquidbounce.features.module.modules.movement.speed.modes.sentinel.SpeedSentinelLowHop
 import net.ccbluex.liquidbounce.features.module.modules.movement.speed.modes.sentinel.SpeedSentinelOnGround
+import net.ccbluex.liquidbounce.features.module.modules.movement.speed.modes.sentinel.SpeedSentinelStrafeHop
 import net.ccbluex.liquidbounce.features.module.modules.movement.speed.modes.spartan.SpeedSpartanV4043
 import net.ccbluex.liquidbounce.features.module.modules.movement.speed.modes.spartan.SpeedSpartanV4043FastFall
 import net.ccbluex.liquidbounce.features.module.modules.movement.speed.modes.vanilla.SpeedGround
@@ -80,6 +82,9 @@ import java.util.function.BooleanSupplier
  * Allows you to move faster.
  */
 object ModuleSpeed : ClientModule("Speed", ModuleCategories.MOVEMENT) {
+
+    private const val SPEED_MODES_PACKAGE =
+        "net.ccbluex.liquidbounce.features.module.modules.movement.speed.modes"
 
     /**
      * Initialize speeds choices independently
@@ -128,6 +133,8 @@ object ModuleSpeed : ClientModule("Speed", ModuleCategories.MOVEMENT) {
         SpeedGWENHighHop(modeValueGroup),
         SpeedGround(modeValueGroup),
         SpeedSentinelFastHop(modeValueGroup),
+        SpeedSentinelLowHop(modeValueGroup),
+        SpeedSentinelStrafeHop(modeValueGroup),
         SpeedSentinelOnGround(modeValueGroup),
         SpeedVenomGround(modeValueGroup),
         SpeedWatchdog(modeValueGroup),
@@ -140,7 +147,9 @@ object ModuleSpeed : ClientModule("Speed", ModuleCategories.MOVEMENT) {
         SpeedMatrix7(modeValueGroup)
     )
 
-    val modes = choices("Mode", 0, this::initializeSpeeds).apply(::tagBy)
+    val modes = choices("Mode", 0, this::initializeSpeeds)
+        .categorizedBy(::speedCategory)
+        .apply(::tagBy)
 
     private val notCondition by multiEnumChoice("Not", NotCondition.SCAFFOLD)
 
@@ -172,9 +181,27 @@ object ModuleSpeed : ClientModule("Speed", ModuleCategories.MOVEMENT) {
         else -> !notCondition.any { it.condition.asBoolean }
     }
 
+    private fun speedCategory(mode: Mode): String {
+        val category = mode.javaClass.packageName
+            .removePrefix(SPEED_MODES_PACKAGE)
+            .removePrefix(".")
+            .substringBefore('.')
+
+        return when (category) {
+            "" -> "General"
+            "aac" -> "AAC"
+            "blocksmc" -> "BlocksMC"
+            "gwen" -> "GWEN"
+            "ncp" -> "NCP"
+            "watchdog" -> "Hypixel"
+            else -> category.replaceFirstChar { it.uppercase() }
+        }
+    }
+
     private object OnlyInCombat : ToggleableValueGroup(this, "OnlyInCombat", false) {
 
         val modes = modes(this, "Mode", activeIndex = 0, ModuleSpeed::initializeSpeeds)
+            .categorizedBy(ModuleSpeed::speedCategory)
 
         /**
          * Controls [modes] activation state.
@@ -198,6 +225,7 @@ object ModuleSpeed : ClientModule("Speed", ModuleCategories.MOVEMENT) {
         )
 
         val modes = modes(this, "Mode", activeIndex = 0, ModuleSpeed::initializeSpeeds)
+            .categorizedBy(ModuleSpeed::speedCategory)
 
         /**
          * Controls [modes] activation state.

@@ -24,8 +24,8 @@ import net.ccbluex.liquidbounce.event.events.PacketEvent
 import net.ccbluex.liquidbounce.event.handler
 import net.ccbluex.liquidbounce.event.tickHandler
 import net.ccbluex.liquidbounce.features.module.modules.movement.sentinel.isSentinelOutgoingMovementPacket
-import net.ccbluex.liquidbounce.features.module.modules.movement.speed.modes.revive.setReviveSpeed
 import net.ccbluex.liquidbounce.utils.entity.moving
+import net.ccbluex.liquidbounce.utils.entity.withStrafe
 import kotlin.random.Random
 
 class SpeedSentinelOnGround(override val parent: ModeValueGroup<*>) : Mode("SentinelOnGround") {
@@ -38,7 +38,7 @@ class SpeedSentinelOnGround(override val parent: ModeValueGroup<*>) : Mode("Sent
         moveSpeed = 0f
         cancelPackets = true
         scheduleRelease()
-        player.setReviveSpeed(0.0)
+        player.deltaMovement = player.deltaMovement.withStrafe(speed = 0.0)
         super.enable()
     }
 
@@ -58,7 +58,7 @@ class SpeedSentinelOnGround(override val parent: ModeValueGroup<*>) : Mode("Sent
         }
 
         if (player.moving) {
-            player.setReviveSpeed(moveSpeed.toDouble())
+            player.deltaMovement = player.deltaMovement.withStrafe(speed = moveSpeed.toDouble())
         }
     }
 

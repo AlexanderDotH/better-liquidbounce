@@ -23,12 +23,14 @@ import net.ccbluex.liquidbounce.config.types.group.ModeValueGroup
 import net.ccbluex.liquidbounce.event.events.MovementInputEvent
 import net.ccbluex.liquidbounce.event.handler
 import net.ccbluex.liquidbounce.event.tickHandler
+import net.ccbluex.liquidbounce.features.module.modules.movement.speed.ModuleSpeed
 import net.ccbluex.liquidbounce.features.module.modules.movement.speed.ModuleSpeed.doOptimizationsPreventJump
-import net.ccbluex.liquidbounce.features.module.modules.movement.speed.modes.revive.offsetReviveMotionY
-import net.ccbluex.liquidbounce.features.module.modules.movement.speed.modes.revive.requestReviveTimer
-import net.ccbluex.liquidbounce.features.module.modules.movement.speed.modes.revive.reviveBaseMoveSpeed
-import net.ccbluex.liquidbounce.features.module.modules.movement.speed.modes.revive.setReviveSpeed
+import net.ccbluex.liquidbounce.utils.client.Timer
 import net.ccbluex.liquidbounce.utils.entity.moving
+import net.ccbluex.liquidbounce.utils.entity.withStrafe
+import net.ccbluex.liquidbounce.utils.kotlin.Priority
+import net.ccbluex.liquidbounce.utils.math.copy
+import net.ccbluex.liquidbounce.utils.movement.getCalculatedBaseMovementSpeed
 
 class SpeedBlockdrop(override val parent: ModeValueGroup<*>) : Mode("Blockdrop") {
 
@@ -54,7 +56,7 @@ class SpeedBlockdrop(override val parent: ModeValueGroup<*>) : Mode("Blockdrop")
 
         if (player.onGround()) {
             backSwitch = !backSwitch
-            player.setReviveSpeed(0.1)
+            player.deltaMovement = player.deltaMovement.withStrafe(speed = 0.1)
         }
 
         if (backSwitch) {
@@ -63,18 +65,20 @@ class SpeedBlockdrop(override val parent: ModeValueGroup<*>) : Mode("Blockdrop")
         }
 
         if (player.fallDistance > 0f) {
-            player.setReviveSpeed(0.2)
+            player.deltaMovement = player.deltaMovement.withStrafe(speed = 0.2)
         }
-        requestReviveTimer(1.1f)
+        Timer.requestTimerSpeed(1.1f, Priority.IMPORTANT_FOR_USAGE_1, ModuleSpeed)
     }
 
     private fun handleFastHalf() {
-        player.setReviveSpeed(player.reviveBaseMoveSpeed() + 0.1)
-        player.offsetReviveMotionY(0.008)
-        requestReviveTimer(1.2f)
+        player.deltaMovement = player.deltaMovement.withStrafe(
+            speed = player.getCalculatedBaseMovementSpeed() + 0.1
+        )
+        player.deltaMovement = player.deltaMovement.copy(y = player.deltaMovement.y + 0.008)
+        Timer.requestTimerSpeed(1.2f, Priority.IMPORTANT_FOR_USAGE_1, ModuleSpeed)
 
         if (player.fallDistance > 0.5f) {
-            player.setReviveSpeed(0.2)
+            player.deltaMovement = player.deltaMovement.withStrafe(speed = 0.2)
         }
     }
 

@@ -45,6 +45,13 @@ class ModeValueGroup<T : Mode>(
     var activeMode: T = defaultMode
         private set
 
+    @Exclude
+    @ProtocolExclude
+    private var categorySelector: ((T) -> String)? = null
+
+    val categories: Map<String, List<T>>
+        get() = categorySelector?.let(modes::groupBy).orEmpty()
+
     init {
         for (choice in modes) {
             choice.base = this
@@ -99,6 +106,14 @@ class ModeValueGroup<T : Mode>(
 
     @ScriptApiRequired
     fun getModeStrings(): Array<String> = modes.mapToArray { it.name }
+
+    fun categorizedBy(categorySelector: (T) -> String): ModeValueGroup<T> = apply {
+        require(modes.all { categorySelector(it).isNotBlank() }) {
+            "Mode categories must not be blank"
+        }
+
+        this.categorySelector = categorySelector
+    }
 
 }
 

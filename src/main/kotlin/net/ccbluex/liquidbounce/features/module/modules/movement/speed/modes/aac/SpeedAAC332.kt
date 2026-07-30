@@ -22,11 +22,13 @@ import net.ccbluex.liquidbounce.config.types.group.ModeValueGroup
 import net.ccbluex.liquidbounce.event.events.PlayerJumpEvent
 import net.ccbluex.liquidbounce.event.handler
 import net.ccbluex.liquidbounce.event.tickHandler
+import net.ccbluex.liquidbounce.features.module.modules.movement.speed.ModuleSpeed
 import net.ccbluex.liquidbounce.features.module.modules.movement.speed.modes.SpeedBHopBase
-import net.ccbluex.liquidbounce.features.module.modules.movement.speed.modes.revive.requestReviveTimer
-import net.ccbluex.liquidbounce.features.module.modules.movement.speed.modes.revive.reviveBaseMoveSpeed
-import net.ccbluex.liquidbounce.features.module.modules.movement.speed.modes.revive.setReviveSpeed
+import net.ccbluex.liquidbounce.utils.client.Timer
 import net.ccbluex.liquidbounce.utils.entity.moving
+import net.ccbluex.liquidbounce.utils.entity.withStrafe
+import net.ccbluex.liquidbounce.utils.kotlin.Priority
+import net.ccbluex.liquidbounce.utils.movement.getCalculatedBaseMovementSpeed
 
 class SpeedAAC332(parent: ModeValueGroup<*>) : SpeedBHopBase("AAC332", parent) {
 
@@ -37,13 +39,17 @@ class SpeedAAC332(parent: ModeValueGroup<*>) : SpeedBHopBase("AAC332", parent) {
         }
 
         if (player.onGround()) {
-            player.setReviveSpeed(player.reviveBaseMoveSpeed() + 0.06)
+            player.deltaMovement = player.deltaMovement.withStrafe(
+                speed = player.getCalculatedBaseMovementSpeed() + 0.06
+            )
             return@tickHandler
         }
 
-        player.setReviveSpeed(player.reviveBaseMoveSpeed() - 0.008)
+        player.deltaMovement = player.deltaMovement.withStrafe(
+            speed = player.getCalculatedBaseMovementSpeed() - 0.008
+        )
         if (player.fallDistance > 0.41f) {
-            requestReviveTimer(1.2f)
+            Timer.requestTimerSpeed(1.2f, Priority.IMPORTANT_FOR_USAGE_1, ModuleSpeed)
         }
     }
 

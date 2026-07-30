@@ -33,6 +33,7 @@ import net.ccbluex.liquidbounce.authlib.account.CrackedAccount
 import net.ccbluex.liquidbounce.authlib.account.MicrosoftAccount
 import net.ccbluex.liquidbounce.authlib.account.MinecraftAccount
 import net.ccbluex.liquidbounce.authlib.account.SessionAccount
+import net.ccbluex.liquidbounce.authlib.bantracker.Ban
 import net.ccbluex.liquidbounce.authlib.yggdrasil.clientIdentifier
 import net.ccbluex.liquidbounce.config.ConfigSystem
 import net.ccbluex.liquidbounce.config.types.Config
@@ -390,6 +391,32 @@ object AccountManager : Config("Accounts"), EventListener {
         EventManager.callEvent(SessionEvent(mc.user))
         EventManager.callEvent(AccountManagerLoginResultEvent(username = mc.user.name))
     }
+
+    internal fun trackCurrentAccountBan(serverName: String, reason: String, bannedUntil: Long): Boolean {
+        val account = currentAccount() ?: return false
+
+        account.trackBan(Ban(serverName, reason, bannedUntil))
+        AccountServerAccessRegistry.markUnavailable(account, serverName)
+        ConfigSystem.store(this@AccountManager)
+        return true
+    }
+
+    internal fun trackCurrentAccountServerAccess(serverName: String): Boolean {
+        val account = currentAccount() ?: return false
+        val normalizedServerName = normalizeServerName(serverName)
+        val matchingBans = account.bans.keys.filter { serverNamesMatch(it, normalizedServerName) }
+
+        matchingBans.forEach(account::untrackBan)
+        val accessChanged = AccountServerAccessRegistry.markWorking(account, normalizedServerName)
+        if (matchingBans.isNotEmpty() || accessChanged) {
+            ConfigSystem.store(this@AccountManager)
+        }
+        return true
+    }
+
+    private fun currentAccount(): MinecraftAccount? =
+        accounts.firstOrNull { it.profile?.uuid == mc.user.profileId }
+            ?: accounts.firstOrNull { it.profile?.username.equals(mc.user.name, ignoreCase = true) }
 
     fun favoriteAccount(id: Int) {
         val account = accounts.getOrNull(id) ?: error("Account not found!")

@@ -20,9 +20,11 @@ package net.ccbluex.liquidbounce.features.module.modules.movement.speed.modes.in
 
 import net.ccbluex.liquidbounce.config.types.group.ModeValueGroup
 import net.ccbluex.liquidbounce.event.tickHandler
+import net.ccbluex.liquidbounce.features.module.modules.movement.speed.ModuleSpeed
 import net.ccbluex.liquidbounce.features.module.modules.movement.speed.modes.SpeedBHopBase
-import net.ccbluex.liquidbounce.features.module.modules.movement.speed.modes.revive.requestReviveTimer
+import net.ccbluex.liquidbounce.utils.client.Timer
 import net.ccbluex.liquidbounce.utils.entity.moving
+import net.ccbluex.liquidbounce.utils.kotlin.Priority
 
 class SpeedIntave(parent: ModeValueGroup<*>) : SpeedBHopBase("Intave", parent) {
 
@@ -32,12 +34,14 @@ class SpeedIntave(parent: ModeValueGroup<*>) : SpeedBHopBase("Intave", parent) {
             return@tickHandler
         }
 
-        requestReviveTimer(
+        Timer.requestTimerSpeed(
             when {
                 player.fallDistance > 0.1f -> 0.95f
                 player.deltaMovement.y > 0.0 -> 1.15f
                 else -> 1f
-            }
+            },
+            Priority.IMPORTANT_FOR_USAGE_1,
+            ModuleSpeed
         )
     }
 

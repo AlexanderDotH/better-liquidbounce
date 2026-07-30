@@ -30,7 +30,6 @@ import net.ccbluex.liquidbounce.features.module.modules.combat.criticals.modes.C
 import net.ccbluex.liquidbounce.features.module.modules.exploit.ModuleAntiReducedDebugInfo;
 import net.ccbluex.liquidbounce.features.module.modules.exploit.ModuleNoAdventure;
 import net.ccbluex.liquidbounce.features.module.modules.movement.ModuleNoClip;
-import net.ccbluex.liquidbounce.features.module.modules.movement.ModulePose;
 import net.ccbluex.liquidbounce.features.module.modules.movement.ModuleSprint;
 import net.ccbluex.liquidbounce.features.module.modules.player.ModuleReach;
 import net.ccbluex.liquidbounce.features.module.modules.player.nofall.modes.NoFallNoGround;
@@ -46,7 +45,6 @@ import net.minecraft.sounds.SoundEvents;
 import net.minecraft.sounds.SoundSource;
 import net.minecraft.world.damagesource.DamageSource;
 import net.minecraft.world.entity.Entity;
-import net.minecraft.world.entity.Pose;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.level.GameType;
 import net.minecraft.world.level.Level;
@@ -81,15 +79,6 @@ public abstract class MixinPlayer extends MixinLivingEntity {
     @ModifyReturnValue(method = {"getPlainTextName", "getScoreboardName"}, at = @At("RETURN"))
     private String hookAmnesiaPlainName(String original) {
         return PlayerModelAppearanceHook.replacePlainName((Player) (Object) this, original);
-    }
-
-    @ModifyReturnValue(method = "getDesiredPose", at = @At("RETURN"))
-    private Pose hookDesiredPose(Pose original) {
-        if (!liquid_bounce$isClientPlayer()) {
-            return original;
-        }
-
-        return ModulePose.INSTANCE.modifyDesiredPose(original);
     }
 
     /**

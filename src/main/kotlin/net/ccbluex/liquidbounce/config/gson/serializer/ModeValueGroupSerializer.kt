@@ -56,6 +56,16 @@ class ModeValueGroupSerializer private constructor(
 
         obj.add("choices", choices)
         if (withValueType) {
+            if (src.categories.isNotEmpty()) {
+                val categories = JsonObject()
+
+                for ((category, modes) in src.categories) {
+                    categories.add(category, context.serialize(modes.map { it.tag }))
+                }
+
+                obj.add("categories", categories)
+            }
+
             obj.add("valueType", context.serialize(src.valueType))
         }
 

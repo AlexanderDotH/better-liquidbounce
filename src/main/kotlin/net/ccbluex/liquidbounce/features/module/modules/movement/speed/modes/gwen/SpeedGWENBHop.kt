@@ -22,10 +22,12 @@ import net.ccbluex.liquidbounce.config.types.group.ModeValueGroup
 import net.ccbluex.liquidbounce.event.events.PlayerJumpEvent
 import net.ccbluex.liquidbounce.event.handler
 import net.ccbluex.liquidbounce.event.tickHandler
+import net.ccbluex.liquidbounce.features.module.modules.movement.speed.ModuleSpeed
 import net.ccbluex.liquidbounce.features.module.modules.movement.speed.modes.SpeedBHopBase
-import net.ccbluex.liquidbounce.features.module.modules.movement.speed.modes.revive.requestReviveTimer
-import net.ccbluex.liquidbounce.features.module.modules.movement.speed.modes.revive.setReviveSpeed
+import net.ccbluex.liquidbounce.utils.client.Timer
 import net.ccbluex.liquidbounce.utils.entity.moving
+import net.ccbluex.liquidbounce.utils.entity.withStrafe
+import net.ccbluex.liquidbounce.utils.kotlin.Priority
 
 class SpeedGWENBHop(parent: ModeValueGroup<*>) : SpeedBHopBase("GWENBHop", parent) {
 
@@ -43,8 +45,12 @@ class SpeedGWENBHop(parent: ModeValueGroup<*>) : SpeedBHopBase("GWENBHop", paren
         }
 
         val exhausted = motionTicks > 7f
-        requestReviveTimer(if (exhausted) 1f else 1.3f)
-        player.setReviveSpeed(if (exhausted) 0.4 else 0.45)
+        Timer.requestTimerSpeed(
+            if (exhausted) 1f else 1.3f,
+            Priority.IMPORTANT_FOR_USAGE_1,
+            ModuleSpeed
+        )
+        player.deltaMovement = player.deltaMovement.withStrafe(speed = if (exhausted) 0.4 else 0.45)
 
         if (!exhausted) {
             motionTicks += 1f
@@ -53,7 +59,7 @@ class SpeedGWENBHop(parent: ModeValueGroup<*>) : SpeedBHopBase("GWENBHop", paren
 
     @Suppress("unused")
     private val jumpHandler = handler<PlayerJumpEvent> { event ->
-        player.setReviveSpeed(0.3)
+        player.deltaMovement = player.deltaMovement.withStrafe(speed = 0.3)
         event.motion -= 0.04f
         motionTicks = 0.1f
     }

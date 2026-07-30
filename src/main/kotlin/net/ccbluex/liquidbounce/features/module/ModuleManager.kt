@@ -135,7 +135,6 @@ import net.ccbluex.liquidbounce.features.module.modules.movement.ModuleNoJumpDel
 import net.ccbluex.liquidbounce.features.module.modules.movement.ModuleNoPose
 import net.ccbluex.liquidbounce.features.module.modules.movement.ModuleNoPush
 import net.ccbluex.liquidbounce.features.module.modules.movement.ModuleParkour
-import net.ccbluex.liquidbounce.features.module.modules.movement.ModulePose
 import net.ccbluex.liquidbounce.features.module.modules.movement.ModuleSafeWalk
 import net.ccbluex.liquidbounce.features.module.modules.movement.ModuleSneak
 import net.ccbluex.liquidbounce.features.module.modules.movement.ModuleSprint
@@ -584,7 +583,6 @@ object ModuleManager : EventListener, Collection<ClientModule> by modules {
             ModuleNoSlow,
             ModuleNoWeb,
             ModuleParkour,
-            ModulePose,
             ModuleEntityControl,
             ModuleSafeWalk,
             ModuleSneak,

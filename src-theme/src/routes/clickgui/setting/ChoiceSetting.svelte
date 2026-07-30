@@ -14,9 +14,16 @@
     const thisPath = `${path}.${cSetting.name}`;
 
     const dispatch = createEventDispatcher();
-    const options = Object.keys(cSetting.choices);
+    const allOptions = Object.keys(cSetting.choices);
+    const categories: Record<string, string[]> = cSetting.categories ?? {};
+    const categoryOptions = Object.keys(categories);
+    let activeCategory = categoryOptions.find((category) =>
+        categories[category].includes(cSetting.active)
+    ) ?? categoryOptions[0];
+    let options = allOptions;
+    $: options = activeCategory ? categories[activeCategory] ?? allOptions : allOptions;
     const extendedDescriptions = Object.fromEntries(
-        options.map((option) => [option, cSetting.choices[option]?.extendedDescription]),
+        allOptions.map((option) => [option, cSetting.choices[option]?.extendedDescription]),
     );
     let expanded = localStorage.getItem(thisPath) === "true";
 
@@ -32,12 +39,33 @@
         dispatch("change");
     }
 
+    function handleCategoryChange() {
+        const firstMode = categories[activeCategory]?.[0];
+        if (!firstMode) {
+            return;
+        }
+
+        cSetting.active = firstMode;
+        handleChange();
+    }
+
     function toggleExpanded() {
         expanded = !expanded;
     }
 </script>
 
 <div class="setting">
+    {#if categoryOptions.length > 0}
+        <div class="category">
+            <Dropdown
+                bind:value={activeCategory}
+                options={categoryOptions}
+                name="Category"
+                on:change={handleCategoryChange}
+            />
+        </div>
+    {/if}
+
     {#if nestedSettings.length > 0}
         <!-- svelte-ignore a11y-no-static-element-interactions -->
         <div class="head expand" class:expanded on:contextmenu|preventDefault={toggleExpanded}>
@@ -75,6 +103,10 @@
 
     .setting {
         padding: 7px 0px;
+
+        .category {
+            margin-bottom: 7px;
+        }
 
         .head {
           transition: ease margin-bottom .2s;

@@ -20,16 +20,18 @@ package net.ccbluex.liquidbounce.features.module.modules.movement.speed.modes.in
 
 import net.ccbluex.liquidbounce.config.types.group.ModeValueGroup
 import net.ccbluex.liquidbounce.event.tickHandler
+import net.ccbluex.liquidbounce.features.module.modules.movement.speed.ModuleSpeed
 import net.ccbluex.liquidbounce.features.module.modules.movement.speed.modes.SpeedBHopBase
-import net.ccbluex.liquidbounce.features.module.modules.movement.speed.modes.revive.requestReviveTimer
+import net.ccbluex.liquidbounce.utils.client.Timer
 import net.ccbluex.liquidbounce.utils.entity.moving
+import net.ccbluex.liquidbounce.utils.kotlin.Priority
 
 class SpeedIntaveInstant(parent: ModeValueGroup<*>) : SpeedBHopBase("IntaveInstant", parent) {
 
     @Suppress("unused")
     private val tickHandler = tickHandler {
         if (player.moving && !player.onGround() && player.fallDistance > 0f) {
-            requestReviveTimer(1.2f)
+            Timer.requestTimerSpeed(1.2f, Priority.IMPORTANT_FOR_USAGE_1, ModuleSpeed)
         }
     }
 

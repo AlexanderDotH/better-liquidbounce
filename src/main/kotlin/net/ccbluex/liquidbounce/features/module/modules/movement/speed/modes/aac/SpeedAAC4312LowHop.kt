@@ -20,9 +20,11 @@ package net.ccbluex.liquidbounce.features.module.modules.movement.speed.modes.aa
 
 import net.ccbluex.liquidbounce.config.types.group.ModeValueGroup
 import net.ccbluex.liquidbounce.event.tickHandler
+import net.ccbluex.liquidbounce.features.module.modules.movement.speed.ModuleSpeed
 import net.ccbluex.liquidbounce.features.module.modules.movement.speed.modes.SpeedBHopBase
-import net.ccbluex.liquidbounce.features.module.modules.movement.speed.modes.revive.requestReviveTimer
+import net.ccbluex.liquidbounce.utils.client.Timer
 import net.ccbluex.liquidbounce.utils.entity.moving
+import net.ccbluex.liquidbounce.utils.kotlin.Priority
 
 class SpeedAAC4312LowHop(parent: ModeValueGroup<*>) : SpeedBHopBase("AAC4312LowHop", parent) {
 
@@ -33,12 +35,16 @@ class SpeedAAC4312LowHop(parent: ModeValueGroup<*>) : SpeedBHopBase("AAC4312LowH
         }
 
         if (player.onGround()) {
-            requestReviveTimer(2f)
+            Timer.requestTimerSpeed(2f, Priority.IMPORTANT_FOR_USAGE_1, ModuleSpeed)
             return@tickHandler
         }
 
         if (player.fallDistance > 0.078356f) {
-            requestReviveTimer((player.fallDistance * 2.5).toFloat())
+            Timer.requestTimerSpeed(
+                (player.fallDistance * 2.5).toFloat(),
+                Priority.IMPORTANT_FOR_USAGE_1,
+                ModuleSpeed
+            )
         }
     }
 

@@ -22,11 +22,13 @@ import net.ccbluex.liquidbounce.config.types.group.ModeValueGroup
 import net.ccbluex.liquidbounce.event.events.PlayerJumpEvent
 import net.ccbluex.liquidbounce.event.handler
 import net.ccbluex.liquidbounce.event.tickHandler
+import net.ccbluex.liquidbounce.features.module.modules.movement.speed.ModuleSpeed
 import net.ccbluex.liquidbounce.features.module.modules.movement.speed.modes.SpeedBHopBase
-import net.ccbluex.liquidbounce.features.module.modules.movement.speed.modes.revive.offsetReviveMotionY
-import net.ccbluex.liquidbounce.features.module.modules.movement.speed.modes.revive.requestReviveTimer
-import net.ccbluex.liquidbounce.features.module.modules.movement.speed.modes.revive.setReviveSpeed
+import net.ccbluex.liquidbounce.utils.client.Timer
 import net.ccbluex.liquidbounce.utils.entity.moving
+import net.ccbluex.liquidbounce.utils.entity.withStrafe
+import net.ccbluex.liquidbounce.utils.kotlin.Priority
+import net.ccbluex.liquidbounce.utils.math.copy
 
 class SpeedGWENHighHop(parent: ModeValueGroup<*>) : SpeedBHopBase("GWENHighHop", parent) {
 
@@ -43,27 +45,27 @@ class SpeedGWENHighHop(parent: ModeValueGroup<*>) : SpeedBHopBase("GWENHighHop",
             return@tickHandler
         }
 
-        player.setReviveSpeed(0.45)
-        player.offsetReviveMotionY(0.015)
+        player.deltaMovement = player.deltaMovement.withStrafe(speed = 0.45)
+        player.deltaMovement = player.deltaMovement.copy(y = player.deltaMovement.y + 0.015)
         handleFallPhase()
     }
 
     @Suppress("unused")
     private val jumpHandler = handler<PlayerJumpEvent> {
-        player.setReviveSpeed(0.2)
+        player.deltaMovement = player.deltaMovement.withStrafe(speed = 0.2)
         motionTicks = 0.1f
     }
 
     private fun handleFallPhase() {
         if (player.fallDistance > 0f) {
-            player.offsetReviveMotionY(-0.005)
-            requestReviveTimer(1.2f)
+            player.deltaMovement = player.deltaMovement.copy(y = player.deltaMovement.y - 0.005)
+            Timer.requestTimerSpeed(1.2f, Priority.IMPORTANT_FOR_USAGE_1, ModuleSpeed)
         } else if (motionTicks < 1.1f) {
             motionTicks += 0.25f
         }
 
         if (player.fallDistance > 0.2f) {
-            requestReviveTimer(1f)
+            Timer.requestTimerSpeed(1f, Priority.IMPORTANT_FOR_USAGE_1, ModuleSpeed)
         }
     }
 

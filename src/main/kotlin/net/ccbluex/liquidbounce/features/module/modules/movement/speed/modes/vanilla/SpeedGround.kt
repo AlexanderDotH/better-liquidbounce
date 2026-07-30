@@ -21,9 +21,9 @@ package net.ccbluex.liquidbounce.features.module.modules.movement.speed.modes.va
 import net.ccbluex.liquidbounce.config.types.group.Mode
 import net.ccbluex.liquidbounce.config.types.group.ModeValueGroup
 import net.ccbluex.liquidbounce.event.tickHandler
-import net.ccbluex.liquidbounce.features.module.modules.movement.speed.modes.revive.reviveBaseMoveSpeed
-import net.ccbluex.liquidbounce.features.module.modules.movement.speed.modes.revive.setReviveSpeed
 import net.ccbluex.liquidbounce.utils.entity.moving
+import net.ccbluex.liquidbounce.utils.entity.withStrafe
+import net.ccbluex.liquidbounce.utils.movement.getCalculatedBaseMovementSpeed
 
 class SpeedGround(override val parent: ModeValueGroup<*>) : Mode("Ground") {
 
@@ -32,7 +32,9 @@ class SpeedGround(override val parent: ModeValueGroup<*>) : Mode("Ground") {
     @Suppress("unused")
     private val tickHandler = tickHandler {
         if (player.moving) {
-            player.setReviveSpeed(player.reviveBaseMoveSpeed() * multiplier)
+            player.deltaMovement = player.deltaMovement.withStrafe(
+                speed = player.getCalculatedBaseMovementSpeed() * multiplier
+            )
         }
     }
 

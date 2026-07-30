@@ -23,9 +23,9 @@ import net.ccbluex.liquidbounce.event.events.PlayerJumpEvent
 import net.ccbluex.liquidbounce.event.handler
 import net.ccbluex.liquidbounce.event.tickHandler
 import net.ccbluex.liquidbounce.features.module.modules.movement.speed.modes.SpeedBHopBase
-import net.ccbluex.liquidbounce.features.module.modules.movement.speed.modes.revive.reviveBaseMoveSpeed
-import net.ccbluex.liquidbounce.features.module.modules.movement.speed.modes.revive.setReviveSpeed
 import net.ccbluex.liquidbounce.utils.entity.moving
+import net.ccbluex.liquidbounce.utils.entity.withStrafe
+import net.ccbluex.liquidbounce.utils.movement.getCalculatedBaseMovementSpeed
 
 class SpeedSentinelFastHop(parent: ModeValueGroup<*>) : SpeedBHopBase("SentinelFastHop", parent) {
 
@@ -45,11 +45,15 @@ class SpeedSentinelFastHop(parent: ModeValueGroup<*>) : SpeedBHopBase("SentinelF
         }
 
         if (player.fallDistance > 0.2f) {
-            player.setReviveSpeed(player.reviveBaseMoveSpeed() - 0.08)
+            player.deltaMovement = player.deltaMovement.withStrafe(
+                speed = player.getCalculatedBaseMovementSpeed() - 0.08
+            )
         }
 
         if (motionTicks > 1f && canBoost) {
-            player.setReviveSpeed(player.reviveBaseMoveSpeed() + 0.3)
+            player.deltaMovement = player.deltaMovement.withStrafe(
+                speed = player.getCalculatedBaseMovementSpeed() + 0.3
+            )
             canBoost = false
             return@tickHandler
         }

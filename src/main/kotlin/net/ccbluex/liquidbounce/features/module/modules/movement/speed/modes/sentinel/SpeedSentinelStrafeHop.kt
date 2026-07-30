@@ -16,20 +16,27 @@
  * You should have received a copy of the GNU General Public License
  * along with LiquidBounce. If not, see <https://www.gnu.org/licenses/>.
  */
-package net.ccbluex.liquidbounce.features.module.modules.movement.speed.modes.watchdog
+package net.ccbluex.liquidbounce.features.module.modules.movement.speed.modes.sentinel
 
 import net.ccbluex.liquidbounce.config.types.group.ModeValueGroup
+import net.ccbluex.liquidbounce.event.events.PlayerJumpEvent
+import net.ccbluex.liquidbounce.event.handler
 import net.ccbluex.liquidbounce.event.tickHandler
-import net.ccbluex.liquidbounce.features.module.modules.movement.speed.ModuleSpeed
 import net.ccbluex.liquidbounce.features.module.modules.movement.speed.modes.SpeedBHopBase
-import net.ccbluex.liquidbounce.utils.client.Timer
 import net.ccbluex.liquidbounce.utils.entity.moving
 import net.ccbluex.liquidbounce.utils.entity.withStrafe
-import net.ccbluex.liquidbounce.utils.kotlin.Priority
 import net.ccbluex.liquidbounce.utils.movement.getCalculatedBaseMovementSpeed
-import kotlin.random.Random
 
-class SpeedWatchdog(parent: ModeValueGroup<*>) : SpeedBHopBase("Watchdog", parent) {
+class SpeedSentinelStrafeHop(parent: ModeValueGroup<*>) : SpeedBHopBase("SentinelStrafeHop", parent) {
+
+    private var motionTicks = 0f
+    private var canBoost = true
+
+    override fun enable() {
+        motionTicks = 0.1f
+        canBoost = true
+        super.enable()
+    }
 
     @Suppress("unused")
     private val tickHandler = tickHandler {
@@ -37,14 +44,25 @@ class SpeedWatchdog(parent: ModeValueGroup<*>) : SpeedBHopBase("Watchdog", paren
             return@tickHandler
         }
 
-        player.deltaMovement = player.deltaMovement.withStrafe(
-            speed = player.getCalculatedBaseMovementSpeed() + Random.nextDouble(0.01, 0.05)
-        )
-        Timer.requestTimerSpeed(
-            Random.nextDouble(1.2, 1.4).toFloat(),
-            Priority.IMPORTANT_FOR_USAGE_1,
-            ModuleSpeed
-        )
+        if (player.fallDistance > 0.2f) {
+            player.deltaMovement = player.deltaMovement.withStrafe()
+        }
+
+        if (motionTicks > 1f && canBoost) {
+            player.deltaMovement = player.deltaMovement.withStrafe(
+                speed = player.getCalculatedBaseMovementSpeed() + 0.1
+            )
+            canBoost = false
+            return@tickHandler
+        }
+
+        motionTicks += 1f
+    }
+
+    @Suppress("unused")
+    private val jumpHandler = handler<PlayerJumpEvent> {
+        motionTicks = 0f
+        canBoost = true
     }
 
 }

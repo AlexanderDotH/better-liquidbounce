@@ -29,7 +29,6 @@ import net.ccbluex.liquidbounce.event.events.*;
 import net.ccbluex.liquidbounce.features.module.modules.exploit.ModulePortalMenu;
 import net.ccbluex.liquidbounce.features.module.modules.movement.ModuleEntityControl;
 import net.ccbluex.liquidbounce.features.module.modules.movement.ModuleNoPush;
-import net.ccbluex.liquidbounce.features.module.modules.movement.ModulePose;
 import net.ccbluex.liquidbounce.features.module.modules.movement.ModuleSprint;
 import net.ccbluex.liquidbounce.features.module.modules.movement.NoPushBy;
 import net.ccbluex.liquidbounce.features.module.modules.movement.noslow.ModuleNoSlow;
@@ -318,14 +317,6 @@ public abstract class MixinLocalPlayer extends MixinPlayer implements LocalPlaye
         var playerSneakMultiplier = new PlayerSneakMultiplier(original);
         EventManager.INSTANCE.callEvent(playerSneakMultiplier);
         return playerSneakMultiplier.getMultiplier();
-    }
-
-    @ModifyExpressionValue(method = "isMovingSlowly", at = @At(
-            value = "INVOKE",
-            target = "Lnet/minecraft/client/player/LocalPlayer;isVisuallyCrawling()Z"
-    ))
-    private boolean hookPoseMovementSlowdown(boolean original) {
-        return ModulePose.INSTANCE.modifyCrawlingForMovement(original);
     }
 
     /**

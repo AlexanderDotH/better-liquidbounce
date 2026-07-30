@@ -20,9 +20,11 @@ package net.ccbluex.liquidbounce.features.module.modules.movement.speed.modes.aa
 
 import net.ccbluex.liquidbounce.config.types.group.ModeValueGroup
 import net.ccbluex.liquidbounce.event.tickHandler
+import net.ccbluex.liquidbounce.features.module.modules.movement.speed.ModuleSpeed
 import net.ccbluex.liquidbounce.features.module.modules.movement.speed.modes.SpeedBHopBase
-import net.ccbluex.liquidbounce.features.module.modules.movement.speed.modes.revive.requestReviveTimer
+import net.ccbluex.liquidbounce.utils.client.Timer
 import net.ccbluex.liquidbounce.utils.entity.moving
+import net.ccbluex.liquidbounce.utils.kotlin.Priority
 
 class SpeedAAC4310FastHop(parent: ModeValueGroup<*>) : SpeedBHopBase("AAC4310FastHop", parent) {
 
@@ -33,11 +35,15 @@ class SpeedAAC4310FastHop(parent: ModeValueGroup<*>) : SpeedBHopBase("AAC4310Fas
         }
 
         val timer = (player.fallDistance * 1.6).toFloat()
-        requestReviveTimer(if (timer > 0.3f && timer < 0.5f) {
-            (player.fallDistance * 1.4).toFloat()
-        } else {
-            timer
-        })
+        Timer.requestTimerSpeed(
+            if (timer > 0.3f && timer < 0.5f) {
+                (player.fallDistance * 1.4).toFloat()
+            } else {
+                timer
+            },
+            Priority.IMPORTANT_FOR_USAGE_1,
+            ModuleSpeed
+        )
     }
 
 }

@@ -5,6 +5,7 @@
     export let title: string;
     export let disabled = false;
     export let secondary = false;
+    export let danger = false;
     export let inset = false;
     export let listenForEnter = false;
     export let loading = false;
@@ -22,7 +23,8 @@
 </script>
 
 <svelte:window on:keydown={handleKeyDown}/>
-<button class="button-setting" class:inset type="button" on:click={() => dispatch("click")} {disabled} class:secondary>
+<button class="button-setting" class:inset type="button" on:click={() => dispatch("click")} {disabled}
+        class:secondary class:danger>
     {#if loading}
         <CircleLoader/>
     {/if}
@@ -50,12 +52,20 @@
       background-color: var(--menu-button-secondary-background-color);
     }
 
+    &.danger {
+      background-color: var(--menu-error-color);
+    }
+
     &:not([disabled]):hover {
       background-color: var(--menu-button-hover-background-color);
       cursor: pointer;
 
       &.secondary {
         background-color: var(--menu-button-secondary-hover-background-color);
+      }
+
+      &.danger {
+        background-color: color-mix(in srgb, var(--menu-error-color) 80%, black);
       }
     }
 

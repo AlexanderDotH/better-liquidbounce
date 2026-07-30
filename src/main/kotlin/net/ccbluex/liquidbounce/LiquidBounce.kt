@@ -46,7 +46,9 @@ import net.ccbluex.liquidbounce.event.events.ClientShutdownEvent
 import net.ccbluex.liquidbounce.event.events.ClientStartEvent
 import net.ccbluex.liquidbounce.event.events.ScreenEvent
 import net.ccbluex.liquidbounce.event.handler
+import net.ccbluex.liquidbounce.features.account.AccountBanTracker
 import net.ccbluex.liquidbounce.features.account.AccountManager
+import net.ccbluex.liquidbounce.features.account.AccountServerAccessTracker
 import net.ccbluex.liquidbounce.features.blink.BlinkManager
 import net.ccbluex.liquidbounce.features.command.CommandManager
 import net.ccbluex.liquidbounce.features.cosmetic.ClientAccountManager
@@ -268,6 +270,8 @@ object LiquidBounce : EventListener {
         CommandManager
         ProxyManager
         AccountManager
+        AccountBanTracker
+        AccountServerAccessTracker
 
         // Utility managers
         RotationManager

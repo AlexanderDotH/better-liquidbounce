@@ -28,6 +28,7 @@ import net.ccbluex.liquidbounce.config.gson.interopGson
 import net.ccbluex.liquidbounce.event.EventManager
 import net.ccbluex.liquidbounce.event.events.AccountManagerMessageEvent
 import net.ccbluex.liquidbounce.features.account.AccountManager
+import net.ccbluex.liquidbounce.features.account.AccountServerAccessRegistry
 import net.ccbluex.liquidbounce.utils.client.browseUrl
 import net.ccbluex.liquidbounce.utils.client.mc
 import net.ccbluex.liquidbounce.utils.client.randomUsername
@@ -46,6 +47,7 @@ private fun Routing.getAccounts() = get {
             addProperty("uuid", profile.uuid?.toString().orEmpty())
             addProperty("avatar", formatAvatarUrl(profile.uuid, profile.username))
             add("bans", interopGson.toJsonTree(account.bans))
+            add("workingServers", interopGson.toJsonTree(AccountServerAccessRegistry.list(account)))
             addProperty("type", account.type.commonName)
             addProperty("favorite", account.favorite)
         })

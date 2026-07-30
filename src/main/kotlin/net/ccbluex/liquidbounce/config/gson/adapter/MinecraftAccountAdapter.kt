@@ -30,6 +30,7 @@ import net.ccbluex.liquidbounce.authlib.account.AlteningAccount
 import net.ccbluex.liquidbounce.authlib.account.CrackedAccount
 import net.ccbluex.liquidbounce.authlib.account.MinecraftAccount
 import net.ccbluex.liquidbounce.authlib.compat.GameProfile
+import net.ccbluex.liquidbounce.features.account.AccountServerAccessRegistry
 import java.lang.reflect.Type
 
 object MinecraftAccountAdapter : JsonSerializer<MinecraftAccount>, JsonDeserializer<MinecraftAccount> {
@@ -37,9 +38,11 @@ object MinecraftAccountAdapter : JsonSerializer<MinecraftAccount>, JsonDeseriali
     private const val ALTENING_ACCOUNT_TYPE = "AlteningAccount"
     private const val ALTENING_ACCOUNT_TOKEN = "accountToken"
     private const val ALTENING_ACCOUNT_PENDING = "pending"
+    private const val WORKING_SERVERS = "workingServers"
 
     override fun serialize(src: MinecraftAccount, typeOfSrc: Type, context: JsonSerializationContext) =
         src.toJson().apply {
+            add(WORKING_SERVERS, context.serialize(AccountServerAccessRegistry.list(src)))
             if (src is AlteningAccount && src.accountToken.isNotBlank()) {
                 addProperty(ALTENING_ACCOUNT_TOKEN, src.accountToken)
                 addProperty(ALTENING_ACCOUNT_PENDING, src.profile?.uuid == null)
@@ -48,13 +51,15 @@ object MinecraftAccountAdapter : JsonSerializer<MinecraftAccount>, JsonDeseriali
 
     override fun deserialize(json: JsonElement, typeOfT: Type, context: JsonDeserializationContext?) = try {
         val jsonObject = json.asJsonObject
-        if (jsonObject.isPendingAlteningAccount()) {
+        val account = if (jsonObject.isPendingAlteningAccount()) {
             deserializePendingAlteningAccount(jsonObject)
         } else {
             MinecraftAccount.fromJson(jsonObject).apply {
                 restoreAlteningAccountToken(jsonObject)
             }
         }
+        account.restoreWorkingServers(jsonObject)
+        account
     } catch (e: Exception) {
         logger.error("Failed to deserialize MinecraftAccount from JSON.", e)
         CrackedAccount("Error${json.hashCode()}")
@@ -81,6 +86,15 @@ object MinecraftAccountAdapter : JsonSerializer<MinecraftAccount>, JsonDeseriali
                 accountToken = it
             }
         }
+    }
+
+    private fun MinecraftAccount.restoreWorkingServers(json: JsonObject) {
+        val serverNames = json[WORKING_SERVERS]
+            ?.takeIf(JsonElement::isJsonArray)
+            ?.asJsonArray
+            ?.mapNotNull { element -> runCatching(element::getAsString).getOrNull() }
+            .orEmpty()
+        AccountServerAccessRegistry.restore(this, serverNames)
     }
 
     private fun JsonObject.requireString(name: String) = get(name)?.asString?.takeIf { it.isNotBlank() }
