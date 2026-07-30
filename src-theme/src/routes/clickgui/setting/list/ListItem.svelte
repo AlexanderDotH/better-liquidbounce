@@ -49,7 +49,7 @@
     display: grid;
     grid-template-columns: 1fr;
     align-items: center;
-    column-gap: 5px;
+    column-gap: var(--clickgui-setting-control-gap, 5px);
     margin: 2px 5px 2px 0;
 
     &.pointer-cursor {
@@ -79,7 +79,7 @@
   }
 
   .name {
-    font-size: 12px;
+    font-size: var(--clickgui-control-font-size, 12px);
     color: var(--clickgui-text-color);
     text-overflow: ellipsis;
     white-space: nowrap;

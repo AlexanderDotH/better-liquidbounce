@@ -71,25 +71,29 @@
       }
 
       .head {
-        border-radius: 3px 3px 0 0;
+        border-radius:
+          var(--clickgui-dropdown-radius, 3px)
+          var(--clickgui-dropdown-radius, 3px)
+          0
+          0;
       }
     }
   }
 
   .head {
     background-color: var(--clickgui-dropdown-trigger-background-color);
-    padding: 6px 10px;
+    padding: var(--clickgui-control-padding, 6px 10px);
     cursor: pointer;
     display: flex;
     align-items: center;
     position: relative;
-    border-radius: 3px;
-    transition: ease border-radius .2s;
+    border-radius: var(--clickgui-dropdown-radius, 3px);
+    transition: ease border-radius var(--clickgui-control-transition-duration, .2s);
 
     .text {
       font-weight: 500;
       color: var(--clickgui-text-color);
-      font-size: 12px;
+      font-size: var(--clickgui-control-font-size, 12px);
       overflow: hidden;
       text-overflow: ellipsis;
       white-space: nowrap;
@@ -102,11 +106,15 @@
   }
 
   .options {
-    padding: 6px 10px;
+    padding: var(--clickgui-control-padding, 6px 10px);
     background-color: var(--clickgui-dropdown-background-color);
-    border: solid 1px var(--clickgui-dropdown-border-color);
+    border: solid var(--clickgui-dropdown-border-width, 1px) var(--clickgui-dropdown-border-color);
     border-top: none;
-    border-radius: 0 0 3px 3px;
+    border-radius:
+      0
+      0
+      var(--clickgui-dropdown-radius, 3px)
+      var(--clickgui-dropdown-radius, 3px);
     z-index: 9999;
     width: 100%;
     position: absolute;
@@ -114,11 +122,11 @@
     .option {
       color: var(--clickgui-dropdown-option-color);
       font-weight: 500;
-      font-size: 12px;
-      padding: 5px 0;
+      font-size: var(--clickgui-control-font-size, 12px);
+      padding: var(--clickgui-dropdown-option-padding, 5px 0);
       cursor: pointer;
       text-align: center;
-      transition: ease color 0.2s;
+      transition: ease color var(--clickgui-control-transition-duration, 0.2s);
 
       &:hover {
         color: var(--clickgui-dropdown-option-hover-color);

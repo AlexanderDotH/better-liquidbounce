@@ -331,7 +331,7 @@
 <style lang="scss">
 
   .setting {
-    padding: 7px 0;
+    padding: var(--clickgui-setting-padding, 7px 0);
     position: relative;
   }
 
@@ -340,27 +340,29 @@
     opacity: 0;
     overflow: hidden;
     will-change: height, opacity;
-    transition: ease height 0.2s, ease opacity 0.2s;
+    transition:
+      ease height var(--clickgui-setting-transition-duration, 0.2s),
+      ease opacity var(--clickgui-setting-transition-duration, 0.2s);
 
     &.visible {
-      height: 180px;
+      height: var(--clickgui-curve-height, 180px);
       opacity: 1;
     }
   }
 
   .title {
     color: var(--clickgui-text-color);
-    font-size: 12px;
+    font-size: var(--clickgui-control-font-size, 12px);
     font-weight: 600;
   }
 
   .head {
     display: flex;
     justify-content: space-between;
-    transition: ease margin-bottom .2s;
+    transition: ease margin-bottom var(--clickgui-setting-transition-duration, .2s);
 
     &.expanded {
-      margin-bottom: 10px;
+      margin-bottom: var(--clickgui-setting-expanded-gap, 10px);
     }
   }
 

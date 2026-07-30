@@ -53,27 +53,27 @@
 <style lang="scss">
 
   .setting {
-    padding: 7px 0;
+    padding: var(--clickgui-setting-padding, 7px 0);
   }
 
   .title {
     color: var(--clickgui-text-color);
-    font-size: 12px;
+    font-size: var(--clickgui-control-font-size, 12px);
     font-weight: 600;
   }
 
   .head {
     display: flex;
     justify-content: space-between;
-    transition: ease margin-bottom .2s;
+    transition: ease margin-bottom var(--clickgui-setting-transition-duration, .2s);
 
     &.expanded {
-      margin-bottom: 10px;
+      margin-bottom: var(--clickgui-setting-expanded-gap, 10px);
     }
   }
 
   .nested-settings {
-    border-left: solid 2px var(--clickgui-setting-group-border-color);
-    padding-left: 7px;
+    border-left: solid var(--clickgui-setting-group-border-width, 2px) var(--clickgui-setting-group-border-color);
+    padding-left: var(--clickgui-setting-group-padding, 7px);
   }
 </style>

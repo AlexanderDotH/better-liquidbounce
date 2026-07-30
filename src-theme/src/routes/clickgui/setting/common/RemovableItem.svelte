@@ -16,9 +16,9 @@
   .removable-item {
     display: grid;
     grid-template-columns: 1fr max-content;
-    column-gap: 5px;
+    column-gap: var(--clickgui-setting-control-gap, 5px);
     align-items: center;
-    padding-right: 8px;
+    padding-right: var(--clickgui-removable-item-padding, 8px);
   }
 
   .button-remove {

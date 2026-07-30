@@ -63,11 +63,11 @@
   }
 
   .arrow {
-    width: 10px;
-    animation: jiggle 200ms ease;
+    width: var(--clickgui-bind-action-arrow-size, 10px);
+    animation: jiggle var(--clickgui-control-transition-duration, 200ms) ease;
 
     &.arrow-right::after {
-      @include icon-settings-expand($size: 10px, $right: auto);
+      @include icon-settings-expand($size: var(--clickgui-bind-action-arrow-size, 10px), $right: auto);
       color: var(--clickgui-text-dimmed-color);
     }
   }
@@ -78,7 +78,7 @@
     .chosen {
       font-weight: 500;
       color: var(--clickgui-text-color);
-      font-size: 12px;
+      font-size: var(--clickgui-control-font-size, 12px);
       text-overflow: ellipsis;
       white-space: nowrap;
       grid-column: 1/1;
@@ -92,7 +92,7 @@
     padding: 0;
     cursor: pointer;
     display: flex;
-    gap: 3px;
+    gap: var(--clickgui-bind-action-gap, 3px);
     align-items: center;
     position: relative;
     border: none;

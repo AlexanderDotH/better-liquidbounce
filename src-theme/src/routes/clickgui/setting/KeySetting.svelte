@@ -103,23 +103,23 @@
 <style lang="scss">
 
   .setting {
-    padding: 7px 0;
+    padding: var(--clickgui-setting-padding, 7px 0);
   }
 
   .change-bind {
     background-color: transparent;
-    border: solid 2px var(--accent-color);
-    border-radius: 3px;
+    border: solid var(--clickgui-control-border-width, 2px) var(--accent-color);
+    border-radius: var(--clickgui-control-radius, 3px);
     cursor: pointer;
-    padding: 4px;
+    padding: var(--clickgui-bind-padding, 4px);
     font-weight: 500;
     color: var(--clickgui-text-color);
-    font-size: 12px;
+    font-size: var(--clickgui-control-font-size, 12px);
     font-family: "Inter", sans-serif;
     width: 100%;
     display: flex;
     justify-content: center;
-    column-gap: 5px;
+    column-gap: var(--clickgui-setting-control-gap, 5px);
 
     .name {
       font-weight: 500;

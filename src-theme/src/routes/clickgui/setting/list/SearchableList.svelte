@@ -38,12 +38,12 @@
   .search-input {
     width: 100%;
     border: none;
-    border-bottom: solid 1px var(--accent-color);
+    border-bottom: solid var(--clickgui-search-input-border-width, 1px) var(--accent-color);
     font-family: "Inter", sans-serif;
-    font-size: 12px;
-    padding: 5px;
+    font-size: var(--clickgui-control-font-size, 12px);
+    padding: var(--clickgui-input-padding, 5px);
     color: var(--clickgui-text-color);
-    margin-bottom: 5px;
+    margin-bottom: var(--clickgui-setting-label-gap, 5px);
     background-color: var(--clickgui-input-background-color);
   }
 </style>

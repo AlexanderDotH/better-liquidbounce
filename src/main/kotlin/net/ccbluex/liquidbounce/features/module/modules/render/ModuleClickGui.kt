@@ -20,6 +20,7 @@ package net.ccbluex.liquidbounce.features.module.modules.render
 
 import net.ccbluex.liquidbounce.LiquidBounce
 import net.ccbluex.liquidbounce.config.types.group.ToggleableValueGroup
+import net.ccbluex.liquidbounce.config.types.list.Tagged
 import net.ccbluex.liquidbounce.event.EventManager
 import net.ccbluex.liquidbounce.event.events.BrowserReadyEvent
 import net.ccbluex.liquidbounce.event.events.ClickGuiScaleChangeEvent
@@ -48,10 +49,19 @@ import org.lwjgl.glfw.GLFW
  * Shows you an easy-to-use menu to toggle and configure modules.
  */
 
+enum class ClickGuiTheme(override val tag: String) : Tagged {
+    CLASSIC("Classic"),
+    MODERN("Modern"),
+}
+
 object ModuleClickGui :
     ClientModule("ClickGUI", ModuleCategories.RENDER, bind = GLFW.GLFW_KEY_RIGHT_SHIFT, disableActivation = true) {
 
     override val running get() = true
+
+    val theme by enumChoice("Theme", ClickGuiTheme.MODERN).onChanged {
+        EventManager.callEvent(ClickGuiValueChangeEvent(this))
+    }
 
     @Suppress("UnusedPrivateProperty")
     private val scale by float("Scale", 1f, 0.5f..2f).onChanged {

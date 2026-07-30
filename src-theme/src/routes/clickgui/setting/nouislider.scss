@@ -3,10 +3,10 @@
     background-color: var(--clickgui-slider-handle-color);
     box-shadow: unset;
     border: none;
-    border-radius: 50%;
-    height: 12px !important;
-    width: 12px !important;
-    transform: translate(-5px, 1px);
+    border-radius: var(--clickgui-slider-handle-radius, 50%);
+    height: var(--clickgui-slider-handle-size, 12px) !important;
+    width: var(--clickgui-slider-handle-size, 12px) !important;
+    transform: var(--clickgui-slider-handle-transform, translate(-5px, 1px));
 }
 
 .noUi-handle::after,
@@ -15,8 +15,8 @@
 }
 
 .noUi-target {
-    margin: 10px 0;
-    height: 2px;
+    margin: var(--clickgui-slider-track-margin, 10px 0);
+    height: var(--clickgui-slider-track-height, 2px);
     border: none;
     background-color: var(--clickgui-slider-track-color);
     box-shadow: unset;

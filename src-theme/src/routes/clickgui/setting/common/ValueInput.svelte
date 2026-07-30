@@ -46,10 +46,10 @@
     font-family: monospace;
     color: var(--clickgui-text-color);
     font-weight: 500;
-    font-size: 12px;
+    font-size: var(--clickgui-control-font-size, 12px);
     background-color: transparent;
     border: none;
-    min-width: 5px;
+    min-width: var(--clickgui-value-input-min-width, 5px);
     display: inline-block;
   }
 </style>

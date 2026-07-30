@@ -55,16 +55,16 @@
 <style lang="scss">
 
     .setting {
-        padding: 7px 0 2px 0;
+        padding: var(--clickgui-slider-setting-padding, 7px 0 2px 0);
         display: grid;
         grid-template-areas:
             "a b"
             "d d";
         grid-template-columns: 1fr max-content;
-        column-gap: 5px;
+        column-gap: var(--clickgui-setting-control-gap, 5px);
 
         /* animation fix */
-        min-height: 46px;
+        min-height: var(--clickgui-slider-setting-min-height, 46px);
     }
 
     .setting.has-suffix {
@@ -79,7 +79,7 @@
     .value {
         color: var(--clickgui-text-color);
         font-weight: 500;
-        font-size: 12px;
+        font-size: var(--clickgui-control-font-size, 12px);
     }
 
     .name {
@@ -97,6 +97,6 @@
 
     .slider {
         grid-area: d;
-        padding-right: 10px;
+        padding-right: var(--clickgui-slider-end-padding, 10px);
     }
 </style>

@@ -56,31 +56,31 @@
 <style lang="scss">
 
   .setting {
-    padding: 7px 0;
+    padding: var(--clickgui-setting-padding, 7px 0);
   }
 
   .name {
     font-weight: 500;
     color: var(--clickgui-text-color);
-    font-size: 12px;
-    margin-bottom: 5px;
+    font-size: var(--clickgui-control-font-size, 12px);
+    margin-bottom: var(--clickgui-setting-label-gap, 5px);
   }
 
   .input-group {
     display: grid;
-    column-gap: 5px;
+    column-gap: var(--clickgui-setting-control-gap, 5px);
 
     input.value {
       width: 100%;
       background-color: var(--clickgui-input-background-color);
       font-family: monospace;
-      font-size: 12px;
+      font-size: var(--clickgui-control-font-size, 12px);
       color: var(--clickgui-text-color);
       border: none;
-      border-bottom: solid 2px var(--clickgui-input-border-color);
-      padding: 5px;
-      border-radius: 3px;
-      transition: ease border-color .2s;
+      border-bottom: solid var(--clickgui-control-border-width, 2px) var(--clickgui-input-border-color);
+      padding: var(--clickgui-input-padding, 5px);
+      border-radius: var(--clickgui-control-radius, 3px);
+      transition: ease border-color var(--clickgui-control-transition-duration, .2s);
       appearance: textfield;
 
       &::-webkit-scrollbar {
@@ -101,7 +101,7 @@
       border: none;
       cursor: pointer;
       color: var(--clickgui-text-color);
-      font-size: 12px;
+      font-size: var(--clickgui-control-font-size, 12px);
       text-align: right;
     }
   }

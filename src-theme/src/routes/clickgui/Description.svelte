@@ -26,7 +26,7 @@
 
 {#key data}
     {#if data !== null}
-        <div transition:fly|global={{duration: 200, x: anchor === "right" ? -15 : 15}} class="description-wrapper"
+        <div transition:fly={{duration: 200, x: anchor === "right" ? -15 : 15}} class="description-wrapper"
              style="top: {data.y}px; left: {left}px;" bind:this={element}>
             <div class="description" class:right={anchor === "left"}>
                 <div class="text" class:extended={data.variant === "extended"}>{data.description}</div>

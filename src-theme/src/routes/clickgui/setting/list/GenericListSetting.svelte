@@ -39,7 +39,7 @@
         <ExpandArrow bind:expanded/>
     </div>
     {#if expanded}
-        <div in:slide|global={{duration: 200, axis: "y"}} out:slide|global={{duration: 200, axis: "y"}}>
+        <div in:slide={{duration: 200, axis: "y"}} out:slide={{duration: 200, axis: "y"}}>
             <SearchableList {items} let:item>
                 <ListItem value={item.value} name={item.name} icon={item.icon}
                           enabled={cSetting.value.includes(item.value)} on:toggle={handleItemToggle} />
@@ -51,21 +51,21 @@
 <style lang="scss">
 
   .setting {
-    padding: 7px 0;
+    padding: var(--clickgui-setting-padding, 7px 0);
   }
 
   .head {
     display: flex;
     justify-content: space-between;
-    transition: ease margin-bottom .2s;
+    transition: ease margin-bottom var(--clickgui-setting-transition-duration, .2s);
 
     &.expanded {
-      margin-bottom: 10px;
+      margin-bottom: var(--clickgui-setting-expanded-gap, 10px);
     }
 
     .name {
       color: var(--clickgui-text-color);
-      font-size: 12px;
+      font-size: var(--clickgui-control-font-size, 12px);
       font-weight: 600;
     }
   }

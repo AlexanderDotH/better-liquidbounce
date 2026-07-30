@@ -15,12 +15,12 @@
     import None from "./routes/none/None.svelte";
     import Disconnected from "./routes/menu/disconnected/Disconnected.svelte";
     import Browser from "./routes/browser/Browser.svelte";
-    import TabbedClickGui from "./routes/clickgui/TabbedClickGui.svelte";
+    import ClickGuiThemeHost from "./routes/clickgui/theme/ClickGuiThemeHost.svelte";
     import {intToRgba, rgbaToHex} from "./integration/util";
     import type {ThemeColorChangeEvent} from "./integration/events";
 
     const routes = {
-        "/clickgui": TabbedClickGui,
+        "/clickgui": ClickGuiThemeHost,
         "/hud": Hud,
         "/inventory": Inventory,
         "/title": Title,

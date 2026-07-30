@@ -557,6 +557,7 @@
   "liquidbounce.module.chestCleaner.description": "Automatically drops unwanted items from a chest.",
   "liquidbounce.module.chestStealer.description": "Automatically steals all items from a chest.",
   "liquidbounce.module.clickGUI.description": "Shows you an easy to use menu to toggle and configure modules.",
+  "liquidbounce.module.clickGUI.theme.description": "Selects the ClickGUI layout. Classic preserves the current interface, while Modern uses the new graphite glass design.",
   "liquidbounce.module.clientSpoofer.description": "Spoofs your game client brand to another.",
   "liquidbounce.module.clip.description": "Allows you to clip through blocks.",
   "liquidbounce.module.clip.messages.whoosh": "Whoosh!",

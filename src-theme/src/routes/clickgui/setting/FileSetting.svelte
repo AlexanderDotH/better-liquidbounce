@@ -63,19 +63,19 @@
 <style lang="scss">
 
   .setting {
-    padding: 7px 0;
+    padding: var(--clickgui-setting-padding, 7px 0);
   }
 
   .name {
     font-weight: 500;
     color: var(--clickgui-text-color);
-    font-size: 12px;
-    margin-bottom: 5px;
+    font-size: var(--clickgui-control-font-size, 12px);
+    margin-bottom: var(--clickgui-setting-label-gap, 5px);
   }
 
   .body {
     display: flex;
-    column-gap: 5px;
+    column-gap: var(--clickgui-setting-control-gap, 5px);
   }
 
   .button-action {
@@ -94,13 +94,13 @@
     width: 100%;
     background-color: var(--clickgui-input-background-color);
     font-family: monospace;
-    font-size: 12px;
+    font-size: var(--clickgui-control-font-size, 12px);
     color: var(--clickgui-text-dimmed-color);
     border: none;
-    border-bottom: solid 2px var(--clickgui-input-border-color);
-    padding: 6px;
-    border-radius: 3px;
-    transition: ease border-color .2s;
+    border-bottom: solid var(--clickgui-control-border-width, 2px) var(--clickgui-input-border-color);
+    padding: var(--clickgui-input-padding, 6px);
+    border-radius: var(--clickgui-control-radius, 3px);
+    transition: ease border-color var(--clickgui-control-transition-duration, .2s);
 
     white-space: nowrap;
     overflow: hidden;

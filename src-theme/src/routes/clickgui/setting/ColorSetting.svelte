@@ -91,14 +91,14 @@
         grid-template-areas:
             "a b"
             "c c";
-        padding: 7px 0px;
+        padding: var(--clickgui-setting-padding, 7px 0);
     }
 
     .name {
         grid-area: a;
         font-weight: 500;
         color: var(--clickgui-text-color);
-        font-size: 12px;
+        font-size: var(--clickgui-control-font-size, 12px);
     }
 
     .hidden {
@@ -110,16 +110,16 @@
         font-weight: 500;
         color: var(--clickgui-text-color);
         text-align: right;
-        font-size: 12px;
+        font-size: var(--clickgui-control-font-size, 12px);
         cursor: text;
         text-transform: uppercase;
         background-color: transparent;
         border: none;
         padding: 0;
         margin: 0;
-        margin-right: 15px;
+        margin-right: var(--clickgui-color-input-gap, 15px);
         margin-left: auto;
-        width: 70px;
+        width: var(--clickgui-color-input-width, 70px);
         font-family: monospace;
     }
 
@@ -135,14 +135,14 @@
     }
 
     .color-pickr-button {
-        margin-top: -2px;
-        margin-bottom: -2px;
-        width: 30px;
-        border-radius: 3px;
+        margin-top: var(--clickgui-color-swatch-bleed, -2px);
+        margin-bottom: var(--clickgui-color-swatch-bleed, -2px);
+        width: var(--clickgui-color-swatch-width, 30px);
+        border-radius: var(--clickgui-control-radius, 3px);
         background-color: blue;
         border-style: none;
     }
     .color-pickr-button:focus {
-        outline: 3px solid #ffffff;
+        outline: var(--clickgui-focus-ring-width, 3px) solid #ffffff;
     }
 </style>

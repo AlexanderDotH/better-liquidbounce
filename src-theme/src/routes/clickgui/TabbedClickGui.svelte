@@ -2,12 +2,20 @@
     import ClickGui from "./ClickGui.svelte";
     import GlobalSettings from "./tabs/GlobalSettings.svelte";
     import Tabs from "./tabs/Tabs.svelte";
-    import {gridSize, os, scaleFactor, showGrid, snappingEnabled} from "./clickgui_store";
+    import {
+        clickGuiThemeSession,
+        gridSize,
+        os,
+        scaleFactor,
+        showGrid,
+        snappingEnabled,
+        type ClickGuiView,
+    } from "./clickgui_store";
     import type {ConfigurableSetting, TogglableSetting} from "../../integration/types";
     import {onMount} from "svelte";
-    import {getClientInfo, getGameWindow, getModuleSettings, setTyping} from "../../integration/rest";
+    import {getClientInfo, getGameWindow, setTyping} from "../../integration/rest";
     import {listen} from "../../integration/ws";
-    import type {ClickGuiValueChangeEvent, ScaleFactorChangeEvent} from "../../integration/events";
+    import type {ScaleFactorChangeEvent} from "../../integration/events";
 
     const tabs = [
         {title: "ClickGUI", content: ClickGui},
@@ -19,7 +27,21 @@
     let clickGuiScaleFactor = $state(1);
 
     $effect(() => {
+        activeTab = viewToTab($clickGuiThemeSession.view);
+    });
+
+    $effect(() => {
+        clickGuiThemeSession.setView(tabToView(activeTab));
+    });
+
+    $effect(() => {
         $scaleFactor = minecraftScaleFactor * clickGuiScaleFactor;
+    });
+
+    $effect(() => {
+        if ($clickGuiThemeSession.settings) {
+            applyValues($clickGuiThemeSession.settings);
+        }
     });
 
     function applyValues(configurable: ConfigurableSetting) {
@@ -42,9 +64,6 @@
         const gameWindow = await getGameWindow();
         minecraftScaleFactor = gameWindow.scaleFactor;
 
-        const clickGuiSettings = await getModuleSettings("ClickGUI");
-        applyValues(clickGuiSettings);
-
         await setTyping(false);
     });
 
@@ -52,9 +71,13 @@
         minecraftScaleFactor = e.scaleFactor;
     });
 
-    listen("clickGuiValueChange", (e: ClickGuiValueChangeEvent) => {
-        applyValues(e.configurable);
-    });
+    function viewToTab(view: ClickGuiView): number {
+        return view === "settings" ? 1 : 0;
+    }
+
+    function tabToView(tab: number): ClickGuiView {
+        return tab === 1 ? "settings" : "clickgui";
+    }
 </script>
 
 <div

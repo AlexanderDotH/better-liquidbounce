@@ -59,7 +59,7 @@
     </div>
 
     {#if expanded}
-        <div class="choices" transition:slide|global={{duration: 200, axis: "y"}}>
+        <div class="choices" transition:slide={{duration: 200, axis: "y"}}>
             {#each cSetting.choices as choice (choice)}
                 <div
                         class="choice"
@@ -79,24 +79,24 @@
 <style lang="scss">
 
   .setting {
-    padding: 7px 0;
+    padding: var(--clickgui-setting-padding, 7px 0);
     color: var(--clickgui-text-color);
   }
 
   .title {
     color: var(--clickgui-text-color);
-    font-size: 12px;
+    font-size: var(--clickgui-control-font-size, 12px);
     font-weight: 600;
   }
 
   .choice {
     color: var(--clickgui-text-dimmed-color);
     background-color: var(--clickgui-selection-chip-background-color);
-    border-radius: 3px;
-    padding: 3px 6px;
+    border-radius: var(--clickgui-chip-radius, 3px);
+    padding: var(--clickgui-chip-padding, 3px 6px);
     cursor: pointer;
     font-weight: 500;
-    transition: ease color 0.2s;
+    transition: ease color var(--clickgui-control-transition-duration, 0.2s);
     overflow-wrap: anywhere;
 
     &:hover {
@@ -117,28 +117,28 @@
   .amount {
     letter-spacing: 1px;
     font-weight: 500;
-    font-size: 12px;
+    font-size: var(--clickgui-control-font-size, 12px);
     font-family: monospace;
   }
 
   .head {
     display: grid;
     grid-template-columns: 1fr max-content max-content;
-    transition: ease margin-bottom .2s;
+    transition: ease margin-bottom var(--clickgui-setting-transition-duration, .2s);
     align-items: center;
 
     &.expanded {
-      margin-bottom: 10px;
+      margin-bottom: var(--clickgui-setting-expanded-gap, 10px);
     }
   }
 
   .choices {
-    border-left: solid 2px var(--clickgui-setting-group-border-color);
+    border-left: solid var(--clickgui-setting-group-border-width, 2px) var(--clickgui-setting-group-border-color);
     color: var(--clickgui-text-color);
-    padding: 7px 7px;
+    padding: var(--clickgui-setting-group-padding, 7px);
     display: flex;
     flex-wrap: wrap;
-    gap: 7px;
-    font-size: 12px;
+    gap: var(--clickgui-chip-gap, 7px);
+    font-size: var(--clickgui-control-font-size, 12px);
   }
 </style>

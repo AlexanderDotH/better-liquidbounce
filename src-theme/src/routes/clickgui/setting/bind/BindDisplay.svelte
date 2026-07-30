@@ -65,7 +65,7 @@
 <style lang="scss">
 
   .wrapper {
-    column-gap: 2px;
+    column-gap: var(--clickgui-bind-modifier-gap, 2px);
     display: flex;
     align-items: center;
   }
@@ -80,7 +80,7 @@
     opacity: 0.8;
     line-height: 1;
     font-family: monospace;
-    margin-left: 2px;
+    margin-left: var(--clickgui-bind-modifier-gap, 2px);
   }
 
   .boundKey {

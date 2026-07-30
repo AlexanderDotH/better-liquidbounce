@@ -1,5 +1,13 @@
 import {type Writable, writable} from "svelte/store";
 
+export {clickGuiThemeSession} from "./theme/themeSession";
+export type {
+    ClickGuiThemeSession,
+    ClickGuiThemeSessionState,
+    ClickGuiView,
+    ClickGuiVisualTheme,
+} from "./theme/clickGuiThemeState";
+
 export interface TDescription {
     description: string;
     anchor: "left" | "right",

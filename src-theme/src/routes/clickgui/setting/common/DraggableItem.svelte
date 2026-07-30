@@ -12,7 +12,7 @@
   .draggable-item {
     display: grid;
     grid-template-columns: max-content 1fr;
-    column-gap: 10px;
+    column-gap: var(--clickgui-setting-expanded-gap, 10px);
     align-items: center;
     cursor: pointer;
 

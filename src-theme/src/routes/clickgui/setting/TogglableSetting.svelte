@@ -66,11 +66,11 @@
 <style lang="scss">
 
     .setting {
-        padding: 7px 0px;
+        padding: var(--clickgui-setting-padding, 7px 0);
     }
 
     .head {
-        transition: ease margin-bottom .2s;
+        transition: ease margin-bottom var(--clickgui-setting-transition-duration, .2s);
 
         &.expand {
           display: grid;
@@ -78,12 +78,12 @@
         }
 
         &.expanded {
-            margin-bottom: 10px;
+            margin-bottom: var(--clickgui-setting-expanded-gap, 10px);
         }
     }
 
     .nested-settings {
-        border-left: solid 2px var(--clickgui-setting-group-border-color);
-        padding-left: 7px;
+        border-left: solid var(--clickgui-setting-group-border-width, 2px) var(--clickgui-setting-group-border-color);
+        padding-left: var(--clickgui-setting-group-padding, 7px);
     }
 </style>

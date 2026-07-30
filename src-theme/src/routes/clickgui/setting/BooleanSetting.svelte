@@ -30,6 +30,6 @@
 
 <style lang="scss">
     .setting {
-        padding: 7px 0px;
+        padding: var(--clickgui-setting-padding, 7px 0);
     }
 </style>
