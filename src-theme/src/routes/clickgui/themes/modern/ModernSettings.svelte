@@ -673,39 +673,33 @@
   @keyframes settings-enter {
     from {
       transform: translateY(8px);
-      opacity: 0;
     }
 
     to {
       transform: translateY(0);
-      opacity: 1;
     }
   }
 
   @keyframes modern-settings-section-enter {
     from {
-      opacity: 0;
       transform: translateY(5px);
     }
   }
 
   @keyframes modern-theme-option-enter {
     from {
-      opacity: 0;
       transform: translateY(6px);
     }
   }
 
   @keyframes modern-setting-card-enter {
     from {
-      opacity: 0;
       transform: translateY(7px);
     }
   }
 
   @keyframes modern-selection-confirm {
     from {
-      opacity: 0;
       transform: scale(0.45) rotate(-18deg);
     }
   }

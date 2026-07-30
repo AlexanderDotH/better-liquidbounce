@@ -28,7 +28,11 @@
     import ModernCommandBar from "./ModernCommandBar.svelte";
     import ModernSearch from "./ModernSearch.svelte";
     import ModernSettings from "./ModernSettings.svelte";
-    import {MODERN_LAYOUT_RESET_DURATION_MS} from "./model/modernMotion";
+    import {
+        MODERN_ANIMATION_STALL_GUARD_MS,
+        MODERN_LAYOUT_RESET_DURATION_MS,
+        shouldSettleModernAnimation,
+    } from "./model/modernMotion";
     import {normalizeClickGuiScaleFactor} from "./modernShellState";
 
     let {
@@ -42,6 +46,7 @@
     let minecraftScaleFactor = $state(2);
     let clickGuiScaleFactor = $state(1);
     let resetLayoutVersion = $state(0);
+    let clickGuiElement: HTMLElement;
     let renderScaleFactor = $derived(normalizeClickGuiScaleFactor($scaleFactor));
 
     $effect(() => {
@@ -60,6 +65,13 @@
 
     onMount(() => {
         void initializeClientState();
+
+        const stallGuardTimeout = window.setTimeout(
+            settleStalledAnimations,
+            MODERN_ANIMATION_STALL_GUARD_MS,
+        );
+
+        return () => window.clearTimeout(stallGuardTimeout);
     });
 
     async function initializeClientState(): Promise<void> {
@@ -101,6 +113,32 @@
         resetLayoutVersion += 1;
     }
 
+    function settleStalledAnimations(): void {
+        for (const animation of clickGuiElement.getAnimations({subtree: true})) {
+            const currentTime = typeof animation.currentTime === "number"
+                ? animation.currentTime
+                : null;
+            const endTime = Number(
+                animation.effect?.getComputedTiming().endTime
+                ?? Number.POSITIVE_INFINITY,
+            );
+
+            if (!shouldSettleModernAnimation(
+                animation.playState,
+                currentTime,
+                endTime,
+            )) {
+                continue;
+            }
+
+            try {
+                animation.finish();
+            } catch {
+                animation.cancel();
+            }
+        }
+    }
+
     function handleShiftKeyDown(event: KeyboardEvent): void {
         if (event.key === "Shift" || event.shiftKey) {
             shiftHeld.set(true);
@@ -125,6 +163,7 @@
 <div
         class="modern-clickgui"
         class:grid={$showGrid}
+        bind:this={clickGuiElement}
         style="
           transform: scale({renderScaleFactor / 2});
           width: {2 / renderScaleFactor * 100}vw;
@@ -240,28 +279,16 @@
     inset: 0;
     overflow: hidden;
     color: var(--clickgui-text-color);
-    background:
-      linear-gradient(145deg, rgba(18, 22, 28, 0.88), rgba(7, 9, 12, 0.96) 52%, rgba(10, 12, 16, 0.94)),
-      rgba(6, 8, 11, 0.94);
+    background: transparent;
     transform-origin: top left;
     isolation: isolate;
   }
 
-  .modern-clickgui::before,
   .modern-clickgui::after {
     position: absolute;
     inset: 0;
     content: "";
     pointer-events: none;
-  }
-
-  .modern-clickgui::before {
-    z-index: -2;
-    background:
-      linear-gradient(rgba(255, 255, 255, 0.012) 1px, transparent 1px),
-      linear-gradient(90deg, rgba(255, 255, 255, 0.012) 1px, transparent 1px);
-    background-size: 64px 64px;
-    opacity: 0.55;
   }
 
   .modern-clickgui::after {
@@ -294,7 +321,6 @@
 
   @keyframes modern-view-enter {
     from {
-      opacity: 0;
       transform: translateY(5px);
     }
   }

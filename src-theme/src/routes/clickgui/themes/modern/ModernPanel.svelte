@@ -571,6 +571,7 @@
       color-mix(in srgb, var(--accent-color) 13%, white 2%),
       transparent
     );
+    opacity: 0;
     pointer-events: none;
     transform: translateX(-110%);
   }
@@ -670,7 +671,6 @@
     stroke-linecap: round;
     stroke-linejoin: round;
     stroke-width: 1.6;
-    transition: transform var(--modern-motion-duration, 140ms) var(--modern-motion-easing, ease);
   }
 
   .expand-toggle.expanded svg {
@@ -684,9 +684,6 @@
     overscroll-behavior: contain;
     opacity: 0;
     background: var(--modern-surface-panel-body, rgba(8, 10, 14, 0.2));
-    transition:
-      max-height var(--modern-motion-entrance-duration, 260ms) cubic-bezier(0.2, 0.75, 0.25, 1),
-      opacity var(--modern-motion-duration, 140ms) var(--modern-motion-easing, ease);
   }
 
   .modules.expanded {
@@ -705,7 +702,6 @@
 
   @keyframes modern-panel-enter {
     from {
-      opacity: 0;
       transform: translateY(10px);
     }
   }

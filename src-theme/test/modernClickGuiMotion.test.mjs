@@ -3,10 +3,12 @@ import {readFileSync} from "node:fs";
 import test from "node:test";
 
 import {
+    MODERN_ANIMATION_STALL_GUARD_MS,
     MODERN_MODULE_STAGGER_LIMIT,
     MODERN_PANEL_STAGGER_LIMIT,
     MODERN_RESULT_STAGGER_LIMIT,
     motionStaggerIndex,
+    shouldSettleModernAnimation,
 } from "../src/routes/clickgui/themes/modern/model/modernMotion.ts";
 
 const modernRoot = new URL(
@@ -18,6 +20,29 @@ function read(relativePath) {
     return readFileSync(new URL(relativePath, modernRoot), "utf8");
 }
 
+function cssBlock(source, selector) {
+    const selectorIndex = source.indexOf(selector);
+    assert.notEqual(selectorIndex, -1, `${selector} must exist`);
+
+    const openingBraceIndex = source.indexOf("{", selectorIndex);
+    assert.notEqual(openingBraceIndex, -1, `${selector} must open a block`);
+
+    let depth = 0;
+    for (let index = openingBraceIndex; index < source.length; index += 1) {
+        if (source[index] === "{") {
+            depth += 1;
+        } else if (source[index] === "}") {
+            depth -= 1;
+        }
+
+        if (depth === 0) {
+            return source.slice(openingBraceIndex + 1, index);
+        }
+    }
+
+    assert.fail(`${selector} must close its block`);
+}
+
 test("motion stagger indices are finite, integral, and capped", () => {
     assert.equal(motionStaggerIndex(-4, MODERN_PANEL_STAGGER_LIMIT), 0);
     assert.equal(motionStaggerIndex(2.9, MODERN_MODULE_STAGGER_LIMIT), 2);
@@ -26,6 +51,15 @@ test("motion stagger indices are finite, integral, and capped", () => {
         MODERN_RESULT_STAGGER_LIMIT,
     );
     assert.equal(motionStaggerIndex(Number.NaN, MODERN_PANEL_STAGGER_LIMIT), 0);
+});
+
+test("only finite animations frozen on their opening frame are force-settled", () => {
+    assert.equal(MODERN_ANIMATION_STALL_GUARD_MS, 600);
+    assert.equal(shouldSettleModernAnimation("running", 0, 260), true);
+    assert.equal(shouldSettleModernAnimation("paused", 0, 260), true);
+    assert.equal(shouldSettleModernAnimation("running", 16, 260), false);
+    assert.equal(shouldSettleModernAnimation("finished", 0, 260), false);
+    assert.equal(shouldSettleModernAnimation("running", 0, Number.POSITIVE_INFINITY), false);
 });
 
 test("Modern owns centralized entrance, interaction, and reduced-motion tokens", () => {
@@ -69,7 +103,7 @@ test("command, search, and settings surfaces expose purposeful motion cues", () 
 
     assert.match(command, /class:settings-active/);
     assert.match(command, /@keyframes\s+modern-command-enter/);
-    assert.match(command, /\.tabs::before[\s\S]*transition:[\s\S]*transform/);
+    assert.match(command, /@keyframes\s+modern-command-sheen/);
     assert.match(search, /--modern-result-enter-index/);
     assert.match(search, /@keyframes\s+modern-search-result-enter/);
     assert.match(settings, /--modern-setting-card-index/);
@@ -132,4 +166,77 @@ test("keyboard selection and pointer feedback move without hover zoom", () => {
     assert.match(settings, /\.theme-option:hover:not\(:disabled\)[\s\S]*translateY/);
     assert.match(settings, /\.setting-card:hover[\s\S]*translateY/);
     assert.doesNotMatch(settings, /:hover[^{]*\{[^}]*scale\(/);
+});
+
+test("Modern keeps the game visible beneath a centered command pill", () => {
+    const tabbed = read("ModernTabbedClickGui.svelte");
+    const command = read("ModernCommandBar.svelte");
+    const shellBlock = cssBlock(tabbed, ".modern-clickgui");
+    const commandBlock = cssBlock(command, ".command-bar");
+
+    assert.match(shellBlock, /background:\s*transparent;/);
+    assert.doesNotMatch(tabbed, /\.modern-clickgui::before/);
+    assert.match(commandBlock, /left:\s*0;/);
+    assert.match(commandBlock, /right:\s*0;/);
+    assert.match(
+        commandBlock,
+        /width:\s*min\(960px,\s*calc\(100%\s*-\s*32px\)\);/,
+    );
+    assert.match(commandBlock, /margin-inline:\s*auto;/);
+    assert.match(commandBlock, /border-radius:\s*999px;/);
+});
+
+test("transient sheen layers settle hidden instead of tinting controls", () => {
+    const command = read("ModernCommandBar.svelte");
+    const module = read("ModernModule.svelte");
+    const panel = read("ModernPanel.svelte");
+
+    for (const block of [
+        cssBlock(command, ".command-bar::after"),
+        cssBlock(module, ".toggle-sweep"),
+        cssBlock(panel, ".header::after"),
+    ]) {
+        assert.match(block, /opacity:\s*0;/);
+        assert.match(block, /transform:\s*translateX\(/);
+    }
+});
+
+test("essential Modern state stays visible when an animation timeline stalls", () => {
+    const command = read("ModernCommandBar.svelte");
+    const module = read("ModernModule.svelte");
+    const panel = read("ModernPanel.svelte");
+    const search = read("ModernSearch.svelte");
+    const settings = read("ModernSettings.svelte");
+    const tabbed = read("ModernTabbedClickGui.svelte");
+
+    const visibleAtRestKeyframes = [
+        [command, "@keyframes modern-command-enter"],
+        [command, "@keyframes modern-command-item-enter"],
+        [module, "@keyframes settings-open"],
+        [module, "@keyframes modern-module-enter"],
+        [module, "@keyframes modern-setting-enter"],
+        [module, "@keyframes modern-state-label-enter"],
+        [panel, "@keyframes modern-panel-enter"],
+        [search, "@keyframes results-enter"],
+        [search, "@keyframes modern-search-result-enter"],
+        [search, "@keyframes modern-search-control-enter"],
+        [settings, "@keyframes settings-enter"],
+        [settings, "@keyframes modern-settings-section-enter"],
+        [settings, "@keyframes modern-theme-option-enter"],
+        [settings, "@keyframes modern-setting-card-enter"],
+        [settings, "@keyframes modern-selection-confirm"],
+        [tabbed, "@keyframes modern-view-enter"],
+    ];
+
+    for (const [source, keyframe] of visibleAtRestKeyframes) {
+        assert.doesNotMatch(cssBlock(source, keyframe), /opacity:\s*0;/);
+    }
+
+    assert.doesNotMatch(cssBlock(panel, ".modules"), /transition:/);
+    assert.doesNotMatch(cssBlock(panel, ".expand-toggle svg"), /transition:/);
+    assert.doesNotMatch(cssBlock(command, ".tabs::before"), /transition:/);
+    assert.doesNotMatch(cssBlock(command, ".search-region"), /transition:/);
+    assert.doesNotMatch(cssBlock(search, ".result::before"), /transition:/);
+    assert.match(tabbed, /getAnimations\(\{subtree:\s*true\}\)/);
+    assert.match(tabbed, /animation\.finish\(\)/);
 });

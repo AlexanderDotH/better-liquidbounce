@@ -1,5 +1,5 @@
 <script lang="ts">
-    import {onMount} from "svelte";
+    import {onDestroy, onMount} from "svelte";
     import type {ConfigurableSetting} from "../../../../integration/types";
     import type {
         ClickGuiValueChangeEvent,
@@ -58,6 +58,8 @@
     let loadingSettings = $state(true);
     let togglePending = $state(false);
     let toggleMotionVersion = $state(0);
+    let toggleFeedbackActive = $state(false);
+    let toggleFeedbackTimeout: number | null = null;
     let savePending = $state(false);
     let interactionError = $state<string | null>(null);
     let settingsSaveError = $state<string | null>(null);
@@ -127,6 +129,12 @@
         void refreshSettings();
     });
 
+    onDestroy(() => {
+        if (toggleFeedbackTimeout !== null) {
+            clearTimeout(toggleFeedbackTimeout);
+        }
+    });
+
     async function refreshSettings(): Promise<void> {
         loadingSettings = true;
 
@@ -151,6 +159,7 @@
         const previousEnabled = liveEnabled;
         liveEnabled = !previousEnabled;
         toggleMotionVersion += 1;
+        startToggleFeedback();
         togglePending = true;
         interactionError = null;
 
@@ -162,6 +171,18 @@
         } finally {
             togglePending = false;
         }
+    }
+
+    function startToggleFeedback(): void {
+        if (toggleFeedbackTimeout !== null) {
+            clearTimeout(toggleFeedbackTimeout);
+        }
+
+        toggleFeedbackActive = true;
+        toggleFeedbackTimeout = window.setTimeout(() => {
+            toggleFeedbackTimeout = null;
+            toggleFeedbackActive = false;
+        }, 500);
     }
 
     function toggleExpanded(): void {
@@ -278,6 +299,7 @@
         class:expanded
         class:highlighted={$highlightModuleName === name}
         class:pending={togglePending}
+        class:state-feedback={toggleFeedbackActive}
         class:revealed
         style:--modern-module-enter-index={motionStaggerIndex(moduleIndex, MODERN_MODULE_STAGGER_LIMIT)}
 >
@@ -302,7 +324,7 @@
             onblur={() => descriptionStore.set(null)}
     >
         {#key toggleMotionVersion}
-            {#if toggleMotionVersion > 0}
+            {#if toggleMotionVersion > 0 && toggleFeedbackActive}
                 <span class="toggle-sweep" aria-hidden="true"></span>
             {/if}
         {/key}
@@ -311,7 +333,12 @@
         <span class="module-name">{displayName(name)}</span>
         <span class="module-state">
             {#key liveEnabled}
-                <span class="module-state-label">{liveEnabled ? "On" : "Off"}</span>
+                <span
+                        class="module-state-label"
+                        class:animating={toggleFeedbackActive}
+                >
+                    {liveEnabled ? "On" : "Off"}
+                </span>
             {/key}
         </span>
 
@@ -421,7 +448,9 @@
       color-mix(in srgb, var(--accent-color) 15%, white 2%),
       transparent
     );
+    opacity: 0;
     pointer-events: none;
+    transform: translateX(110%);
     animation:
       modern-module-toggle-sweep
       440ms
@@ -491,6 +520,9 @@
 
   .module-state-label {
     grid-area: 1 / 1;
+  }
+
+  .module-state-label.animating {
     animation:
       modern-state-label-enter
       var(--modern-motion-duration, 140ms)
@@ -505,20 +537,19 @@
     opacity: 0.52;
     transition:
       opacity var(--modern-motion-duration, 140ms) var(--modern-motion-easing, ease),
-      transform var(--modern-motion-duration, 140ms) var(--modern-motion-easing, ease);
+      color var(--modern-motion-duration, 140ms) var(--modern-motion-easing, ease);
   }
 
   .expand-mark.expanded {
     opacity: 0.9;
     transform: rotate(90deg);
-    animation:
-      modern-expand-confirm
-      calc(var(--modern-motion-duration, 140ms) * 2)
-      var(--modern-motion-entrance-easing, cubic-bezier(0.16, 1, 0.3, 1));
   }
 
   .module.enabled .state-dot {
     background: color-mix(in srgb, var(--accent-color) 82%, white);
+  }
+
+  .module.enabled.state-feedback .state-dot {
     animation:
       modern-state-confirm
       calc(var(--modern-motion-duration, 140ms) * 2)
@@ -627,29 +658,25 @@
 
   @keyframes settings-open {
     from {
-      opacity: 0;
       transform: translateY(-6px);
     }
   }
 
   @keyframes modern-module-enter {
     from {
-      opacity: 0;
       transform: translateX(-6px);
     }
   }
 
   @keyframes modern-setting-enter {
     from {
-      opacity: 0;
       transform: translateX(-4px);
     }
   }
 
   @keyframes modern-state-confirm {
     0% {
-      opacity: 0.45;
-      transform: scale(0.55);
+      transform: scale(0.82);
     }
 
     58% {
@@ -657,14 +684,12 @@
     }
 
     100% {
-      opacity: 1;
       transform: scale(1);
     }
   }
 
   @keyframes modern-locate-confirm {
     from {
-      opacity: 0;
       transform: scale(0.975);
     }
   }
@@ -687,22 +712,7 @@
 
   @keyframes modern-state-label-enter {
     from {
-      opacity: 0;
       transform: translateY(-3px);
-    }
-  }
-
-  @keyframes modern-expand-confirm {
-    0% {
-      transform: rotate(68deg);
-    }
-
-    62% {
-      transform: rotate(102deg);
-    }
-
-    100% {
-      transform: rotate(90deg);
     }
   }
 

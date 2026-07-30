@@ -582,13 +582,6 @@
     pointer-events: none;
     transform: scaleY(0.25);
     transform-origin: center;
-    transition:
-      opacity
-      var(--modern-motion-duration, 140ms)
-      var(--modern-motion-easing, cubic-bezier(0.2, 0.8, 0.2, 1)),
-      transform
-      var(--modern-motion-duration, 140ms)
-      var(--modern-motion-entrance-easing, cubic-bezier(0.16, 1, 0.3, 1));
   }
 
   .result:hover:not(:disabled) {
@@ -712,29 +705,25 @@
 
   @keyframes results-enter {
     from {
-      opacity: 0;
       transform: translateY(-6px);
     }
   }
 
   @keyframes modern-search-result-enter {
     from {
-      opacity: 0;
       transform: translateY(-4px);
     }
   }
 
   @keyframes modern-search-control-enter {
     from {
-      opacity: 0;
       transform: rotate(-45deg);
     }
   }
 
   @keyframes modern-search-state-confirm {
     0% {
-      opacity: 0.45;
-      transform: scale(0.55);
+      transform: scale(0.82);
     }
 
     58% {
@@ -742,7 +731,6 @@
     }
 
     100% {
-      opacity: 1;
       transform: scale(var(--modern-result-state-scale));
     }
   }

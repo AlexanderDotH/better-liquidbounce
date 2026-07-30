@@ -129,9 +129,11 @@
     position: absolute;
     z-index: 1000000;
     top: 16px;
-    left: 20px;
-    right: 20px;
+    right: 0;
+    left: 0;
+    width: min(960px, calc(100% - 32px));
     min-height: 52px;
+    margin-inline: auto;
     display: grid;
     grid-template-columns: minmax(150px, 1fr) auto minmax(240px, 1.4fr) minmax(150px, 1fr);
     align-items: center;
@@ -140,7 +142,7 @@
     color: var(--modern-text-primary, #f4f6f8);
     background: var(--modern-surface-command, rgba(15, 18, 23, 0.96));
     border: 1px solid var(--modern-border, rgba(255, 255, 255, 0.1));
-    border-radius: 14px;
+    border-radius: 999px;
     box-shadow: 0 10px 28px rgba(0, 0, 0, 0.24);
     overflow: hidden;
     animation:
@@ -164,7 +166,9 @@
       color-mix(in srgb, var(--accent-color) 18%, white 3%),
       transparent
     );
+    opacity: 0;
     pointer-events: none;
+    transform: translateX(380%) skewX(-14deg);
     animation:
       modern-command-sheen
       720ms
@@ -244,10 +248,6 @@
     border: 1px solid color-mix(in srgb, var(--accent-color) 36%, transparent);
     border-radius: 7px;
     transform: translateX(0);
-    transition:
-      transform
-      var(--modern-motion-duration, 140ms)
-      var(--modern-motion-easing, cubic-bezier(0.2, 0.8, 0.2, 1));
   }
 
   .tabs.settings-active::before {
@@ -292,7 +292,6 @@
     position: relative;
     z-index: 1;
     min-width: 0;
-    transition: opacity var(--modern-motion-duration, 140ms) var(--modern-motion-easing, ease);
     animation:
       modern-command-item-enter
       var(--modern-motion-entrance-duration, 260ms)
@@ -303,7 +302,6 @@
 
   .search-region.hidden {
     visibility: hidden;
-    opacity: 0;
     pointer-events: none;
   }
 
@@ -396,8 +394,7 @@
 
   @media (max-width: 680px) {
     .command-bar {
-      left: 10px;
-      right: 10px;
+      width: calc(100% - 20px);
       grid-template-columns: auto minmax(64px, 1fr) auto;
       gap: 6px;
       padding: 7px;
@@ -419,14 +416,12 @@
 
   @keyframes modern-command-enter {
     from {
-      opacity: 0;
       transform: translateY(-8px);
     }
   }
 
   @keyframes modern-command-item-enter {
     from {
-      opacity: 0;
       transform: translateY(-3px);
     }
   }
