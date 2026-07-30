@@ -146,6 +146,7 @@
             <ModernPanel
                     {category}
                     {modules}
+                    {panelIndex}
                     initialState={initialPanelStates[panelIndex]}
                     resetVersion={panelResetVersion}
             />

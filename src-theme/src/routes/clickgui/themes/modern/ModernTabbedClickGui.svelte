@@ -174,8 +174,12 @@
     --modern-divider: rgba(255, 255, 255, 0.075);
     --modern-focus-ring: color-mix(in srgb, var(--accent-color) 80%, white);
     --modern-panel-radius: 12px;
+    --modern-motion-fast: 100ms;
     --modern-motion-duration: 140ms;
-    --modern-motion-easing: ease;
+    --modern-motion-entrance-duration: 260ms;
+    --modern-motion-stagger: 24ms;
+    --modern-motion-easing: cubic-bezier(0.2, 0.8, 0.2, 1);
+    --modern-motion-entrance-easing: cubic-bezier(0.16, 1, 0.3, 1);
 
     --clickgui-text-color: var(--modern-text-primary);
     --clickgui-text-dimmed-color: #959da8;
@@ -240,35 +244,69 @@
     isolation: isolate;
   }
 
-  .modern-clickgui::before {
+  .modern-clickgui::before,
+  .modern-clickgui::after {
     position: absolute;
     inset: 0;
-    z-index: -1;
     content: "";
+    pointer-events: none;
+  }
+
+  .modern-clickgui::before {
+    z-index: -2;
     background:
       linear-gradient(rgba(255, 255, 255, 0.012) 1px, transparent 1px),
       linear-gradient(90deg, rgba(255, 255, 255, 0.012) 1px, transparent 1px);
     background-size: 64px 64px;
     opacity: 0.55;
-    pointer-events: none;
   }
 
-  .modern-clickgui.grid {
+  .modern-clickgui::after {
+    z-index: -1;
     background-image:
       linear-gradient(to right, color-mix(in srgb, var(--clickgui-grid-color) 52%, transparent) 1px, transparent 1px),
-      linear-gradient(to bottom, color-mix(in srgb, var(--clickgui-grid-color) 52%, transparent) 1px, transparent 1px),
-      linear-gradient(145deg, rgba(18, 22, 28, 0.88), rgba(7, 9, 12, 0.96) 52%, rgba(10, 12, 16, 0.94));
+      linear-gradient(to bottom, color-mix(in srgb, var(--clickgui-grid-color) 52%, transparent) 1px, transparent 1px);
+    background-size: inherit;
+    opacity: 0;
+    transition: opacity var(--modern-motion-duration) var(--modern-motion-easing);
+  }
+
+  .modern-clickgui.grid::after {
+    opacity: 0.72;
   }
 
   .view-stage {
     position: absolute;
     inset: 0;
+    animation:
+      modern-view-enter
+      var(--modern-motion-entrance-duration)
+      var(--modern-motion-entrance-easing)
+      backwards;
+  }
+
+  @keyframes modern-view-enter {
+    from {
+      opacity: 0;
+      transform: translateY(5px);
+    }
   }
 
   @media (prefers-reduced-motion: reduce) {
     .modern-clickgui {
+      --modern-motion-fast: 0ms;
       --modern-motion-duration: 0ms;
+      --modern-motion-entrance-duration: 0ms;
+      --modern-motion-stagger: 0ms;
       scroll-behavior: auto;
+    }
+
+    .modern-clickgui::after {
+      transition-duration: 0ms;
+    }
+
+    .view-stage {
+      animation: none;
     }
   }
 </style>

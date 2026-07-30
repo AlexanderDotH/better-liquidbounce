@@ -8,6 +8,10 @@
     import ConfigurableSetting from "../../setting/ConfigurableSetting.svelte";
     import {createLatestValueSaveQueue} from "../../theme/latestValueSaveQueue";
     import {productionGlobalSettingsDataSource} from "./model/clickGuiDataSource";
+    import {
+        MODERN_SETTING_STAGGER_LIMIT,
+        motionStaggerIndex,
+    } from "./model/modernMotion";
 
     let {session} = $props<{session: ClickGuiThemeSession}>();
 
@@ -136,7 +140,7 @@
                 </div>
 
                 <div class="theme-options" role="radiogroup" aria-labelledby="appearance-heading">
-                    {#each themeOptions as option (option.value)}
+                    {#each themeOptions as option, optionIndex (option.value)}
                         <button
                                 class="theme-option"
                                 class:selected={$session.theme === option.value}
@@ -144,6 +148,7 @@
                                 role="radio"
                                 disabled={$session.loading || $session.saving}
                                 aria-checked={$session.theme === option.value}
+                                style:--modern-theme-option-index={motionStaggerIndex(optionIndex, MODERN_SETTING_STAGGER_LIMIT)}
                                 onclick={() => selectTheme(option.value)}
                         >
                             <span class="theme-preview" class:modern={option.value === "Modern"} aria-hidden="true">
@@ -207,7 +212,10 @@
                         {#each globalSettings.value as _, index (globalSettings.value[index].name)}
                             {#if globalSettings.value[index].valueType === "CONFIGURABLE"
                             || globalSettings.value[index].valueType === "TOGGLEABLE"}
-                                <div class="setting-card">
+                                <div
+                                        class="setting-card"
+                                        style:--modern-setting-card-index={motionStaggerIndex(index, MODERN_SETTING_STAGGER_LIMIT)}
+                                >
                                     <ConfigurableSetting
                                             path="clickgui.global"
                                             bind:setting={globalSettings.value[index]}
@@ -251,7 +259,11 @@
     border: 1px solid var(--modern-border, rgba(255, 255, 255, 0.1));
     border-radius: 16px;
     box-shadow: 0 18px 48px rgba(0, 0, 0, 0.3);
-    animation: settings-enter var(--modern-motion-duration, 140ms) ease-out both;
+    animation:
+      settings-enter
+      var(--modern-motion-entrance-duration, 260ms)
+      var(--modern-motion-entrance-easing, cubic-bezier(0.16, 1, 0.3, 1))
+      backwards;
   }
 
   .window-heading {
@@ -325,6 +337,19 @@
   .settings-section {
     padding: 24px 28px 28px;
     background: rgba(255, 255, 255, 0.009);
+    animation:
+      modern-settings-section-enter
+      var(--modern-motion-entrance-duration, 260ms)
+      var(--modern-motion-entrance-easing, cubic-bezier(0.16, 1, 0.3, 1))
+      backwards;
+  }
+
+  .settings-section:nth-child(1) {
+    animation-delay: 54ms;
+  }
+
+  .settings-section:nth-child(2) {
+    animation-delay: 94ms;
   }
 
   .settings-section + .settings-section {
@@ -383,6 +408,17 @@
     transition:
       background-color var(--modern-motion-duration, 140ms) var(--modern-motion-easing, ease),
       border-color var(--modern-motion-duration, 140ms) var(--modern-motion-easing, ease);
+    animation:
+      modern-theme-option-enter
+      var(--modern-motion-entrance-duration, 260ms)
+      var(--modern-motion-entrance-easing, cubic-bezier(0.16, 1, 0.3, 1))
+      backwards;
+    animation-delay:
+      calc(
+        78ms
+        + var(--modern-theme-option-index, 0)
+        * var(--modern-motion-stagger, 24ms)
+      );
   }
 
   .theme-option:hover:not(:disabled) {
@@ -425,6 +461,10 @@
     height: 8px;
     background: rgba(255, 255, 255, 0.11);
     border-radius: 2px;
+    transition:
+      transform
+      var(--modern-motion-duration, 140ms)
+      var(--modern-motion-easing, cubic-bezier(0.2, 0.8, 0.2, 1));
   }
 
   .theme-preview .preview-panel {
@@ -434,6 +474,10 @@
     background: rgba(255, 255, 255, 0.075);
     border-top: 2px solid var(--accent-color);
     border-radius: 2px;
+    transition:
+      transform
+      var(--modern-motion-duration, 140ms)
+      var(--modern-motion-easing, cubic-bezier(0.2, 0.8, 0.2, 1));
   }
 
   .theme-preview .preview-panel-primary {
@@ -458,6 +502,18 @@
     background: rgba(255, 255, 255, 0.055);
     border: 1px solid rgba(255, 255, 255, 0.095);
     border-radius: 4px;
+  }
+
+  .theme-option.selected .preview-bar {
+    transform: translateY(1px);
+  }
+
+  .theme-option.selected .preview-panel-primary {
+    transform: translateY(-2px);
+  }
+
+  .theme-option.selected .preview-panel-secondary {
+    transform: translateY(2px);
   }
 
   .theme-copy {
@@ -488,6 +544,13 @@
     background: rgba(255, 255, 255, 0.035);
     border: 1px solid rgba(255, 255, 255, 0.11);
     border-radius: 50%;
+    transition:
+      background-color
+      var(--modern-motion-duration, 140ms)
+      var(--modern-motion-easing, cubic-bezier(0.2, 0.8, 0.2, 1)),
+      border-color
+      var(--modern-motion-duration, 140ms)
+      var(--modern-motion-easing, cubic-bezier(0.2, 0.8, 0.2, 1));
   }
 
   .selected .selection-indicator {
@@ -499,6 +562,11 @@
     width: 11px;
     height: 11px;
     fill: currentColor;
+    animation:
+      modern-selection-confirm
+      var(--modern-motion-entrance-duration, 260ms)
+      var(--modern-motion-entrance-easing, cubic-bezier(0.16, 1, 0.3, 1))
+      backwards;
   }
 
   .settings-grid {
@@ -514,6 +582,17 @@
     background: rgba(255, 255, 255, 0.022);
     border: 1px solid rgba(255, 255, 255, 0.065);
     border-radius: 10px;
+    animation:
+      modern-setting-card-enter
+      var(--modern-motion-entrance-duration, 260ms)
+      var(--modern-motion-entrance-easing, cubic-bezier(0.16, 1, 0.3, 1))
+      backwards;
+    animation-delay:
+      calc(
+        116ms
+        + var(--modern-setting-card-index, 0)
+        * var(--modern-motion-stagger, 24ms)
+      );
   }
 
   .inline-message,
@@ -565,13 +644,41 @@
 
   @keyframes settings-enter {
     from {
-      transform: translateY(4px);
+      transform: translateY(8px);
       opacity: 0;
     }
 
     to {
       transform: translateY(0);
       opacity: 1;
+    }
+  }
+
+  @keyframes modern-settings-section-enter {
+    from {
+      opacity: 0;
+      transform: translateY(5px);
+    }
+  }
+
+  @keyframes modern-theme-option-enter {
+    from {
+      opacity: 0;
+      transform: translateY(6px);
+    }
+  }
+
+  @keyframes modern-setting-card-enter {
+    from {
+      opacity: 0;
+      transform: translateY(7px);
+    }
+  }
+
+  @keyframes modern-selection-confirm {
+    from {
+      opacity: 0;
+      transform: scale(0.45) rotate(-18deg);
     }
   }
 
@@ -611,9 +718,19 @@
   @media (prefers-reduced-motion: reduce) {
     .settings-window,
     .spinner,
-    .theme-option {
+    .theme-option,
+    .theme-preview .preview-bar,
+    .theme-preview .preview-panel,
+    .selection-indicator {
       animation-duration: 0ms;
       transition-duration: 0ms;
+    }
+
+    .settings-section,
+    .theme-option,
+    .selection-indicator svg,
+    .setting-card {
+      animation: none;
     }
   }
 </style>

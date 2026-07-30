@@ -26,11 +26,16 @@
         type ModernPanelPosition,
         type ModernPanelState,
     } from "./model/modernPanelState";
+    import {
+        MODERN_PANEL_STAGGER_LIMIT,
+        motionStaggerIndex,
+    } from "./model/modernMotion";
     import {logicalViewportDimension} from "./modernShellState";
 
     interface Props {
         category: string;
         modules: ClickGuiModule[];
+        panelIndex: number;
         initialState: ModernPanelState;
         resetVersion: number;
     }
@@ -41,7 +46,13 @@
         shiftKey: boolean;
     }
 
-    let {category, modules, initialState, resetVersion}: Props = $props();
+    let {
+        category,
+        modules,
+        panelIndex,
+        initialState,
+        resetVersion,
+    }: Props = $props();
 
     const storageKey = $derived(modernPanelStateKey(category));
     let panelState = $state<ModernPanelState>(loadPanelState());
@@ -387,6 +398,7 @@
         style:--modern-panel-width="{MODERN_PANEL_WIDTH}px"
         style:--modern-panel-header-height="{MODERN_PANEL_HEADER_HEIGHT}px"
         style:--modern-panel-max-modules-height="{maximumModulesHeight}px"
+        style:--modern-panel-enter-index={motionStaggerIndex(panelIndex, MODERN_PANEL_STAGGER_LIMIT)}
 >
     <!-- svelte-ignore a11y_no_static_element_interactions -->
     <header
@@ -430,8 +442,15 @@
             bind:this={modulesElement}
             onscroll={handleModulesScroll}
     >
-        {#each modules as {name, enabled, description, aliases} (name)}
-            <ModernModule {name} {enabled} {description} {aliases}/>
+        {#each modules as {name, enabled, description, aliases}, moduleIndex (name)}
+            <ModernModule
+                    {name}
+                    {enabled}
+                    {description}
+                    {aliases}
+                    {moduleIndex}
+                    revealed={panelState.expanded}
+            />
         {/each}
     </div>
 </article>
@@ -453,9 +472,31 @@
     contain: layout paint style;
     user-select: none;
     -webkit-user-select: none;
+    animation:
+      modern-panel-enter
+      var(--modern-motion-entrance-duration, 260ms)
+      var(--modern-motion-entrance-easing, cubic-bezier(0.16, 1, 0.3, 1))
+      backwards;
+    animation-delay:
+      calc(
+        var(--modern-panel-enter-index, 0)
+        * var(--modern-motion-stagger, 24ms)
+      );
+    transition:
+      transform
+      var(--modern-motion-fast, 100ms)
+      var(--modern-motion-easing, cubic-bezier(0.2, 0.8, 0.2, 1)),
+      border-color
+      var(--modern-motion-duration, 140ms)
+      var(--modern-motion-easing, cubic-bezier(0.2, 0.8, 0.2, 1)),
+      box-shadow
+      var(--modern-motion-duration, 140ms)
+      var(--modern-motion-easing, cubic-bezier(0.2, 0.8, 0.2, 1));
   }
 
   .panel.moving {
+    transform: translateY(-2px);
+    border-color: var(--modern-border-strong, rgba(255, 255, 255, 0.13));
     box-shadow:
       0 20px 46px rgba(0, 0, 0, 0.36),
       inset 0 1px rgba(255, 255, 255, 0.04);
@@ -472,6 +513,13 @@
     touch-action: none;
     background: var(--modern-surface-panel-header, rgba(255, 255, 255, 0.035));
     border-bottom: 1px solid transparent;
+    transition:
+      background-color
+      var(--modern-motion-duration, 140ms)
+      var(--modern-motion-easing, cubic-bezier(0.2, 0.8, 0.2, 1)),
+      border-color
+      var(--modern-motion-duration, 140ms)
+      var(--modern-motion-easing, cubic-bezier(0.2, 0.8, 0.2, 1));
   }
 
   .panel.expanded .header {
@@ -480,6 +528,7 @@
 
   .moving .header {
     cursor: grabbing;
+    background: color-mix(in srgb, var(--accent-color) 7%, var(--modern-surface-panel-header));
   }
 
   .category-icon {
@@ -571,7 +620,7 @@
     opacity: 0;
     background: var(--modern-surface-panel-body, rgba(8, 10, 14, 0.2));
     transition:
-      max-height var(--modern-motion-duration, 140ms) cubic-bezier(0.2, 0.75, 0.25, 1),
+      max-height var(--modern-motion-entrance-duration, 260ms) cubic-bezier(0.2, 0.75, 0.25, 1),
       opacity var(--modern-motion-duration, 140ms) var(--modern-motion-easing, ease);
   }
 
@@ -589,11 +638,24 @@
     border-radius: 999px;
   }
 
+  @keyframes modern-panel-enter {
+    from {
+      opacity: 0;
+      transform: translateY(10px);
+    }
+  }
+
   @media (prefers-reduced-motion: reduce) {
+    .panel,
+    .header,
     .expand-toggle,
     .expand-toggle svg,
     .modules {
       transition-duration: 0ms;
+    }
+
+    .panel {
+      animation: none;
     }
   }
 </style>

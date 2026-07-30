@@ -61,7 +61,12 @@
         <span class="identity-name">LiquidBounce</span>
     </div>
 
-    <div class="tabs" role="tablist" aria-label="ClickGUI views">
+    <div
+            class="tabs"
+            class:settings-active={view === "settings"}
+            role="tablist"
+            aria-label="ClickGUI views"
+    >
         {#each tabs as tab (tab.view)}
             <button
                     id="modern-command-tab-{tab.view}"
@@ -128,6 +133,11 @@
     border: 1px solid var(--modern-border, rgba(255, 255, 255, 0.1));
     border-radius: 14px;
     box-shadow: 0 10px 28px rgba(0, 0, 0, 0.24);
+    animation:
+      modern-command-enter
+      var(--modern-motion-entrance-duration, 260ms)
+      var(--modern-motion-entrance-easing, cubic-bezier(0.16, 1, 0.3, 1))
+      backwards;
   }
 
   .identity {
@@ -136,6 +146,12 @@
     align-items: center;
     gap: 9px;
     padding-left: 3px;
+    animation:
+      modern-command-item-enter
+      var(--modern-motion-entrance-duration, 260ms)
+      var(--modern-motion-entrance-easing, cubic-bezier(0.16, 1, 0.3, 1))
+      30ms
+      backwards;
   }
 
   .identity-mark {
@@ -163,13 +179,43 @@
   }
 
   .tabs {
-    display: flex;
+    position: relative;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
     align-items: center;
-    gap: 3px;
     padding: 3px;
     background: rgba(255, 255, 255, 0.045);
     border: 1px solid rgba(255, 255, 255, 0.07);
     border-radius: 9px;
+    isolation: isolate;
+    animation:
+      modern-command-item-enter
+      var(--modern-motion-entrance-duration, 260ms)
+      var(--modern-motion-entrance-easing, cubic-bezier(0.16, 1, 0.3, 1))
+      54ms
+      backwards;
+  }
+
+  .tabs::before {
+    position: absolute;
+    z-index: 0;
+    top: 3px;
+    bottom: 3px;
+    left: 3px;
+    width: calc((100% - 6px) / 2);
+    content: "";
+    background: color-mix(in srgb, var(--accent-color) 14%, rgba(255, 255, 255, 0.055));
+    border: 1px solid color-mix(in srgb, var(--accent-color) 36%, transparent);
+    border-radius: 7px;
+    transform: translateX(0);
+    transition:
+      transform
+      var(--modern-motion-duration, 140ms)
+      var(--modern-motion-easing, cubic-bezier(0.2, 0.8, 0.2, 1));
+  }
+
+  .tabs.settings-active::before {
+    transform: translateX(100%);
   }
 
   .tab,
@@ -178,6 +224,8 @@
   }
 
   .tab {
+    position: relative;
+    z-index: 1;
     min-height: 30px;
     padding: 0 12px;
     color: #929aa6;
@@ -200,13 +248,19 @@
 
   .tab.active {
     color: #ffffff;
-    background: color-mix(in srgb, var(--accent-color) 14%, rgba(255, 255, 255, 0.055));
-    border-color: color-mix(in srgb, var(--accent-color) 36%, transparent);
+    background: transparent;
+    border-color: transparent;
   }
 
   .search-region {
     min-width: 0;
     transition: opacity var(--modern-motion-duration, 140ms) var(--modern-motion-easing, ease);
+    animation:
+      modern-command-item-enter
+      var(--modern-motion-entrance-duration, 260ms)
+      var(--modern-motion-entrance-easing, cubic-bezier(0.16, 1, 0.3, 1))
+      78ms
+      backwards;
   }
 
   .search-region.hidden {
@@ -218,6 +272,12 @@
   .actions {
     display: flex;
     justify-content: flex-end;
+    animation:
+      modern-command-item-enter
+      var(--modern-motion-entrance-duration, 260ms)
+      var(--modern-motion-entrance-easing, cubic-bezier(0.16, 1, 0.3, 1))
+      102ms
+      backwards;
   }
 
   .action-button {
@@ -255,6 +315,14 @@
     width: 14px;
     height: 14px;
     fill: currentColor;
+    transition:
+      transform
+      var(--modern-motion-duration, 140ms)
+      var(--modern-motion-easing, cubic-bezier(0.2, 0.8, 0.2, 1));
+  }
+
+  .action-button:active:not(:disabled) svg {
+    transform: rotate(-90deg);
   }
 
   .tab:focus-visible,
@@ -297,11 +365,35 @@
     }
   }
 
+  @keyframes modern-command-enter {
+    from {
+      opacity: 0;
+      transform: translateY(-8px);
+    }
+  }
+
+  @keyframes modern-command-item-enter {
+    from {
+      opacity: 0;
+      transform: translateY(-3px);
+    }
+  }
+
   @media (prefers-reduced-motion: reduce) {
     .tab,
     .action-button,
-    .search-region {
+    .search-region,
+    .tabs::before,
+    .action-button svg {
       transition-duration: 0ms;
+    }
+
+    .command-bar,
+    .identity,
+    .tabs,
+    .search-region,
+    .actions {
+      animation: none;
     }
   }
 </style>

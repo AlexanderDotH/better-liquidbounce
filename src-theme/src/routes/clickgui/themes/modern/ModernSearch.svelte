@@ -21,6 +21,10 @@
         moveSearchSelection,
         readSearchBarAutoFocus,
     } from "./model/modernInteractionState";
+    import {
+        MODERN_RESULT_STAGGER_LIMIT,
+        motionStaggerIndex,
+    } from "./model/modernMotion";
     import {filterModulesBySearch} from "./model/moduleSearch";
     import {motionAwareScrollBehavior} from "./modernShellState";
 
@@ -375,6 +379,7 @@
                             aria-selected={selectedIndex === index}
                             aria-busy={isTogglePending(module.name)}
                             disabled={isTogglePending(module.name)}
+                            style:--modern-result-enter-index={motionStaggerIndex(index, MODERN_RESULT_STAGGER_LIMIT)}
                             onclick={() => selectResult(module)}
                             onmouseenter={() => selectedIndex = index}
                             oncontextmenu={(event) => {
@@ -468,6 +473,18 @@
     border: 0;
     border-radius: 6px;
     cursor: pointer;
+    animation:
+      modern-search-control-enter
+      var(--modern-motion-duration, 140ms)
+      var(--modern-motion-easing, cubic-bezier(0.2, 0.8, 0.2, 1))
+      backwards;
+    transition:
+      color
+      var(--modern-motion-duration, 140ms)
+      var(--modern-motion-easing, cubic-bezier(0.2, 0.8, 0.2, 1)),
+      background-color
+      var(--modern-motion-duration, 140ms)
+      var(--modern-motion-easing, cubic-bezier(0.2, 0.8, 0.2, 1));
   }
 
   .clear-button:hover {
@@ -505,7 +522,11 @@
     border: 1px solid rgba(255, 255, 255, 0.1);
     border-radius: 11px;
     box-shadow: 0 16px 36px rgba(0, 0, 0, 0.34);
-    animation: results-enter var(--modern-motion-duration, 140ms) ease-out both;
+    animation:
+      results-enter
+      var(--modern-motion-entrance-duration, 260ms)
+      var(--modern-motion-entrance-easing, cubic-bezier(0.16, 1, 0.3, 1))
+      backwards;
   }
 
   .results {
@@ -533,6 +554,16 @@
     transition:
       color var(--modern-motion-duration, 140ms) var(--modern-motion-easing, ease),
       background-color var(--modern-motion-duration, 140ms) var(--modern-motion-easing, ease);
+    animation:
+      modern-search-result-enter
+      var(--modern-motion-entrance-duration, 260ms)
+      var(--modern-motion-entrance-easing, cubic-bezier(0.16, 1, 0.3, 1))
+      backwards;
+    animation-delay:
+      calc(
+        var(--modern-result-enter-index, 0)
+        * var(--modern-motion-stagger, 24ms)
+      );
   }
 
   .result:hover,
@@ -553,14 +584,33 @@
   }
 
   .result-state {
+    --modern-result-state-scale: 1;
+
     width: 6px;
     height: 6px;
     background: #555e69;
     border-radius: 50%;
+    transition:
+      background-color
+      var(--modern-motion-duration, 140ms)
+      var(--modern-motion-easing, cubic-bezier(0.2, 0.8, 0.2, 1)),
+      transform
+      var(--modern-motion-duration, 140ms)
+      var(--modern-motion-easing, cubic-bezier(0.2, 0.8, 0.2, 1));
   }
 
   .result.enabled .result-state {
     background: color-mix(in srgb, var(--accent-color) 82%, white);
+    animation:
+      modern-search-state-confirm
+      var(--modern-motion-entrance-duration, 260ms)
+      var(--modern-motion-entrance-easing, cubic-bezier(0.16, 1, 0.3, 1));
+  }
+
+  .result.selected .result-state {
+    --modern-result-state-scale: 1.3;
+
+    transform: scale(var(--modern-result-state-scale));
   }
 
   .result-copy {
@@ -629,7 +679,37 @@
   @keyframes results-enter {
     from {
       opacity: 0;
-      transform: translateY(-3px);
+      transform: translateY(-6px);
+    }
+  }
+
+  @keyframes modern-search-result-enter {
+    from {
+      opacity: 0;
+      transform: translateY(-4px);
+    }
+  }
+
+  @keyframes modern-search-control-enter {
+    from {
+      opacity: 0;
+      transform: rotate(-45deg);
+    }
+  }
+
+  @keyframes modern-search-state-confirm {
+    0% {
+      opacity: 0.45;
+      transform: scale(0.55);
+    }
+
+    58% {
+      transform: scale(1.35);
+    }
+
+    100% {
+      opacity: 1;
+      transform: scale(var(--modern-result-state-scale));
     }
   }
 
@@ -645,12 +725,17 @@
 
   @media (prefers-reduced-motion: reduce) {
     .modern-search,
-    .result {
+    .result,
+    .result-state,
+    .clear-button {
       transition-duration: 0.01ms;
     }
 
     .results,
-    .search-error {
+    .search-error,
+    .result,
+    .result.enabled .result-state,
+    .clear-button {
       animation: none;
     }
   }

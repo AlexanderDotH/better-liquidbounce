@@ -20,6 +20,11 @@
     import type {ClickGuiDataSource} from "./model/clickGuiDataSource";
     import {productionClickGuiDataSource} from "./model/clickGuiDataSource";
     import {modernModuleExpansionKey} from "./model/modernInteractionState";
+    import {
+        MODERN_MODULE_STAGGER_LIMIT,
+        MODERN_SETTING_STAGGER_LIMIT,
+        motionStaggerIndex,
+    } from "./model/modernMotion";
     import {createLatestValueSaveQueue} from "../../theme/latestValueSaveQueue";
     import {
         logicalViewportDimension,
@@ -31,6 +36,8 @@
         enabled: boolean;
         description: string;
         aliases: string[];
+        moduleIndex: number;
+        revealed: boolean;
         dataSource?: ClickGuiDataSource;
     }
 
@@ -39,6 +46,8 @@
         enabled,
         description,
         aliases,
+        moduleIndex,
+        revealed,
         dataSource = productionClickGuiDataSource,
     }: Props = $props();
 
@@ -267,6 +276,8 @@
         class:expanded
         class:highlighted={$highlightModuleName === name}
         class:pending={togglePending}
+        class:revealed
+        style:--modern-module-enter-index={motionStaggerIndex(moduleIndex, MODERN_MODULE_STAGGER_LIMIT)}
 >
     <button
             class="module-row"
@@ -314,7 +325,10 @@
                 </div>
             {:else if configurable}
                 {#each configurable.value as _, index (configurable.value[index].name)}
-                    <div class="modern-setting-shell">
+                    <div
+                            class="modern-setting-shell"
+                            style:--modern-setting-enter-index={motionStaggerIndex(index, MODERN_SETTING_STAGGER_LIMIT)}
+                    >
                         <GenericSetting
                                 path={settingsPath}
                                 bind:setting={configurable.value[index]}
@@ -345,6 +359,19 @@
     position: relative;
     color: var(--clickgui-text-dimmed-color);
     border-bottom: 1px solid rgba(255, 255, 255, 0.055);
+  }
+
+  .module.revealed {
+    animation:
+      modern-module-enter
+      var(--modern-motion-entrance-duration, 260ms)
+      var(--modern-motion-entrance-easing, cubic-bezier(0.16, 1, 0.3, 1))
+      backwards;
+    animation-delay:
+      calc(
+        var(--modern-module-enter-index, 0)
+        * var(--modern-motion-stagger, 24ms)
+      );
   }
 
   .module:last-child {
@@ -387,7 +414,13 @@
     height: 6px;
     background: #58606b;
     border-radius: 50%;
-    transition: background-color var(--modern-motion-duration, 140ms) var(--modern-motion-easing, ease);
+    transition:
+      background-color
+      var(--modern-motion-duration, 140ms)
+      var(--modern-motion-easing, cubic-bezier(0.2, 0.8, 0.2, 1)),
+      transform
+      var(--modern-motion-duration, 140ms)
+      var(--modern-motion-easing, cubic-bezier(0.2, 0.8, 0.2, 1));
   }
 
   .module-name {
@@ -408,6 +441,13 @@
     font-weight: 650;
     letter-spacing: 0.06em;
     text-transform: uppercase;
+    transition:
+      color
+      var(--modern-motion-duration, 140ms)
+      var(--modern-motion-easing, cubic-bezier(0.2, 0.8, 0.2, 1)),
+      opacity
+      var(--modern-motion-duration, 140ms)
+      var(--modern-motion-easing, cubic-bezier(0.2, 0.8, 0.2, 1));
   }
 
   .expand-mark {
@@ -427,10 +467,18 @@
 
   .module.enabled .state-dot {
     background: color-mix(in srgb, var(--accent-color) 82%, white);
+    animation:
+      modern-state-confirm
+      calc(var(--modern-motion-duration, 140ms) * 2)
+      var(--modern-motion-entrance-easing, cubic-bezier(0.16, 1, 0.3, 1));
   }
 
   .module.enabled .module-name {
     color: color-mix(in srgb, var(--accent-color) 78%, white);
+  }
+
+  .module.enabled .module-state {
+    color: color-mix(in srgb, var(--accent-color) 68%, white);
   }
 
   .module.highlighted::after {
@@ -440,6 +488,11 @@
     border: 1px solid color-mix(in srgb, var(--accent-color) 68%, white);
     border-radius: 7px;
     pointer-events: none;
+    animation:
+      modern-locate-confirm
+      calc(var(--modern-motion-entrance-duration, 260ms) * 2)
+      var(--modern-motion-entrance-easing, cubic-bezier(0.16, 1, 0.3, 1))
+      backwards;
   }
 
   .module.pending .module-row {
@@ -452,7 +505,11 @@
     color: var(--clickgui-text-color);
     background: rgba(255, 255, 255, 0.022);
     border-left: 2px solid color-mix(in srgb, var(--accent-color) 46%, transparent);
-    animation: settings-open var(--modern-motion-duration, 140ms) ease-out both;
+    animation:
+      settings-open
+      var(--modern-motion-entrance-duration, 260ms)
+      var(--modern-motion-entrance-easing, cubic-bezier(0.16, 1, 0.3, 1))
+      backwards;
   }
 
   // GenericSetting's shared entrance transition can measure zero while its
@@ -462,6 +519,19 @@
     height: auto !important;
     overflow: visible !important;
     opacity: 1 !important;
+  }
+
+  .modern-setting-shell {
+    animation:
+      modern-setting-enter
+      var(--modern-motion-entrance-duration, 260ms)
+      var(--modern-motion-entrance-easing, cubic-bezier(0.16, 1, 0.3, 1))
+      backwards;
+    animation-delay:
+      calc(
+        var(--modern-setting-enter-index, 0)
+        * var(--modern-motion-stagger, 24ms)
+      );
   }
 
   .settings-status,
@@ -506,7 +576,44 @@
   @keyframes settings-open {
     from {
       opacity: 0;
-      transform: translateY(-3px);
+      transform: translateY(-6px);
+    }
+  }
+
+  @keyframes modern-module-enter {
+    from {
+      opacity: 0;
+      transform: translateX(-6px);
+    }
+  }
+
+  @keyframes modern-setting-enter {
+    from {
+      opacity: 0;
+      transform: translateX(-4px);
+    }
+  }
+
+  @keyframes modern-state-confirm {
+    0% {
+      opacity: 0.45;
+      transform: scale(0.55);
+    }
+
+    58% {
+      transform: scale(1.35);
+    }
+
+    100% {
+      opacity: 1;
+      transform: scale(1);
+    }
+  }
+
+  @keyframes modern-locate-confirm {
+    from {
+      opacity: 0;
+      transform: scale(0.975);
     }
   }
 
@@ -520,11 +627,16 @@
     .module-row,
     .state-dot,
     .module-name,
+    .module-state,
     .expand-mark {
       transition-duration: 0.01ms;
     }
 
-    .module-settings {
+    .module.revealed,
+    .module.enabled .state-dot,
+    .module.highlighted::after,
+    .module-settings,
+    .modern-setting-shell {
       animation: none;
     }
 
