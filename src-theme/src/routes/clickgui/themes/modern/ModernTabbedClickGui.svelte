@@ -28,6 +28,7 @@
     import ModernCommandBar from "./ModernCommandBar.svelte";
     import ModernSearch from "./ModernSearch.svelte";
     import ModernSettings from "./ModernSettings.svelte";
+    import {MODERN_LAYOUT_RESET_DURATION_MS} from "./model/modernMotion";
     import {normalizeClickGuiScaleFactor} from "./modernShellState";
 
     let {
@@ -130,11 +131,13 @@
           height: {2 / renderScaleFactor * 100}vh;
           background-size: {$gridSize}px {$gridSize}px;
           --modern-logical-viewport-height: {2 / renderScaleFactor * 100}vh;
+          --modern-motion-layout-duration: {MODERN_LAYOUT_RESET_DURATION_MS}ms;
         "
 >
     <ModernCommandBar
             view={$session.view}
             busy={$session.saving}
+            resetVersion={resetLayoutVersion}
             onViewChange={changeView}
             onResetLayout={resetLayout}
     >
@@ -273,6 +276,10 @@
 
   .modern-clickgui.grid::after {
     opacity: 0.72;
+    animation:
+      modern-grid-engage
+      var(--modern-motion-entrance-duration)
+      var(--modern-motion-entrance-easing);
   }
 
   .view-stage {
@@ -292,6 +299,12 @@
     }
   }
 
+  @keyframes modern-grid-engage {
+    from {
+      transform: scale(1.012);
+    }
+  }
+
   @media (prefers-reduced-motion: reduce) {
     .modern-clickgui {
       --modern-motion-fast: 0ms;
@@ -305,6 +318,7 @@
       transition-duration: 0ms;
     }
 
+    .modern-clickgui.grid::after,
     .view-stage {
       animation: none;
     }

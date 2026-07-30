@@ -537,6 +537,7 @@
   }
 
   .result {
+    position: relative;
     width: 100%;
     min-height: 46px;
     display: grid;
@@ -548,12 +549,14 @@
     background: transparent;
     border: 0;
     border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    overflow: hidden;
     cursor: pointer;
     font-family: inherit;
     text-align: left;
     transition:
       color var(--modern-motion-duration, 140ms) var(--modern-motion-easing, ease),
-      background-color var(--modern-motion-duration, 140ms) var(--modern-motion-easing, ease);
+      background-color var(--modern-motion-duration, 140ms) var(--modern-motion-easing, ease),
+      transform var(--modern-motion-fast, 100ms) var(--modern-motion-easing, ease);
     animation:
       modern-search-result-enter
       var(--modern-motion-entrance-duration, 260ms)
@@ -566,10 +569,41 @@
       );
   }
 
+  .result::before {
+    position: absolute;
+    top: 22%;
+    bottom: 22%;
+    left: 0;
+    width: 2px;
+    content: "";
+    background: color-mix(in srgb, var(--accent-color) 78%, white);
+    border-radius: 0 2px 2px 0;
+    opacity: 0;
+    pointer-events: none;
+    transform: scaleY(0.25);
+    transform-origin: center;
+    transition:
+      opacity
+      var(--modern-motion-duration, 140ms)
+      var(--modern-motion-easing, cubic-bezier(0.2, 0.8, 0.2, 1)),
+      transform
+      var(--modern-motion-duration, 140ms)
+      var(--modern-motion-entrance-easing, cubic-bezier(0.16, 1, 0.3, 1));
+  }
+
+  .result:hover:not(:disabled) {
+    transform: translateX(2px);
+  }
+
   .result:hover,
   .result.selected {
     color: #eef1f5;
     background: rgba(255, 255, 255, 0.055);
+  }
+
+  .result.selected::before {
+    opacity: 1;
+    transform: scaleY(1);
   }
 
   .result:disabled {
@@ -726,6 +760,7 @@
   @media (prefers-reduced-motion: reduce) {
     .modern-search,
     .result,
+    .result::before,
     .result-state,
     .clear-button {
       transition-duration: 0.01ms;
@@ -737,6 +772,10 @@
     .result.enabled .result-state,
     .clear-button {
       animation: none;
+    }
+
+    .result:hover:not(:disabled) {
+      transform: none;
     }
   }
 </style>

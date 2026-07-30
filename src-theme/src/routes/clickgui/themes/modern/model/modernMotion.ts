@@ -2,6 +2,7 @@ export const MODERN_PANEL_STAGGER_LIMIT = 7;
 export const MODERN_MODULE_STAGGER_LIMIT = 8;
 export const MODERN_RESULT_STAGGER_LIMIT = 6;
 export const MODERN_SETTING_STAGGER_LIMIT = 6;
+export const MODERN_LAYOUT_RESET_DURATION_MS = 360;
 
 export function motionStaggerIndex(index: number, maximum: number): number {
     if (!Number.isFinite(index) || !Number.isFinite(maximum)) {

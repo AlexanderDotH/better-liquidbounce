@@ -57,6 +57,7 @@
     let expanded = $state(false);
     let loadingSettings = $state(true);
     let togglePending = $state(false);
+    let toggleMotionVersion = $state(0);
     let savePending = $state(false);
     let interactionError = $state<string | null>(null);
     let settingsSaveError = $state<string | null>(null);
@@ -149,6 +150,7 @@
 
         const previousEnabled = liveEnabled;
         liveEnabled = !previousEnabled;
+        toggleMotionVersion += 1;
         togglePending = true;
         interactionError = null;
 
@@ -299,9 +301,19 @@
             onfocus={showDescription}
             onblur={() => descriptionStore.set(null)}
     >
+        {#key toggleMotionVersion}
+            {#if toggleMotionVersion > 0}
+                <span class="toggle-sweep" aria-hidden="true"></span>
+            {/if}
+        {/key}
+
         <span class="state-dot" aria-hidden="true"></span>
         <span class="module-name">{displayName(name)}</span>
-        <span class="module-state">{liveEnabled ? "On" : "Off"}</span>
+        <span class="module-state">
+            {#key liveEnabled}
+                <span class="module-state-label">{liveEnabled ? "On" : "Off"}</span>
+            {/key}
+        </span>
 
         {#if hasSettings}
             <svg class="expand-mark" class:expanded aria-hidden="true" viewBox="0 0 16 16">
@@ -379,6 +391,7 @@
   }
 
   .module-row {
+    position: relative;
     width: 100%;
     min-height: 42px;
     display: grid;
@@ -389,12 +402,35 @@
     color: inherit;
     background: transparent;
     border: 0;
+    overflow: hidden;
     cursor: pointer;
     font-family: inherit;
     text-align: left;
     transition:
       color var(--modern-motion-duration, 140ms) var(--modern-motion-easing, ease),
       background-color var(--modern-motion-duration, 140ms) var(--modern-motion-easing, ease);
+  }
+
+  .toggle-sweep {
+    position: absolute;
+    z-index: 0;
+    inset: 0;
+    background: linear-gradient(
+      90deg,
+      transparent,
+      color-mix(in srgb, var(--accent-color) 15%, white 2%),
+      transparent
+    );
+    pointer-events: none;
+    animation:
+      modern-module-toggle-sweep
+      440ms
+      var(--modern-motion-entrance-easing, cubic-bezier(0.16, 1, 0.3, 1));
+  }
+
+  .module-row > :not(.toggle-sweep) {
+    position: relative;
+    z-index: 1;
   }
 
   .module-row:hover {
@@ -436,6 +472,9 @@
   }
 
   .module-state {
+    min-width: 20px;
+    display: grid;
+    place-items: center end;
     color: var(--modern-text-muted, #8d96a3);
     font-size: 9px;
     font-weight: 650;
@@ -448,6 +487,15 @@
       opacity
       var(--modern-motion-duration, 140ms)
       var(--modern-motion-easing, cubic-bezier(0.2, 0.8, 0.2, 1));
+  }
+
+  .module-state-label {
+    grid-area: 1 / 1;
+    animation:
+      modern-state-label-enter
+      var(--modern-motion-duration, 140ms)
+      var(--modern-motion-entrance-easing, cubic-bezier(0.16, 1, 0.3, 1))
+      backwards;
   }
 
   .expand-mark {
@@ -463,6 +511,10 @@
   .expand-mark.expanded {
     opacity: 0.9;
     transform: rotate(90deg);
+    animation:
+      modern-expand-confirm
+      calc(var(--modern-motion-duration, 140ms) * 2)
+      var(--modern-motion-entrance-easing, cubic-bezier(0.16, 1, 0.3, 1));
   }
 
   .module.enabled .state-dot {
@@ -617,6 +669,43 @@
     }
   }
 
+  @keyframes modern-module-toggle-sweep {
+    from {
+      opacity: 0;
+      transform: translateX(-110%);
+    }
+
+    48% {
+      opacity: 0.72;
+    }
+
+    to {
+      opacity: 0;
+      transform: translateX(110%);
+    }
+  }
+
+  @keyframes modern-state-label-enter {
+    from {
+      opacity: 0;
+      transform: translateY(-3px);
+    }
+  }
+
+  @keyframes modern-expand-confirm {
+    0% {
+      transform: rotate(68deg);
+    }
+
+    62% {
+      transform: rotate(102deg);
+    }
+
+    100% {
+      transform: rotate(90deg);
+    }
+  }
+
   @keyframes spin {
     to {
       transform: rotate(360deg);
@@ -636,7 +725,10 @@
     .module.enabled .state-dot,
     .module.highlighted::after,
     .module-settings,
-    .modern-setting-shell {
+    .modern-setting-shell,
+    .toggle-sweep,
+    .module-state-label,
+    .expand-mark.expanded {
       animation: none;
     }
 

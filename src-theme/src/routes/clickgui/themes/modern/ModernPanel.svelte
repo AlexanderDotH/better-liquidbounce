@@ -27,6 +27,7 @@
         type ModernPanelState,
     } from "./model/modernPanelState";
     import {
+        MODERN_LAYOUT_RESET_DURATION_MS,
         MODERN_PANEL_STAGGER_LIMIT,
         motionStaggerIndex,
     } from "./model/modernMotion";
@@ -64,9 +65,11 @@
     let dragFrame: number | null = null;
     let scrollSaveTimeout: number | null = null;
     let scaleChangeFrame: number | null = null;
+    let resetAnimationTimeout: number | null = null;
     let observedScaleFactor: number | null = null;
     let observedResetVersion: number | null = null;
     let moving = $state(false);
+    let resetting = $state(false);
     let viewport = $state<LogicalViewport>(readLogicalViewport());
     let maximumModulesHeight = $derived(Math.max(
         0,
@@ -149,6 +152,10 @@
             cancelAnimationFrame(scaleChangeFrame);
         }
 
+        if (resetAnimationTimeout !== null) {
+            clearTimeout(resetAnimationTimeout);
+        }
+
     });
 
     function loadPanelState(): ModernPanelState {
@@ -171,8 +178,17 @@
             scrollSaveTimeout = null;
         }
 
+        if (resetAnimationTimeout !== null) {
+            clearTimeout(resetAnimationTimeout);
+        }
+
+        resetting = true;
         panelState = {...nextInitialState};
         updateMaximumZIndex();
+        resetAnimationTimeout = window.setTimeout(() => {
+            resetAnimationTimeout = null;
+            resetting = false;
+        }, MODERN_LAYOUT_RESET_DURATION_MS);
 
         void tick().then(() => {
             if (modulesElement) {
@@ -390,6 +406,7 @@
 <article
         class="panel"
         class:moving
+        class:resetting
         class:expanded={panelState.expanded}
         aria-label="{category} modules"
         style:left="{panelState.left}px"
@@ -502,7 +519,27 @@
       inset 0 1px rgba(255, 255, 255, 0.04);
   }
 
+  .panel.resetting {
+    transition:
+      left
+      var(--modern-motion-layout-duration, 360ms)
+      var(--modern-motion-entrance-easing, cubic-bezier(0.16, 1, 0.3, 1)),
+      top
+      var(--modern-motion-layout-duration, 360ms)
+      var(--modern-motion-entrance-easing, cubic-bezier(0.16, 1, 0.3, 1)),
+      transform
+      var(--modern-motion-fast, 100ms)
+      var(--modern-motion-easing, cubic-bezier(0.2, 0.8, 0.2, 1)),
+      border-color
+      var(--modern-motion-duration, 140ms)
+      var(--modern-motion-easing, cubic-bezier(0.2, 0.8, 0.2, 1)),
+      box-shadow
+      var(--modern-motion-duration, 140ms)
+      var(--modern-motion-easing, cubic-bezier(0.2, 0.8, 0.2, 1));
+  }
+
   .header {
+    position: relative;
     height: var(--modern-panel-header-height, 44px);
     display: grid;
     grid-template-columns: 28px minmax(0, 1fr) 30px;
@@ -513,6 +550,7 @@
     touch-action: none;
     background: var(--modern-surface-panel-header, rgba(255, 255, 255, 0.035));
     border-bottom: 1px solid transparent;
+    overflow: hidden;
     transition:
       background-color
       var(--modern-motion-duration, 140ms)
@@ -520,6 +558,33 @@
       border-color
       var(--modern-motion-duration, 140ms)
       var(--modern-motion-easing, cubic-bezier(0.2, 0.8, 0.2, 1));
+  }
+
+  .header::after {
+    position: absolute;
+    z-index: 0;
+    inset: 0;
+    content: "";
+    background: linear-gradient(
+      90deg,
+      transparent,
+      color-mix(in srgb, var(--accent-color) 13%, white 2%),
+      transparent
+    );
+    pointer-events: none;
+    transform: translateX(-110%);
+  }
+
+  .header > * {
+    position: relative;
+    z-index: 1;
+  }
+
+  .panel.expanded .header::after {
+    animation:
+      modern-panel-expand-sweep
+      440ms
+      var(--modern-motion-entrance-easing, cubic-bezier(0.16, 1, 0.3, 1));
   }
 
   .panel.expanded .header {
@@ -645,6 +710,22 @@
     }
   }
 
+  @keyframes modern-panel-expand-sweep {
+    from {
+      opacity: 0;
+      transform: translateX(-110%);
+    }
+
+    48% {
+      opacity: 0.72;
+    }
+
+    to {
+      opacity: 0;
+      transform: translateX(110%);
+    }
+  }
+
   @media (prefers-reduced-motion: reduce) {
     .panel,
     .header,
@@ -655,6 +736,14 @@
     }
 
     .panel {
+      animation: none;
+    }
+
+    .panel.resetting {
+      transition-duration: 0ms;
+    }
+
+    .panel.expanded .header::after {
       animation: none;
     }
   }

@@ -407,7 +407,9 @@
     font-family: inherit;
     transition:
       background-color var(--modern-motion-duration, 140ms) var(--modern-motion-easing, ease),
-      border-color var(--modern-motion-duration, 140ms) var(--modern-motion-easing, ease);
+      border-color var(--modern-motion-duration, 140ms) var(--modern-motion-easing, ease),
+      box-shadow var(--modern-motion-duration, 140ms) var(--modern-motion-easing, ease),
+      transform var(--modern-motion-fast, 100ms) var(--modern-motion-easing, ease);
     animation:
       modern-theme-option-enter
       var(--modern-motion-entrance-duration, 260ms)
@@ -424,6 +426,12 @@
   .theme-option:hover:not(:disabled) {
     background: rgba(255, 255, 255, 0.045);
     border-color: rgba(255, 255, 255, 0.13);
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.14);
+    transform: translateY(-2px);
+  }
+
+  .theme-option:active:not(:disabled) {
+    transform: translateY(0);
   }
 
   .theme-option.selected {
@@ -593,6 +601,26 @@
         + var(--modern-setting-card-index, 0)
         * var(--modern-motion-stagger, 24ms)
       );
+    transition:
+      background-color
+      var(--modern-motion-duration, 140ms)
+      var(--modern-motion-easing, cubic-bezier(0.2, 0.8, 0.2, 1)),
+      border-color
+      var(--modern-motion-duration, 140ms)
+      var(--modern-motion-easing, cubic-bezier(0.2, 0.8, 0.2, 1)),
+      box-shadow
+      var(--modern-motion-duration, 140ms)
+      var(--modern-motion-easing, cubic-bezier(0.2, 0.8, 0.2, 1)),
+      transform
+      var(--modern-motion-fast, 100ms)
+      var(--modern-motion-easing, cubic-bezier(0.2, 0.8, 0.2, 1));
+  }
+
+  .setting-card:hover {
+    background: rgba(255, 255, 255, 0.03);
+    border-color: rgba(255, 255, 255, 0.1);
+    box-shadow: 0 8px 22px rgba(0, 0, 0, 0.13);
+    transform: translateY(-2px);
   }
 
   .inline-message,
@@ -731,6 +759,12 @@
     .selection-indicator svg,
     .setting-card {
       animation: none;
+    }
+
+    .theme-option:hover:not(:disabled),
+    .theme-option:active:not(:disabled),
+    .setting-card:hover {
+      transform: none;
     }
   }
 </style>

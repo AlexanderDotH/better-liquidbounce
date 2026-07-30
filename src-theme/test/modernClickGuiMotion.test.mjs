@@ -92,3 +92,44 @@ test("every animated Modern surface explicitly disables decorative motion", () =
         );
     }
 });
+
+test("layout reset animates both the command feedback and mounted panel positions", () => {
+    const tabbed = read("ModernTabbedClickGui.svelte");
+    const command = read("ModernCommandBar.svelte");
+    const panel = read("ModernPanel.svelte");
+
+    assert.match(tabbed, /resetVersion=\{resetLayoutVersion\}/);
+    assert.match(command, /#key\s+resetVersion/);
+    assert.match(command, /@keyframes\s+modern-reset-confirm/);
+    assert.match(panel, /class:resetting/);
+    assert.match(
+        panel,
+        /\.panel\.resetting[\s\S]*transition:[\s\S]*left[\s\S]*top/,
+    );
+});
+
+test("panel expansion and module state changes use finite accent sweeps", () => {
+    const command = read("ModernCommandBar.svelte");
+    const panel = read("ModernPanel.svelte");
+    const module = read("ModernModule.svelte");
+
+    assert.match(command, /@keyframes\s+modern-command-sheen/);
+    assert.match(panel, /@keyframes\s+modern-panel-expand-sweep/);
+    assert.match(module, /#key\s+liveEnabled/);
+    assert.match(module, /@keyframes\s+modern-module-toggle-sweep/);
+    assert.match(module, /@keyframes\s+modern-state-label-enter/);
+    assert.doesNotMatch(command, /modern-command-sheen[\s\S]{0,160}infinite/);
+    assert.doesNotMatch(panel, /modern-panel-expand-sweep[\s\S]{0,160}infinite/);
+    assert.doesNotMatch(module, /modern-module-toggle-sweep[\s\S]{0,160}infinite/);
+});
+
+test("keyboard selection and pointer feedback move without hover zoom", () => {
+    const search = read("ModernSearch.svelte");
+    const settings = read("ModernSettings.svelte");
+
+    assert.match(search, /\.result\.selected::before/);
+    assert.match(search, /\.result:hover[\s\S]*translateX/);
+    assert.match(settings, /\.theme-option:hover:not\(:disabled\)[\s\S]*translateY/);
+    assert.match(settings, /\.setting-card:hover[\s\S]*translateY/);
+    assert.doesNotMatch(settings, /:hover[^{]*\{[^}]*scale\(/);
+});

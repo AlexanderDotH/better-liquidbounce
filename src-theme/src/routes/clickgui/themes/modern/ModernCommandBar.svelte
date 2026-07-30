@@ -6,6 +6,7 @@
     interface Props {
         view: ClickGuiView;
         busy?: boolean;
+        resetVersion: number;
         search?: Snippet;
         onViewChange: (view: ClickGuiView) => void;
         onResetLayout: () => void;
@@ -14,6 +15,7 @@
     let {
         view,
         busy = false,
+        resetVersion,
         search,
         onViewChange,
         onResetLayout,
@@ -106,9 +108,16 @@
                     title="Reset panel layout"
                     onclick={onResetLayout}
             >
-                <svg aria-hidden="true" viewBox="0 0 20 20">
-                    <path d="M15.9 5.2A7 7 0 1 0 17 11h-1.7a5.3 5.3 0 1 1-.8-2.8l-2.2.1V10H18V4.3h-1.7l-.4.9Z"/>
-                </svg>
+                {#key resetVersion}
+                    <svg
+                            class="reset-icon"
+                            class:resetting={resetVersion > 0}
+                            aria-hidden="true"
+                            viewBox="0 0 20 20"
+                    >
+                        <path d="M15.9 5.2A7 7 0 1 0 17 11h-1.7a5.3 5.3 0 1 1-.8-2.8l-2.2.1V10H18V4.3h-1.7l-.4.9Z"/>
+                    </svg>
+                {/key}
                 <span>Reset layout</span>
             </button>
         {/if}
@@ -133,6 +142,7 @@
     border: 1px solid var(--modern-border, rgba(255, 255, 255, 0.1));
     border-radius: 14px;
     box-shadow: 0 10px 28px rgba(0, 0, 0, 0.24);
+    overflow: hidden;
     animation:
       modern-command-enter
       var(--modern-motion-entrance-duration, 260ms)
@@ -140,7 +150,32 @@
       backwards;
   }
 
+  .command-bar::after {
+    position: absolute;
+    z-index: 0;
+    top: -40%;
+    bottom: -40%;
+    left: 0;
+    width: 34%;
+    content: "";
+    background: linear-gradient(
+      90deg,
+      transparent,
+      color-mix(in srgb, var(--accent-color) 18%, white 3%),
+      transparent
+    );
+    pointer-events: none;
+    animation:
+      modern-command-sheen
+      720ms
+      var(--modern-motion-entrance-easing, cubic-bezier(0.16, 1, 0.3, 1))
+      140ms
+      backwards;
+  }
+
   .identity {
+    position: relative;
+    z-index: 1;
     min-width: 0;
     display: flex;
     align-items: center;
@@ -187,6 +222,7 @@
     background: rgba(255, 255, 255, 0.045);
     border: 1px solid rgba(255, 255, 255, 0.07);
     border-radius: 9px;
+    z-index: 1;
     isolation: isolate;
     animation:
       modern-command-item-enter
@@ -253,6 +289,8 @@
   }
 
   .search-region {
+    position: relative;
+    z-index: 1;
     min-width: 0;
     transition: opacity var(--modern-motion-duration, 140ms) var(--modern-motion-easing, ease);
     animation:
@@ -270,6 +308,8 @@
   }
 
   .actions {
+    position: relative;
+    z-index: 1;
     display: flex;
     justify-content: flex-end;
     animation:
@@ -297,13 +337,18 @@
     transition:
       color var(--modern-motion-duration, 140ms) var(--modern-motion-easing, ease),
       background-color var(--modern-motion-duration, 140ms) var(--modern-motion-easing, ease),
-      border-color var(--modern-motion-duration, 140ms) var(--modern-motion-easing, ease);
+      border-color var(--modern-motion-duration, 140ms) var(--modern-motion-easing, ease),
+      transform var(--modern-motion-fast, 100ms) var(--modern-motion-easing, ease);
   }
 
   .action-button:hover:not(:disabled) {
     color: #f5f7fa;
     background: rgba(255, 255, 255, 0.075);
     border-color: rgba(255, 255, 255, 0.13);
+  }
+
+  .action-button:active:not(:disabled) {
+    transform: translateY(1px);
   }
 
   .action-button:disabled {
@@ -323,6 +368,13 @@
 
   .action-button:active:not(:disabled) svg {
     transform: rotate(-90deg);
+  }
+
+  .reset-icon.resetting {
+    animation:
+      modern-reset-confirm
+      var(--modern-motion-layout-duration, 360ms)
+      var(--modern-motion-entrance-easing, cubic-bezier(0.16, 1, 0.3, 1));
   }
 
   .tab:focus-visible,
@@ -379,6 +431,32 @@
     }
   }
 
+  @keyframes modern-command-sheen {
+    0% {
+      opacity: 0;
+      transform: translateX(-120%) skewX(-14deg);
+    }
+
+    42% {
+      opacity: 0.72;
+    }
+
+    100% {
+      opacity: 0;
+      transform: translateX(380%) skewX(-14deg);
+    }
+  }
+
+  @keyframes modern-reset-confirm {
+    from {
+      transform: rotate(0);
+    }
+
+    to {
+      transform: rotate(-360deg);
+    }
+  }
+
   @media (prefers-reduced-motion: reduce) {
     .tab,
     .action-button,
@@ -388,6 +466,8 @@
       transition-duration: 0ms;
     }
 
+    .command-bar::after,
+    .reset-icon.resetting,
     .command-bar,
     .identity,
     .tabs,
