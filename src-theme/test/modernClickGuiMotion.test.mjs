@@ -142,19 +142,28 @@ test("layout reset animates both the command feedback and mounted panel position
     );
 });
 
-test("panel expansion and module state changes use finite accent sweeps", () => {
+test("panel expansion and module toggles use finite accent sweeps", () => {
     const command = read("ModernCommandBar.svelte");
     const panel = read("ModernPanel.svelte");
     const module = read("ModernModule.svelte");
 
     assert.match(command, /@keyframes\s+modern-command-sheen/);
     assert.match(panel, /@keyframes\s+modern-panel-expand-sweep/);
-    assert.match(module, /#key\s+liveEnabled/);
     assert.match(module, /@keyframes\s+modern-module-toggle-sweep/);
-    assert.match(module, /@keyframes\s+modern-state-label-enter/);
+    assert.match(module, /@keyframes\s+modern-state-confirm/);
     assert.doesNotMatch(command, /modern-command-sheen[\s\S]{0,160}infinite/);
     assert.doesNotMatch(panel, /modern-panel-expand-sweep[\s\S]{0,160}infinite/);
     assert.doesNotMatch(module, /modern-module-toggle-sweep[\s\S]{0,160}infinite/);
+});
+
+test("module state remains accessible without visible on or off labels", () => {
+    const module = read("ModernModule.svelte");
+
+    assert.match(module, /aria-pressed=\{liveEnabled\}/);
+    assert.match(module, /class="state-dot"/);
+    assert.doesNotMatch(module, /\{liveEnabled\s*\?\s*"On"\s*:\s*"Off"\}/);
+    assert.doesNotMatch(module, /class="module-state"/);
+    assert.doesNotMatch(module, /class="module-state-label"/);
 });
 
 test("keyboard selection and pointer feedback move without hover zoom", () => {
@@ -215,7 +224,6 @@ test("essential Modern state stays visible when an animation timeline stalls", (
         [module, "@keyframes settings-open"],
         [module, "@keyframes modern-module-enter"],
         [module, "@keyframes modern-setting-enter"],
-        [module, "@keyframes modern-state-label-enter"],
         [panel, "@keyframes modern-panel-enter"],
         [search, "@keyframes results-enter"],
         [search, "@keyframes modern-search-result-enter"],

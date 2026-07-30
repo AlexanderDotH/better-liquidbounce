@@ -331,16 +331,6 @@
 
         <span class="state-dot" aria-hidden="true"></span>
         <span class="module-name">{displayName(name)}</span>
-        <span class="module-state">
-            {#key liveEnabled}
-                <span
-                        class="module-state-label"
-                        class:animating={toggleFeedbackActive}
-                >
-                    {liveEnabled ? "On" : "Off"}
-                </span>
-            {/key}
-        </span>
 
         {#if hasSettings}
             <svg class="expand-mark" class:expanded aria-hidden="true" viewBox="0 0 16 16">
@@ -422,7 +412,7 @@
     width: 100%;
     min-height: 42px;
     display: grid;
-    grid-template-columns: 7px minmax(0, 1fr) auto auto;
+    grid-template-columns: 7px minmax(0, 1fr) auto;
     align-items: center;
     gap: 9px;
     padding: 0 12px;
@@ -500,36 +490,6 @@
     transition: color var(--modern-motion-duration, 140ms) var(--modern-motion-easing, ease);
   }
 
-  .module-state {
-    min-width: 20px;
-    display: grid;
-    place-items: center end;
-    color: var(--modern-text-muted, #8d96a3);
-    font-size: 9px;
-    font-weight: 650;
-    letter-spacing: 0.06em;
-    text-transform: uppercase;
-    transition:
-      color
-      var(--modern-motion-duration, 140ms)
-      var(--modern-motion-easing, cubic-bezier(0.2, 0.8, 0.2, 1)),
-      opacity
-      var(--modern-motion-duration, 140ms)
-      var(--modern-motion-easing, cubic-bezier(0.2, 0.8, 0.2, 1));
-  }
-
-  .module-state-label {
-    grid-area: 1 / 1;
-  }
-
-  .module-state-label.animating {
-    animation:
-      modern-state-label-enter
-      var(--modern-motion-duration, 140ms)
-      var(--modern-motion-entrance-easing, cubic-bezier(0.16, 1, 0.3, 1))
-      backwards;
-  }
-
   .expand-mark {
     width: 12px;
     height: 12px;
@@ -558,10 +518,6 @@
 
   .module.enabled .module-name {
     color: color-mix(in srgb, var(--accent-color) 78%, white);
-  }
-
-  .module.enabled .module-state {
-    color: color-mix(in srgb, var(--accent-color) 68%, white);
   }
 
   .module.highlighted::after {
@@ -710,12 +666,6 @@
     }
   }
 
-  @keyframes modern-state-label-enter {
-    from {
-      transform: translateY(-3px);
-    }
-  }
-
   @keyframes spin {
     to {
       transform: rotate(360deg);
@@ -726,7 +676,6 @@
     .module-row,
     .state-dot,
     .module-name,
-    .module-state,
     .expand-mark {
       transition-duration: 0.01ms;
     }
@@ -737,7 +686,6 @@
     .module-settings,
     .modern-setting-shell,
     .toggle-sweep,
-    .module-state-label,
     .expand-mark.expanded {
       animation: none;
     }

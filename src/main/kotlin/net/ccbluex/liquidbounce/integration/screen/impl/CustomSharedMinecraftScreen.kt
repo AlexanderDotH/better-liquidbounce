@@ -19,12 +19,15 @@
 
 package net.ccbluex.liquidbounce.integration.screen.impl
 
+import net.ccbluex.liquidbounce.features.module.modules.render.ModuleClickGui
+import net.ccbluex.liquidbounce.features.module.modules.render.shouldSuppressNativeClickGuiBackground
 import net.ccbluex.liquidbounce.integration.screen.CustomScreenType
 import net.ccbluex.liquidbounce.integration.screen.ScreenManager
 import net.ccbluex.liquidbounce.integration.theme.Theme
 import net.ccbluex.liquidbounce.integration.theme.ThemeManager
 import net.ccbluex.liquidbounce.utils.text.asPlainText
 import net.ccbluex.liquidbounce.utils.client.mc
+import net.minecraft.client.gui.GuiGraphicsExtractor
 import net.minecraft.client.gui.screens.Screen
 
 class CustomSharedMinecraftScreen(
@@ -48,6 +51,17 @@ class CustomSharedMinecraftScreen(
         }
     }
 
+    override fun isInGameUi() = suppressesNativeBackground() || super.isInGameUi()
+
+    override fun extractTransparentBackground(context: GuiGraphicsExtractor) {
+        if (!suppressesNativeBackground()) {
+            super.extractTransparentBackground(context)
+        }
+    }
+
     override fun isPauseScreen() = false
+
+    private fun suppressesNativeBackground() =
+        shouldSuppressNativeClickGuiBackground(screenType, ModuleClickGui.theme)
 
 }
