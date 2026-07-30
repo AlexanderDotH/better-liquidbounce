@@ -4,6 +4,7 @@
     import {itemTextureUrl} from "../../../../integration/rest";
 
     export let stack: ItemStack;
+    export let variant: "classic" | "modern" = "classic";
 
     const {count, damage, identifier, maxDamage, enchantments} = stack;
 
@@ -12,7 +13,7 @@
     const valueColor = mapToColor(120 * (maxDamage - damage) / maxDamage);
 </script>
 
-<div class="item-stack">
+<div class="item-stack" class:item-stack--modern={variant === "modern"}>
     {#if enchantments}
         <div class="mask" style="mask-image: url({itemTextureUrl(identifier)})"></div>
     {/if}
@@ -39,6 +40,11 @@
     position: relative;
     width: 32px;
     height: 32px;
+  }
+
+  .item-stack--modern {
+    width: 28px;
+    height: 28px;
   }
 
   .mask {

@@ -1,60 +1,110 @@
 <script lang="ts">
     import {flip} from "svelte/animate";
+    import {onDestroy} from "svelte";
     import {listen} from "../../../../integration/ws";
     import {fly} from "svelte/transition";
     import Notification from "./Notification.svelte";
     import type {NotificationEvent} from "../../../../integration/events";
+    import {hudMotionDuration, prefersReducedMotion} from "../../motion/hudMotion";
 
     interface TNotification {
-        animationKey: number;
         id: number;
         title: string;
         severity: string;
         message: string;
     }
 
+    export let variant: "classic" | "modern" = "classic";
+
     let notifications: TNotification[] = [];
+    let nextNotificationId = 1;
+    let motionDuration = 200;
+    let motionOffset = 30;
 
-    function addNotification(title: string, message: string, severity: string) {
-        let animationKey = Date.now();
-        const id = animationKey;
+    const expiryTimers = new Map<number, number>();
 
-        if (severity === "ENABLED" || severity === "DISABLED") {
-            // Check if there still exists an enable/disable notification for the same module
-            const index = notifications.findIndex((n) => n.message === message)
-            if (index !== -1) {
-                // Set the id of the new notification to the old notification's id.
-                // This will make svelte able to animate it correctly
-                animationKey = notifications[index].animationKey;
+    $: motionDuration = hudMotionDuration(variant, $prefersReducedMotion);
+    $: motionOffset = variant === "modern" ? 18 : 30;
 
-                // Remove the old notification
-                notifications.splice(index, 1);
-            }
+    function isModuleToggle(severity: string) {
+        return severity === "ENABLED" || severity === "DISABLED";
+    }
+
+    function clearExpiry(id: number) {
+        const existingTimer = expiryTimers.get(id);
+        if (existingTimer === undefined) {
+            return;
         }
 
+        clearTimeout(existingTimer);
+        expiryTimers.delete(id);
+    }
+
+    function removeNotification(id: number) {
+        notifications = notifications.filter((notification) => notification.id !== id);
+        expiryTimers.delete(id);
+    }
+
+    function scheduleExpiry(id: number) {
+        clearExpiry(id);
+        expiryTimers.set(id, window.setTimeout(() => removeNotification(id), 3000));
+    }
+
+    function addNotification(title: string, message: string, severity: string) {
+        const existingNotification = isModuleToggle(severity)
+            ? notifications.find((notification) =>
+                isModuleToggle(notification.severity) && notification.message === message)
+            : undefined;
+
+        if (existingNotification) {
+            const updatedNotification = {
+                ...existingNotification,
+                title,
+                message,
+                severity,
+            };
+
+            notifications = [
+                updatedNotification,
+                ...notifications.filter((notification) => notification.id !== existingNotification.id),
+            ];
+            scheduleExpiry(existingNotification.id);
+            return;
+        }
+
+        const id = nextNotificationId++;
         notifications = [
-            {animationKey, id, title, message, severity},
+            {id, title, message, severity},
             ...notifications,
         ];
-        
-        setTimeout(() => {
-            notifications = notifications.filter((n) => n.id !== id);
-        }, 3000);
+        scheduleExpiry(id);
     }
 
     listen("notification", (e: NotificationEvent) => {
         addNotification(e.title, e.message, e.severity);
     });
+
+    onDestroy(() => {
+        for (const timeout of expiryTimers.values()) {
+            clearTimeout(timeout);
+        }
+        expiryTimers.clear();
+    });
 </script>
 
 <div class="notifications">
-    {#each notifications as {title, message, severity, animationKey} (animationKey)}
+    {#each notifications as notification (notification.id)}
         <div
-                animate:flip={{ duration: 200 }}
-                in:fly={{ x: 30, duration: 200 }}
-                out:fly={{ x: 30, duration: 200 }}
+                animate:flip={{ duration: motionDuration }}
+                in:fly={{ x: motionOffset, duration: motionDuration }}
+                out:fly={{ x: motionOffset, duration: motionDuration }}
         >
-            <Notification {title} {message} {severity}/>
+            <Notification
+                title={notification.title}
+                message={notification.message}
+                severity={notification.severity}
+                {variant}
+            />
         </div>
     {/each}
 </div>

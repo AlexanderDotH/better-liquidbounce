@@ -7,12 +7,45 @@
     import {flip} from "svelte/animate";
     import {fly} from "svelte/transition";
     import {convertToSpacedString, spaceSeperatedNames} from "../../../theme/theme_config";
+    import {hudMotionDuration, prefersReducedMotion} from "../motion/hudMotion";
 
     export let settings: { [name: string]: any };
+    export let variant: "classic" | "modern" = "classic";
 
     const cSettings = settings as HudArrayListSettings;
+    const CLASSIC_FONT = "500 14px Inter";
+    const MODERN_NAME_FONT = "550 12px Inter";
+    const MODERN_TAG_FONT = "600 10px Inter";
+    const MODERN_TAG_GAP_PX = 6;
+    const MODERN_TAG_HORIZONTAL_PADDING_PX = 12;
 
     let enabledModules: Module[] = [];
+    let motionDuration = 200;
+    let motionOffset = 50;
+    let previousVariant = variant;
+
+    $: motionDuration = hudMotionDuration(variant, $prefersReducedMotion);
+    $: motionOffset = variant === "modern" ? 18 : 50;
+
+    function measureModuleWidth(module: Module, formattedName: string): number {
+        const visibleTag = cSettings.showTags ? module.tag : null;
+
+        if (variant !== "modern") {
+            const fullName = visibleTag
+                ? `${formattedName} ${visibleTag}`
+                : formattedName;
+            return getTextWidth(fullName, CLASSIC_FONT);
+        }
+
+        const nameWidth = getTextWidth(formattedName, MODERN_NAME_FONT);
+        if (!visibleTag) {
+            return nameWidth;
+        }
+
+        return nameWidth
+            + MODERN_TAG_GAP_PX + MODERN_TAG_HORIZONTAL_PADDING_PX
+            + getTextWidth(visibleTag, MODERN_TAG_FONT);
+    }
 
     async function updateEnabledModules() {
         const modules = await getModules();
@@ -20,13 +53,10 @@
 
         const modulesWithWidths = visibleModules.map(module => {
             const formattedName = $spaceSeperatedNames ? convertToSpacedString(module.name) : module.name;
-            const fullName = module.tag == null || !cSettings.showTags
-                ? formattedName
-                : formattedName + " " + module.tag;
 
             return {
                 ...module,
-                width: getTextWidth(fullName, "500 14px Inter")
+                width: measureModuleWidth(module, formattedName)
             };
         });
 
@@ -36,12 +66,12 @@
         await tick();
     }
 
-    spaceSeperatedNames.subscribe(async () => {
-        await updateEnabledModules();
-    });
+    onMount(() => {
+        const unsubscribe = spaceSeperatedNames.subscribe(() => {
+            void updateEnabledModules();
+        });
 
-    onMount(async () => {
-        await updateEnabledModules();
+        return unsubscribe;
     });
 
     listen("moduleToggle", async () => {
@@ -51,6 +81,11 @@
     listen("refreshArrayList", async () => {
         await updateEnabledModules();
     });
+
+    $: if (variant !== previousVariant) {
+        previousVariant = variant;
+        void updateEnabledModules();
+    }
 </script>
 
 <div class="arraylist">
@@ -58,12 +93,14 @@
         <div
                 class="module"
                 style={cSettings.itemAlignment === "Left" ? "margin-right: auto;" : "margin-left: auto;"}
-                animate:flip={{ duration: 200 }}
-                transition:fly={{ x: 50, duration: 200 }}
+                animate:flip={{ duration: motionDuration }}
+                transition:fly={{ x: motionOffset, duration: motionDuration }}
         >
-            {$spaceSeperatedNames ? convertToSpacedString(name) : name}
+            <span class="module-name">
+                {$spaceSeperatedNames ? convertToSpacedString(name) : name}
+            </span>
             {#if tag && cSettings.showTags}
-                <span class="tag"> {tag}</span>
+                <span class="tag">{tag}</span>
             {/if}
         </div>
     {/each}

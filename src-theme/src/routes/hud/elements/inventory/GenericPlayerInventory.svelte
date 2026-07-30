@@ -10,8 +10,13 @@
     export let backgroundColor: string = "var(--inventory-background-color)";
     export let gap: string = "0.5rem";
     export let getRenderedStacks: (inventory: PlayerInventory) => ItemStack[];
+    export let variant: "classic" | "modern" = "classic";
+    export let label: string | undefined = undefined;
 
     let stacks: ItemStack[] = [];
+
+    $: panelBackgroundColor = variant === "modern" ? "rgba(15, 18, 23, 0.76)" : backgroundColor;
+    $: panelGap = variant === "modern" ? "2px" : gap;
 
     listen("clientPlayerInventory", (data: ClientPlayerInventoryEvent) => {
         stacks = getRenderedStacks(data.inventory);
@@ -23,13 +28,20 @@
     });
 </script>
 
-<div class="inventory" style="
-    background-color: {backgroundColor};
-    gap: {gap};
+<div
+    class="inventory"
+    class:inventory--modern={variant === "modern"}
+    style="
+    background-color: {panelBackgroundColor};
+    gap: {panelGap};
     --row-length: {rowLength};
 ">
+    {#if variant === "modern" && label}
+        <div class="inventory-label">{label}</div>
+    {/if}
+
     {#each stacks as stack (stack)}
-        <ItemStackView {stack}/>
+        <ItemStackView {stack} {variant}/>
     {/each}
 </div>
 
@@ -39,5 +51,25 @@
     border-radius: 5px;
     display: grid;
     grid-template-columns: repeat(var(--row-length), 1fr);
+  }
+
+  .inventory--modern {
+    gap: 2px;
+    padding: 6px;
+    background: rgba(15, 18, 23, 0.76);
+    border: 0;
+    border-radius: 10px;
+    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.16);
+  }
+
+  .inventory-label {
+    grid-column: 1 / -1;
+    margin: 0 2px 2px;
+    color: rgba(226, 232, 240, 0.58);
+    font-size: 9px;
+    font-weight: 650;
+    line-height: 12px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
   }
 </style>

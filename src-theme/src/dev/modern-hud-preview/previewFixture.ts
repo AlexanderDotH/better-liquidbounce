@@ -23,7 +23,10 @@ export interface ModernHudPreviewServerEvent {
     event: unknown;
 }
 
+export type ModernHudPreviewFixture = "showcase" | "inventory";
+
 export interface ModernHudPreviewState {
+    fixture: ModernHudPreviewFixture;
     metadata: Metadata;
     components: HudComponent[];
     modules: Module[];
@@ -39,7 +42,38 @@ export interface ModernHudPreviewState {
 
 const API_PREFIX = "/api/v1/client";
 
-export function createModernHudPreviewState(): ModernHudPreviewState {
+const SHOWCASE_COMPONENTS = new Set([
+    "Watermark",
+    "Text",
+    "KeyBinds",
+    "TabGui",
+    "ArrayList",
+    "Notifications",
+    "Hotbar",
+    "Scoreboard",
+    "TargetHud",
+    "Effects",
+]);
+
+const INVENTORY_COMPONENTS = new Set([
+    "ArmorItems",
+    "InventoryStatistics",
+    "Inventory",
+    "CraftingInventory",
+    "EnderChestInventory",
+]);
+
+export function resolveModernHudPreviewFixture(
+    searchParams: URLSearchParams,
+): ModernHudPreviewFixture {
+    return searchParams.get("fixture") === "inventory"
+        ? "inventory"
+        : "showcase";
+}
+
+export function createModernHudPreviewState(
+    fixture: ModernHudPreviewFixture = "showcase",
+): ModernHudPreviewState {
     const metadata = createMetadata();
     const inventory = createInventory();
     const player = createPlayer("PreviewPlayer", "00000000-0000-4000-a000-000000000001");
@@ -48,8 +82,9 @@ export function createModernHudPreviewState(): ModernHudPreviewState {
     player.armorItems = clone(inventory.armor);
 
     return {
+        fixture,
         metadata,
-        components: createComponents(metadata.components),
+        components: createComponents(metadata.components, fixture),
         modules: createModules(),
         hudSettings: createHudSettings(),
         player,
@@ -265,7 +300,10 @@ function createMetadata(): Metadata {
     };
 }
 
-function createComponents(names: string[]): HudComponent[] {
+function createComponents(
+    names: string[],
+    fixture: ModernHudPreviewFixture,
+): HudComponent[] {
     const settingsByName: Record<string, Record<string, unknown>> = {
         Watermark: positioned("Left", 20, "Top", 20),
         TabGui: positioned("Left", 190, "Top", 20),
@@ -281,9 +319,9 @@ function createComponents(names: string[]): HudComponent[] {
             ...positioned("Right", 20, "Top", 270),
             show: ["Header", "Name", "Score"],
         },
-        ArmorItems: positioned("CenterTranslated", 274, "Bottom", 24),
+        ArmorItems: positioned("CenterTranslated", 96, "Bottom", 34),
         InventoryStatistics: {
-            ...positioned("CenterTranslated", -276, "Bottom", 24),
+            ...positioned("CenterTranslated", -96, "Bottom", 34),
             items: [
                 "minecraft:emerald",
                 "minecraft:diamond",
@@ -293,9 +331,9 @@ function createComponents(names: string[]): HudComponent[] {
             showEmpty: true,
             rowLength: 1,
         },
-        Inventory: positioned("Left", 20, "Top", 318),
-        CraftingInventory: positioned("Left", 332, "Top", 318),
-        EnderChestInventory: positioned("Left", 422, "Top", 318),
+        Inventory: positioned("Left", 20, "Top", 90),
+        CraftingInventory: positioned("CenterTranslated", 0, "Top", 90),
+        EnderChestInventory: positioned("Right", 20, "Top", 90),
         TargetHud: positioned("CenterTranslated", 0, "CenterTranslated", -78),
         BlockCounter: {
             ...positioned("CenterTranslated", 0, "CenterTranslated", 26),
@@ -312,6 +350,7 @@ function createComponents(names: string[]): HudComponent[] {
         Text: {
             ...positioned("Left", 20, "Top", 76),
             text: "XYZ {blockPosition.x} / {blockPosition.y} / {blockPosition.z}",
+            container: "Pill",
             color: 4294967295,
             font: "Inter",
             size: 12,
@@ -342,10 +381,21 @@ function createComponents(names: string[]): HudComponent[] {
         name,
         id: `preview-${index + 1}-${name.toLowerCase()}`,
         settings: {
-            enabled: true,
+            enabled: isComponentEnabled(name, fixture),
             ...settingsByName[name],
         },
     }));
+}
+
+function isComponentEnabled(
+    name: string,
+    fixture: ModernHudPreviewFixture,
+): boolean {
+    const enabledComponents = fixture === "inventory"
+        ? INVENTORY_COMPONENTS
+        : SHOWCASE_COMPONENTS;
+
+    return enabledComponents.has(name);
 }
 
 function positioned(

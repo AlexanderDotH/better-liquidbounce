@@ -45,6 +45,8 @@ test("installs the mock runtime before dynamically importing the production HUD"
     assert.ok(runtimeInstall >= 0);
     assert.ok(hudImport > runtimeInstall);
     assert.match(main, /mount\(Hud,/);
+    assert.match(main, /resolveModernHudPreviewFixture/);
+    assert.match(main, /new URLSearchParams\(window\.location\.search\)/);
 });
 
 test("keeps the preview and its game-like transparency scene out of production entries", () => {

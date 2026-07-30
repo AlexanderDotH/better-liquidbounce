@@ -10,22 +10,22 @@
 
     export let settings: { [name: string]: any };
 
-    const cSettings = settings as HudTextSettings;
+    let cSettings = settings as HudTextSettings;
+    let container: "Plain" | "Pill" = "Plain";
 
     listen("clientPlayerData", (event: ClientPlayerDataEvent) => {
         playerData = event.playerData;
-        processText();
     });
 
-    function processText() {
-        if (!cSettings.text || !playerData) {
-            processedText = cSettings.text || '';
+    function processText(currentSettings: HudTextSettings, currentPlayer: PlayerData | null) {
+        if (!currentSettings.text || !currentPlayer) {
+            processedText = currentSettings.text || '';
             return;
         }
 
-        processedText = cSettings.text.replace(/{(\w+(\.\w+)*)}/g, (match: string, p1: string) => {
+        processedText = currentSettings.text.replace(/{(\w+(\.\w+)*)}/g, (match: string, p1: string) => {
             const keys = p1.split(".");
-            let value: any = playerData;
+            let value: any = currentPlayer;
 
             for (const key of keys) {
                 value = value ? value[key] : null;
@@ -50,11 +50,12 @@
         });
     }
 
-    // Process text on mount
-    $: processText();
+    $: cSettings = settings as HudTextSettings;
+    $: container = cSettings.container ?? "Plain";
+    $: processText(cSettings, playerData);
 </script>
 
-<div class="text" style="
+<div class="text" class:text--pill={container === "Pill"} style="
     font-family: {cSettings.font};
     font-size: {cSettings.size}px;
     color: {rgbaToHex(intToRgba(cSettings.color))};
@@ -80,5 +81,13 @@
         user-select: none;
         pointer-events: none;
         z-index: 1000;
+    }
+
+    .text.text--pill {
+        padding: 6px 9px;
+        line-height: 1.15;
+        background: var(--modern-hud-surface-soft, rgba(15, 18, 23, 0.84));
+        border-radius: 999px;
+        box-shadow: 0 5px 14px rgba(0, 0, 0, 0.16);
     }
 </style>

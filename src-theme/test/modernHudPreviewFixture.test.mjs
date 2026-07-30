@@ -4,8 +4,30 @@ import test from "node:test";
 import {
     createModernHudPreviewSnapshotEvents,
     createModernHudPreviewState,
+    resolveModernHudPreviewFixture,
     routeModernHudPreviewRequest,
 } from "../src/dev/modern-hud-preview/previewFixture.ts";
+
+const SHOWCASE_COMPONENTS = [
+    "Watermark",
+    "Text",
+    "KeyBinds",
+    "TabGui",
+    "ArrayList",
+    "Notifications",
+    "Hotbar",
+    "Scoreboard",
+    "TargetHud",
+    "Effects",
+];
+
+const INVENTORY_COMPONENTS = [
+    "ArmorItems",
+    "InventoryStatistics",
+    "Inventory",
+    "CraftingInventory",
+    "EnderChestInventory",
+];
 
 function jsonRequest(url, method, body) {
     return new Request(url, {
@@ -15,7 +37,7 @@ function jsonRequest(url, method, body) {
     });
 }
 
-test("serves every production HUD component with deterministic settings", async () => {
+test("showcase fixture serves every component but enables only the product HUD", async () => {
     const state = createModernHudPreviewState();
     const response = await routeModernHudPreviewRequest(
         state,
@@ -28,15 +50,71 @@ test("serves every production HUD component with deterministic settings", async 
         components.map(component => component.name),
         state.metadata.components,
     );
-    assert.ok(components.every(component => component.settings.enabled));
     assert.ok(components.every(component => component.settings.alignment));
+    assert.deepEqual(
+        new Set(enabledComponentNames(components)),
+        new Set(SHOWCASE_COMPONENTS),
+    );
     assert.equal(
         components.find(component => component.name === "Text").settings.text,
         "XYZ {blockPosition.x} / {blockPosition.y} / {blockPosition.z}",
     );
     assert.equal(
+        components.find(component => component.name === "Text").settings.container,
+        "Pill",
+    );
+    assert.equal(
         components.find(component => component.name === "InventoryStatistics").settings.rowLength,
         1,
+    );
+});
+
+test("inventory fixture isolates the optional inventory family in a non-overlapping layout", () => {
+    const state = createModernHudPreviewState("inventory");
+
+    assert.deepEqual(
+        new Set(enabledComponentNames(state.components)),
+        new Set(INVENTORY_COMPONENTS),
+    );
+    assert.deepEqual(
+        componentPosition(state, "Inventory"),
+        ["Left", 20, "Top", 90],
+    );
+    assert.deepEqual(
+        componentPosition(state, "CraftingInventory"),
+        ["CenterTranslated", 0, "Top", 90],
+    );
+    assert.deepEqual(
+        componentPosition(state, "EnderChestInventory"),
+        ["Right", 20, "Top", 90],
+    );
+    assert.deepEqual(
+        componentPosition(state, "InventoryStatistics"),
+        ["CenterTranslated", -96, "Bottom", 34],
+    );
+    assert.deepEqual(
+        componentPosition(state, "ArmorItems"),
+        ["CenterTranslated", 96, "Bottom", 34],
+    );
+    assert.deepEqual(
+        state.components.map(component => component.name),
+        state.metadata.components,
+    );
+});
+
+test("fixture query selection defaults safely to showcase", () => {
+    assert.equal(resolveModernHudPreviewFixture(new URLSearchParams()), "showcase");
+    assert.equal(
+        resolveModernHudPreviewFixture(new URLSearchParams("fixture=showcase")),
+        "showcase",
+    );
+    assert.equal(
+        resolveModernHudPreviewFixture(new URLSearchParams("fixture=inventory")),
+        "inventory",
+    );
+    assert.equal(
+        resolveModernHudPreviewFixture(new URLSearchParams("fixture=prototype")),
+        "showcase",
     );
 });
 
@@ -144,3 +222,22 @@ test("returns an explicit 404 for APIs outside the HUD preview contract", async 
     assert.equal(response.status, 404);
     assert.match(await response.text(), /unsupported modern hud preview api/i);
 });
+
+function enabledComponentNames(components) {
+    return components
+        .filter(component => component.settings.enabled)
+        .map(component => component.name);
+}
+
+function componentPosition(state, name) {
+    const component = state.components.find(candidate => candidate.name === name);
+    assert.ok(component, `${name} component must exist`);
+    const alignment = component.settings.alignment;
+
+    return [
+        alignment.horizontalAlignment,
+        alignment.horizontalOffset,
+        alignment.verticalAlignment,
+        alignment.verticalOffset,
+    ];
+}

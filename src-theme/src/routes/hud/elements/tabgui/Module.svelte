@@ -6,13 +6,14 @@
     export let name: string;
     export let enabled: boolean;
     export let selected: boolean;
+    export let variant: "classic" | "modern" = "classic";
 
     let moduleElement: HTMLElement;
 
     afterUpdate(() => {
         if (moduleElement && selected) {
             moduleElement.scrollIntoView({
-                behavior: "smooth",
+                behavior: variant === "modern" ? "auto" : "smooth",
                 block: "nearest",
             });
         }
@@ -27,7 +28,16 @@
 
 <svelte:window on:keydown={handleKeyDown} />
 
-<div class="module" class:enabled class:selected bind:this={moduleElement}>
+<div
+    class="module"
+    class:enabled
+    class:selected
+    class:modern={variant === "modern"}
+    bind:this={moduleElement}
+>
+    {#if variant === "modern"}
+        <span class="status-dot" aria-hidden="true"></span>
+    {/if}
     <div class="name">{$spaceSeperatedNames ? convertToSpacedString(name) : name}</div>
 </div>
 
@@ -55,5 +65,43 @@
         &.enabled {
             color: var(--tabgui-text-color);
         }
+    }
+
+    .module.modern {
+        display: flex;
+        align-items: center;
+        gap: 7px;
+        min-height: 26px;
+        padding: 0 8px;
+        border-radius: 7px;
+        transition:
+            color var(--modern-hud-motion) var(--modern-hud-easing),
+            background-color var(--modern-hud-motion) var(--modern-hud-easing);
+
+        .name {
+            transform: none;
+        }
+    }
+
+    .module.modern.selected {
+        color: var(--modern-hud-text);
+        background: rgba(70, 119, 255, 0.14);
+
+        .name {
+            transform: none;
+        }
+    }
+
+    .status-dot {
+        flex: 0 0 auto;
+        width: 5px;
+        height: 5px;
+        background: rgba(145, 154, 166, 0.42);
+        border-radius: 50%;
+    }
+
+    .module.modern.enabled .status-dot {
+        background: #4677ff;
+        box-shadow: 0 0 7px rgba(70, 119, 255, 0.4);
     }
 </style>

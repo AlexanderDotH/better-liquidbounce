@@ -1,10 +1,16 @@
 import {mount} from "svelte";
 import "../../app.scss";
 import "./preview.scss";
-import {createModernHudPreviewState} from "./previewFixture";
+import {
+    createModernHudPreviewState,
+    resolveModernHudPreviewFixture,
+} from "./previewFixture";
 import {installModernHudPreviewRuntime} from "./previewRuntime";
 
-const previewState = createModernHudPreviewState();
+const fixture = resolveModernHudPreviewFixture(
+    new URLSearchParams(window.location.search),
+);
+const previewState = createModernHudPreviewState(fixture);
 const previewRuntime = installModernHudPreviewRuntime(previewState);
 applyPreviewColors();
 

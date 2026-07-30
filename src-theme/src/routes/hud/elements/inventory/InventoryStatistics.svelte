@@ -23,6 +23,8 @@
     import type {ItemStack} from "../../../../integration/types";
 
     export let settings: { [name: string]: any };
+    export let variant: "classic" | "modern" = "classic";
+    export let label: string | undefined = undefined;
 
     const cSettings = settings as HudInventoryStatisticsSettings;
 
@@ -69,4 +71,6 @@
         backgroundColor="transparent"
         gap="2px"
         getRenderedStacks={it => getInventoryStatisticsStacks(it)}
+        {variant}
+        {label}
 />

@@ -20,7 +20,6 @@
 package net.ccbluex.liquidbounce.injection.mixins.minecraft.gui;
 
 import net.ccbluex.liquidbounce.integration.theme.component.HudComponentManager;
-import net.ccbluex.liquidbounce.integration.theme.component.HudComponentTweak;
 import net.minecraft.client.gui.contextualbar.LocatorBar;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
@@ -32,14 +31,14 @@ public abstract class MixinLocatorBar {
 
     @Inject(method = "extractRenderState", at = @At("HEAD"), cancellable = true)
     private void hookDisableLocatorBarTweak(final CallbackInfo ci) {
-        if (HudComponentManager.isTweakEnabled(HudComponentTweak.DISABLE_LOCATOR_BAR)) {
+        if (HudComponentManager.shouldSuppressLocatorBar()) {
             ci.cancel();
         }
     }
 
     @Inject(method = "extractBackground", at = @At("HEAD"), cancellable = true)
     private void hookDisableLocatorBarTweakOnBackground(final CallbackInfo ci) {
-        if (HudComponentManager.isTweakEnabled(HudComponentTweak.DISABLE_LOCATOR_BAR)) {
+        if (HudComponentManager.shouldSuppressLocatorBar()) {
             ci.cancel();
         }
     }

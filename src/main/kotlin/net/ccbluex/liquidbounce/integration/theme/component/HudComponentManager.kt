@@ -23,6 +23,7 @@ import net.ccbluex.liquidbounce.event.EventManager
 import net.ccbluex.liquidbounce.event.events.ComponentsUpdateEvent
 import net.ccbluex.liquidbounce.features.misc.HideAppearance
 import net.ccbluex.liquidbounce.features.module.modules.render.ModuleHud
+import net.ccbluex.liquidbounce.integration.screen.CustomScreenType
 import net.ccbluex.liquidbounce.integration.theme.ThemeManager
 import net.ccbluex.liquidbounce.integration.theme.component.components.minimap.MinimapHudComponent
 
@@ -38,6 +39,13 @@ object HudComponentManager {
         components.any { component ->
             component.enabled && component.tweaks.contains(tweak)
         }
+
+    @JvmStatic
+    fun shouldSuppressLocatorBar(): Boolean = resolveLocatorBarSuppression(
+        tweakEnabled = isTweakEnabled(HudComponentTweak.DISABLE_LOCATOR_BAR),
+        hudTheme = ModuleHud.theme,
+        bundledHud = isBundledHudRendered(),
+    )
 
     @JvmStatic
     fun getComponentWithTweak(tweak: HudComponentTweak): HudComponent? {
@@ -65,5 +73,9 @@ object HudComponentManager {
         val theme = ThemeManager.theme ?: return
         EventManager.callEvent(ComponentsUpdateEvent(theme.metadata.id, theme.components))
     }
+
+    private fun isBundledHudRendered(): Boolean = runCatching {
+        ThemeManager.getScreenLocation(CustomScreenType.HUD).theme === ThemeManager.includedTheme
+    }.getOrDefault(false)
 
 }

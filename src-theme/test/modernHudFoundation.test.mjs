@@ -43,8 +43,11 @@ test("Modern HUD uses a compact watermark while Classic keeps its current waterm
         /c\.name === "Watermark"[\s\S]*\$hudThemeSession\.theme === "Modern"[\s\S]*<ModernWatermark\/>[\s\S]*<Watermark\/>/,
     );
     assert.match(watermark, /class="modern-watermark"/);
-    assert.match(watermark, /LiquidBounce/);
-    assert.match(watermark, /border-radius:\s*999px/);
+    assert.match(watermark, /aria-label="LiquidBounce"/);
+    assert.match(watermark, /src="\/img\/menu\/icon-liquidbounce\.svg"/);
+    assert.match(watermark, /width:\s*36px/);
+    assert.match(watermark, /height:\s*36px/);
+    assert.doesNotMatch(watermark, /Modern HUD|status-dot/);
 });
 
 test("Modern HUD foundation is transparent and scoped away from Classic", () => {
@@ -102,7 +105,7 @@ test("Modern HUD preserves native item and hotbar geometry", () => {
     );
     assert.match(
         modern,
-        /\[data-component="Inventory"\][\s\S]*\.item-stack[\s\S]*width:\s*32px[\s\S]*height:\s*32px/,
+        /\[data-component="Inventory"\][\s\S]*\.item-stack[\s\S]*width:\s*28px[\s\S]*height:\s*28px/,
     );
 });
 

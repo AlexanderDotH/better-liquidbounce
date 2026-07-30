@@ -28,6 +28,9 @@
     let zoom = 100;
     let metadata: Metadata;
     let components: HudComponent[] = [];
+    let presentation: "classic" | "modern" = "classic";
+
+    $: presentation = $hudThemeSession.theme === "Modern" ? "modern" : "classic";
 
     onMount(async () => {
         void hudThemeSession.load();
@@ -78,13 +81,13 @@
                         <Watermark/>
                     {/if}
                 {:else if c.name === "ArrayList"}
-                    <ArrayList settings={c.settings}/>
+                    <ArrayList settings={c.settings} variant={presentation}/>
                 {:else if c.name === "TabGui"}
-                    <TabGui/>
+                    <TabGui variant={presentation}/>
                 {:else if c.name === "Notifications"}
-                    <Notifications/>
+                    <Notifications variant={presentation}/>
                 {:else if c.name === "TargetHud"}
-                    <TargetHud/>
+                    <TargetHud {presentation}/>
                 {:else if c.name === "BlockCounter"}
                     <BlockCounter settings={c.settings}/>
                 {:else if c.name === "Hotbar"}
@@ -97,15 +100,36 @@
                             backgroundColor="transparent"
                             gap="2px"
                             getRenderedStacks={it => Array.from(it.armor).reverse()}
+                            variant={presentation}
+                            label={presentation === "modern" ? "Armor" : undefined}
                     />
                 {:else if c.name === "InventoryStatistics"}
-                    <InventoryStatistics settings={c.settings} />
+                    <InventoryStatistics
+                            settings={c.settings}
+                            variant={presentation}
+                            label={presentation === "modern" ? "Resources" : undefined}
+                    />
                 {:else if c.name === "Inventory"}
-                    <GenericPlayerInventory rowLength={9} getRenderedStacks={it => it.main.slice(9)} />
+                    <GenericPlayerInventory
+                            rowLength={9}
+                            getRenderedStacks={it => it.main.slice(9)}
+                            variant={presentation}
+                            label={presentation === "modern" ? "Inventory" : undefined}
+                    />
                 {:else if c.name === "CraftingInventory"}
-                    <GenericPlayerInventory rowLength={2} getRenderedStacks={it => it.crafting} />
+                    <GenericPlayerInventory
+                            rowLength={2}
+                            getRenderedStacks={it => it.crafting}
+                            variant={presentation}
+                            label={presentation === "modern" ? "Crafting" : undefined}
+                    />
                 {:else if c.name === "EnderChestInventory"}
-                    <GenericPlayerInventory rowLength={9} getRenderedStacks={it => it.enderChest} />
+                    <GenericPlayerInventory
+                            rowLength={9}
+                            getRenderedStacks={it => it.enderChest}
+                            variant={presentation}
+                            label={presentation === "modern" ? "Ender Chest" : undefined}
+                    />
                 {:else if c.name === "Taco"}
                     <Taco/>
                 {:else if c.name === "Keystrokes"}

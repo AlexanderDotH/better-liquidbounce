@@ -43,6 +43,7 @@ interface HudScoreboardSettings {
 
 interface HudTextSettings {
     text: string;
+    container?: "Plain" | "Pill";
     color: number;
     font: string;
     size: number;
