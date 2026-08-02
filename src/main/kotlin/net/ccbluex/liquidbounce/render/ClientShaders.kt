@@ -86,6 +86,18 @@ sealed class ClientShaders(val type: ShaderType) : ShaderSource {
         val EntityOutline = "outline"("shaders/outline/entity_outline.frag")
 
         @JvmField
+        val EspDownsample = "esp_downsample"("shaders/esp/downsample.frag")
+
+        @JvmField
+        val EspGaussianBlur = "esp_gaussian_blur"("shaders/esp/gaussian_blur.frag")
+
+        @JvmField
+        val EspGlowComposite = "esp_glow_composite"("shaders/esp/glow_composite.frag")
+
+        @JvmField
+        val EspOutlineComposite = "esp_outline_composite"("shaders/esp/outline_composite.frag")
+
+        @JvmField
         val RoundedRect = "rounded_rect"("shaders/circle/rounded_rect.fsh")
 
         @JvmField

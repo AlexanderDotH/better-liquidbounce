@@ -19,28 +19,23 @@
 package net.ccbluex.liquidbounce.features.module.modules.combat
 
 import net.ccbluex.liquidbounce.config.types.list.Tagged
-import net.ccbluex.liquidbounce.event.events.BlinkPacketEvent
 import net.ccbluex.liquidbounce.event.events.GameTickEvent
 import net.ccbluex.liquidbounce.event.events.KeybindIsPressedEvent
 import net.ccbluex.liquidbounce.event.events.PacketEvent
-import net.ccbluex.liquidbounce.event.events.TransferOrigin
 import net.ccbluex.liquidbounce.event.events.WorldRenderEvent
 import net.ccbluex.liquidbounce.event.handler
 import net.ccbluex.liquidbounce.event.tickHandler
-import net.ccbluex.liquidbounce.event.waitTicks
-import net.ccbluex.liquidbounce.features.blink.BlinkManager
 import net.ccbluex.liquidbounce.features.module.ClientModule
 import net.ccbluex.liquidbounce.features.module.ModuleCategories
+import net.ccbluex.liquidbounce.features.module.modules.exploit.ModuleClickTp
 import net.ccbluex.liquidbounce.render.drawLine
 import net.ccbluex.liquidbounce.render.engine.type.Color4b
 import net.ccbluex.liquidbounce.render.renderEnvironmentForWorld
-import net.ccbluex.liquidbounce.utils.aiming.RotationManager
 import net.ccbluex.liquidbounce.utils.block.SwingMode
 import net.ccbluex.liquidbounce.utils.client.chat
 import net.ccbluex.liquidbounce.utils.client.markAsError
-import net.ccbluex.liquidbounce.utils.combat.TargetPriority
-import net.ccbluex.liquidbounce.utils.combat.TargetSelector
 import net.ccbluex.liquidbounce.utils.combat.attackEntity
+import net.ccbluex.liquidbounce.utils.combat.shouldBeAttacked
 import net.ccbluex.liquidbounce.utils.entity.hasCooldown
 import net.ccbluex.liquidbounce.utils.entity.rotation
 import net.ccbluex.liquidbounce.utils.entity.squaredBoxedDistanceTo
@@ -51,7 +46,7 @@ import net.ccbluex.liquidbounce.utils.movement.buildLinearTeleportPath
 import net.ccbluex.liquidbounce.utils.network.MovePacketType
 import net.ccbluex.liquidbounce.utils.network.sendPacketSilently
 import net.ccbluex.liquidbounce.utils.raytracing.findEntityInCrosshair
-import net.ccbluex.liquidbounce.utils.raytracing.isLookingAtEntity
+import net.ccbluex.liquidbounce.utils.raytracing.hasLineOfSight
 import net.ccbluex.liquidbounce.utils.render.TargetRenderer
 import net.minecraft.network.protocol.game.ClientboundPlayerPositionPacket
 import net.minecraft.network.protocol.game.ServerboundMovePlayerPacket
@@ -59,10 +54,11 @@ import net.minecraft.world.entity.LivingEntity
 import net.minecraft.world.phys.Vec3
 import kotlin.math.abs
 import kotlin.math.floor
+import kotlin.math.max
 
 /**
- * Hits entities at extended range by stepping position packets to the target,
- * attacking, then stepping back to the origin.
+ * Hits entities at extended range. Packet mode spoofs a round trip, while Sentinel
+ * delegates a real forward teleport to ClickTP and leaves the player beside the target.
  */
 object ModuleSuperHit : ClientModule("SuperHit", ModuleCategories.COMBAT, disableOnQuit = true) {
 
@@ -71,12 +67,6 @@ object ModuleSuperHit : ClientModule("SuperHit", ModuleCategories.COMBAT, disabl
     private val minRange by float("MinRange", 3.0f, 0f..6f)
     private val stepSize by float("StepSize", 10f, 1f..20f)
     private val attackRange by float("AttackRange", 4.2f, 3f..5f)
-    private val cubeCraftStep by float("CubeCraftStep", 4.0f, 0.25f..10f, "blocks")
-    private val cubeCraftMaxPackets by int("CubeCraftMaxPackets", 120, 1..500)
-    private val cubeCraftReleaseDelay by int("CubeCraftReleaseDelay", 1, 0..5, "ticks")
-    private val cubeCraftGround by boolean("CubeCraftGround", true)
-
-    private val targetSelector = tree(TargetSelector(TargetPriority.HURT_TIME))
 
     var desyncPlayerPosition: Vec3? = null
         private set
@@ -86,8 +76,6 @@ object ModuleSuperHit : ClientModule("SuperHit", ModuleCategories.COMBAT, disabl
 
     private var isExecuting = false
     private var setbackDetected = false
-    private var requiresBlink = false
-    private var sendingTeleportPacket = false
 
     init {
         tree(TargetRenderer(this) { hoverTarget })
@@ -109,7 +97,7 @@ object ModuleSuperHit : ClientModule("SuperHit", ModuleCategories.COMBAT, disabl
         }
 
         resolveCrosshairTarget() ?: return@handler
-        if (player.hasCooldown) {
+        if (!isAttackReady()) {
             return@handler
         }
 
@@ -123,7 +111,7 @@ object ModuleSuperHit : ClientModule("SuperHit", ModuleCategories.COMBAT, disabl
             return@tickHandler
         }
 
-        if (isExecuting || player.hasCooldown) {
+        if (isExecuting || !isAttackReady()) {
             return@tickHandler
         }
 
@@ -138,27 +126,25 @@ object ModuleSuperHit : ClientModule("SuperHit", ModuleCategories.COMBAT, disabl
         try {
             when (mode) {
                 SuperHitMode.PACKET -> executePacketHit(target, origin, targetPos)
-                SuperHitMode.CUBECRAFT -> executeCubeCraftHit(target, origin, targetPos)
+                SuperHitMode.SENTINEL -> executeSentinelHit(target, origin, targetPos)
             }
         } finally {
-            requiresBlink = false
             desyncPlayerPosition = null
             isExecuting = false
             setbackDetected = false
-            sendingTeleportPacket = false
         }
     }
 
     @Suppress("unused")
     private val packetHandler = handler<PacketEvent> {
+        if (mode != SuperHitMode.PACKET) {
+            return@handler
+        }
+
         val packet = it.packet
 
         when (packet) {
             is ServerboundMovePlayerPacket -> {
-                if (sendingTeleportPacket) {
-                    return@handler
-                }
-
                 val position = desyncPlayerPosition ?: return@handler
 
                 packet.x = position.x
@@ -167,25 +153,15 @@ object ModuleSuperHit : ClientModule("SuperHit", ModuleCategories.COMBAT, disabl
                 packet.hasPos = true
             }
             is ClientboundPlayerPositionPacket -> {
-                if (!isExecuting && desyncPlayerPosition == null && !requiresBlink) {
+                if (!isExecuting && desyncPlayerPosition == null) {
                     return@handler
                 }
 
                 setbackDetected = true
                 desyncPlayerPosition = null
-
-                if (mode != SuperHitMode.CUBECRAFT) {
-                    chat(markAsError("Server setback detected - SuperHit failed!"))
-                    isExecuting = false
-                }
+                chat(markAsError("Server setback detected - SuperHit failed!"))
+                isExecuting = false
             }
-        }
-    }
-
-    @Suppress("unused")
-    private val fakeLagHandler = handler<BlinkPacketEvent> { event ->
-        if (event.origin == TransferOrigin.OUTGOING && requiresBlink) {
-            event.action = BlinkManager.Action.QUEUE
         }
     }
 
@@ -207,8 +183,6 @@ object ModuleSuperHit : ClientModule("SuperHit", ModuleCategories.COMBAT, disabl
         hoverTarget = null
         isExecuting = false
         setbackDetected = false
-        requiresBlink = false
-        sendingTeleportPacket = false
         super.onDisabled()
     }
 
@@ -221,19 +195,19 @@ object ModuleSuperHit : ClientModule("SuperHit", ModuleCategories.COMBAT, disabl
         }
     }
 
-    private suspend fun executeCubeCraftHit(target: LivingEntity, origin: Vec3, targetPos: Vec3) {
-        requiresBlink = true
+    private suspend fun executeSentinelHit(target: LivingEntity, origin: Vec3, targetPos: Vec3) {
+        val destination = calculateSuperHitDestination(
+            origin = origin,
+            targetPosition = targetPos,
+            playerWidth = player.bbWidth.toDouble(),
+            targetWidth = target.bbWidth.toDouble(),
+        )
 
-        teleportCubeCraft(targetPos, stopOnSetback = true)
-        attackTarget(target, targetPos)
-
-        // Cubecraft mode uses real client teleports, so return explicitly instead of relying on a setback.
-        setbackDetected = false
-        teleportCubeCraft(origin, stopOnSetback = false)
-
-        if (cubeCraftReleaseDelay > 0) {
-            waitTicks(cubeCraftReleaseDelay)
-        }
+        executeSentinelSuperHit(
+            destination = destination,
+            teleport = ModuleClickTp::teleportCubeCraftPacket,
+            attack = { attackTarget(target, player.position()) },
+        )
     }
 
     private fun attackTarget(target: LivingEntity, fallbackPosition: Vec3) {
@@ -247,25 +221,22 @@ object ModuleSuperHit : ClientModule("SuperHit", ModuleCategories.COMBAT, disabl
         }
     }
 
-    private fun resolveCrosshairTarget(): LivingEntity? {
-        val rotation = RotationManager.currentRotation ?: player.rotation
-        val hitResult = findEntityInCrosshair(maxRange.toDouble(), rotation) { entity ->
-            entity is LivingEntity && targetSelector.validate(entity)
-        } ?: return null
+    private fun isAttackReady() = isSuperHitAttackReady(
+        usesAttackCooldown = player.hasCooldown,
+        attackStrength = player.getAttackStrengthScale(0.5f),
+    )
 
+    private fun resolveCrosshairTarget(): LivingEntity? {
+        val camera = mc.cameraEntity ?: return null
+        val hitResult = findEntityInCrosshair(maxRange.toDouble(), player.rotation) ?: return null
         val entity = hitResult.entity as? LivingEntity ?: return null
         val distanceSq = player.squaredBoxedDistanceTo(entity)
 
-        if (distanceSq <= minRange.sq() || distanceSq > maxRange.sq()) {
+        if (!entity.shouldBeAttacked() || distanceSq <= minRange.sq() || distanceSq > maxRange.sq()) {
             return null
         }
 
-        return isLookingAtEntity(
-            toEntity = entity,
-            rotation = rotation,
-            range = maxRange.toDouble(),
-            throughWallsRange = 0.0,
-        )?.entity as? LivingEntity
+        return entity.takeIf { hasLineOfSight(camera.eyePosition, hitResult.location, camera) }
     }
 
     private fun travelSteps(from: Vec3, to: Vec3) {
@@ -319,59 +290,55 @@ object ModuleSuperHit : ClientModule("SuperHit", ModuleCategories.COMBAT, disabl
         desyncPlayerPosition = to
     }
 
-    private fun teleportCubeCraft(pos: Vec3, stopOnSetback: Boolean) {
-        travelCubeCraft(
-            from = player.position(),
-            to = pos,
-            stopOnSetback = stopOnSetback,
-        )
-        player.setPos(pos)
-        desyncPlayerPosition = pos
-    }
-
-    private fun travelCubeCraft(from: Vec3, to: Vec3, stopOnSetback: Boolean) {
-        val path = buildLinearTeleportPath(
-            from = from,
-            to = to,
-            stepDistance = cubeCraftStep.toDouble(),
-            maxPackets = cubeCraftMaxPackets,
-        )
-
-        for (step in path) {
-            if (stopOnSetback && setbackDetected) {
-                return
-            }
-
-            sendCubeCraftMovePacket(step)
-            desyncPlayerPosition = step
-        }
-    }
-
-    private fun sendCubeCraftMovePacket(pos: Vec3) {
-        sendingTeleportPacket = true
-        try {
-            network.send(
-                ServerboundMovePlayerPacket.PosRot(
-                    pos.x,
-                    pos.y,
-                    pos.z,
-                    player.yRot,
-                    player.xRot,
-                    cubeCraftGround,
-                    player.horizontalCollision,
-                )
-            )
-        } finally {
-            sendingTeleportPacket = false
-        }
-    }
-
-    private enum class SuperHitMode(
-        override val tag: String,
-        override val tagAliases: List<String> = emptyList(),
-    ) : Tagged {
-        PACKET("Packet"),
-        CUBECRAFT("Cubecraft", listOf("Cube Craft")),
-    }
-
 }
+
+internal enum class SuperHitMode(
+    override val tag: String,
+    override val tagAliases: List<String> = emptyList(),
+) : Tagged {
+    PACKET("Packet"),
+    SENTINEL("Sentinel", listOf("Cubecraft", "Cube Craft")),
+}
+
+internal fun isSuperHitAttackReady(usesAttackCooldown: Boolean, attackStrength: Float): Boolean {
+    return !usesAttackCooldown || attackStrength > SUPER_HIT_MIN_ATTACK_STRENGTH
+}
+
+internal fun calculateSuperHitDestination(
+    origin: Vec3,
+    targetPosition: Vec3,
+    playerWidth: Double,
+    targetWidth: Double,
+): Vec3 {
+    require(playerWidth >= 0.0) { "Player width must not be negative" }
+    require(targetWidth >= 0.0) { "Target width must not be negative" }
+
+    val towardOrigin = Vec3(origin.x - targetPosition.x, 0.0, origin.z - targetPosition.z)
+    val direction = if (towardOrigin.lengthSqr() > SUPER_HIT_DIRECTION_EPSILON) {
+        towardOrigin.normalize()
+    } else {
+        Vec3(1.0, 0.0, 0.0)
+    }
+    val collisionClearance = (playerWidth + targetWidth) / 2.0 + SUPER_HIT_COLLISION_PADDING
+    val axisProjection = max(abs(direction.x), abs(direction.z))
+    val clearance = collisionClearance / axisProjection
+
+    return targetPosition.add(direction.scale(clearance))
+}
+
+internal suspend fun executeSentinelSuperHit(
+    destination: Vec3,
+    teleport: suspend (Vec3) -> Boolean,
+    attack: () -> Unit,
+): Boolean {
+    if (!teleport(destination)) {
+        return false
+    }
+
+    attack()
+    return true
+}
+
+private const val SUPER_HIT_MIN_ATTACK_STRENGTH = 0.9f
+private const val SUPER_HIT_COLLISION_PADDING = 0.1
+private const val SUPER_HIT_DIRECTION_EPSILON = 1.0E-9

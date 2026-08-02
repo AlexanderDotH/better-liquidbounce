@@ -48,6 +48,14 @@ object HudComponentManager {
     )
 
     @JvmStatic
+    fun getHotbarItemYOffset(hudComponent: HudComponent): Double = resolveHotbarItemYOffset(
+        hudTheme = ModuleHud.theme,
+        bundledHud = isBundledHudRendered(),
+        verticalAlignment = hudComponent.alignment.verticalAlignment,
+        verticalOffset = hudComponent.alignment.verticalOffset,
+    )
+
+    @JvmStatic
     fun getComponentWithTweak(tweak: HudComponentTweak): HudComponent? {
         if (!ModuleHud.running || HideAppearance.isHidingNow) {
             return null

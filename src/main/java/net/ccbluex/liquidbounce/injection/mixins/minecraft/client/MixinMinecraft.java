@@ -235,6 +235,7 @@ public abstract class MixinMinecraft {
         CoroutineTicker.INSTANCE.beginMinecraftTick();
         TickLoopTaskExecutor.INSTANCE.onTickLoopStart();
         CoroutineTicker.INSTANCE.tick();
+        ServerPlayerModelStateTracker.onGameTick();
         EventManager.INSTANCE.callEvent(GameTickEvent.INSTANCE);
     }
 

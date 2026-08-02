@@ -20,7 +20,8 @@ test("Modern watermark is a standalone official LiquidBounce badge", () => {
     const watermark = read("themes/modern/ModernWatermark.svelte");
 
     assert.match(watermark, /class="modern-watermark"\s+aria-label="LiquidBounce"/);
-    assert.match(watermark, /src="\/img\/menu\/icon-liquidbounce\.svg"/);
+    assert.match(watermark, /src="img\/menu\/icon-liquidbounce\.svg"/);
+    assert.doesNotMatch(watermark, /src="\/img\//);
     assert.match(watermark, /\.modern-watermark[\s\S]*width:\s*36px/);
     assert.match(watermark, /\.modern-watermark[\s\S]*height:\s*36px/);
     assert.match(watermark, /background:\s*#4677ff/);

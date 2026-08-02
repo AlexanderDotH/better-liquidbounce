@@ -58,6 +58,8 @@
 </script>
 
 <header class="command-bar" aria-label="ClickGUI command bar">
+    <span class="command-bar-sheen" aria-hidden="true"></span>
+
     <div class="identity" aria-label="LiquidBounce">
         <span class="identity-mark" aria-hidden="true">L</span>
         <span class="identity-name">LiquidBounce</span>
@@ -144,7 +146,7 @@
     border: 1px solid var(--modern-border, rgba(255, 255, 255, 0.1));
     border-radius: 999px;
     box-shadow: 0 10px 28px rgba(0, 0, 0, 0.24);
-    overflow: hidden;
+    overflow: visible;
     animation:
       modern-command-enter
       var(--modern-motion-entrance-duration, 260ms)
@@ -152,9 +154,17 @@
       backwards;
   }
 
-  .command-bar::after {
+  .command-bar-sheen {
     position: absolute;
     z-index: 0;
+    inset: 0;
+    overflow: hidden;
+    border-radius: inherit;
+    pointer-events: none;
+  }
+
+  .command-bar-sheen::after {
+    position: absolute;
     top: -40%;
     bottom: -40%;
     left: 0;
@@ -167,7 +177,6 @@
       transparent
     );
     opacity: 0;
-    pointer-events: none;
     transform: translateX(380%) skewX(-14deg);
     animation:
       modern-command-sheen
@@ -461,7 +470,7 @@
       transition-duration: 0ms;
     }
 
-    .command-bar::after,
+    .command-bar-sheen::after,
     .reset-icon.resetting,
     .command-bar,
     .identity,

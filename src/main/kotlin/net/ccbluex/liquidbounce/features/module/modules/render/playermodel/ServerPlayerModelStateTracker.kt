@@ -30,6 +30,7 @@ import net.minecraft.network.protocol.game.ServerboundUseItemPacket
 import net.minecraft.world.InteractionHand
 import net.minecraft.world.entity.player.Input
 import net.minecraft.world.phys.Vec3
+import java.util.concurrent.atomic.AtomicLong
 import java.util.concurrent.atomic.AtomicReference
 import kotlin.math.hypot
 
@@ -46,8 +47,7 @@ data class ServerPlayerModelSnapshot(
     val useStartedAtNanos: Long? = null,
     val swingHand: InteractionHand? = null,
     val swingStartedAtNanos: Long? = null,
-    val previousMovementAtNanos: Long? = null,
-    val movementAtNanos: Long? = null,
+    val lastPositionTick: Long? = null,
     val previousWalkAnimationSpeed: Float = 0f,
     val walkAnimationSpeed: Float = 0f,
     val walkAnimationPosition: Float = 0f,
@@ -73,10 +73,16 @@ object ServerPlayerModelStateTracker {
     private const val NANOS_PER_TICK = 50_000_000L
 
     private val state = AtomicReference(ServerPlayerModelSnapshot.EMPTY)
+    private val gameTick = AtomicLong()
 
     @get:JvmStatic
     val snapshot: ServerPlayerModelSnapshot
         get() = state.get()
+
+    @JvmStatic
+    fun onGameTick() {
+        gameTick.incrementAndGet()
+    }
 
     @JvmStatic
     fun onPacketSent(packet: Packet<*>) {
@@ -102,8 +108,7 @@ object ServerPlayerModelStateTracker {
                 position = position,
                 previousRotation = rotation,
                 rotation = rotation,
-                previousMovementAtNanos = nowNanos,
-                movementAtNanos = nowNanos,
+                lastPositionTick = gameTick.get(),
                 previousWalkAnimationSpeed = 0f,
                 walkAnimationSpeed = 0f,
             )
@@ -112,11 +117,12 @@ object ServerPlayerModelStateTracker {
 
     @JvmStatic
     fun reset() {
+        gameTick.set(0L)
         state.set(ServerPlayerModelSnapshot.EMPTY)
     }
 
     fun snapshotForRender(nowNanos: Long, swingDurationTicks: Int): ServerPlayerModelSnapshot {
-        return state.updateAndGet { current ->
+        val current = state.updateAndGet { current ->
             val withoutTimedOutUse = expireUse(current, nowNanos)
             val swingStartedAt = withoutTimedOutUse.swingStartedAtNanos
             if (swingStartedAt != null && nowNanos - swingStartedAt >= swingDurationTicks * NANOS_PER_TICK) {
@@ -125,6 +131,7 @@ object ServerPlayerModelStateTracker {
                 withoutTimedOutUse
             }
         }
+        return settleMovementForRender(current, gameTick.get())
     }
 
     private fun reducePacket(
@@ -132,7 +139,7 @@ object ServerPlayerModelStateTracker {
         packet: Packet<*>,
         nowNanos: Long,
     ): ServerPlayerModelSnapshot = when (packet) {
-        is ServerboundMovePlayerPacket -> reduceMovement(current, packet, nowNanos)
+        is ServerboundMovePlayerPacket -> reduceMovement(current, packet)
         is ServerboundPlayerInputPacket -> current.copy(input = packet.input())
         is ServerboundSetCarriedItemPacket -> current.copy(
             selectedHotbarSlot = packet.slot,
@@ -159,7 +166,6 @@ object ServerPlayerModelStateTracker {
     private fun reduceMovement(
         current: ServerPlayerModelSnapshot,
         packet: ServerboundMovePlayerPacket,
-        nowNanos: Long,
     ): ServerPlayerModelSnapshot {
         val nextPosition = if (packet.hasPosition()) {
             Vec3(
@@ -200,6 +206,13 @@ object ServerPlayerModelStateTracker {
             0.0
         }
         val walkSpeed = (distance.toFloat() * WALK_DISTANCE_SCALE).coerceAtMost(MAX_WALK_SPEED)
+        val packetTick = gameTick.get()
+        val ticksSincePosition = current.lastPositionTick?.let(packetTick::minus)
+        val previousWalkSpeed = if (ticksSincePosition != null && ticksSincePosition in 0L..1L) {
+            current.walkAnimationSpeed
+        } else {
+            0f
+        }
 
         return current.copy(
             previousPosition = previousPosition,
@@ -208,9 +221,8 @@ object ServerPlayerModelStateTracker {
             rotation = nextRotation,
             onGround = packet.isOnGround,
             horizontalCollision = packet.horizontalCollision(),
-            previousMovementAtNanos = current.movementAtNanos ?: nowNanos,
-            movementAtNanos = nowNanos,
-            previousWalkAnimationSpeed = current.walkAnimationSpeed,
+            lastPositionTick = packetTick,
+            previousWalkAnimationSpeed = previousWalkSpeed,
             walkAnimationSpeed = walkSpeed,
             walkAnimationPosition = current.walkAnimationPosition + walkSpeed,
         )
@@ -238,4 +250,20 @@ object ServerPlayerModelStateTracker {
             current
         }
     }
+}
+
+private fun settleMovementForRender(
+    snapshot: ServerPlayerModelSnapshot,
+    currentTick: Long,
+): ServerPlayerModelSnapshot {
+    val lastPositionTick = snapshot.lastPositionTick ?: return snapshot
+    if (lastPositionTick >= currentTick) {
+        return snapshot
+    }
+
+    return snapshot.copy(
+        previousPosition = snapshot.position,
+        previousWalkAnimationSpeed = 0f,
+        walkAnimationSpeed = 0f,
+    )
 }

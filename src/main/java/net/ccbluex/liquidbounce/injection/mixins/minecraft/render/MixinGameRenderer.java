@@ -32,6 +32,7 @@ import net.ccbluex.liquidbounce.event.events.WorldRenderEvent;
 import net.ccbluex.liquidbounce.features.module.modules.fun.ModuleDankBobbing;
 import net.ccbluex.liquidbounce.features.module.modules.render.*;
 import net.ccbluex.liquidbounce.render.WorldRenderEnvironment;
+import net.ccbluex.liquidbounce.render.engine.esp.EspShaderRenderer;
 import net.ccbluex.liquidbounce.utils.collection.Pools;
 import net.ccbluex.liquidbounce.utils.render.WorldToScreen;
 import net.minecraft.client.Camera;
@@ -82,7 +83,20 @@ public abstract class MixinGameRenderer {
      */
     @Inject(method = "render", at = @At("HEAD"))
     public void hookGameRender(CallbackInfo callbackInfo) {
+        EspShaderRenderer.beginFrame();
         EventManager.INSTANCE.callEvent(GameRenderEvent.INSTANCE);
+    }
+
+    @Inject(
+        method = "render",
+        at = @At(
+            value = "INVOKE",
+            target = "Lnet/minecraft/client/renderer/LevelRenderer;doEntityOutline()V",
+            shift = At.Shift.AFTER
+        )
+    )
+    private void compositeEspShaders(CallbackInfo ci) {
+        EspShaderRenderer.composite(mainRenderTarget);
     }
 
     @Inject(method = "extractCamera", at = @At("TAIL"))

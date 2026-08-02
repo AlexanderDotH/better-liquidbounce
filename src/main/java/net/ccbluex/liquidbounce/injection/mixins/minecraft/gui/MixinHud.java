@@ -212,7 +212,7 @@ public abstract class MixinHud {
         var bounds = hudComponent.getAlignment().getBounds(0, 0);
 
         int center = (int) bounds.xMin();
-        var y = bounds.yMin() - 12;
+        var y = bounds.yMin() - 12 + HudComponentManager.getHotbarItemYOffset(hudComponent);
 
         int l = 1;
         for (int m = 0; m < 9; ++m) {

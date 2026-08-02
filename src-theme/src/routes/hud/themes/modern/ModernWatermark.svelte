@@ -1,5 +1,5 @@
 <div class="modern-watermark" aria-label="LiquidBounce" role="img">
-    <img src="/img/menu/icon-liquidbounce.svg" alt="" aria-hidden="true" />
+    <img src="img/menu/icon-liquidbounce.svg" alt="" aria-hidden="true" />
 </div>
 
 <style lang="scss">

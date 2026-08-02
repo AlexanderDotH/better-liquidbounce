@@ -27,21 +27,10 @@ import org.junit.jupiter.api.Test
 class ClickGuiScreenBackgroundTest {
 
     @Test
-    fun `modern click gui suppresses minecraft native background`() {
+    fun `click gui suppresses minecraft native background`() {
         assertTrue(
             shouldSuppressNativeClickGuiBackground(
                 CustomScreenType.CLICK_GUI,
-                ClickGuiTheme.MODERN,
-            )
-        )
-    }
-
-    @Test
-    fun `classic click gui preserves minecraft native background`() {
-        assertFalse(
-            shouldSuppressNativeClickGuiBackground(
-                CustomScreenType.CLICK_GUI,
-                ClickGuiTheme.CLASSIC,
             )
         )
     }
@@ -51,7 +40,6 @@ class ClickGuiScreenBackgroundTest {
         assertFalse(
             shouldSuppressNativeClickGuiBackground(
                 CustomScreenType.TITLE,
-                ClickGuiTheme.MODERN,
             )
         )
     }

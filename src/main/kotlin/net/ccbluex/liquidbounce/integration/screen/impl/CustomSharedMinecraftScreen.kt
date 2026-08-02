@@ -19,7 +19,6 @@
 
 package net.ccbluex.liquidbounce.integration.screen.impl
 
-import net.ccbluex.liquidbounce.features.module.modules.render.ModuleClickGui
 import net.ccbluex.liquidbounce.features.module.modules.render.shouldSuppressNativeClickGuiBackground
 import net.ccbluex.liquidbounce.integration.screen.CustomScreenType
 import net.ccbluex.liquidbounce.integration.screen.ScreenManager
@@ -62,6 +61,6 @@ class CustomSharedMinecraftScreen(
     override fun isPauseScreen() = false
 
     private fun suppressesNativeBackground() =
-        shouldSuppressNativeClickGuiBackground(screenType, ModuleClickGui.theme)
+        shouldSuppressNativeClickGuiBackground(screenType)
 
 }

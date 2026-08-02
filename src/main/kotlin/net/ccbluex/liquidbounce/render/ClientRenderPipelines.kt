@@ -304,7 +304,6 @@ object ClientRenderPipelines {
      */
     private val OutlineQuads = newPipeline("outline_quads") {
         withSnippet(RenderPipelines.DEBUG_FILLED_SNIPPET)
-        withSnippet(RenderPipelines.GLOBALS_SNIPPET)
         withVertexShader(ClientShaders.Vertex.PosColorRelativeToCamera)
         withVertexBinding(0, DefaultVertexFormat.POSITION_COLOR)
         withPrimitiveTopology(PrimitiveTopology.QUADS)
@@ -315,7 +314,6 @@ object ClientRenderPipelines {
 
     private val OutlineQuadsNoColor = newPipeline("outline_quads_no_color") {
         withSnippet(RenderPipelines.DEBUG_FILLED_SNIPPET)
-        withSnippet(RenderPipelines.GLOBALS_SNIPPET)
         withVertexShader(ClientShaders.Vertex.PosRelativeToCamera)
         withFragmentShader(ClientShaders.Fragment.PosRelativeToCamera)
         withVertexBinding(0, DefaultVertexFormat.POSITION)
@@ -412,6 +410,62 @@ object ClientRenderPipelines {
         withColorTargetState(
             ColorTargetState(
                 optional(BlendFunction.ENTITY_OUTLINE_BLIT),
+                GpuFormat.RGBA8_UNORM,
+                ColorTargetState.WRITE_COLOR,
+            )
+        )
+        withDepthStencilState(optional())
+    }
+
+    @JvmField
+    val EspDownsample = newPipeline("esp/downsample") {
+        screenQuadSnippet()
+        withFragmentShader(ClientShaders.Fragment.EspDownsample)
+        withBindGroupLayout { withSampler("MaskSampler") }
+        withColorTargetState(
+            ColorTargetState(optional(), GpuFormat.RGBA16_FLOAT, ColorTargetState.WRITE_ALL)
+        )
+        withDepthStencilState(optional())
+    }
+
+    @JvmField
+    val EspGaussianBlur = newPipeline("esp/gaussian_blur") {
+        screenQuadSnippet()
+        withFragmentShader(ClientShaders.Fragment.EspGaussianBlur)
+        withBindGroupLayout { withSampler("InputSampler") }
+        withUniformBuffer(ClientUniformDefine.ESP_BLUR)
+        withColorTargetState(
+            ColorTargetState(optional(), GpuFormat.RGBA16_FLOAT, ColorTargetState.WRITE_ALL)
+        )
+        withDepthStencilState(optional())
+    }
+
+    @JvmField
+    val EspGlowComposite = newPipeline("esp/glow_composite") {
+        screenQuadSnippet()
+        withFragmentShader(ClientShaders.Fragment.EspGlowComposite)
+        withBindGroupLayout {
+            withSampler("MaskSampler")
+            withSampler("BlurSampler")
+        }
+        withColorTargetState(
+            ColorTargetState(
+                optional(BlendFunction.TRANSLUCENT_PREMULTIPLIED_ALPHA),
+                GpuFormat.RGBA8_UNORM,
+                ColorTargetState.WRITE_COLOR,
+            )
+        )
+        withDepthStencilState(optional())
+    }
+
+    @JvmField
+    val EspOutlineComposite = newPipeline("esp/outline_composite") {
+        screenQuadSnippet()
+        withFragmentShader(ClientShaders.Fragment.EspOutlineComposite)
+        withBindGroupLayout { withSampler("MaskSampler") }
+        withColorTargetState(
+            ColorTargetState(
+                optional(BlendFunction.TRANSLUCENT_PREMULTIPLIED_ALPHA),
                 GpuFormat.RGBA8_UNORM,
                 ColorTargetState.WRITE_COLOR,
             )

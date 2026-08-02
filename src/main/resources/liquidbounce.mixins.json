@@ -117,6 +117,7 @@
     "minecraft.render.MixinEntityHitboxDebugRenderer",
     "minecraft.render.MixinFont",
     "minecraft.render.MixinFramerateLimitTracker",
+    "minecraft.render.MixinFeatureRenderDispatcherPreparedFrame",
     "minecraft.render.MixinGameRenderer",
     "minecraft.render.MixinLevelRenderer",
     "minecraft.render.MixinLightmap",

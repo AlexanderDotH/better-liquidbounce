@@ -21,8 +21,8 @@ package net.ccbluex.liquidbounce.injection.mixins.minecraft.render.blockentity;
 import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
 import com.mojang.blaze3d.vertex.PoseStack;
-import net.ccbluex.liquidbounce.common.StorageEspOutlineContext;
-import net.ccbluex.liquidbounce.features.module.modules.render.ModuleStorageESP;
+import net.ccbluex.liquidbounce.common.EspMaskCaptureContext;
+import net.ccbluex.liquidbounce.render.engine.esp.EspMaskTargetSelector;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.SubmitNodeCollector;
 import net.minecraft.client.renderer.blockentity.BlockEntityRenderer;
@@ -48,21 +48,13 @@ public abstract class MixinBlockEntityRenderDispatcher {
         BlockEntityRenderer<?, S> renderer, S state, PoseStack poseStack, SubmitNodeCollector submitNodeCollector,
         CameraRenderState camera, Operation<Void> original
     ) {
-        int outlineColor = 0;
         var client = Minecraft.getInstance();
-        if (ModuleStorageESP.GlowMode.INSTANCE.getRunning() && client.level != null) {
-            var type = ModuleStorageESP.categorize(client.level.getBlockEntity(state.blockPos));
-
-            if (type != null && type.shouldRender(state.blockPos)) {
-                var color = type.getColor();
-
-                if (!color.isTransparent()) {
-                    outlineColor = color.argb();
-                }
-            }
-        }
-
-        StorageEspOutlineContext.render(outlineColor, () -> original.call(renderer, state, poseStack, submitNodeCollector, camera));
+        var blockEntity = client.level == null ? null : client.level.getBlockEntity(state.blockPos);
+        var request = EspMaskTargetSelector.forBlockEntity(blockEntity);
+        EspMaskCaptureContext.run(
+            request,
+            () -> original.call(renderer, state, poseStack, submitNodeCollector, camera)
+        );
     }
 
 }

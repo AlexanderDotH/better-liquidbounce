@@ -28,7 +28,7 @@
         if (playerData.absorption > maxAbsorption) {
             maxAbsorption = playerData.absorption;
         }
-        currentSlot = playerData.selectedSlot;
+        currentSlot = Math.min(8, Math.max(0, playerData.selectedSlot));
         if (currentSlot !== lastSlot) {
             lastSlot = currentSlot;
             if (playerData.mainHandStack.identifier !== "minecraft:air") {
@@ -145,7 +145,7 @@
         </div>
 
         <div class="hotbar-elements">
-            <div class="slider" style="left: {currentSlot * 45}px"></div>
+            <div class="slider" style="transform: translateX({currentSlot * 45}px)"></div>
             <div class="slots" bind:this={slotsElement}>
                 <div class="slot"></div>
                 <div class="slot"></div>
@@ -192,8 +192,8 @@
       height: 45px;
       width: 45px;
       position: absolute;
+      left: 0;
       border-radius: 5px;
-      /* transition: linear left 0.05s; TODO: Animation is possible but annoying */
     }
 
     .slots {

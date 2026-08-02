@@ -36,6 +36,7 @@ enum class ClientUniformDefine(val uboName: String, val size: Int) {
     ROUNDED_RECT("u_RoundedRect", std140Size { vec2 + float }),
     HAND_ITEM_LIGHTMAP("ItemChamsData", std140Size { int + float + vec4 + float + vec4 + float + int }),
     GUI_BLUR("BlurData", std140Size { float + float + float }),
+    ESP_BLUR("EspBlurData", std140Size { vec4 + vec4 + vec4 + vec4 + vec4 + vec4 + vec4 }),
     BLEND("BlendData", std140Size { vec4 }),
     THEME_BACKGROUND("ThemeBackgroundData", std140Size { float + vec2 + vec2 }),
     ;

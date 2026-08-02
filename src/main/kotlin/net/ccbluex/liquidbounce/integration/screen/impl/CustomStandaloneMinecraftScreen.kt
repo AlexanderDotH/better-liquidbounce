@@ -20,7 +20,6 @@
 package net.ccbluex.liquidbounce.integration.screen.impl
 
 import net.ccbluex.liquidbounce.additions.setPosition
-import net.ccbluex.liquidbounce.features.module.modules.render.ModuleClickGui
 import net.ccbluex.liquidbounce.features.module.modules.render.shouldSuppressNativeClickGuiBackground
 import net.ccbluex.liquidbounce.integration.interop.protocol.rest.v1.game.isTyping
 import net.ccbluex.liquidbounce.integration.screen.CustomScreenType
@@ -85,6 +84,6 @@ class CustomStandaloneMinecraftScreen(
     }
 
     private fun suppressesNativeBackground() =
-        shouldSuppressNativeClickGuiBackground(screenType, ModuleClickGui.theme)
+        shouldSuppressNativeClickGuiBackground(screenType)
 
 }

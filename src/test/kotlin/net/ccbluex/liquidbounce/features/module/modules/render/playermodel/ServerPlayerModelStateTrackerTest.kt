@@ -94,6 +94,77 @@ class ServerPlayerModelStateTrackerTest {
     }
 
     @Test
+    fun `render snapshot settles the final landing after a tick without position`() {
+        ServerPlayerModelStateTracker.onGameTick()
+        ServerPlayerModelStateTracker.onPacketSent(
+            ServerboundMovePlayerPacket.PosRot(0.0, 64.0, 0.0, 0f, 0f, true, false),
+            nowNanos = 1L,
+        )
+        ServerPlayerModelStateTracker.onGameTick()
+        ServerPlayerModelStateTracker.onPacketSent(
+            ServerboundMovePlayerPacket.Pos(0.0, 64.42, 0.0, false, false),
+            nowNanos = 50_000_001L,
+        )
+        ServerPlayerModelStateTracker.onGameTick()
+        ServerPlayerModelStateTracker.onPacketSent(
+            ServerboundMovePlayerPacket.Pos(0.0, 64.0, 0.0, true, false),
+            nowNanos = 100_000_001L,
+        )
+
+        val landing = ServerPlayerModelStateTracker.snapshotForRender(
+            nowNanos = 100_000_002L,
+            swingDurationTicks = 6,
+        )
+        assertVec3Equals(Vec3(0.0, 64.42, 0.0), landing.previousPosition!!, 0.0)
+
+        ServerPlayerModelStateTracker.onGameTick()
+        val settled = ServerPlayerModelStateTracker.snapshotForRender(
+            nowNanos = 150_000_002L,
+            swingDurationTicks = 6,
+        )
+
+        assertVec3Equals(Vec3(0.0, 64.0, 0.0), settled.previousPosition!!, 0.0)
+        assertVec3Equals(Vec3(0.0, 64.0, 0.0), settled.position!!, 0.0)
+        assertEquals(0f, settled.previousWalkAnimationSpeed)
+        assertEquals(0f, settled.walkAnimationSpeed)
+    }
+
+    @Test
+    fun `movement resumes from the settled idle position and walk state`() {
+        ServerPlayerModelStateTracker.onGameTick()
+        ServerPlayerModelStateTracker.onPacketSent(
+            ServerboundMovePlayerPacket.PosRot(0.0, 64.0, 0.0, 0f, 0f, true, false),
+            nowNanos = 1L,
+        )
+        ServerPlayerModelStateTracker.onGameTick()
+        ServerPlayerModelStateTracker.onPacketSent(
+            ServerboundMovePlayerPacket.Pos(0.2, 64.0, 0.0, true, false),
+            nowNanos = 50_000_001L,
+        )
+        assertTrue(ServerPlayerModelStateTracker.snapshot.walkAnimationSpeed > 0f)
+
+        ServerPlayerModelStateTracker.onGameTick()
+        val settled = ServerPlayerModelStateTracker.snapshotForRender(
+            nowNanos = 100_000_002L,
+            swingDurationTicks = 6,
+        )
+        assertEquals(0f, settled.previousWalkAnimationSpeed)
+        assertEquals(0f, settled.walkAnimationSpeed)
+
+        ServerPlayerModelStateTracker.onGameTick()
+        ServerPlayerModelStateTracker.onPacketSent(
+            ServerboundMovePlayerPacket.Pos(0.35, 64.0, 0.0, true, false),
+            nowNanos = 150_000_001L,
+        )
+
+        val resumed = ServerPlayerModelStateTracker.snapshot
+        assertVec3Equals(Vec3(0.2, 64.0, 0.0), resumed.previousPosition!!, 0.0)
+        assertVec3Equals(Vec3(0.35, 64.0, 0.0), resumed.position!!, 0.0)
+        assertEquals(0f, resumed.previousWalkAnimationSpeed)
+        assertTrue(resumed.walkAnimationSpeed > 0f)
+    }
+
+    @Test
     fun `actual send bridge records effective player input`() {
         val input = Input(true, false, true, false, true, true, true)
 

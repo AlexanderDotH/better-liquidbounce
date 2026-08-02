@@ -75,7 +75,7 @@
   }
 
   .clickgui-theme-host {
-    background: #090b0f;
+    background: transparent;
   }
 
   .theme-status {
@@ -87,9 +87,8 @@
     gap: 10px;
     padding: 24px;
     color: #f2f4f8;
-    background:
-      radial-gradient(circle at 50% 40%, rgba(255, 255, 255, 0.035), transparent 42%),
-      #090b0f;
+    background: transparent;
+    text-shadow: 0 1px 4px rgba(0, 0, 0, 0.75);
     text-align: center;
   }
 

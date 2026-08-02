@@ -29,6 +29,8 @@ import net.ccbluex.liquidbounce.utils.movement.getCalculatedBaseMovementSpeed
 
 class SpeedSentinelLowHop(parent: ModeValueGroup<*>) : SpeedBHopBase("SentinelLowHop", parent) {
 
+    private val boost by float("Boost", 0.15f, 0f..0.5f, "b/t")
+
     private var motionTicks = 0f
     private var canBoost = true
 
@@ -50,7 +52,7 @@ class SpeedSentinelLowHop(parent: ModeValueGroup<*>) : SpeedBHopBase("SentinelLo
 
         if (motionTicks > 1f && canBoost) {
             player.deltaMovement = player.deltaMovement.withStrafe(
-                speed = player.getCalculatedBaseMovementSpeed() + 0.2
+                speed = player.getCalculatedBaseMovementSpeed() + boost
             )
             canBoost = false
             return@tickHandler

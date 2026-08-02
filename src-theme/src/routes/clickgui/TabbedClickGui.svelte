@@ -98,7 +98,7 @@
   $GRID_SIZE: 10px;
 
   .tabbed-clickgui {
-    background-color: var(--clickgui-overlay-background-color);
+    background-color: transparent;
     overflow: hidden;
     position: absolute;
     will-change: opacity;

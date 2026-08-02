@@ -195,13 +195,26 @@ test("Modern keeps the game visible beneath a centered command pill", () => {
     assert.match(commandBlock, /border-radius:\s*999px;/);
 });
 
+test("Modern search suggestions escape the command pill while its sheen stays clipped", () => {
+    const command = read("ModernCommandBar.svelte");
+    const search = read("ModernSearch.svelte");
+
+    assert.match(cssBlock(command, ".command-bar"), /overflow:\s*visible;/);
+    assert.match(cssBlock(command, ".command-bar-sheen"), /overflow:\s*hidden;/);
+    assert.match(command, /class="command-bar-sheen"\s+aria-hidden="true"/);
+    assert.match(cssBlock(search, ".results"), /position:\s*absolute;/);
+    assert.match(search, /role="combobox"/);
+    assert.match(search, /role="listbox"/);
+    assert.match(search, /Tab Locate/);
+});
+
 test("transient sheen layers settle hidden instead of tinting controls", () => {
     const command = read("ModernCommandBar.svelte");
     const module = read("ModernModule.svelte");
     const panel = read("ModernPanel.svelte");
 
     for (const block of [
-        cssBlock(command, ".command-bar::after"),
+        cssBlock(command, ".command-bar-sheen::after"),
         cssBlock(module, ".toggle-sweep"),
         cssBlock(panel, ".header::after"),
     ]) {

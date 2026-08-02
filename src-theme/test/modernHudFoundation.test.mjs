@@ -44,7 +44,8 @@ test("Modern HUD uses a compact watermark while Classic keeps its current waterm
     );
     assert.match(watermark, /class="modern-watermark"/);
     assert.match(watermark, /aria-label="LiquidBounce"/);
-    assert.match(watermark, /src="\/img\/menu\/icon-liquidbounce\.svg"/);
+    assert.match(watermark, /src="img\/menu\/icon-liquidbounce\.svg"/);
+    assert.doesNotMatch(watermark, /src="\/img\//);
     assert.match(watermark, /width:\s*36px/);
     assert.match(watermark, /height:\s*36px/);
     assert.doesNotMatch(watermark, /Modern HUD|status-dot/);

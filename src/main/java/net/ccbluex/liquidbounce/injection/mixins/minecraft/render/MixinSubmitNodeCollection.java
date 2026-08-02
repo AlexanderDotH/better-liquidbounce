@@ -18,27 +18,173 @@
  */
 package net.ccbluex.liquidbounce.injection.mixins.minecraft.render;
 
+import com.llamalad7.mixinextras.injector.ModifyReturnValue;
 import com.mojang.blaze3d.vertex.PoseStack;
-import net.ccbluex.liquidbounce.common.StorageEspOutlineContext;
+import net.ccbluex.liquidbounce.common.EspMaskCaptureContext;
+import net.ccbluex.liquidbounce.interfaces.SubmitNodeCollectionAddition;
 import net.ccbluex.liquidbounce.utils.render.NametagSubmitContext;
 import net.ccbluex.liquidbounce.utils.render.PlayerModelNametagHook;
+import net.minecraft.client.model.Model;
 import net.minecraft.client.renderer.SubmitNodeCollection;
+import net.minecraft.client.renderer.block.BlockModelRenderState;
+import net.minecraft.client.renderer.block.dispatch.BlockStateModelPart;
+import net.minecraft.client.renderer.feature.BlockModelFeatureRenderer;
+import net.minecraft.client.renderer.feature.ItemFeatureRenderer;
+import net.minecraft.client.renderer.feature.ModelFeatureRenderer;
+import net.minecraft.client.renderer.feature.phase.FeatureRenderPhase;
+import net.minecraft.client.renderer.feature.phase.SimpleFeatureRenderPhase;
+import net.minecraft.client.renderer.item.ItemStackRenderState;
+import net.minecraft.client.renderer.rendertype.RenderType;
 import net.minecraft.client.renderer.state.level.CameraRenderState;
+import net.minecraft.client.renderer.texture.OverlayTexture;
+import net.minecraft.client.renderer.texture.TextureAtlasSprite;
+import net.minecraft.client.resources.model.geometry.BakedQuad;
 import net.minecraft.network.chat.Component;
+import net.minecraft.world.item.ItemDisplayContext;
 import net.minecraft.world.phys.Vec3;
 import org.spongepowered.asm.mixin.Mixin;
+import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
-import org.spongepowered.asm.mixin.injection.ModifyVariable;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
-@Mixin(SubmitNodeCollection.class)
-public abstract class MixinSubmitNodeCollection {
+import java.util.ArrayList;
+import java.util.List;
 
-    @ModifyVariable(method = "submitModel", at = @At("HEAD"), argsOnly = true, name = "outlineColor")
-    private int injectStorageEspGlowOutlineColor(int outlineColor) {
-        int storageEspOutlineColor = StorageEspOutlineContext.getOutlineColor();
-        return outlineColor == 0 && storageEspOutlineColor != 0 ? storageEspOutlineColor : outlineColor;
+@Mixin(SubmitNodeCollection.class)
+public abstract class MixinSubmitNodeCollection implements SubmitNodeCollectionAddition {
+
+    @Unique
+    private SimpleFeatureRenderPhase liquid_bounce$espGlowPhase;
+
+    @Unique
+    private SimpleFeatureRenderPhase liquid_bounce$espOutlinePhase;
+
+    @Inject(method = "<init>", at = @At("RETURN"))
+    private void initializeEspPhases(CallbackInfo ci) {
+        liquid_bounce$espGlowPhase = new SimpleFeatureRenderPhase();
+        liquid_bounce$espOutlinePhase = new SimpleFeatureRenderPhase();
+    }
+
+    @ModifyReturnValue(method = "allPhases", at = @At("RETURN"))
+    private List<FeatureRenderPhase<?>> includeEspPhases(List<FeatureRenderPhase<?>> original) {
+        var phases = new ArrayList<>(original);
+        phases.add(liquid_bounce$espGlowPhase);
+        phases.add(liquid_bounce$espOutlinePhase);
+        return List.copyOf(phases);
+    }
+
+    @Override
+    public SimpleFeatureRenderPhase liquid_bounce$getEspGlowPhase() {
+        return liquid_bounce$espGlowPhase;
+    }
+
+    @Override
+    public SimpleFeatureRenderPhase liquid_bounce$getEspOutlinePhase() {
+        return liquid_bounce$espOutlinePhase;
+    }
+
+    @Inject(method = "submitModel", at = @At("TAIL"))
+    private <S> void captureEspModel(
+        Model<? super S> model,
+        S state,
+        PoseStack poseStack,
+        RenderType renderType,
+        int lightCoords,
+        int overlayCoords,
+        int tintedColor,
+        TextureAtlasSprite sprite,
+        int outlineColor,
+        ModelFeatureRenderer.CrumblingOverlay crumblingOverlay,
+        CallbackInfo ci
+    ) {
+        var maskRenderType = liquid_bounce$getOutlineRenderType(renderType);
+        if (maskRenderType == null) {
+            return;
+        }
+
+        var request = EspMaskCaptureContext.current();
+        if (request.glowColor() != 0) {
+            liquid_bounce$espGlowPhase.submit(new ModelFeatureRenderer.Submit<>(
+                maskRenderType, poseStack.last().copy(), model, state,
+                15728880, OverlayTexture.NO_OVERLAY, request.glowColor(), sprite, null
+            ));
+        }
+        if (request.outlineColor() != 0) {
+            liquid_bounce$espOutlinePhase.submit(new ModelFeatureRenderer.Submit<>(
+                maskRenderType, poseStack.last().copy(), model, state,
+                15728880, OverlayTexture.NO_OVERLAY, request.outlineColor(), sprite, null
+            ));
+        }
+    }
+
+    @Inject(method = "submitBlockModel", at = @At("TAIL"))
+    private void captureEspBlockModel(
+        PoseStack poseStack,
+        RenderType renderType,
+        List<BlockStateModelPart> modelParts,
+        int[] tintLayers,
+        int lightCoords,
+        int overlayCoords,
+        int outlineColor,
+        CallbackInfo ci
+    ) {
+        var maskRenderType = liquid_bounce$getOutlineRenderType(renderType);
+        if (maskRenderType == null) {
+            return;
+        }
+
+        var request = EspMaskCaptureContext.current();
+        if (request.glowColor() != 0) {
+            liquid_bounce$espGlowPhase.submit(new BlockModelFeatureRenderer.Submit(
+                poseStack.last().copy(), maskRenderType, modelParts, BlockModelRenderState.EMPTY_TINTS,
+                15728880, OverlayTexture.NO_OVERLAY, request.glowColor(), null
+            ));
+        }
+        if (request.outlineColor() != 0) {
+            liquid_bounce$espOutlinePhase.submit(new BlockModelFeatureRenderer.Submit(
+                poseStack.last().copy(), maskRenderType, modelParts, BlockModelRenderState.EMPTY_TINTS,
+                15728880, OverlayTexture.NO_OVERLAY, request.outlineColor(), null
+            ));
+        }
+    }
+
+    @Inject(method = "submitItem", at = @At("TAIL"))
+    private void captureEspItem(
+        PoseStack poseStack,
+        ItemDisplayContext displayContext,
+        int lightCoords,
+        int overlayCoords,
+        int outlineColor,
+        int[] tintLayers,
+        List<BakedQuad> quads,
+        ItemStackRenderState.FoilType foilType,
+        CallbackInfo ci
+    ) {
+        var request = EspMaskCaptureContext.current();
+        if (request.glowColor() != 0) {
+            liquid_bounce$espGlowPhase.submit(new ItemFeatureRenderer.Submit(
+                poseStack.last().copy(), displayContext, 15728880, OverlayTexture.NO_OVERLAY,
+                request.glowColor(), ItemStackRenderState.LayerRenderState.EMPTY_TINTS,
+                quads, ItemStackRenderState.FoilType.NONE
+            ));
+        }
+        if (request.outlineColor() != 0) {
+            liquid_bounce$espOutlinePhase.submit(new ItemFeatureRenderer.Submit(
+                poseStack.last().copy(), displayContext, 15728880, OverlayTexture.NO_OVERLAY,
+                request.outlineColor(), ItemStackRenderState.LayerRenderState.EMPTY_TINTS,
+                quads, ItemStackRenderState.FoilType.NONE
+            ));
+        }
+    }
+
+    @Unique
+    private static RenderType liquid_bounce$getOutlineRenderType(RenderType renderType) {
+        if (renderType.isOutline()) {
+            return renderType;
+        }
+
+        return renderType.outline().orElse(null);
     }
 
     @Inject(

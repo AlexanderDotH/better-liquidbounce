@@ -64,7 +64,7 @@ class PlayerModelRenderStateApplierTest {
     }
 
     @Test
-    fun `movement applies transmitted walk accumulation and sprint intensity`() {
+    fun `movement uses current transmitted speed for vanilla walk phase`() {
         val state = AvatarRenderState()
         val snapshot = ServerPlayerModelSnapshot(
             input = Input(false, false, false, false, false, false, true),
@@ -76,7 +76,7 @@ class PlayerModelRenderStateApplierTest {
         PlayerModelRenderStateApplier.applyMovement(state, snapshot, partialTicks = 0.5f)
 
         assertEquals(0.5f, state.walkAnimationSpeed, 0.0001f)
-        assertEquals(4.8f, state.walkAnimationPos, 0.0001f)
+        assertEquals(4.7f, state.walkAnimationPos, 0.0001f)
     }
 
     @Test

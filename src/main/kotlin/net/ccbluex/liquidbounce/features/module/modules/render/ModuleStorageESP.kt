@@ -18,11 +18,11 @@
  */
 package net.ccbluex.liquidbounce.features.module.modules.render
 
+import com.mojang.blaze3d.pipeline.RenderTarget
 import kotlinx.atomicfu.atomic
 import net.ccbluex.liquidbounce.config.types.group.Mode
 import net.ccbluex.liquidbounce.config.types.group.ModeValueGroup
 import net.ccbluex.liquidbounce.config.types.group.ToggleableValueGroup
-import net.ccbluex.liquidbounce.event.events.DrawOutlinesEvent
 import net.ccbluex.liquidbounce.event.events.GameTickEvent
 import net.ccbluex.liquidbounce.event.events.WorldRenderEvent
 import net.ccbluex.liquidbounce.event.handler
@@ -89,7 +89,7 @@ import java.awt.Color
 
 object ModuleStorageESP : ClientModule("StorageESP", ModuleCategories.RENDER, aliases = listOf("ChestESP")) {
 
-    private val modes = choices("Mode", GlowMode, arrayOf(BoxMode, GlowMode))
+    private val modes = choices("Mode", GlowMode, arrayOf(BoxMode, OutlineMode, GlowMode))
 
     sealed class ChestType(name: String, defaultColor: Color4b) : ToggleableValueGroup(this, name, enabled = true) {
         val color by color("Color", defaultColor)
@@ -287,7 +287,7 @@ object ModuleStorageESP : ClientModule("StorageESP", ModuleCategories.RENDER, al
 
     }
 
-    object GlowMode : Mode("Glow") {
+    sealed class ShaderMode(name: String) : Mode(name) {
         private val dirtyFlag = atomic(true)
 
         private val renderState = CachedMeshStorage("${ModuleStorageESP.name} $name")
@@ -312,18 +312,12 @@ object ModuleStorageESP : ClientModule("StorageESP", ModuleCategories.RENDER, al
         override val parent: ModeValueGroup<Mode>
             get() = modes
 
-        @Suppress("unused")
-        private val glowRenderHandler = handler<DrawOutlinesEvent> { event ->
-            val dirty = event.renderTarget.drawGenericBlockESP(
+        internal fun drawMask(renderTarget: RenderTarget): Boolean =
+            renderTarget.drawGenericBlockESP(
                 renderState = renderState,
                 pipeline = ClientRenderPipelines.outlineQuads(useColor = true),
                 distanceFade = distanceFade,
             )
-
-            if (dirty) {
-                event.markDirty()
-            }
-        }
 
         @Suppress("unused")
         private val tickHandler = handler<GameTickEvent> {
@@ -351,6 +345,10 @@ object ModuleStorageESP : ClientModule("StorageESP", ModuleCategories.RENDER, al
             }
         }
     }
+
+    object GlowMode : ShaderMode("Glow")
+
+    object OutlineMode : ShaderMode("Outline")
 
     @Suppress("unused")
     private val renderHandler = handler<WorldRenderEvent> { event ->
@@ -451,6 +449,7 @@ object ModuleStorageESP : ClientModule("StorageESP", ModuleCategories.RENDER, al
 
     private fun markDirtyForModes() {
         GlowMode.markDirty()
+        OutlineMode.markDirty()
         BoxMode.markDirty()
     }
 

@@ -20,15 +20,18 @@ package net.ccbluex.liquidbounce.injection.mixins.minecraft.render;
 
 import com.llamalad7.mixinextras.injector.ModifyExpressionValue;
 import com.llamalad7.mixinextras.injector.v2.WrapWithCondition;
+import com.llamalad7.mixinextras.sugar.Local;
 import com.mojang.blaze3d.pipeline.RenderTarget;
 import com.mojang.blaze3d.vertex.PoseStack;
 import net.ccbluex.liquidbounce.event.EventManager;
 import net.ccbluex.liquidbounce.event.events.DrawOutlinesEvent;
 import net.ccbluex.liquidbounce.features.module.modules.render.*;
+import net.ccbluex.liquidbounce.render.engine.esp.EspShaderRenderer;
 import net.ccbluex.liquidbounce.utils.collection.Pools;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.LevelRenderer;
 import net.minecraft.client.renderer.SubmitNodeCollector;
+import net.minecraft.client.renderer.feature.FeatureRenderDispatcher;
 import net.minecraft.client.renderer.state.level.LevelRenderState;
 import org.jspecify.annotations.Nullable;
 import org.joml.Vector4fc;
@@ -93,7 +96,12 @@ public abstract class MixinLevelRenderer {
 //    }
 
     @Inject(method = "lambda$addMainPass$0", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/renderer/feature/FeatureRenderDispatcher$PreparedFrame;executeOutline()V", shift = At.Shift.BEFORE))
-    private void onRenderGlow(CallbackInfo ci) {
+    private void onRenderGlow(
+        CallbackInfo ci,
+        @Local(argsOnly = true) FeatureRenderDispatcher.PreparedFrame preparedFrame
+    ) {
+        EspShaderRenderer.capture(preparedFrame);
+
         var minecraft = Minecraft.getInstance();
         var entityOutlineFb = entityOutlineTarget();
         if (entityOutlineFb == null
