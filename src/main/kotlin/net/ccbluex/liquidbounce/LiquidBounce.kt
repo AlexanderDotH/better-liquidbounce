@@ -198,11 +198,11 @@ object LiquidBounce : EventListener {
     private fun initializeClient(
         workerDispatcher: CoroutineDispatcher,
         renderThreadDispatcher: CoroutineDispatcher,
-    ): CompletableFuture<Unit> = CoroutineScope(
+    ): CompletableFuture<Void?> = CoroutineScope(
         renderThreadDispatcher + CoroutineName("$CLIENT_NAME Initializer")
-    ).future {
+    ).future<Void?> {
         if (isInitialized) {
-            return@future
+            return@future null
         }
 
         // Ensure we are on the render thread
@@ -239,6 +239,7 @@ object LiquidBounce : EventListener {
 
         isInitialized = true
         logger.info("$CLIENT_NAME has been successfully initialized.")
+        null
     }.exceptionally { throwable ->
         ErrorHandler.fatal(throwable, additionalMessage = "$CLIENT_NAME initializer")
     }
@@ -402,8 +403,10 @@ object LiquidBounce : EventListener {
                 runCatching {
                     DeepLearningEngine.init(task)
                     ModelManager.load()
+                    DeepLearningEngine.markInitialized()
                 }.onFailure { exception ->
                     task.subTasks.clear()
+                    DeepLearningEngine.markUnavailable()
 
                     // LiquidBounce can still run without deep learning,
                     // and we don't want to crash the client if it fails.
@@ -442,6 +445,7 @@ object LiquidBounce : EventListener {
 
         // Unregister all event listener and stop all running tasks
         ChunkScanner.stopThread()
+        FontManager.closeGlyphManager()
         EventManager.unregisterAll()
 
         // Shutdown HTTP server
@@ -525,11 +529,10 @@ object LiquidBounce : EventListener {
                 .thenCompose {
                     val prepareDispatcher = prepareExecutor.asCoroutineDispatcher()
                     val applyDispatcher = applyExecutor.asCoroutineDispatcher()
-                    @Suppress("UNCHECKED_CAST") // Kotlin Unit to Java Void
                     initializeClient(
                         workerDispatcher = prepareDispatcher,
                         renderThreadDispatcher = applyDispatcher,
-                    ) as CompletableFuture<Void>
+                    )
                 }
         }
 

@@ -244,6 +244,7 @@
     "liquidbounce.command.models.subcommand.create.result.trainingFailed": "❌ 訓練失敗，錯誤資訊：%s",
     "liquidbounce.command.models.subcommand.create.result.trainingStart": "⚡ 開始訓練模型%s…",
     "liquidbounce.command.models.subcommand.delete.description": "刪除一個深度學習模型。",
+    "liquidbounce.command.models.subcommand.delete.result.modelDeleteFailed": "❌ 刪除模型%s失敗：%s",
     "liquidbounce.command.models.subcommand.delete.result.modelDeleted": "✔ 模型%s已刪除。",
     "liquidbounce.command.models.subcommand.delete.result.modelNotFound": "❌ 未找到模型%s。",
     "liquidbounce.command.models.subcommand.improve.description": "改進一個深度學習模型。",

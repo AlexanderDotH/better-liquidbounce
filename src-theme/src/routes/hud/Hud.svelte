@@ -6,8 +6,14 @@
     import TabGui from "./elements/tabgui/TabGui.svelte";
     import HotBar from "./elements/hotbar/HotBar.svelte";
     import Scoreboard from "./elements/Scoreboard.svelte";
-    import {onMount} from "svelte";
-    import {getClientInfo, getComponents, getGameWindow, getMetadata} from "../../integration/rest";
+    import {onMount, setContext} from "svelte";
+    import {
+        getClientInfo,
+        getComponents,
+        getGameWindow,
+        getMetadata,
+        getNativeComponents
+    } from "../../integration/rest";
     import {listen} from "../../integration/ws";
     import type {HudComponent, Metadata} from "../../integration/types";
     import Taco from "./elements/taco/Taco.svelte";
@@ -18,19 +24,33 @@
     import Text from "./elements/Text.svelte";
     import DraggableComponent from "./elements/DraggableComponent.svelte";
     import KeyBinds from "./elements/KeyBinds.svelte";
+    import ClosedCaptions from "./elements/ClosedCaptions.svelte";
     import GenericPlayerInventory from "./elements/inventory/GenericPlayerInventory.svelte";
     import {os} from "../clickgui/clickgui_store";
     import InventoryStatistics from "./elements/inventory/InventoryStatistics.svelte";
     import ModernWatermark from "./themes/modern/ModernWatermark.svelte";
     import {hudThemeSession} from "./theme/themeSession";
     import type {HudValueChangeEvent} from "../../integration/events";
+    import {
+        HUD_EDITOR_ELEMENTS_CONTEXT,
+        type HudEditorDragState
+    } from "../clickgui/tabs/hud_editor/constants";
+    import Image from "./elements/Image.svelte";
+
+    export let inEditor = false;
+    export let onDragStateChange: ((state: HudEditorDragState) => void) | undefined = undefined;
+    export let magneticTargetIds: string[] = [];
 
     let zoom = 100;
     let metadata: Metadata;
-    let components: HudComponent[] = [];
+    let nativeComponents: HudComponent[] = [];
+    let themeComponents: HudComponent[] = [];
     let presentation: "classic" | "modern" = "classic";
 
+    $: renderedComponents = inEditor ? [...nativeComponents, ...themeComponents] : themeComponents;
     $: presentation = $hudThemeSession.theme === "Modern" ? "modern" : "classic";
+
+    setContext(HUD_EDITOR_ELEMENTS_CONTEXT, new Map<string, HTMLElement>());
 
     onMount(async () => {
         void hudThemeSession.load();
@@ -40,22 +60,24 @@
         zoom = gameWindow.scaleFactor * 50;
 
         metadata = await getMetadata();
-        components = await getComponents(metadata.id);
+        [nativeComponents, themeComponents] = await Promise.all([
+            inEditor ? getNativeComponents() : Promise.resolve([]),
+            getComponents(metadata.id)
+        ]);
     });
 
     listen("scaleFactorChange", (data: ScaleFactorChangeEvent) => {
         zoom = data.scaleFactor * 50;
     });
 
-    listen("componentsUpdate", (data: ComponentsUpdateEvent) => {
-        if (data.id != metadata.id) {
-            // reject
-            return;
+    listen("componentsUpdate", (event: ComponentsUpdateEvent) => {
+        if (inEditor && event.source === "native") {
+            nativeComponents = event.components;
         }
 
-        // force update to re-render
-        components = [];
-        components = data.components;
+        if (event.source === "theme" && event.themeId === metadata?.id) {
+            themeComponents = event.components;
+        }
     });
 
     listen("hudValueChange", (event: HudValueChangeEvent) => {
@@ -71,9 +93,19 @@
         class:hud-theme--modern={$hudThemeSession.theme === "Modern"}
         style="zoom: {zoom}%"
 >
-    {#each components as c}
+    {#each renderedComponents as c (c.id)}
         {#if c.settings.enabled}
-            <DraggableComponent alignment={c.settings.alignment} componentName={c.name}>
+            <DraggableComponent
+                    {inEditor}
+                    {onDragStateChange}
+                    componentId={c.id}
+                    componentName={c.name}
+                    alignment={c.settings.alignment}
+                    zIndex={c.settings.zIndex ?? 0}
+                    magneticallyReferenced={magneticTargetIds.includes(c.id)}
+                    width={c.width}
+                    height={c.height}
+            >
                 {#if c.name === "Watermark"}
                     {#if $hudThemeSession.theme === "Modern"}
                         <ModernWatermark/>
@@ -96,7 +128,7 @@
                     <Scoreboard settings={c.settings}/>
                 {:else if c.name === "ArmorItems"}
                     <GenericPlayerInventory
-                            rowLength={1}
+                            rowLength={c.settings.layout === "Horizontal" ? 4 : 1}
                             backgroundColor="transparent"
                             gap="2px"
                             getRenderedStacks={it => Array.from(it.armor).reverse()}
@@ -137,11 +169,15 @@
                 {:else if c.name === "Effects"}
                     <Effects/>
                 {:else if c.name === "Text"}
-                    <Text settings={c.settings} />
+                    <Text settings={c.settings}/>
                 {:else if c.name === "Image"}
-                    <img alt="" src="{c.settings.uRL}" style="scale: {c.settings.scale};">
+                    <Image componentId={c.id} settings={c.settings}/>
                 {:else if c.name === "KeyBinds"}
                     <KeyBinds/>
+                {:else if c.name === "ClosedCaptions"}
+                    <ClosedCaptions/>
+                {:else if c.width !== undefined && c.height !== undefined}
+                    <div></div>
                 {/if}
             </DraggableComponent>
         {/if}

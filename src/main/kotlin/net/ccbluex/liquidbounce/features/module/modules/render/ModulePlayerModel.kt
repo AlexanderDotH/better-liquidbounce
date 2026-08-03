@@ -32,7 +32,7 @@ import net.ccbluex.liquidbounce.render.drawBox
 import net.ccbluex.liquidbounce.render.drawLine
 import net.ccbluex.liquidbounce.render.engine.type.Color4b
 import net.ccbluex.liquidbounce.render.engine.type.Vec3f
-import net.ccbluex.liquidbounce.render.renderEnvironmentForWorld
+import net.ccbluex.liquidbounce.render.renderEnvironment
 import net.ccbluex.liquidbounce.utils.aiming.data.Rotation
 import net.ccbluex.liquidbounce.utils.kotlin.EventPriorityConvention
 import net.ccbluex.liquidbounce.utils.math.toVec3f
@@ -143,7 +143,7 @@ object ModulePlayerModel : ClientModule(
             .toVec3f()
         val eyeVector = Vec3f.eyeVector(event.camera)
 
-        renderEnvironmentForWorld(event.matrixStack) {
+        event.renderEnvironment {
             val vector = eyeVector.fma(100f, interpolatedRotationVec)
             if (drawVectorLine) {
                 drawLine(eyeVector, vector, vectorLine.argb)

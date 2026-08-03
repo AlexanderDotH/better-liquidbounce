@@ -45,6 +45,7 @@ import net.ccbluex.liquidbounce.features.module.modules.combat.ModuleKeepSprint
 import net.ccbluex.liquidbounce.features.module.modules.combat.ModuleMaceKill
 import net.ccbluex.liquidbounce.features.module.modules.combat.ModuleNoMissCooldown
 import net.ccbluex.liquidbounce.features.module.modules.combat.ModuleSuperHit
+import net.ccbluex.liquidbounce.features.module.modules.combat.ModuleSpearKill
 import net.ccbluex.liquidbounce.features.module.modules.combat.ModuleSuperKnockback
 import net.ccbluex.liquidbounce.features.module.modules.combat.ModuleSwordBlock
 import net.ccbluex.liquidbounce.features.module.modules.combat.ModuleTickBase
@@ -467,7 +468,6 @@ object ModuleManager : EventListener, Collection<ClientModule> by modules {
             ModuleAutoArmor,
             ModuleAutoBow,
             ModuleAutoClicker,
-            AutoMobHeal,
             ModuleAutoLeave,
             ModuleAutoBuff,
             ModuleAutoRod,
@@ -487,6 +487,7 @@ object ModuleManager : EventListener, Collection<ClientModule> by modules {
             ModuleAutoShoot,
             ModuleKeepSprint,
             ModuleMaceKill,
+            ModuleSpearKill,
             ModuleNoMissCooldown,
 
             // Exploit
@@ -687,6 +688,7 @@ object ModuleManager : EventListener, Collection<ClientModule> by modules {
             ModuleCrosshair,
 
             // World
+            AutoMobHeal,
             ModuleAirPlace,
             ModuleAutoBuild,
             ModuleAutoDisable,

@@ -2,7 +2,7 @@ import type {ClickGuiView} from "../../theme/clickGuiThemeState";
 
 export const DEFAULT_CLICK_GUI_SCALE_FACTOR = 2;
 
-const CLICK_GUI_VIEWS: readonly ClickGuiView[] = ["clickgui", "settings"];
+const CLICK_GUI_VIEWS: readonly ClickGuiView[] = ["clickgui", "hud-editor", "settings"];
 
 export function normalizeClickGuiScaleFactor(scaleFactor: number): number {
     return Number.isFinite(scaleFactor) && scaleFactor > 0

@@ -46,7 +46,7 @@ import net.ccbluex.liquidbounce.render.engine.esp.EspOutlineStyleConfig
 import net.ccbluex.liquidbounce.render.engine.type.Color4b
 import net.ccbluex.liquidbounce.render.engine.type.Vec3f
 import net.ccbluex.liquidbounce.render.getDynamicTransformsUniform
-import net.ccbluex.liquidbounce.render.renderEnvironmentForWorld
+import net.ccbluex.liquidbounce.render.renderEnvironment
 import net.ccbluex.liquidbounce.render.translate
 import net.ccbluex.liquidbounce.render.utils.DistanceFadeUniformValueGroup
 import net.ccbluex.liquidbounce.render.withPositionRelativeToCamera
@@ -73,6 +73,7 @@ import net.minecraft.world.level.block.entity.BarrelBlockEntity
 import net.minecraft.world.level.block.entity.BlockEntity
 import net.minecraft.world.level.block.entity.BrewingStandBlockEntity
 import net.minecraft.world.level.block.entity.ChestBlockEntity
+import net.minecraft.world.level.block.entity.ChiseledBookShelfBlockEntity
 import net.minecraft.world.level.block.entity.CrafterBlockEntity
 import net.minecraft.world.level.block.entity.DecoratedPotBlockEntity
 import net.minecraft.world.level.block.entity.DispenserBlockEntity
@@ -119,6 +120,7 @@ object ModuleStorageESP : ClientModule("StorageESP", ModuleCategories.RENDER, al
         object Hopper : ChestType("Hopper", Color4b(Color.GRAY))
         object ShulkerBox : ChestType("ShulkerBox", Color4b(Color(0x6e, 0x4d, 0x6e).brighter()))
         object Pot : ChestType("Pot", Color4b(209, 134, 0))
+        object Bookshelf : ChestType("Bookshelf", Color4b(139, 90, 43))
         object Shelf : ChestType("Shelf", Color4b(160, 82, 45))
     }
 
@@ -132,6 +134,7 @@ object ModuleStorageESP : ClientModule("StorageESP", ModuleCategories.RENDER, al
         ChestType.Hopper,
         ChestType.ShulkerBox,
         ChestType.Pot,
+        ChestType.Bookshelf,
         ChestType.Shelf,
     )
 
@@ -196,7 +199,7 @@ object ModuleStorageESP : ClientModule("StorageESP", ModuleCategories.RENDER, al
                     distanceFade = distanceFade,
                 ) {
                     getDynamicTransformsUniform(
-                        modelView = event.matrixStack.last().pose(),
+                        modelView = event.poseStack.last().pose(),
                     )
                 }
             }
@@ -207,15 +210,15 @@ object ModuleStorageESP : ClientModule("StorageESP", ModuleCategories.RENDER, al
                 distanceFade = distanceFade,
             ) {
                 getDynamicTransformsUniform(
-                    modelView = event.matrixStack.last().pose(),
+                    modelView = event.poseStack.last().pose(),
                 )
             }
 
             if (entityBoxes.isEmpty()) return@handler
 
-            val matrixStack = event.matrixStack
+            val matrixStack = event.poseStack
 
-            renderEnvironmentForWorld(matrixStack) {
+            event.renderEnvironment {
                 for ((entity, box, color) in entityBoxes) {
                     val baseColor = color.with(a = 50)
                     val outlineColor = if (outline) color.with(a = 100) else null
@@ -369,14 +372,14 @@ object ModuleStorageESP : ClientModule("StorageESP", ModuleCategories.RENDER, al
         val types = allTypes.filter { it.tracers && !it.color.isTransparent }
         if (types.isEmpty()) return@handler
 
-        renderEnvironmentForWorld(event.matrixStack) {
+        event.renderEnvironment {
             val eyeVector = Vec3f.eyeVector(camera)
 
             if (!StorageScanner.isEmpty()) {
                 for (type in types) {
                     for (blockPos in StorageScanner.iterate(type)) {
                         if (!type.shouldRender(blockPos)) continue
-                        val pos = relativeToCamera(blockPos.center).toVec3f()
+                        val pos = blockPos.center.subtract(camera.position()).toVec3f()
 
                         drawLine(eyeVector, pos, type.color.argb)
                     }
@@ -387,7 +390,7 @@ object ModuleStorageESP : ClientModule("StorageESP", ModuleCategories.RENDER, al
                 val category = entity.categorize() ?: continue
                 if (!category.shouldRender(entity) || !category.tracers) continue
 
-                val pos = relativeToCamera(entity.interpolateCurrentPosition(event.partialTicks)).toVec3f()
+                val pos = entity.interpolateCurrentPosition(event.partialTicks).subtract(camera.position()).toVec3f()
                 val topPos = pos.add(0f, entity.bbHeight, 0f)
 
                 drawLines(category.color.argb, eyeVector, pos, pos, topPos)
@@ -421,6 +424,7 @@ object ModuleStorageESP : ClientModule("StorageESP", ModuleCategories.RENDER, al
             is HopperBlockEntity -> ChestType.Hopper
             is ShulkerBoxBlockEntity -> ChestType.ShulkerBox
             is DecoratedPotBlockEntity -> ChestType.Pot
+            is ChiseledBookShelfBlockEntity -> ChestType.Bookshelf
             is ShelfBlockEntity -> ChestType.Shelf
             else -> null
         }

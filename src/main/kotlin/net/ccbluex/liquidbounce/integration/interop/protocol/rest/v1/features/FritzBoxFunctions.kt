@@ -20,16 +20,21 @@ package net.ccbluex.liquidbounce.integration.interop.protocol.rest.v1.features
 
 import com.google.gson.JsonNull
 import com.google.gson.JsonObject
+import io.ktor.server.request.receive
+import io.ktor.server.response.respond
+import io.ktor.server.routing.Route
+import io.ktor.server.routing.post
+import io.ktor.server.routing.route
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import net.ccbluex.netty.http.routing.Routing
+import net.ccbluex.liquidbounce.integration.interop.internalServerError
 
 private val fritzBoxWebClient = FritzBoxWebClient()
 
 private data class FritzBoxReconnectRequest(val password: String? = null)
 
 // POST /api/v1/client/fritzbox/reconnect
-private fun Routing.postFritzBoxReconnect() = post("/reconnect") {
+private fun Route.postFritzBoxReconnect() = post("/reconnect") {
     val request = runCatching {
         call.receive<FritzBoxReconnectRequest>()
     }.getOrDefault(FritzBoxReconnectRequest())
@@ -57,6 +62,6 @@ private fun JsonObject.addNullableProperty(name: String, value: String?) {
     addProperty(name, value)
 }
 
-internal fun Routing.fritzBoxRoutes() = route("/fritzbox") {
+internal fun Route.fritzBoxRoutes() = route("/fritzbox") {
     postFritzBoxReconnect()
 }

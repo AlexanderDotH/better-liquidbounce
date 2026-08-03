@@ -19,6 +19,7 @@
 
 package net.ccbluex.liquidbounce.integration.screen.impl
 
+import net.ccbluex.liquidbounce.features.module.modules.render.ModuleHud
 import net.ccbluex.liquidbounce.features.module.modules.render.shouldSuppressNativeClickGuiBackground
 import net.ccbluex.liquidbounce.integration.screen.CustomScreenType
 import net.ccbluex.liquidbounce.integration.screen.ScreenManager
@@ -50,10 +51,10 @@ class CustomSharedMinecraftScreen(
         }
     }
 
-    override fun isInGameUi() = suppressesNativeBackground() || super.isInGameUi()
+    override fun isInGameUi() = suppressesNativeBackground() || isHudEditorActive() || super.isInGameUi()
 
     override fun extractTransparentBackground(context: GuiGraphicsExtractor) {
-        if (!suppressesNativeBackground()) {
+        if (!suppressesNativeBackground() && !isHudEditorActive()) {
             super.extractTransparentBackground(context)
         }
     }
@@ -62,5 +63,8 @@ class CustomSharedMinecraftScreen(
 
     private fun suppressesNativeBackground() =
         shouldSuppressNativeClickGuiBackground(screenType)
+
+    private fun isHudEditorActive() =
+        screenType == CustomScreenType.CLICK_GUI && ModuleHud.hudEditorSelected
 
 }

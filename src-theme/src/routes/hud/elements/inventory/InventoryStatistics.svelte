@@ -26,10 +26,14 @@
     export let variant: "classic" | "modern" = "classic";
     export let label: string | undefined = undefined;
 
-    const cSettings = settings as HudInventoryStatisticsSettings;
+    let cSettings: HudInventoryStatisticsSettings;
+    let getInventoryStatisticsStacks: (inventory: PlayerInventory) => ItemStack[];
 
-    const getInventoryStatisticsStacks = (inventory: PlayerInventory): ItemStack[] => {
-        const selectedItems = cSettings.items;
+    function calculateInventoryStatisticsStacks(
+        inventory: PlayerInventory,
+        settings: HudInventoryStatisticsSettings
+    ): ItemStack[] {
+        const selectedItems = settings.items;
         if (!Array.isArray(selectedItems) || selectedItems.length === 0) {
             return [];
         }
@@ -62,8 +66,11 @@
                 displayName: identifier,
             }));
 
-        return cSettings.showEmpty ? mergedStacks : mergedStacks.filter(it => it.count);
-    };
+        return settings.showEmpty ? mergedStacks : mergedStacks.filter(it => it.count);
+    }
+
+    $: cSettings = settings as HudInventoryStatisticsSettings;
+    $: getInventoryStatisticsStacks = (inventory) => calculateInventoryStatisticsStacks(inventory, cSettings);
 </script>
 
 <GenericPlayerInventory

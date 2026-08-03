@@ -379,6 +379,7 @@ function createComponents(
 
     return names.map((name, index) => ({
         name,
+        description: `${name} deterministic Modern HUD preview component.`,
         id: `preview-${index + 1}-${name.toLowerCase()}`,
         settings: {
             enabled: isComponentEnabled(name, fixture),

@@ -10,6 +10,7 @@
     } from "../clickgui_store";
     import {createLatestValueSaveQueue} from "../theme/latestValueSaveQueue";
     import {productionGlobalSettingsDataSource} from "../themes/modern/model/clickGuiDataSource";
+    import ScaledClickGuiContent from "../ScaledClickGuiContent.svelte";
 
     let globalSettings = $state<ConfigurableSettingData | null>(null);
     let globalLoading = $state(true);
@@ -67,7 +68,7 @@
     }
 
     onMount(() => {
-        void fetchGlobalSettings();
+        fetchGlobalSettings();
     });
 
     function describeError(error: unknown, fallback: string): string {
@@ -79,7 +80,8 @@
     }
 </script>
 
-<WindowPanel title="Global Settings" icon="client">
+<ScaledClickGuiContent>
+  <WindowPanel title="Global Settings" icon="client">
     <section class="appearance-setting" aria-labelledby="clickgui-theme-title">
         <div class="appearance-copy">
             <span id="clickgui-theme-title" class="appearance-title">ClickGUI Theme</span>
@@ -161,7 +163,8 @@
     {:else if globalSaving}
         <div class="global-status" role="status">Saving global settings…</div>
     {/if}
-</WindowPanel>
+  </WindowPanel>
+</ScaledClickGuiContent>
 
 <style lang="scss">
 

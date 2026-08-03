@@ -13,19 +13,21 @@
     export let variant: "classic" | "modern" = "classic";
     export let label: string | undefined = undefined;
 
+    let inventory: PlayerInventory | undefined;
     let stacks: ItemStack[] = [];
 
     $: panelBackgroundColor = variant === "modern" ? "rgba(15, 18, 23, 0.76)" : backgroundColor;
     $: panelGap = variant === "modern" ? "2px" : gap;
 
     listen("clientPlayerInventory", (data: ClientPlayerInventoryEvent) => {
-        stacks = getRenderedStacks(data.inventory);
+        inventory = data.inventory;
     });
 
     onMount(async () => {
-        const inventory = await getPlayerInventory();
-        stacks = getRenderedStacks(inventory);
+        inventory = await getPlayerInventory();
     });
+
+    $: stacks = inventory ? getRenderedStacks(inventory) : [];
 </script>
 
 <div

@@ -86,7 +86,7 @@ test("Text exposes an opt-in Plain or Pill container with a legacy-safe Plain fa
 
     assert.match(types, /container\?:\s*"Plain" \| "Pill"/);
     assert.match(text, /\$:\s*container = cSettings\.container \?\? "Plain"/);
-    assert.match(text, /\$:\s*processText\(cSettings,\s*playerData\)/);
+    assert.match(text, /\$:\s*processedText = processText\(cSettings\.text,\s*playerData\)/);
     assert.match(text, /class:text--pill=\{container === "Pill"\}/);
     assert.match(
         text,

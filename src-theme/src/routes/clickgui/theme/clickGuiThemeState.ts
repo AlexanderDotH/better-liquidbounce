@@ -9,7 +9,7 @@ export const CLICK_GUI_VISUAL_THEMES = ["Classic", "Modern"] as const;
 export const DEFAULT_CLICK_GUI_VISUAL_THEME = "Modern";
 
 export type ClickGuiVisualTheme = typeof CLICK_GUI_VISUAL_THEMES[number];
-export type ClickGuiView = "clickgui" | "settings";
+export type ClickGuiView = "clickgui" | "hud-editor" | "settings";
 
 export interface ClickGuiThemeSessionState {
     settings: ConfigurableSetting | null;

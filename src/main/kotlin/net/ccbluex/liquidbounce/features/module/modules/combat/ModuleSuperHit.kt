@@ -30,7 +30,7 @@ import net.ccbluex.liquidbounce.features.module.ModuleCategories
 import net.ccbluex.liquidbounce.features.module.modules.exploit.ModuleClickTp
 import net.ccbluex.liquidbounce.render.drawLine
 import net.ccbluex.liquidbounce.render.engine.type.Color4b
-import net.ccbluex.liquidbounce.render.renderEnvironmentForWorld
+import net.ccbluex.liquidbounce.render.renderEnvironment
 import net.ccbluex.liquidbounce.utils.block.SwingMode
 import net.ccbluex.liquidbounce.utils.client.chat
 import net.ccbluex.liquidbounce.utils.client.markAsError
@@ -41,7 +41,6 @@ import net.ccbluex.liquidbounce.utils.entity.rotation
 import net.ccbluex.liquidbounce.utils.entity.squaredBoxedDistanceTo
 import net.ccbluex.liquidbounce.utils.input.InputTracker.wasPressedRecently
 import net.ccbluex.liquidbounce.utils.math.sq
-import net.ccbluex.liquidbounce.utils.math.toVec3f
 import net.ccbluex.liquidbounce.utils.movement.buildLinearTeleportPath
 import net.ccbluex.liquidbounce.utils.network.MovePacketType
 import net.ccbluex.liquidbounce.utils.network.sendPacketSilently
@@ -169,10 +168,11 @@ object ModuleSuperHit : ClientModule("SuperHit", ModuleCategories.COMBAT, disabl
     private val renderHandler = handler<WorldRenderEvent> { event ->
         val target = hoverTarget ?: return@handler
 
-        renderEnvironmentForWorld(event.matrixStack) {
+        event.renderEnvironment {
+            val cameraPosition = camera.position()
             drawLine(
-                relativeToCamera(player.position().add(0.0, 1.0, 0.0)).toVec3f(),
-                relativeToCamera(target.position().add(0.0, 1.0, 0.0)).toVec3f(),
+                player.position().add(0.0, 1.0, 0.0).subtract(cameraPosition),
+                target.position().add(0.0, 1.0, 0.0).subtract(cameraPosition),
                 Color4b.WHITE.argb,
             )
         }

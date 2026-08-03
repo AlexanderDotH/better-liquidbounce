@@ -18,7 +18,6 @@
  */
 package net.ccbluex.liquidbounce.features.account
 
-import net.ccbluex.liquidbounce.test.assertNotNull
 import net.minecraft.network.chat.Component
 import net.minecraft.network.protocol.common.ClientboundDisconnectPacket
 import net.minecraft.network.protocol.login.ClientboundLoginDisconnectPacket
@@ -26,6 +25,7 @@ import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.Test
+import kotlin.test.assertNotNull
 
 class AccountBanMessageParserTest {
 

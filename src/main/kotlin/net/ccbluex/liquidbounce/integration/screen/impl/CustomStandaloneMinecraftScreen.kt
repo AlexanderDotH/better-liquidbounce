@@ -20,6 +20,7 @@
 package net.ccbluex.liquidbounce.integration.screen.impl
 
 import net.ccbluex.liquidbounce.additions.setPosition
+import net.ccbluex.liquidbounce.features.module.modules.render.ModuleHud
 import net.ccbluex.liquidbounce.features.module.modules.render.shouldSuppressNativeClickGuiBackground
 import net.ccbluex.liquidbounce.integration.interop.protocol.rest.v1.game.isTyping
 import net.ccbluex.liquidbounce.integration.screen.CustomScreenType
@@ -47,8 +48,8 @@ class CustomStandaloneMinecraftScreen(
         browser.visible = false
     }
 
-    var mouseX = 0.0
-    var mouseY = 0.0
+    private var mouseX = 0.0
+    private var mouseY = 0.0
 
     override fun init() {
         browser.visible = true
@@ -69,10 +70,10 @@ class CustomStandaloneMinecraftScreen(
         super.onClose()
     }
 
-    override fun isInGameUi() = suppressesNativeBackground() || super.isInGameUi()
+    override fun isInGameUi() = suppressesNativeBackground() || isHudEditorActive() || super.isInGameUi()
 
     override fun extractTransparentBackground(context: GuiGraphicsExtractor) {
-        if (!suppressesNativeBackground()) {
+        if (!suppressesNativeBackground() && !isHudEditorActive()) {
             super.extractTransparentBackground(context)
         }
     }
@@ -85,5 +86,8 @@ class CustomStandaloneMinecraftScreen(
 
     private fun suppressesNativeBackground() =
         shouldSuppressNativeClickGuiBackground(screenType)
+
+    private fun isHudEditorActive() =
+        screenType == CustomScreenType.CLICK_GUI && ModuleHud.hudEditorSelected
 
 }

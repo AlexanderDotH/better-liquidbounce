@@ -12,7 +12,7 @@
     export let settings: { [name: string]: any };
     export let variant: "classic" | "modern" = "classic";
 
-    const cSettings = settings as HudArrayListSettings;
+    let cSettings = settings as HudArrayListSettings;
     const CLASSIC_FONT = "500 14px Inter";
     const MODERN_NAME_FONT = "550 12px Inter";
     const MODERN_TAG_FONT = "600 10px Inter";
@@ -64,6 +64,11 @@
 
         enabledModules = modulesWithWidths;
         await tick();
+    }
+
+    $: if (cSettings !== settings) {
+        cSettings = settings as HudArrayListSettings;
+        void updateEnabledModules();
     }
 
     onMount(() => {

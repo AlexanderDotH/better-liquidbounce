@@ -23,6 +23,7 @@
 
     const tabs: readonly {view: ClickGuiView; label: string}[] = [
         {view: "clickgui", label: "ClickGUI"},
+        {view: "hud-editor", label: "HUD Editor"},
         {view: "settings", label: "Settings"},
     ];
 

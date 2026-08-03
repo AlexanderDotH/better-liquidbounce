@@ -3,7 +3,7 @@
     import type {Module as TModule} from "../../integration/types";
     import {listen} from "../../integration/ws";
     import Module from "./Module.svelte";
-    import type {ModuleToggleEvent} from "../../integration/events";
+    import type {KeyboardKeyEvent, ModuleToggleEvent} from "../../integration/events";
     import {fade} from "svelte/transition";
     import {quintOut} from "svelte/easing";
     import {
@@ -96,7 +96,7 @@
         offsetX = e.clientX * (2 / $scaleFactor) - panelConfig.left;
         offsetY = e.clientY * (2 / $scaleFactor) - panelConfig.top;
         panelConfig.zIndex = ++$maxPanelZIndex;
-        
+
         $showGrid = $snappingEnabled && !expandButtonElement.contains(e.target as HTMLElement);
     }
 
@@ -171,17 +171,11 @@
         });
     });
 
-    function handleKeydown(e: KeyboardEvent) {
-        if (e.key === "Shift") {
-            ignoreGrid = true;
+    listen("keyboardKey", (e: KeyboardKeyEvent) => {
+        if (e.key === "key.keyboard.left.shift") {
+            ignoreGrid = e.action === 1;
         }
-    }
-
-    function handleKeyup(e: KeyboardEvent) {
-        if (e.key === "Shift") {
-            ignoreGrid = false;
-        }
-    }
+    });
 
     function snapToGrid(value: number): number {
         if (ignoreGrid || !$snappingEnabled) return value;
@@ -190,7 +184,7 @@
     }
 </script>
 
-<svelte:window on:mouseup={onMouseUp} on:mousemove={onMouseMove} on:keydown={handleKeydown} on:keyup={handleKeyup}/>
+<svelte:window on:mouseup={onMouseUp} on:mousemove={onMouseMove}/>
 
 <div
         class="panel"
@@ -270,10 +264,15 @@
     &.expanded {
       max-height: 545px;
     }
-  }
 
-  .modules::-webkit-scrollbar {
-    width: 0;
+    &::-webkit-scrollbar {
+      width: 2px;
+      height: 2px;
+    }
+
+    &::-webkit-scrollbar-thumb {
+      border-radius: 2px;
+    }
   }
 
   .expand-toggle {

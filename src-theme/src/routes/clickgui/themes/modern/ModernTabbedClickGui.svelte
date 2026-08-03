@@ -28,6 +28,7 @@
     import ModernCommandBar from "./ModernCommandBar.svelte";
     import ModernSearch from "./ModernSearch.svelte";
     import ModernSettings from "./ModernSettings.svelte";
+    import HudEditor from "../../tabs/hud_editor/HudEditor.svelte";
     import {
         MODERN_ANIMATION_STALL_GUARD_MS,
         MODERN_LAYOUT_RESET_DURATION_MS,
@@ -48,6 +49,10 @@
     let resetLayoutVersion = $state(0);
     let clickGuiElement: HTMLElement;
     let renderScaleFactor = $derived(normalizeClickGuiScaleFactor($scaleFactor));
+    let hudEditorActive = $derived($session.view === "hud-editor");
+    let viewportTransform = $derived(hudEditorActive ? "none" : `scale(${renderScaleFactor / 2})`);
+    let viewportWidth = $derived(hudEditorActive ? "100vw" : `${2 / renderScaleFactor * 100}vw`);
+    let viewportHeight = $derived(hudEditorActive ? "100vh" : `${2 / renderScaleFactor * 100}vh`);
 
     $effect(() => {
         $scaleFactor = minecraftScaleFactor * clickGuiScaleFactor;
@@ -165,9 +170,9 @@
         class:grid={$showGrid}
         bind:this={clickGuiElement}
         style="
-          transform: scale({renderScaleFactor / 2});
-          width: {2 / renderScaleFactor * 100}vw;
-          height: {2 / renderScaleFactor * 100}vh;
+          transform: {viewportTransform};
+          width: {viewportWidth};
+          height: {viewportHeight};
           background-size: {$gridSize}px {$gridSize}px;
           --modern-logical-viewport-height: {2 / renderScaleFactor * 100}vh;
           --modern-motion-layout-duration: {MODERN_LAYOUT_RESET_DURATION_MS}ms;
@@ -195,6 +200,8 @@
             <Description/>
             <ModernClickGui {resetLayoutVersion}/>
         </div>
+    {:else if $session.view === "hud-editor"}
+        <HudEditor/>
     {:else}
         <ModernSettings {session}/>
     {/if}

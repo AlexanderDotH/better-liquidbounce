@@ -23,13 +23,13 @@ import net.ccbluex.liquidbounce.api.thirdparty.TheAlteningGeneratedAccount
 import net.ccbluex.liquidbounce.authlib.account.AlteningAccount
 import net.ccbluex.liquidbounce.authlib.account.MinecraftAccount
 import net.ccbluex.liquidbounce.config.gson.adapter.MinecraftAccountAdapter
-import net.ccbluex.liquidbounce.test.assertIs
-import net.ccbluex.liquidbounce.test.assertNotNull
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 import java.util.UUID
+import kotlin.test.assertIs
+import kotlin.test.assertNotNull
 
 class PendingAlteningAccountTest {
 

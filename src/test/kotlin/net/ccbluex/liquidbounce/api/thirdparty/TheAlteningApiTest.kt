@@ -21,10 +21,10 @@ package net.ccbluex.liquidbounce.api.thirdparty
 import com.google.gson.JsonParser
 import net.ccbluex.liquidbounce.api.core.HttpException
 import net.ccbluex.liquidbounce.api.core.HttpMethod
-import net.ccbluex.liquidbounce.test.assertFailsWith
-import net.ccbluex.liquidbounce.test.assertIs
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Test
+import kotlin.test.assertFailsWith
+import kotlin.test.assertIs
 
 class TheAlteningApiTest {
 

@@ -22,11 +22,11 @@
         <div transition:fly|global={{duration: MENU_TRANSITION_MS, y: -MENU_VERTICAL_OFFSET_PX}}>
             <Header/>
         </div>
-
-        <div class="menu-wrapper">
-            <slot/>
-        </div>
     {/if}
+
+    <div class="menu-wrapper">
+        <slot/>
+    </div>
 </div>
 
 <style lang="scss">

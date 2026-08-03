@@ -372,7 +372,7 @@ object PlayerModelHysteriaState {
         val eyes = target.getEyePosition(partialTicks)
         val aimRotation = Rotation.lookingAt(aimPoint(entity), eyes)
         val displayRotation = Rotation(displayHeadYaw, displayPitch)
-        return displayRotation.angleTo(aimRotation) <= COMBAT_LOOK_TOLERANCE
+        return displayRotation.rotationDeltaLengthTo(aimRotation).coerceAtMost(180f) <= COMBAT_LOOK_TOLERANCE
     }
 
     private fun realRotation(target: LivingEntity, partialTicks: Float): ModelRotation {
@@ -413,7 +413,7 @@ object PlayerModelHysteriaState {
             }
 
             val rotationToEntity = Rotation.lookingAt(aimPoint(entity), eyes)
-            val angle = rotation.angleTo(rotationToEntity)
+            val angle = rotation.rotationDeltaLengthTo(rotationToEntity).coerceAtMost(180f)
             if (angle < bestAngle) {
                 bestAngle = angle
                 best = entity

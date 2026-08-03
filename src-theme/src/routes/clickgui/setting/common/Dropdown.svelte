@@ -1,5 +1,5 @@
 <script lang="ts">
-    import {createEventDispatcher} from "svelte";
+    import {createEventDispatcher, tick} from "svelte";
     import {convertToSpacedString, spaceSeperatedNames} from "../../../../theme/theme_config";
     import {shiftDescription} from "./shiftDescription";
 
@@ -12,6 +12,15 @@
 
     let expanded = false;
     let dropdownHead: HTMLElement;
+    let optionsStyle = "";
+
+    function portal(node: HTMLElement) {
+        document.body.appendChild(node);
+
+        return {
+            destroy: () => node.remove()
+        };
+    }
 
     function windowClickHide(e: MouseEvent) {
         if (!dropdownHead.contains(e.target as Node)) {
@@ -21,18 +30,53 @@
 
     function updateValue(v: string) {
         value = v;
+        expanded = false;
         dispatch("change");
+    }
+
+    async function toggleExpanded() {
+        expanded = !expanded;
+        if (!expanded) {
+            return;
+        }
+
+        await tick();
+        updateOptionsPosition();
+    }
+
+    function updateOptionsPosition() {
+        if (!expanded) {
+            return;
+        }
+
+        const bounds = dropdownHead.getBoundingClientRect();
+        const scale = bounds.width / dropdownHead.offsetWidth;
+        optionsStyle = [
+            `left: ${bounds.left}px`,
+            `top: ${bounds.bottom}px`,
+            `width: ${dropdownHead.offsetWidth}px`,
+            `--dropdown-scale: ${scale}`
+        ].join(";");
+    }
+
+    function closeDropdown() {
+        expanded = false;
     }
 </script>
 
-<svelte:window on:click={windowClickHide}/>
+<svelte:window
+        on:click={windowClickHide}
+        on:resize={updateOptionsPosition}
+        on:scroll|capture={closeDropdown}
+/>
 <!-- svelte-ignore a11y-click-events-have-key-events -->
 <!-- svelte-ignore a11y-no-static-element-interactions -->
-<div class="dropdown" class:expanded on:click={() => (expanded = !expanded)}>
+<div class="dropdown" class:expanded>
     <div
             class="head"
             bind:this={dropdownHead}
             use:shiftDescription={{ getText: () => extendedDescriptions?.[value] }}
+            on:click={toggleExpanded}
     >
         {#if name !== null}
             <span class="text">{$spaceSeperatedNames ? convertToSpacedString(name) : name}
@@ -43,7 +87,7 @@
     </div>
 
     {#if expanded}
-        <div class="options">
+        <div class="options" style={optionsStyle} use:portal>
             {#each options as o (o)}
                 <div
                         class="option"
@@ -106,6 +150,8 @@
   }
 
   .options {
+    --dropdown-scale: 1;
+
     padding: var(--clickgui-control-padding, 6px 10px);
     background-color: var(--clickgui-dropdown-background-color);
     border: solid var(--clickgui-dropdown-border-width, 1px) var(--clickgui-dropdown-border-color);
@@ -115,9 +161,11 @@
       0
       var(--clickgui-dropdown-radius, 3px)
       var(--clickgui-dropdown-radius, 3px);
-    z-index: 9999;
-    width: 100%;
-    position: absolute;
+    z-index: 999999;
+    position: fixed;
+    box-sizing: border-box;
+    transform: scale(var(--dropdown-scale));
+    transform-origin: top left;
 
     .option {
       color: var(--clickgui-dropdown-option-color);

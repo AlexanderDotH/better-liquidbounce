@@ -19,8 +19,10 @@
 package net.ccbluex.liquidbounce.injection.mixins.minecraft.render;
 
 import com.llamalad7.mixinextras.injector.ModifyReturnValue;
+import com.llamalad7.mixinextras.sugar.Local;
 import com.mojang.blaze3d.vertex.PoseStack;
 import net.ccbluex.liquidbounce.common.EspMaskCaptureContext;
+import net.ccbluex.liquidbounce.features.module.modules.render.ModuleChams;
 import net.ccbluex.liquidbounce.interfaces.SubmitNodeCollectionAddition;
 import net.ccbluex.liquidbounce.utils.render.NametagSubmitContext;
 import net.ccbluex.liquidbounce.utils.render.PlayerModelNametagHook;
@@ -47,6 +49,7 @@ import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
+import org.spongepowered.asm.mixin.injection.ModifyVariable;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -206,6 +209,30 @@ public abstract class MixinSubmitNodeCollection implements SubmitNodeCollectionA
         if (state != null && PlayerModelNametagHook.shouldSuppressVanillaNameDisplay(state)) {
             ci.cancel();
         }
+    }
+
+    @ModifyVariable(
+        method = "submitModel(Lnet/minecraft/client/model/Model;Ljava/lang/Object;Lcom/mojang/blaze3d/vertex/PoseStack;Lnet/minecraft/client/renderer/rendertype/RenderType;IIILnet/minecraft/client/renderer/texture/TextureAtlasSprite;ILnet/minecraft/client/renderer/feature/ModelFeatureRenderer$CrumblingOverlay;)V",
+        at = @At("HEAD"),
+        argsOnly = true,
+        name = "renderType"
+    )
+    private RenderType remapHeldItemModelRenderType(RenderType renderType) {
+        return ModuleChams.INSTANCE.remapCurrentHeldItemRenderTypeIfNeeded(renderType);
+    }
+
+    @Inject(
+        method = "submitItem",
+        at = @At(
+            value = "INVOKE",
+            target = "Lnet/minecraft/client/renderer/feature/ItemFeatureRenderer$Submit;hasTranslucency()Z"
+        )
+    )
+    private void markHeldItemSubmit(
+        CallbackInfo callbackInfo,
+        @Local(name = "submit") ItemFeatureRenderer.Submit submit
+    ) {
+        ModuleChams.INSTANCE.markHeldItemSubmitIfActive(submit);
     }
 
 }
