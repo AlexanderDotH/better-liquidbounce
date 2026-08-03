@@ -21,12 +21,14 @@ data class GaussianKernel(val centerWeight: Float, val pairs: List<GaussianPair>
     companion object {
         const val MIN_SCREEN_RADIUS = 4f
         const val MAX_SCREEN_RADIUS = 24f
+        const val MIN_SOFTNESS = 0.5f
+        const val MAX_SOFTNESS = 1.5f
         const val PAIR_COUNT = 6
 
-        fun forScreenRadius(radius: Float): GaussianKernel {
+        fun forScreenRadius(radius: Float, softness: Float = 1f): GaussianKernel {
             val halfRadius = radius.coerceIn(MIN_SCREEN_RADIUS, MAX_SCREEN_RADIUS) * 0.5f
             val sampleRadius = ceil(halfRadius).toInt().coerceIn(1, PAIR_COUNT * 2)
-            val sigma = (halfRadius / 3f).coerceAtLeast(0.5f)
+            val sigma = (halfRadius / 3f * softness.coerceIn(MIN_SOFTNESS, MAX_SOFTNESS)).coerceAtLeast(0.5f)
             val discrete = FloatArray(PAIR_COUNT * 2 + 1) { index ->
                 if (index > sampleRadius) 0f else exp((-index * index / (2f * sigma * sigma)).toDouble()).toFloat()
             }

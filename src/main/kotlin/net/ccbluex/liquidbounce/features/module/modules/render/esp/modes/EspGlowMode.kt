@@ -18,4 +18,13 @@
  */
 package net.ccbluex.liquidbounce.features.module.modules.render.esp.modes
 
-object EspGlowMode : EspMode("Glow", requiresTrueSight = true)
+import net.ccbluex.liquidbounce.render.engine.esp.EspGlowStyle
+import net.ccbluex.liquidbounce.render.engine.esp.EspGlowStyleConfig
+
+object EspGlowMode : EspMode("Glow", requiresTrueSight = true) {
+
+    private val styleConfig = EspGlowStyleConfig(this)
+
+    internal val style: EspGlowStyle
+        get() = styleConfig.style
+}

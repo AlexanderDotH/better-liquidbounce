@@ -39,6 +39,10 @@ import net.ccbluex.liquidbounce.render.drawBox
 import net.ccbluex.liquidbounce.render.drawGenericBlockESP
 import net.ccbluex.liquidbounce.render.drawLine
 import net.ccbluex.liquidbounce.render.drawLines
+import net.ccbluex.liquidbounce.render.engine.esp.EspGlowStyle
+import net.ccbluex.liquidbounce.render.engine.esp.EspGlowStyleConfig
+import net.ccbluex.liquidbounce.render.engine.esp.EspOutlineStyle
+import net.ccbluex.liquidbounce.render.engine.esp.EspOutlineStyleConfig
 import net.ccbluex.liquidbounce.render.engine.type.Color4b
 import net.ccbluex.liquidbounce.render.engine.type.Vec3f
 import net.ccbluex.liquidbounce.render.getDynamicTransformsUniform
@@ -346,9 +350,19 @@ object ModuleStorageESP : ClientModule("StorageESP", ModuleCategories.RENDER, al
         }
     }
 
-    object GlowMode : ShaderMode("Glow")
+    object GlowMode : ShaderMode("Glow") {
+        private val styleConfig = EspGlowStyleConfig(this)
 
-    object OutlineMode : ShaderMode("Outline")
+        internal val style: EspGlowStyle
+            get() = styleConfig.style
+    }
+
+    object OutlineMode : ShaderMode("Outline") {
+        private val styleConfig = EspOutlineStyleConfig(this)
+
+        internal val style: EspOutlineStyle
+            get() = styleConfig.style
+    }
 
     @Suppress("unused")
     private val renderHandler = handler<WorldRenderEvent> { event ->

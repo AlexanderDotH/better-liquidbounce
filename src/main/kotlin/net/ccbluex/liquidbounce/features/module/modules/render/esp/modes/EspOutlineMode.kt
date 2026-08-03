@@ -18,5 +18,14 @@
  */
 package net.ccbluex.liquidbounce.features.module.modules.render.esp.modes
 
+import net.ccbluex.liquidbounce.render.engine.esp.EspOutlineStyle
+import net.ccbluex.liquidbounce.render.engine.esp.EspOutlineStyleConfig
+
 @Suppress("unused")
-object EspOutlineMode : EspMode("Outline", requiresTrueSight = true)
+object EspOutlineMode : EspMode("Outline", requiresTrueSight = true) {
+
+    private val styleConfig = EspOutlineStyleConfig(this)
+
+    internal val style: EspOutlineStyle
+        get() = styleConfig.style
+}

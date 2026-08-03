@@ -6,6 +6,11 @@ out vec4 fragColor;
 uniform sampler2D MaskSampler;
 uniform sampler2D BlurSampler;
 
+layout(std140) uniform EspStyleData {
+    vec4 glowParams;
+    vec4 outlineParams;
+};
+
 const vec2 DIRECTIONS[8] = vec2[](
     vec2( 1.0,  0.0), vec2(-1.0,  0.0),
     vec2( 0.0,  1.0), vec2( 0.0, -1.0),
@@ -24,13 +29,13 @@ void main() {
 
     vec4 nearest = vec4(0.0);
     for (int i = 0; i < 8; ++i) {
-        vec4 candidate = texture(MaskSampler, texCoord + DIRECTIONS[i] * texel * 1.25);
+        vec4 candidate = texture(MaskSampler, texCoord + DIRECTIONS[i] * texel * glowParams.x);
         if (candidate.a > nearest.a) nearest = candidate;
     }
 
     float outside = 1.0 - smoothstep(0.02, 0.65, center.a);
-    float haloAlpha = min(0.72, blurred.a * 1.18) * outside;
-    float coreAlpha = smoothstep(0.02, 0.92, nearest.a - center.a) * 0.95;
+    float haloAlpha = clamp(min(0.72, blurred.a * 1.18) * glowParams.y * glowParams.z * outside, 0.0, 1.0);
+    float coreAlpha = smoothstep(0.02, 0.92, nearest.a - center.a) * 0.95 * glowParams.z;
 
     vec4 halo = vec4(straightColor(blurred) * haloAlpha, haloAlpha);
     vec3 coreColor = nearest.a > 0.0001 ? nearest.rgb / nearest.a : straightColor(blurred);

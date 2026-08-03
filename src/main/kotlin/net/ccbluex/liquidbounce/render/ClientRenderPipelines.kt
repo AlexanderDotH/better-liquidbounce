@@ -448,6 +448,7 @@ object ClientRenderPipelines {
             withSampler("MaskSampler")
             withSampler("BlurSampler")
         }
+        withUniformBuffer(ClientUniformDefine.ESP_STYLE)
         withColorTargetState(
             ColorTargetState(
                 optional(BlendFunction.TRANSLUCENT_PREMULTIPLIED_ALPHA),
@@ -463,6 +464,7 @@ object ClientRenderPipelines {
         screenQuadSnippet()
         withFragmentShader(ClientShaders.Fragment.EspOutlineComposite)
         withBindGroupLayout { withSampler("MaskSampler") }
+        withUniformBuffer(ClientUniformDefine.ESP_STYLE)
         withColorTargetState(
             ColorTargetState(
                 optional(BlendFunction.TRANSLUCENT_PREMULTIPLIED_ALPHA),

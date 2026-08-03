@@ -44,4 +44,15 @@ class GaussianKernelTest {
         assertEquals(GaussianKernel.forScreenRadius(4f), GaussianKernel.forScreenRadius(-20f))
         assertEquals(GaussianKernel.forScreenRadius(24f), GaussianKernel.forScreenRadius(200f))
     }
+
+    @Test
+    fun `softness changes the fade while preserving normalization and clamps safely`() {
+        val crisp = GaussianKernel.forScreenRadius(14f, 0.5f)
+        val soft = GaussianKernel.forScreenRadius(14f, 1.5f)
+
+        assertTrue(crisp.centerWeight > soft.centerWeight)
+        assertEquals(1.0, soft.centerWeight + 2.0 * soft.pairs.sumOf { it.weight.toDouble() }, 0.0001)
+        assertEquals(crisp, GaussianKernel.forScreenRadius(14f, -10f))
+        assertEquals(soft, GaussianKernel.forScreenRadius(14f, 10f))
+    }
 }

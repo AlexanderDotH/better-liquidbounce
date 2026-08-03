@@ -20,6 +20,8 @@ import net.ccbluex.liquidbounce.event.events.ClientShutdownEvent
 import net.ccbluex.liquidbounce.event.handler
 import net.ccbluex.liquidbounce.features.module.MinecraftShortcuts
 import net.ccbluex.liquidbounce.features.module.modules.render.ModuleStorageESP
+import net.ccbluex.liquidbounce.features.module.modules.render.esp.modes.EspGlowMode
+import net.ccbluex.liquidbounce.features.module.modules.render.esp.modes.EspOutlineMode
 import net.ccbluex.liquidbounce.interfaces.PreparedFrameAddition
 import net.ccbluex.liquidbounce.render.ClientRenderPipelines
 import net.ccbluex.liquidbounce.render.ClientUniformDefine
@@ -37,8 +39,6 @@ import net.minecraft.client.renderer.feature.FeatureRenderDispatcher
  */
 object EspShaderRenderer : MinecraftShortcuts, EventListener {
 
-    private const val GLOW_RADIUS = 14f
-
     private val glowMask = EspRenderTargetHolder("LiquidBounce ESP Glow Mask", true, GpuFormat.RGBA8_UNORM)
     private val outlineMask = EspRenderTargetHolder("LiquidBounce ESP Outline Mask", true, GpuFormat.RGBA8_UNORM)
     private val blurPing = EspRenderTargetHolder("LiquidBounce ESP Blur Ping", false, GpuFormat.RGBA16_FLOAT)
@@ -47,14 +47,19 @@ object EspShaderRenderer : MinecraftShortcuts, EventListener {
     private val linearSampler = RenderSystem.getSamplerCache().getClampToEdge(FilterMode.LINEAR)
     private val horizontalBlurData = ClientUniformDefine.ESP_BLUR.createSingleBuffer()
     private val verticalBlurData = ClientUniformDefine.ESP_BLUR.createSingleBuffer()
+    private val styleData = ClientUniformDefine.ESP_STYLE.createSingleBuffer()
 
     private var hasGlow = false
     private var hasOutline = false
+    private var glowStyle = EspGlowStyle.DEFAULT
+    private var outlineStyle = EspOutlineStyle.DEFAULT
 
     @JvmStatic
     fun beginFrame() {
         hasGlow = false
         hasOutline = false
+        glowStyle = EspGlowStyle.DEFAULT
+        outlineStyle = EspOutlineStyle.DEFAULT
     }
 
     @JvmStatic
@@ -62,6 +67,15 @@ object EspShaderRenderer : MinecraftShortcuts, EventListener {
         IrisPipelineBypass.run {
             val bridge = preparedFrame as PreparedFrameAddition
             val mainTarget = mc.gameRenderer.mainRenderTarget()
+
+            glowStyle = EspShaderStyleResolver.resolveGlow(
+                EspGlowMode.style.takeIf { EspGlowMode.running },
+                ModuleStorageESP.GlowMode.style.takeIf { ModuleStorageESP.GlowMode.running },
+            )
+            outlineStyle = EspShaderStyleResolver.resolveOutline(
+                EspOutlineMode.style.takeIf { EspOutlineMode.running },
+                ModuleStorageESP.OutlineMode.style.takeIf { ModuleStorageESP.OutlineMode.running },
+            )
 
             val hasGlowNodes = bridge.`liquid_bounce$hasEspGlow`()
             if (hasGlowNodes || ModuleStorageESP.GlowMode.running) {
@@ -94,9 +108,10 @@ object EspShaderRenderer : MinecraftShortcuts, EventListener {
 
         IrisPipelineBypass.run {
             try {
+                writeStyleData()
                 var blurredMask: RenderTarget? = null
                 if (EspPostProcessPass.DOWNSAMPLE in plan) {
-                    blurredMask = downsampleAndBlur(requireNotNull(glowMask.raw))
+                    blurredMask = downsampleAndBlur(requireNotNull(glowMask.raw), glowStyle)
                 }
 
                 if (EspPostProcessPass.GLOW_COMPOSITE in plan) {
@@ -104,6 +119,7 @@ object EspShaderRenderer : MinecraftShortcuts, EventListener {
                         pass.setPipeline(ClientRenderPipelines.EspGlowComposite)
                         pass.bindTexture("MaskSampler", requireNotNull(glowMask.raw).colorTextureView, linearSampler)
                         pass.bindTexture("BlurSampler", requireNotNull(blurredMask).colorTextureView, linearSampler)
+                        pass.setUniform(ClientUniformDefine.ESP_STYLE.uboName, styleData)
                         pass.draw(3, 1, 0, 0)
                     }
                 }
@@ -112,6 +128,7 @@ object EspShaderRenderer : MinecraftShortcuts, EventListener {
                     target.createRenderPass({ "LiquidBounce ESP outline composite" }).use { pass ->
                         pass.setPipeline(ClientRenderPipelines.EspOutlineComposite)
                         pass.bindTexture("MaskSampler", requireNotNull(outlineMask.raw).colorTextureView, linearSampler)
+                        pass.setUniform(ClientUniformDefine.ESP_STYLE.uboName, styleData)
                         pass.draw(3, 1, 0, 0)
                     }
                 }
@@ -122,7 +139,7 @@ object EspShaderRenderer : MinecraftShortcuts, EventListener {
         }
     }
 
-    private fun downsampleAndBlur(mask: RenderTarget): RenderTarget {
+    private fun downsampleAndBlur(mask: RenderTarget, style: EspGlowStyle): RenderTarget {
         val size = EspTargetSize.halfOf(mask.width, mask.height)
         val ping = blurPing.initAndClear(size.width, size.height)
         val pong = blurPong.initAndClear(size.width, size.height)
@@ -133,7 +150,7 @@ object EspShaderRenderer : MinecraftShortcuts, EventListener {
             pass.draw(3, 1, 0, 0)
         }
 
-        writeBlurData(horizontalBlurData, size.width, size.height, horizontal = true)
+        writeBlurData(horizontalBlurData, size.width, size.height, horizontal = true, style)
         pong.createRenderPass({ "LiquidBounce ESP glow horizontal blur" }).use { pass ->
             pass.setPipeline(ClientRenderPipelines.EspGaussianBlur)
             pass.bindTexture("InputSampler", ping.colorTextureView, linearSampler)
@@ -141,7 +158,7 @@ object EspShaderRenderer : MinecraftShortcuts, EventListener {
             pass.draw(3, 1, 0, 0)
         }
 
-        writeBlurData(verticalBlurData, size.width, size.height, horizontal = false)
+        writeBlurData(verticalBlurData, size.width, size.height, horizontal = false, style)
         ping.createRenderPass({ "LiquidBounce ESP glow vertical blur" }).use { pass ->
             pass.setPipeline(ClientRenderPipelines.EspGaussianBlur)
             pass.bindTexture("InputSampler", pong.colorTextureView, linearSampler)
@@ -157,8 +174,9 @@ object EspShaderRenderer : MinecraftShortcuts, EventListener {
         width: Int,
         height: Int,
         horizontal: Boolean,
+        style: EspGlowStyle,
     ) {
-        val kernel = GaussianKernel.forScreenRadius(GLOW_RADIUS)
+        val kernel = GaussianKernel.forScreenRadius(style.radius, style.softness)
         buffer.writeStd140 {
             putVec4(
                 if (horizontal) 1f / width else 0f,
@@ -172,6 +190,13 @@ object EspShaderRenderer : MinecraftShortcuts, EventListener {
         }
     }
 
+    private fun writeStyleData() {
+        styleData.writeStd140 {
+            putVec4(glowStyle.coreSize, glowStyle.intensity, glowStyle.opacity, 0f)
+            putVec4(outlineStyle.thickness, outlineStyle.opacity, 0f, 0f)
+        }
+    }
+
     @Suppress("unused")
     private val shutdownHandler = handler<ClientShutdownEvent> {
         glowMask.close()
@@ -180,5 +205,6 @@ object EspShaderRenderer : MinecraftShortcuts, EventListener {
         blurPong.close()
         horizontalBlurData.buffer().close()
         verticalBlurData.buffer().close()
+        styleData.buffer().close()
     }
 }
