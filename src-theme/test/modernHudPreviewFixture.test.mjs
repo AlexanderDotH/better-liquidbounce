@@ -10,7 +10,7 @@ import {
 
 const SHOWCASE_COMPONENTS = [
     "Watermark",
-    "Text",
+    "Coordinates",
     "KeyBinds",
     "TabGui",
     "ArrayList",
@@ -55,13 +55,17 @@ test("showcase fixture serves every component but enables only the product HUD",
         new Set(enabledComponentNames(components)),
         new Set(SHOWCASE_COMPONENTS),
     );
-    assert.equal(
-        components.find(component => component.name === "Text").settings.text,
-        "XYZ {blockPosition.x} / {blockPosition.y} / {blockPosition.z}",
+    assert.deepEqual(
+        componentPosition(state, "Coordinates"),
+        ["Left", 15, "Top", 60],
     );
     assert.equal(
-        components.find(component => component.name === "Text").settings.container,
-        "Pill",
+        components.find(component => component.name === "Text").settings.text,
+        "Text",
+    );
+    assert.doesNotMatch(
+        components.find(component => component.name === "Text").settings.text,
+        /blockPosition/,
     );
     assert.equal(
         components.find(component => component.name === "InventoryStatistics").settings.rowLength,
@@ -122,6 +126,7 @@ test("serves player, target, scoreboard, effects, inventory, modules, keybinds, 
     const state = createModernHudPreviewState();
     const paths = [
         "/api/v1/client/player",
+        "/api/v1/client/player/contextualBar",
         "/api/v1/client/player/inventory",
         "/api/v1/client/modules",
         "/api/v1/client/keybinds",
@@ -141,6 +146,9 @@ test("serves player, target, scoreboard, effects, inventory, modules, keybinds, 
     assert.ok(responses.every(response => response.status === 200));
     assert.equal(state.player.scoreboard.entries.length, 5);
     assert.equal(state.player.effects.length, 3);
+    assert.equal(state.contextualBar.mode, "locator");
+    assert.ok(state.contextualBar.markers.some(marker => marker.kind === "player"));
+    assert.ok(state.contextualBar.markers.some(marker => marker.kind === "waypoint"));
     assert.equal(state.target.username, "PreviewTarget");
     assert.equal(state.inventory.main.length, 36);
     assert.ok(state.modules.some(module => module.enabled && module.tag));
@@ -197,6 +205,7 @@ test("snapshot events populate event-driven widgets without sharing mutable fixt
         new Set(events.map(event => event.name)),
         new Set([
             "clientPlayerData",
+            "contextualBar",
             "clientPlayerEffect",
             "clientPlayerInventory",
             "targetChange",

@@ -12,28 +12,39 @@
 package net.ccbluex.liquidbounce.integration.theme.component
 
 import net.ccbluex.liquidbounce.features.module.modules.render.HudTheme
-import net.ccbluex.liquidbounce.utils.render.Alignment.ScreenAxisY
+import net.ccbluex.liquidbounce.features.module.modules.render.ModuleHud
+import net.ccbluex.liquidbounce.render.engine.type.BoundingBox2f
 
 private const val MODERN_HOTBAR_ITEM_Y_OFFSET = -8.0
-private const val BASELINE_BOTTOM_VERTICAL_OFFSET = 15
-private const val WEB_HUD_OFFSET_SCALE = 0.5
 
 internal fun resolveHotbarItemYOffset(
     hudTheme: HudTheme,
     bundledHud: Boolean,
-    verticalAlignment: ScreenAxisY,
-    verticalOffset: Int,
 ): Double {
-    if (!bundledHud || hudTheme != HudTheme.MODERN) {
-        return 0.0
-    }
+    return if (bundledHud && hudTheme == HudTheme.MODERN) MODERN_HOTBAR_ITEM_Y_OFFSET else 0.0
+}
 
-    if (verticalAlignment != ScreenAxisY.BOTTOM) {
-        return MODERN_HOTBAR_ITEM_Y_OFFSET
-    }
+object HotbarItemLayout {
 
-    // Browser HUD offsets occupy half a native GUI unit. Keep the legacy anchor at its calibrated baseline,
-    // then compensate when a bottom-aligned Hotbar is moved closer to or farther from the screen edge.
-    val alignmentCorrection = (verticalOffset - BASELINE_BOTTOM_VERTICAL_OFFSET) * WEB_HUD_OFFSET_SCALE
-    return MODERN_HOTBAR_ITEM_Y_OFFSET + alignmentCorrection
+    @JvmStatic
+    fun getYOffset(): Double = resolveHotbarItemYOffset(
+        hudTheme = ModuleHud.theme,
+        bundledHud = isBundledHudRendered(),
+    )
+
+    @JvmStatic
+    fun getBounds(
+        hudComponent: HudComponent,
+        screenWidth: Float,
+        screenHeight: Float,
+    ): BoundingBox2f = resolveWebHudBounds(
+        screenWidth = screenWidth,
+        screenHeight = screenHeight,
+        width = 203f,
+        height = 25f,
+        horizontalAlignment = hudComponent.alignment.horizontalAlignment,
+        horizontalOffset = hudComponent.alignment.horizontalOffset,
+        verticalAlignment = hudComponent.alignment.verticalAlignment,
+        verticalOffset = hudComponent.alignment.verticalOffset,
+    )
 }

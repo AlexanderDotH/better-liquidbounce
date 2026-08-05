@@ -19,7 +19,9 @@
 
 package net.ccbluex.liquidbounce.injection.mixins.minecraft.gui;
 
+import com.mojang.datafixers.util.Pair;
 import net.minecraft.client.gui.Hud;
+import net.minecraft.client.gui.contextualbar.ContextualBar;
 import net.minecraft.resources.Identifier;
 import net.minecraft.world.scores.PlayerScoreEntry;
 import org.spongepowered.asm.mixin.Mixin;
@@ -29,6 +31,9 @@ import java.util.Comparator;
 
 @Mixin(Hud.class)
 public interface MixinHudAccessor {
+
+    @Accessor("contextualInfoBar")
+    Pair<Hud.ContextualInfo, ContextualBar> getContextualInfoBar();
 
     @Accessor("HOTBAR_SELECTION_SPRITE")
     static Identifier getHotbarSelectionTexture() {

@@ -18,13 +18,18 @@
  */
 package net.ccbluex.liquidbounce.features.module.modules.render.nametags
 
+import com.google.gson.JsonObject
 import net.ccbluex.fastutil.Pool
+import net.ccbluex.liquidbounce.config.types.group.Mode
+import net.ccbluex.liquidbounce.config.types.group.ModeValueGroup
 import net.ccbluex.liquidbounce.config.types.CurveValue.Axis.Companion.axis
 import net.ccbluex.liquidbounce.event.events.OverlayRenderEvent
 import net.ccbluex.liquidbounce.event.handler
 import net.ccbluex.liquidbounce.features.module.ClientModule
 import net.ccbluex.liquidbounce.features.module.ModuleCategories
 import net.ccbluex.liquidbounce.render.FontManager
+import net.ccbluex.liquidbounce.render.engine.esp.EspGlowStyleConfig
+import net.ccbluex.liquidbounce.render.engine.type.Color4b
 import net.ccbluex.liquidbounce.utils.combat.shouldBeShown
 import net.ccbluex.liquidbounce.utils.entity.RenderedEntities
 import net.ccbluex.liquidbounce.utils.entity.cameraDistance
@@ -48,8 +53,53 @@ object ModuleNametags : ClientModule("Nametags", ModuleCategories.RENDER) {
         tree(NametagEquipment)
     }
 
-    internal val borderWidth by float("BorderWidth", 1f, 0f..8f)
-    internal val backgroundRadius by float("BackgroundRadius", 2f, 0f..16f)
+    internal val frameModes = modes(this, "Frame", 1) {
+        arrayOf(ClassicFrame, ModernFrame, GlowFrame)
+    }
+
+    internal object ClassicFrame : Mode("Classic") {
+        override val parent: ModeValueGroup<Mode>
+            get() = frameModes
+
+        internal val borderWidth by float("BorderWidth", 1f, 0f..8f)
+        internal val backgroundRadius by float("BackgroundRadius", 2f, 0f..16f)
+    }
+
+    internal object ModernFrame : Mode("Modern") {
+        override val parent: ModeValueGroup<Mode>
+            get() = frameModes
+    }
+
+    internal object GlowFrame : Mode("Glow") {
+        override val parent: ModeValueGroup<Mode>
+            get() = frameModes
+
+        internal val color by color("Color", MODERN_BLUE_ACCENT)
+        private val styleConfig = EspGlowStyleConfig(this)
+        internal val style get() = styleConfig.style
+    }
+
+    internal val frameAppearance: NametagFrameAppearance
+        get() = when (frameModes.activeMode) {
+            ClassicFrame -> resolveNametagFrameAppearance(
+                NametagFrameKind.CLASSIC,
+                ClassicFrame.borderWidth,
+                ClassicFrame.backgroundRadius,
+            )
+            GlowFrame -> resolveNametagFrameAppearance(
+                NametagFrameKind.GLOW,
+                ClassicFrame.borderWidth,
+                ClassicFrame.backgroundRadius,
+                GlowFrame.color,
+                GlowFrame.style,
+            )
+            else -> resolveNametagFrameAppearance(
+                NametagFrameKind.MODERN,
+                ClassicFrame.borderWidth,
+                ClassicFrame.backgroundRadius,
+            )
+        }
+
     internal val scale = curve(
         "Scale",
         mutableListOf(Vector2f(0f, 1f), Vector2f(200f, 1f)),
@@ -63,6 +113,10 @@ object ModuleNametags : ClientModule("Nametags", ModuleCategories.RENDER) {
     private val nametagPool = Pool(::NametagRenderState, NametagRenderState::reset)
 
     private val nametagsToRender = mutableListOf<NametagRenderState>()
+
+    override fun prepareDeserialize(jsonObject: JsonObject) {
+        migrateLegacyNametagFrame(jsonObject)
+    }
 
     override fun onDisabled() {
         RenderedEntities.unsubscribe(this)

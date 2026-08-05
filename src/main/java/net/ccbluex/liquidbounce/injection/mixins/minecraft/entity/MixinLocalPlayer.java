@@ -39,6 +39,8 @@ import net.ccbluex.liquidbounce.features.module.modules.render.ModuleNoSwing;
 import net.ccbluex.liquidbounce.features.module.modules.world.ModuleLiquidPlace;
 import net.ccbluex.liquidbounce.integration.interop.protocol.rest.v1.game.PlayerData;
 import net.ccbluex.liquidbounce.integration.interop.protocol.rest.v1.game.PlayerInventoryData;
+import net.ccbluex.liquidbounce.integration.theme.component.ModernContextualBar;
+import net.ccbluex.liquidbounce.integration.theme.component.ModernContextualBarSnapshot;
 import net.ccbluex.liquidbounce.integration.screen.ScreenManager;
 import net.ccbluex.liquidbounce.interfaces.LocalPlayerAddition;
 import net.ccbluex.liquidbounce.utils.aiming.RotationManager;
@@ -92,6 +94,9 @@ public abstract class MixinLocalPlayer extends MixinPlayer implements LocalPlaye
     private PlayerInventoryData lastKnownInventory = null;
 
     @Unique
+    private ModernContextualBarSnapshot lastKnownContextualBar = null;
+
+    @Unique
     private PlayerNetworkMovementTickEvent eventMotion;
 
     @Unique
@@ -129,6 +134,12 @@ public abstract class MixinLocalPlayer extends MixinPlayer implements LocalPlaye
             EventManager.INSTANCE.callEvent(new ClientPlayerDataEvent(statistics));
         }
         this.lastKnownStatistics = statistics;
+
+        var contextualBar = ModernContextualBar.snapshot();
+        if (lastKnownContextualBar == null || !lastKnownContextualBar.equals(contextualBar)) {
+            EventManager.INSTANCE.callEvent(new ContextualBarEvent(contextualBar));
+        }
+        this.lastKnownContextualBar = contextualBar;
 
         // Call player inventory event when inventory changes
         var playerInventory = PlayerInventoryData.Companion.fromPlayer((LocalPlayer) (Object) this);

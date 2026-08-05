@@ -21,6 +21,8 @@ package net.ccbluex.liquidbounce.integration.theme.component.components
 
 import net.ccbluex.liquidbounce.integration.theme.component.HudComponent
 import net.ccbluex.liquidbounce.integration.theme.component.HudComponentTweak
+import net.ccbluex.liquidbounce.integration.theme.component.WEB_HUD_BASE_SCALE
+import net.ccbluex.liquidbounce.integration.theme.component.resolveWebHudBounds
 import net.ccbluex.liquidbounce.render.engine.type.BoundingBox2f
 import net.ccbluex.liquidbounce.utils.render.Alignment
 
@@ -50,35 +52,16 @@ abstract class NativeHudComponent(
         width: Float = guiScaledWidth,
         height: Float = guiScaledHeight,
     ): BoundingBox2f {
-        val screenWidth = mc.window.guiScaledWidth.toFloat()
-        val screenHeight = mc.window.guiScaledHeight.toFloat()
-        val horizontalOffset = alignment.horizontalOffset / WEB_HUD_BASE_SCALE
-        val verticalOffset = alignment.verticalOffset / WEB_HUD_BASE_SCALE
-
-        val x = when (alignment.horizontalAlignment) {
-            Alignment.ScreenAxisX.LEFT -> horizontalOffset
-            Alignment.ScreenAxisX.CENTER_TRANSLATED -> screenWidth / 2f - width / 2f + horizontalOffset
-            Alignment.ScreenAxisX.RIGHT -> screenWidth - width - horizontalOffset
-            Alignment.ScreenAxisX.CENTER -> screenWidth / 2f + horizontalOffset
-        }
-
-        val y = when (alignment.verticalAlignment) {
-            Alignment.ScreenAxisY.TOP -> verticalOffset
-            Alignment.ScreenAxisY.CENTER_TRANSLATED -> screenHeight / 2f - height / 2f + verticalOffset
-            Alignment.ScreenAxisY.BOTTOM -> screenHeight - height - verticalOffset
-            Alignment.ScreenAxisY.CENTER -> screenHeight / 2f + verticalOffset
-        }
-
-        return BoundingBox2f(x, y, x + width, y + height)
-    }
-
-    private companion object {
-        /**
-         * The browser HUD uses GUI scale 2 as its layout coordinate space and then zooms by
-         * currentGuiScale / 2. Native components have to expose their editor dimensions and
-         * interpret stored offsets in that same coordinate space.
-         */
-        const val WEB_HUD_BASE_SCALE = 2f
+        return resolveWebHudBounds(
+            screenWidth = mc.window.guiScaledWidth.toFloat(),
+            screenHeight = mc.window.guiScaledHeight.toFloat(),
+            width = width,
+            height = height,
+            horizontalAlignment = alignment.horizontalAlignment,
+            horizontalOffset = alignment.horizontalOffset,
+            verticalAlignment = alignment.verticalAlignment,
+            verticalOffset = alignment.verticalOffset,
+        )
     }
 
 }

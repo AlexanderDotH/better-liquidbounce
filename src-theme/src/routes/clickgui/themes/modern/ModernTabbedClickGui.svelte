@@ -201,7 +201,14 @@
             <ModernClickGui {resetLayoutVersion}/>
         </div>
     {:else if $session.view === "hud-editor"}
-        <HudEditor/>
+        <div
+                id="modern-hud-editor-view"
+                class="view-stage"
+                role="region"
+                aria-labelledby="modern-command-hud-editor"
+        >
+            <HudEditor/>
+        </div>
     {:else}
         <ModernSettings {session}/>
     {/if}

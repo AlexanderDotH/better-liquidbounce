@@ -23,12 +23,11 @@
 
     const tabs: readonly {view: ClickGuiView; label: string}[] = [
         {view: "clickgui", label: "ClickGUI"},
-        {view: "hud-editor", label: "HUD Editor"},
         {view: "settings", label: "Settings"},
     ];
 
-    function handleTabKeydown(event: KeyboardEvent): void {
-        const nextView = keyboardView(event.key);
+    function handleTabKeydown(event: KeyboardEvent, currentView: ClickGuiView): void {
+        const nextView = keyboardView(event.key, currentView);
         if (!nextView) {
             return;
         }
@@ -41,7 +40,7 @@
         });
     }
 
-    function keyboardView(key: string): ClickGuiView | null {
+    function keyboardView(key: string, currentView: ClickGuiView): ClickGuiView | null {
         if (key === "Home") {
             return "clickgui";
         }
@@ -54,89 +53,117 @@
             return null;
         }
 
-        return moveClickGuiView(view, key === "ArrowRight" ? 1 : -1);
+        return moveClickGuiView(currentView, key === "ArrowRight" ? 1 : -1);
     }
 </script>
 
-<header class="command-bar" aria-label="ClickGUI command bar">
-    <span class="command-bar-sheen" aria-hidden="true"></span>
+<div class="command-dock">
+    <header class="command-bar" aria-label="ClickGUI command bar">
+        <span class="command-bar-sheen" aria-hidden="true"></span>
 
-    <div class="identity" aria-label="LiquidBounce">
-        <span class="identity-mark" aria-hidden="true">L</span>
-        <span class="identity-name">LiquidBounce</span>
-    </div>
+        <div class="identity" aria-label="LiquidBounce">
+            <span class="identity-mark" aria-hidden="true">L</span>
+            <span class="identity-name">LiquidBounce</span>
+        </div>
 
-    <div
-            class="tabs"
-            class:settings-active={view === "settings"}
-            role="tablist"
-            aria-label="ClickGUI views"
+        <div
+                class="tabs"
+                class:settings-active={view === "settings"}
+                role="tablist"
+                aria-label="ClickGUI views"
+        >
+            {#each tabs as tab (tab.view)}
+                <button
+                        id="modern-command-tab-{tab.view}"
+                        class="tab"
+                        class:active={view === tab.view}
+                        type="button"
+                        role="tab"
+                        aria-selected={view === tab.view}
+                        aria-controls="modern-{tab.view}-view"
+                        tabindex={view === tab.view || (view === "hud-editor" && tab.view === "clickgui") ? 0 : -1}
+                        onclick={() => onViewChange(tab.view)}
+                        onkeydown={event => handleTabKeydown(event, tab.view)}
+                >
+                    {tab.label}
+                </button>
+            {/each}
+        </div>
+
+        <div
+                class="search-region"
+                class:hidden={view !== "clickgui"}
+                aria-hidden={view !== "clickgui"}
+                inert={view !== "clickgui"}
+        >
+            {#if search}
+                {@render search()}
+            {/if}
+        </div>
+
+        <div class="actions">
+            {#if view === "clickgui"}
+                <button
+                        class="action-button"
+                        type="button"
+                        disabled={busy}
+                        aria-label="Reset Modern panel layout"
+                        title="Reset panel layout"
+                        onclick={onResetLayout}
+                >
+                    {#key resetVersion}
+                        <svg
+                                class="reset-icon"
+                                class:resetting={resetVersion > 0}
+                                aria-hidden="true"
+                                viewBox="0 0 20 20"
+                        >
+                            <path d="M15.9 5.2A7 7 0 1 0 17 11h-1.7a5.3 5.3 0 1 1-.8-2.8l-2.2.1V10H18V4.3h-1.7l-.4.9Z"/>
+                        </svg>
+                    {/key}
+                    <span>Reset layout</span>
+                </button>
+            {/if}
+        </div>
+    </header>
+
+    <button
+            id="modern-command-hud-editor"
+            class="hud-editor-island"
+            class:active={view === "hud-editor"}
+            type="button"
+            aria-pressed={view === "hud-editor"}
+            aria-controls="modern-hud-editor-view"
+            title="Open HUD editor"
+            onclick={() => onViewChange("hud-editor")}
     >
-        {#each tabs as tab (tab.view)}
-            <button
-                    id="modern-command-tab-{tab.view}"
-                    class="tab"
-                    class:active={view === tab.view}
-                    type="button"
-                    role="tab"
-                    aria-selected={view === tab.view}
-                    aria-controls="modern-{tab.view}-view"
-                    tabindex={view === tab.view ? 0 : -1}
-                    onclick={() => onViewChange(tab.view)}
-                    onkeydown={handleTabKeydown}
-            >
-                {tab.label}
-            </button>
-        {/each}
-    </div>
-
-    <div
-            class="search-region"
-            class:hidden={view !== "clickgui"}
-            aria-hidden={view !== "clickgui"}
-            inert={view !== "clickgui"}
-    >
-        {#if search}
-            {@render search()}
-        {/if}
-    </div>
-
-    <div class="actions">
-        {#if view === "clickgui"}
-            <button
-                    class="action-button"
-                    type="button"
-                    disabled={busy}
-                    aria-label="Reset Modern panel layout"
-                    title="Reset panel layout"
-                    onclick={onResetLayout}
-            >
-                {#key resetVersion}
-                    <svg
-                            class="reset-icon"
-                            class:resetting={resetVersion > 0}
-                            aria-hidden="true"
-                            viewBox="0 0 20 20"
-                    >
-                        <path d="M15.9 5.2A7 7 0 1 0 17 11h-1.7a5.3 5.3 0 1 1-.8-2.8l-2.2.1V10H18V4.3h-1.7l-.4.9Z"/>
-                    </svg>
-                {/key}
-                <span>Reset layout</span>
-            </button>
-        {/if}
-    </div>
-</header>
+        <svg aria-hidden="true" viewBox="0 0 20 20">
+            <path d="M3 3h6v6H3V3Zm8 0h6v4h-6V3ZM3 11h4v6H3v-6Zm6-2h8v8H9V9Zm2 2v4h4v-4h-4Z"/>
+        </svg>
+        <span class="hud-editor-label">HUD editor</span>
+    </button>
+</div>
 
 <style lang="scss">
-  .command-bar {
+  .command-dock {
     position: absolute;
     z-index: 1000000;
     top: 16px;
-    right: 0;
-    left: 0;
-    width: min(960px, calc(100% - 32px));
+    right: 16px;
+    left: 16px;
+    display: grid;
+    grid-template-columns: minmax(126px, 1fr) minmax(0, 960px) minmax(126px, 1fr);
+    align-items: start;
+    gap: 12px;
+    pointer-events: none;
+  }
+
+  .command-bar {
+    position: relative;
+    grid-column: 2;
+    grid-row: 1;
+    width: 100%;
     min-height: 52px;
-    margin-inline: auto;
     display: grid;
     grid-template-columns: minmax(150px, 1fr) auto minmax(240px, 1.4fr) minmax(150px, 1fr);
     align-items: center;
@@ -148,6 +175,7 @@
     border-radius: 999px;
     box-shadow: 0 10px 28px rgba(0, 0, 0, 0.24);
     overflow: visible;
+    pointer-events: auto;
     animation:
       modern-command-enter
       var(--modern-motion-entrance-duration, 260ms)
@@ -320,12 +348,63 @@
     z-index: 1;
     display: flex;
     justify-content: flex-end;
+    padding-inline-end: 8px;
     animation:
       modern-command-item-enter
       var(--modern-motion-entrance-duration, 260ms)
       var(--modern-motion-entrance-easing, cubic-bezier(0.16, 1, 0.3, 1))
       102ms
       backwards;
+  }
+
+  .hud-editor-island {
+    grid-column: 3;
+    grid-row: 1;
+    min-height: 42px;
+    justify-self: end;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 0 12px;
+    color: var(--modern-text-secondary, #aeb5bf);
+    background: var(--modern-surface-command, rgba(15, 18, 23, 0.96));
+    border: 1px solid var(--modern-border, rgba(255, 255, 255, 0.1));
+    border-radius: 13px;
+    box-shadow: 0 10px 28px rgba(0, 0, 0, 0.24);
+    cursor: pointer;
+    font-family: inherit;
+    font-size: 11px;
+    font-weight: 600;
+    pointer-events: auto;
+    transition:
+      color var(--modern-motion-duration, 140ms) var(--modern-motion-easing, ease),
+      background-color var(--modern-motion-duration, 140ms) var(--modern-motion-easing, ease),
+      border-color var(--modern-motion-duration, 140ms) var(--modern-motion-easing, ease),
+      transform var(--modern-motion-fast, 100ms) var(--modern-motion-easing, ease);
+    animation:
+      modern-command-enter
+      var(--modern-motion-entrance-duration, 260ms)
+      var(--modern-motion-entrance-easing, cubic-bezier(0.16, 1, 0.3, 1))
+      backwards;
+  }
+
+  .hud-editor-island:hover,
+  .hud-editor-island.active {
+    color: #ffffff;
+    background: color-mix(in srgb, var(--accent-color) 14%, var(--modern-surface-command, #0f1217));
+    border-color: color-mix(in srgb, var(--accent-color) 42%, transparent);
+  }
+
+  .hud-editor-island:active {
+    transform: translateY(1px);
+  }
+
+  .hud-editor-island svg {
+    width: 16px;
+    height: 16px;
+    flex: 0 0 auto;
+    fill: currentColor;
   }
 
   .action-button {
@@ -386,7 +465,8 @@
   }
 
   .tab:focus-visible,
-  .action-button:focus-visible {
+  .action-button:focus-visible,
+  .hud-editor-island:focus-visible {
     outline: 2px solid var(--modern-focus-ring, color-mix(in srgb, var(--accent-color) 80%, white));
     outline-offset: 2px;
   }
@@ -397,14 +477,26 @@
     }
 
     .identity-name,
-    .action-button span {
+    .action-button span,
+    .hud-editor-label {
       display: none;
+    }
+
+    .hud-editor-island {
+      width: 42px;
+      padding: 0;
     }
   }
 
   @media (max-width: 680px) {
+    .command-dock {
+      right: 10px;
+      left: 10px;
+      grid-template-columns: minmax(48px, 1fr) minmax(0, 960px) minmax(48px, 1fr);
+      gap: 6px;
+    }
+
     .command-bar {
-      width: calc(100% - 20px);
       grid-template-columns: auto minmax(64px, 1fr) auto;
       gap: 6px;
       padding: 7px;
@@ -465,6 +557,7 @@
   @media (prefers-reduced-motion: reduce) {
     .tab,
     .action-button,
+    .hud-editor-island,
     .search-region,
     .tabs::before,
     .action-button svg {

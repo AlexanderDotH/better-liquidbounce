@@ -25,10 +25,14 @@ import net.ccbluex.liquidbounce.event.handler
 import net.ccbluex.liquidbounce.features.module.ClientModule
 import net.ccbluex.liquidbounce.features.module.ModuleCategories
 import net.ccbluex.liquidbounce.injection.mixins.minecraft.render.MixinLevelRenderer
+import net.ccbluex.liquidbounce.render.WorldRenderEnvironment
 import net.ccbluex.liquidbounce.render.drawBox
 import net.ccbluex.liquidbounce.render.drawBoxSide
 import net.ccbluex.liquidbounce.render.drawShape
 import net.ccbluex.liquidbounce.render.drawShapeSide
+import net.ccbluex.liquidbounce.render.engine.esp.EspGlowStyle
+import net.ccbluex.liquidbounce.render.engine.esp.EspGlowStyleConfig
+import net.ccbluex.liquidbounce.render.engine.esp.EspShaderRenderer
 import net.ccbluex.liquidbounce.render.engine.type.Color4b
 import net.ccbluex.liquidbounce.render.renderEnvironment
 import net.ccbluex.liquidbounce.render.withPositionRelativeToCamera
@@ -39,7 +43,9 @@ import net.minecraft.util.Mth
 import net.minecraft.world.phys.AABB
 import net.minecraft.world.phys.BlockHitResult
 import net.minecraft.world.phys.HitResult
+import net.minecraft.world.phys.Vec3
 import net.minecraft.world.phys.shapes.CollisionContext
+import net.minecraft.world.phys.shapes.VoxelShape
 
 /**
  * Block Outline module
@@ -56,12 +62,20 @@ object ModuleBlockOutline : ClientModule("BlockOutline", ModuleCategories.RENDER
     private val color by color("Color", Color4b(68, 117, 255, 70))
     private val outlineColor by color("Outline", Color4b(68, 117, 255, 150))
 
+    internal object Glow : ToggleableValueGroup(this, "Glow", true) {
+        private val styleConfig = EspGlowStyleConfig(this)
+
+        internal val style: EspGlowStyle
+            get() = styleConfig.style
+    }
+
     private object Slide : ToggleableValueGroup(this, "Slide", true) {
         val time by int("Time", 150, 1..1000, "ms")
         val easing by easing("Easing", Easing.LINEAR)
     }
 
     init {
+        tree(Glow)
         tree(Slide)
     }
 
@@ -99,11 +113,12 @@ object ModuleBlockOutline : ClientModule("BlockOutline", ModuleCategories.RENDER
 
             event.renderEnvironment {
                 withPositionRelativeToCamera(blockPos) {
-                    if (sideOnly) {
-                        drawShapeSide(shape, side, localHitPos, color, outlineColor)
-                    } else {
-                        drawShape(shape, color, outlineColor)
-                    }
+                    drawHighlight(shape, side, localHitPos, color, outlineColor)
+                }
+            }
+            event.renderGlow {
+                withPositionRelativeToCamera(blockPos) {
+                    drawHighlight(shape, side, localHitPos, it, null)
                 }
             }
             return@handler
@@ -135,20 +150,50 @@ object ModuleBlockOutline : ClientModule("BlockOutline", ModuleCategories.RENDER
         val translatedPosition = renderPosition - event.camera.position()
 
         event.renderEnvironment {
-            if (sideOnly) {
-                drawBoxSide(
-                    translatedPosition,
-                    side,
-                    color,
-                    outlineColor,
-                )
-            } else {
-                drawBox(
-                    translatedPosition,
-                    color,
-                    outlineColor,
-                )
-            }
+            drawHighlight(translatedPosition, side, color, outlineColor)
+        }
+        event.renderGlow {
+            drawHighlight(translatedPosition, side, it, null)
+        }
+    }
+
+    private fun WorldRenderEnvironment.drawHighlight(
+        shape: VoxelShape,
+        side: Direction,
+        hitPos: Vec3,
+        faceColor: Color4b?,
+        edgeColor: Color4b?,
+    ) {
+        if (sideOnly) {
+            drawShapeSide(shape, side, hitPos, faceColor, edgeColor)
+        } else {
+            drawShape(shape, faceColor, edgeColor)
+        }
+    }
+
+    private fun WorldRenderEnvironment.drawHighlight(
+        box: AABB,
+        side: Direction,
+        faceColor: Color4b?,
+        edgeColor: Color4b?,
+    ) {
+        if (sideOnly) {
+            drawBoxSide(box, side, faceColor, edgeColor)
+        } else {
+            drawBox(box, faceColor, edgeColor)
+        }
+    }
+
+    private fun WorldRenderEvent.renderGlow(draw: WorldRenderEnvironment.(Color4b) -> Unit) {
+        if (!Glow.running) return
+
+        val maskColor = when {
+            !color.isTransparent -> color.with(a = 255)
+            !outlineColor.isTransparent -> outlineColor.with(a = 255)
+            else -> return
+        }
+        EspShaderRenderer.contributeGlow(this, Glow.style) {
+            draw(maskColor)
         }
     }
 

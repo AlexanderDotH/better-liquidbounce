@@ -217,7 +217,7 @@ object ModuleSuperKnockback : ClientModule("SuperKnockback", ModuleCategories.CO
     private fun shouldStopSprinting(event: AttackEntityEvent): Boolean {
         val enemy = event.entity
 
-        if (!player.isSprinting || !player.wasSprinting) {
+        if (!allowsKnockbackSprintReset(event.keepSprint) || !player.isSprinting || !player.wasSprinting) {
             return false
         }
 
@@ -240,3 +240,5 @@ object ModuleSuperKnockback : ClientModule("SuperKnockback", ModuleCategories.CO
     }
 
 }
+
+internal fun allowsKnockbackSprintReset(keepSprint: Boolean): Boolean = !keepSprint

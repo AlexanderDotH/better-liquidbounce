@@ -19,14 +19,14 @@ import org.junit.jupiter.api.Test
 class LocatorBarSuppressionTest {
 
     @Test
-    fun `bundled modern HUD restores the locator bar`() {
+    fun `bundled modern HUD suppresses native locator pixels for its browser replacement`() {
         val suppress = resolveLocatorBarSuppression(
             tweakEnabled = true,
             hudTheme = HudTheme.MODERN,
             bundledHud = true,
         )
 
-        assertFalse(suppress)
+        assertTrue(suppress)
     }
 
     @Test

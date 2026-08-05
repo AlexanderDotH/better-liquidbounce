@@ -17,6 +17,7 @@ import com.mojang.blaze3d.systems.RenderSystem
 import com.mojang.blaze3d.textures.FilterMode
 import net.ccbluex.liquidbounce.event.EventListener
 import net.ccbluex.liquidbounce.event.events.ClientShutdownEvent
+import net.ccbluex.liquidbounce.event.events.WorldRenderEvent
 import net.ccbluex.liquidbounce.event.handler
 import net.ccbluex.liquidbounce.features.module.MinecraftShortcuts
 import net.ccbluex.liquidbounce.features.module.modules.render.ModuleStorageESP
@@ -25,7 +26,10 @@ import net.ccbluex.liquidbounce.features.module.modules.render.esp.modes.EspOutl
 import net.ccbluex.liquidbounce.interfaces.PreparedFrameAddition
 import net.ccbluex.liquidbounce.render.ClientRenderPipelines
 import net.ccbluex.liquidbounce.render.ClientUniformDefine
+import net.ccbluex.liquidbounce.render.WorldRenderEnvironment
 import net.ccbluex.liquidbounce.render.createRenderPass
+import net.ccbluex.liquidbounce.render.getDynamicTransformsUniform
+import net.ccbluex.liquidbounce.render.mesh.BatchCollector
 import net.ccbluex.liquidbounce.utils.render.withOutputTextureOverride
 import net.ccbluex.liquidbounce.utils.render.writeStd140
 import net.minecraft.client.renderer.feature.FeatureRenderDispatcher
@@ -40,6 +44,11 @@ import net.minecraft.client.renderer.feature.FeatureRenderDispatcher
 object EspShaderRenderer : MinecraftShortcuts, EventListener {
 
     private val glowMask = EspRenderTargetHolder("LiquidBounce ESP Glow Mask", true, GpuFormat.RGBA8_UNORM)
+    private val haloOnlyMask = EspRenderTargetHolder(
+        "LiquidBounce ESP Halo-Only Mask",
+        false,
+        GpuFormat.RGBA8_UNORM,
+    )
     private val outlineMask = EspRenderTargetHolder("LiquidBounce ESP Outline Mask", true, GpuFormat.RGBA8_UNORM)
     private val blurPing = EspRenderTargetHolder("LiquidBounce ESP Blur Ping", false, GpuFormat.RGBA16_FLOAT)
     private val blurPong = EspRenderTargetHolder("LiquidBounce ESP Blur Pong", false, GpuFormat.RGBA16_FLOAT)
@@ -48,17 +57,18 @@ object EspShaderRenderer : MinecraftShortcuts, EventListener {
     private val horizontalBlurData = ClientUniformDefine.ESP_BLUR.createSingleBuffer()
     private val verticalBlurData = ClientUniformDefine.ESP_BLUR.createSingleBuffer()
     private val styleData = ClientUniformDefine.ESP_STYLE.createSingleBuffer()
+    private val haloHorizontalBlurData = ClientUniformDefine.ESP_BLUR.createSingleBuffer()
+    private val haloVerticalBlurData = ClientUniformDefine.ESP_BLUR.createSingleBuffer()
+    private val haloStyleData = ClientUniformDefine.ESP_STYLE.createSingleBuffer()
 
-    private var hasGlow = false
+    private val glowFrameLanes = EspGlowFrameLanes()
     private var hasOutline = false
-    private var glowStyle = EspGlowStyle.DEFAULT
     private var outlineStyle = EspOutlineStyle.DEFAULT
 
     @JvmStatic
     fun beginFrame() {
-        hasGlow = false
+        glowFrameLanes.reset()
         hasOutline = false
-        glowStyle = EspGlowStyle.DEFAULT
         outlineStyle = EspOutlineStyle.DEFAULT
     }
 
@@ -67,79 +77,158 @@ object EspShaderRenderer : MinecraftShortcuts, EventListener {
         IrisPipelineBypass.run {
             val bridge = preparedFrame as PreparedFrameAddition
             val mainTarget = mc.gameRenderer.mainRenderTarget()
+            captureGlow(bridge, mainTarget)
+            captureOutline(bridge, mainTarget)
+        }
+    }
 
-            glowStyle = EspShaderStyleResolver.resolveGlow(
-                EspGlowMode.style.takeIf { EspGlowMode.running },
-                ModuleStorageESP.GlowMode.style.takeIf { ModuleStorageESP.GlowMode.running },
-            )
-            outlineStyle = EspShaderStyleResolver.resolveOutline(
-                EspOutlineMode.style.takeIf { EspOutlineMode.running },
-                ModuleStorageESP.OutlineMode.style.takeIf { ModuleStorageESP.OutlineMode.running },
-            )
+    private fun captureGlow(bridge: PreparedFrameAddition, mainTarget: RenderTarget) {
+        val hasNodes = bridge.`liquid_bounce$hasEspGlow`()
+        if (!hasNodes && !ModuleStorageESP.GlowMode.running) return
 
-            val hasGlowNodes = bridge.`liquid_bounce$hasEspGlow`()
-            if (hasGlowNodes || ModuleStorageESP.GlowMode.running) {
-                val target = glowMask.initAndClear(mainTarget.width, mainTarget.height)
-                if (hasGlowNodes) {
-                    withOutputTextureOverride(target.colorTextureView, target.depthTextureView) {
-                        bridge.`liquid_bounce$executeEspGlow`()
-                    }
-                }
-                hasGlow = hasGlowNodes || ModuleStorageESP.GlowMode.drawMask(target)
+        val target = prepareGlowMask(glowFrameLanes.full, glowMask, mainTarget.width, mainTarget.height)
+        if (hasNodes) {
+            withOutputTextureOverride(target.colorTextureView, target.depthTextureView) {
+                bridge.`liquid_bounce$executeEspGlow`()
             }
+        }
 
-            val hasOutlineNodes = bridge.`liquid_bounce$hasEspOutline`()
-            if (hasOutlineNodes || ModuleStorageESP.OutlineMode.running) {
-                val target = outlineMask.initAndClear(mainTarget.width, mainTarget.height)
-                if (hasOutlineNodes) {
-                    withOutputTextureOverride(target.colorTextureView, target.depthTextureView) {
-                        bridge.`liquid_bounce$executeEspOutline`()
-                    }
-                }
-                hasOutline = hasOutlineNodes || ModuleStorageESP.OutlineMode.drawMask(target)
+        val hasStorageMask = ModuleStorageESP.GlowMode.running && ModuleStorageESP.GlowMode.drawMask(target)
+        if (hasNodes || hasStorageMask) {
+            glowFrameLanes.full.contribute(
+                EspShaderStyleResolver.resolveGlow(
+                    EspGlowMode.style.takeIf { EspGlowMode.running },
+                    ModuleStorageESP.GlowMode.style.takeIf { ModuleStorageESP.GlowMode.running },
+                )
+            )
+        }
+    }
+
+    private fun captureOutline(bridge: PreparedFrameAddition, mainTarget: RenderTarget) {
+        val hasNodes = bridge.`liquid_bounce$hasEspOutline`()
+        if (!hasNodes && !ModuleStorageESP.OutlineMode.running) return
+
+        outlineStyle = EspShaderStyleResolver.resolveOutline(
+            EspOutlineMode.style.takeIf { EspOutlineMode.running },
+            ModuleStorageESP.OutlineMode.style.takeIf { ModuleStorageESP.OutlineMode.running },
+        )
+        val target = outlineMask.initAndClear(mainTarget.width, mainTarget.height)
+        if (hasNodes) {
+            withOutputTextureOverride(target.colorTextureView, target.depthTextureView) {
+                bridge.`liquid_bounce$executeEspOutline`()
             }
+        }
+        val hasStorageMask = ModuleStorageESP.OutlineMode.running && ModuleStorageESP.OutlineMode.drawMask(target)
+        hasOutline = hasNodes || hasStorageMask
+    }
+
+    /**
+     * Appends dynamic world geometry after the prepared feature frame has been captured.
+     * BlockOverlay uses this seam because its interpolated highlight is created by WorldRenderEvent.
+     */
+    internal fun contributeGlow(
+        event: WorldRenderEvent,
+        style: EspGlowStyle,
+        role: EspGlowContributionRole = EspGlowContributionRole.FULL,
+        draw: WorldRenderEnvironment.() -> Unit,
+    ) {
+        IrisPipelineBypass.run {
+            val lane = glowFrameLanes.lane(role)
+            val mask = when (role) {
+                EspGlowContributionRole.FULL -> glowMask
+                EspGlowContributionRole.HALO_ONLY -> haloOnlyMask
+            }
+            val target = prepareGlowMask(lane, mask, event.renderTarget.width, event.renderTarget.height)
+            drawDynamicMask(event, target, draw)
+            glowFrameLanes.contribute(role, style)
         }
     }
 
     @JvmStatic
     fun composite(target: RenderTarget) {
-        val plan = EspPostProcessPlan.create(hasGlow, hasOutline)
+        val plan = EspPostProcessPlan.create(glowFrameLanes.hasAnyContribution, hasOutline)
         if (plan.isEmpty()) return
 
         IrisPipelineBypass.run {
             try {
-                writeStyleData()
-                var blurredMask: RenderTarget? = null
-                if (EspPostProcessPass.DOWNSAMPLE in plan) {
-                    blurredMask = downsampleAndBlur(requireNotNull(glowMask.raw), glowStyle)
+                if (glowFrameLanes.full.hasContribution) {
+                    writeStyleData(styleData, glowFrameLanes.full.style)
+                    val blurredMask = downsampleAndBlur(
+                        mask = requireNotNull(glowMask.raw),
+                        style = glowFrameLanes.full.style,
+                        horizontalData = horizontalBlurData,
+                        verticalData = verticalBlurData,
+                    )
+                    EspCompositePassRenderer.glow(
+                        target = target,
+                        mask = requireNotNull(glowMask.raw),
+                        blurredMask = blurredMask,
+                        styleData = styleData,
+                    )
                 }
 
-                if (EspPostProcessPass.GLOW_COMPOSITE in plan) {
-                    target.createRenderPass({ "LiquidBounce ESP glow composite" }).use { pass ->
-                        pass.setPipeline(ClientRenderPipelines.EspGlowComposite)
-                        pass.bindTexture("MaskSampler", requireNotNull(glowMask.raw).colorTextureView, linearSampler)
-                        pass.bindTexture("BlurSampler", requireNotNull(blurredMask).colorTextureView, linearSampler)
-                        pass.setUniform(ClientUniformDefine.ESP_STYLE.uboName, styleData)
-                        pass.draw(3, 1, 0, 0)
-                    }
+                if (glowFrameLanes.haloOnly.hasContribution) {
+                    writeStyleData(haloStyleData, glowFrameLanes.haloOnly.style)
+                    val blurredMask = downsampleAndBlur(
+                        mask = requireNotNull(haloOnlyMask.raw),
+                        style = glowFrameLanes.haloOnly.style,
+                        horizontalData = haloHorizontalBlurData,
+                        verticalData = haloVerticalBlurData,
+                    )
+                    EspCompositePassRenderer.glow(
+                        target = target,
+                        mask = requireNotNull(haloOnlyMask.raw),
+                        blurredMask = blurredMask,
+                        styleData = haloStyleData,
+                    )
                 }
 
                 if (EspPostProcessPass.OUTLINE_COMPOSITE in plan) {
-                    target.createRenderPass({ "LiquidBounce ESP outline composite" }).use { pass ->
-                        pass.setPipeline(ClientRenderPipelines.EspOutlineComposite)
-                        pass.bindTexture("MaskSampler", requireNotNull(outlineMask.raw).colorTextureView, linearSampler)
-                        pass.setUniform(ClientUniformDefine.ESP_STYLE.uboName, styleData)
-                        pass.draw(3, 1, 0, 0)
+                    if (!glowFrameLanes.full.hasContribution) {
+                        writeStyleData(styleData, EspGlowStyle.DEFAULT)
                     }
+                    EspCompositePassRenderer.outline(target, requireNotNull(outlineMask.raw), styleData)
                 }
             } finally {
-                hasGlow = false
+                glowFrameLanes.reset()
                 hasOutline = false
             }
         }
     }
 
-    private fun downsampleAndBlur(mask: RenderTarget, style: EspGlowStyle): RenderTarget {
+    private fun prepareGlowMask(
+        state: EspGlowFrameState,
+        holder: EspRenderTargetHolder,
+        width: Int,
+        height: Int,
+    ): RenderTarget {
+        val current = holder.raw
+        if (state.prepareMask() || current == null || current.width != width || current.height != height) {
+            return holder.initAndClear(width, height)
+        }
+        return current
+    }
+
+    private fun drawDynamicMask(
+        event: WorldRenderEvent,
+        target: RenderTarget,
+        draw: WorldRenderEnvironment.() -> Unit,
+    ) {
+        val collector = BatchCollector()
+        val environment = WorldRenderEnvironment(target, event.poseStack, event.camera, collector)
+        try {
+            environment.draw()
+        } finally {
+            collector.flush(target, getDynamicTransformsUniform())
+        }
+    }
+
+    private fun downsampleAndBlur(
+        mask: RenderTarget,
+        style: EspGlowStyle,
+        horizontalData: com.mojang.blaze3d.buffers.GpuBufferSlice,
+        verticalData: com.mojang.blaze3d.buffers.GpuBufferSlice,
+    ): RenderTarget {
         val size = EspTargetSize.halfOf(mask.width, mask.height)
         val ping = blurPing.initAndClear(size.width, size.height)
         val pong = blurPong.initAndClear(size.width, size.height)
@@ -150,19 +239,19 @@ object EspShaderRenderer : MinecraftShortcuts, EventListener {
             pass.draw(3, 1, 0, 0)
         }
 
-        writeBlurData(horizontalBlurData, size.width, size.height, horizontal = true, style)
+        writeBlurData(horizontalData, size.width, size.height, horizontal = true, style)
         pong.createRenderPass({ "LiquidBounce ESP glow horizontal blur" }).use { pass ->
             pass.setPipeline(ClientRenderPipelines.EspGaussianBlur)
             pass.bindTexture("InputSampler", ping.colorTextureView, linearSampler)
-            pass.setUniform(ClientUniformDefine.ESP_BLUR.uboName, horizontalBlurData)
+            pass.setUniform(ClientUniformDefine.ESP_BLUR.uboName, horizontalData)
             pass.draw(3, 1, 0, 0)
         }
 
-        writeBlurData(verticalBlurData, size.width, size.height, horizontal = false, style)
+        writeBlurData(verticalData, size.width, size.height, horizontal = false, style)
         ping.createRenderPass({ "LiquidBounce ESP glow vertical blur" }).use { pass ->
             pass.setPipeline(ClientRenderPipelines.EspGaussianBlur)
             pass.bindTexture("InputSampler", pong.colorTextureView, linearSampler)
-            pass.setUniform(ClientUniformDefine.ESP_BLUR.uboName, verticalBlurData)
+            pass.setUniform(ClientUniformDefine.ESP_BLUR.uboName, verticalData)
             pass.draw(3, 1, 0, 0)
         }
 
@@ -190,9 +279,17 @@ object EspShaderRenderer : MinecraftShortcuts, EventListener {
         }
     }
 
-    private fun writeStyleData() {
-        styleData.writeStd140 {
-            putVec4(glowStyle.coreSize, glowStyle.intensity, glowStyle.opacity, 0f)
+    private fun writeStyleData(
+        buffer: com.mojang.blaze3d.buffers.GpuBufferSlice,
+        glowStyle: EspGlowStyle,
+    ) {
+        buffer.writeStd140 {
+            putVec4(
+                glowStyle.coreSize,
+                glowStyle.intensity,
+                glowStyle.opacity,
+                0f,
+            )
             putVec4(outlineStyle.thickness, outlineStyle.opacity, 0f, 0f)
         }
     }
@@ -200,11 +297,58 @@ object EspShaderRenderer : MinecraftShortcuts, EventListener {
     @Suppress("unused")
     private val shutdownHandler = handler<ClientShutdownEvent> {
         glowMask.close()
+        haloOnlyMask.close()
         outlineMask.close()
         blurPing.close()
         blurPong.close()
         horizontalBlurData.buffer().close()
         verticalBlurData.buffer().close()
         styleData.buffer().close()
+        haloHorizontalBlurData.buffer().close()
+        haloVerticalBlurData.buffer().close()
+        haloStyleData.buffer().close()
+    }
+}
+
+internal enum class EspGlowContributionRole {
+    FULL,
+    HALO_ONLY,
+}
+
+private object EspCompositePassRenderer {
+
+    private val linearSampler = RenderSystem.getSamplerCache().getClampToEdge(FilterMode.LINEAR)
+
+    fun glow(
+        target: RenderTarget,
+        mask: RenderTarget,
+        blurredMask: RenderTarget,
+        styleData: com.mojang.blaze3d.buffers.GpuBufferSlice,
+    ) {
+        target.createRenderPass({ "LiquidBounce ESP glow composite" }).use { pass ->
+            pass.setPipeline(ClientRenderPipelines.EspGlowComposite)
+            pass.bindTexture("MaskSampler", mask.colorTextureView, linearSampler)
+            pass.bindTexture("BlurSampler", blurredMask.colorTextureView, linearSampler)
+            pass.bindTexture(
+                "CoreExclusionSampler",
+                mask.colorTextureView,
+                linearSampler,
+            )
+            pass.setUniform(ClientUniformDefine.ESP_STYLE.uboName, styleData)
+            pass.draw(3, 1, 0, 0)
+        }
+    }
+
+    fun outline(
+        target: RenderTarget,
+        mask: RenderTarget,
+        styleData: com.mojang.blaze3d.buffers.GpuBufferSlice,
+    ) {
+        target.createRenderPass({ "LiquidBounce ESP outline composite" }).use { pass ->
+            pass.setPipeline(ClientRenderPipelines.EspOutlineComposite)
+            pass.bindTexture("MaskSampler", mask.colorTextureView, linearSampler)
+            pass.setUniform(ClientUniformDefine.ESP_STYLE.uboName, styleData)
+            pass.draw(3, 1, 0, 0)
+        }
     }
 }

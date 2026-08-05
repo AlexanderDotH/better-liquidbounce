@@ -1,6 +1,7 @@
 import type {
     ClientInfo,
     ConfigurableSetting,
+    ContextualBarData,
     GameWindow,
     HudComponent,
     ItemStack,
@@ -29,6 +30,7 @@ export interface ModernHudPreviewState {
     fixture: ModernHudPreviewFixture;
     metadata: Metadata;
     components: HudComponent[];
+    contextualBar: ContextualBarData;
     modules: Module[];
     hudSettings: ConfigurableSetting;
     player: PlayerData;
@@ -44,7 +46,7 @@ const API_PREFIX = "/api/v1/client";
 
 const SHOWCASE_COMPONENTS = new Set([
     "Watermark",
-    "Text",
+    "Coordinates",
     "KeyBinds",
     "TabGui",
     "ArrayList",
@@ -85,6 +87,7 @@ export function createModernHudPreviewState(
         fixture,
         metadata,
         components: createComponents(metadata.components, fixture),
+        contextualBar: createContextualBar(),
         modules: createModules(),
         hudSettings: createHudSettings(),
         player,
@@ -124,6 +127,10 @@ export async function routeModernHudPreviewRequest(
 
     if (route === `GET ${API_PREFIX}/player`) {
         return jsonResponse(state.player);
+    }
+
+    if (route === `GET ${API_PREFIX}/player/contextualBar`) {
+        return jsonResponse(state.contextualBar);
     }
 
     if (route === `GET ${API_PREFIX}/player/inventory`) {
@@ -175,6 +182,10 @@ export function createModernHudPreviewSnapshotEvents(
             event: {playerData: state.player},
         },
         {
+            name: "contextualBar",
+            event: {contextualBar: state.contextualBar},
+        },
+        {
             name: "clientPlayerEffect",
             event: {effects: state.player.effects},
         },
@@ -210,6 +221,50 @@ export function createModernHudPreviewSnapshotEvents(
             },
         },
     ]);
+}
+
+function createContextualBar(): ContextualBarData {
+    return {
+        mode: "locator",
+        progress: 0,
+        level: 0,
+        cooldown: false,
+        markers: [
+            {
+                id: "00000000-0000-4000-a000-000000000002",
+                label: "PreviewTarget",
+                offset: -0.34,
+                elevation: "above",
+                distance: 42,
+                color: 0x7897D6,
+                kind: "player",
+                playerUuid: "00000000-0000-4000-a000-000000000002",
+                style: "minecraft:default",
+            },
+            {
+                id: "preview:home",
+                label: "Home",
+                offset: 0.26,
+                elevation: "level",
+                distance: 118,
+                color: 0x64C6B0,
+                kind: "waypoint",
+                playerUuid: null,
+                style: "minecraft:default",
+            },
+            {
+                id: "preview:party",
+                label: "Party",
+                offset: 0.72,
+                elevation: "below",
+                distance: 306,
+                color: 0xD88FC2,
+                kind: "waypoint",
+                playerUuid: null,
+                style: "minecraft:bowtie",
+            },
+        ],
+    };
 }
 
 async function routeHudSettings(
@@ -276,6 +331,7 @@ function createMetadata(): Metadata {
         "Taco",
         "Image",
         "Text",
+        "Coordinates",
         "KeyBinds",
     ];
 
@@ -349,8 +405,8 @@ function createComponents(
         },
         Text: {
             ...positioned("Left", 20, "Top", 76),
-            text: "XYZ {blockPosition.x} / {blockPosition.y} / {blockPosition.z}",
-            container: "Pill",
+            text: "Text",
+            container: "Plain",
             color: 4294967295,
             font: "Inter",
             size: 12,
@@ -374,6 +430,7 @@ function createComponents(
                 color: 4294967295,
             },
         },
+        Coordinates: positioned("Left", 15, "Top", 60),
         KeyBinds: positioned("Left", 20, "Top", 106),
     };
 

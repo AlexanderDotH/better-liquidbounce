@@ -22,6 +22,7 @@
     import Effects from "./elements/Effects.svelte";
     import BlockCounter from "./elements/BlockCounter.svelte";
     import Text from "./elements/Text.svelte";
+    import Coordinates from "./elements/Coordinates.svelte";
     import DraggableComponent from "./elements/DraggableComponent.svelte";
     import KeyBinds from "./elements/KeyBinds.svelte";
     import ClosedCaptions from "./elements/ClosedCaptions.svelte";
@@ -123,7 +124,7 @@
                 {:else if c.name === "BlockCounter"}
                     <BlockCounter settings={c.settings}/>
                 {:else if c.name === "Hotbar"}
-                    <HotBar/>
+                    <HotBar presentation={presentation}/>
                 {:else if c.name === "Scoreboard"}
                     <Scoreboard settings={c.settings}/>
                 {:else if c.name === "ArmorItems"}
@@ -170,6 +171,8 @@
                     <Effects/>
                 {:else if c.name === "Text"}
                     <Text settings={c.settings}/>
+                {:else if c.name === "Coordinates"}
+                    <Coordinates/>
                 {:else if c.name === "Image"}
                     <Image componentId={c.id} settings={c.settings}/>
                 {:else if c.name === "KeyBinds"}

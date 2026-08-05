@@ -35,12 +35,13 @@ class EspShaderCustomizationTest {
     }
 
     @Test
-    fun `shared masks resolve simultaneous sources to the stronger style`() {
+    fun `shared masks resolve player storage and block overlay to the stronger style`() {
         assertEquals(
-            EspGlowStyle(radius = 20f, softness = 1.25f, intensity = 1.4f, coreSize = 2f, opacity = 0.9f),
+            EspGlowStyle(radius = 22f, softness = 1.25f, intensity = 1.6f, coreSize = 2f, opacity = 0.9f),
             EspShaderStyleResolver.resolveGlow(
                 EspGlowStyle(radius = 20f, softness = 0.75f, intensity = 0.8f, coreSize = 2f, opacity = 0.6f),
                 EspGlowStyle(radius = 10f, softness = 1.25f, intensity = 1.4f, coreSize = 0.5f, opacity = 0.9f),
+                EspGlowStyle(radius = 22f, softness = 0.5f, intensity = 1.6f, coreSize = 1f, opacity = 0.7f),
             ),
         )
         assertEquals(
@@ -59,10 +60,14 @@ class EspShaderCustomizationTest {
         val expectedGlow = listOf("Radius", "Softness", "Intensity", "CoreSize", "Opacity")
         val expectedOutline = listOf("Thickness", "Opacity")
         val storageGlowSchema = ValueGroup("Glow").also { EspGlowStyleConfig(it) }
+        val tracerHaloSchema = ValueGroup("Glow")
+        val tracerHaloConfig = EspHaloStyleConfig(tracerHaloSchema)
         val storageOutlineSchema = ValueGroup("Outline").also { EspOutlineStyleConfig(it) }
 
         assertEquals(expectedGlow, EspGlowMode.inner.map { it.name })
         assertEquals(expectedGlow, storageGlowSchema.inner.map { it.name })
+        assertEquals(listOf("Radius", "Softness", "Intensity", "Opacity"), tracerHaloSchema.inner.map { it.name })
+        assertEquals(0f, tracerHaloConfig.style.coreSize)
         assertEquals(expectedOutline, EspOutlineMode.inner.map { it.name })
         assertEquals(expectedOutline, storageOutlineSchema.inner.map { it.name })
 

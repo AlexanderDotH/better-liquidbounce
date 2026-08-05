@@ -94,14 +94,14 @@ test("Text exposes an opt-in Plain or Pill container with a legacy-safe Plain fa
     );
 });
 
-test("Modern HUD preview opts its coordinate Text into the Pill container", () => {
+test("Modern HUD preview uses Coordinates without changing reusable Text behavior", () => {
     const fixture = readFileSync(
         new URL("previewFixture.ts", previewRoot),
         "utf8",
     );
 
-    assert.match(
-        fixture,
-        /Text:\s*\{[\s\S]*?text:\s*"XYZ \{blockPosition\.x\} \/ \{blockPosition\.y\} \/ \{blockPosition\.z\}"[\s\S]*?container:\s*"Pill"/,
-    );
+    assert.match(fixture, /"Coordinates"/);
+    assert.match(fixture, /Coordinates:\s*positioned\("Left",\s*15,\s*"Top",\s*60\)/);
+    assert.doesNotMatch(fixture, /XYZ \{blockPosition\.x\}/);
+    assert.match(fixture, /Text:\s*\{[\s\S]*?text:\s*"Text"[\s\S]*?container:\s*"Plain"/);
 });

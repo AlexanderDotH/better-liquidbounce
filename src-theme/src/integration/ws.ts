@@ -12,6 +12,7 @@ function connect() {
     ws.onopen = () => {
         console.log("[WS] Connected to server");
         alwaysListeners.get("socketReady")?.forEach(callback => callback());
+        listeners.get("socketReady")?.forEach(callback => callback());
     };
 
     ws.onclose = () => {

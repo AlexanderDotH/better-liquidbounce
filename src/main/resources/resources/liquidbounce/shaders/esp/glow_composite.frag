@@ -5,6 +5,7 @@ out vec4 fragColor;
 
 uniform sampler2D MaskSampler;
 uniform sampler2D BlurSampler;
+uniform sampler2D CoreExclusionSampler;
 
 layout(std140) uniform EspStyleData {
     vec4 glowParams;
@@ -29,7 +30,10 @@ void main() {
 
     vec4 nearest = vec4(0.0);
     for (int i = 0; i < 8; ++i) {
-        vec4 candidate = texture(MaskSampler, texCoord + DIRECTIONS[i] * texel * glowParams.x);
+        vec2 sampleCoord = texCoord + DIRECTIONS[i] * texel * glowParams.x;
+        vec4 candidate = texture(MaskSampler, sampleCoord);
+        float exclusion = texture(CoreExclusionSampler, sampleCoord).a * glowParams.w;
+        candidate *= 1.0 - smoothstep(0.02, 0.65, exclusion);
         if (candidate.a > nearest.a) nearest = candidate;
     }
 

@@ -36,13 +36,17 @@ import net.ccbluex.liquidbounce.features.module.modules.render.ModuleFreeCam;
 import net.ccbluex.liquidbounce.features.module.modules.render.ModuleHud;
 import net.ccbluex.liquidbounce.features.module.modules.render.crosshair.ModuleCrosshair;
 import net.ccbluex.liquidbounce.integration.theme.component.HudComponent;
+import net.ccbluex.liquidbounce.integration.theme.component.ClientPlayerLocatorBar;
+import net.ccbluex.liquidbounce.integration.theme.component.HotbarItemLayout;
 import net.ccbluex.liquidbounce.integration.theme.component.HudComponentManager;
 import net.ccbluex.liquidbounce.integration.theme.component.HudComponentTweak;
+import net.ccbluex.liquidbounce.integration.theme.component.ModernContextualBar;
 import net.minecraft.client.CameraType;
 import net.minecraft.client.DeltaTracker;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.Hud;
+import net.minecraft.client.gui.contextualbar.ContextualBar;
 import net.minecraft.client.multiplayer.MultiPlayerGameMode;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.Identifier;
@@ -162,10 +166,59 @@ public abstract class MixinHud {
 
     @ModifyReturnValue(method = "nextContextualInfoState", at = @At("RETURN"))
     private Hud.ContextualInfo tweakExpBar(Hud.ContextualInfo original) {
-        if (HudComponentManager.isTweakEnabled(HudComponentTweak.DISABLE_EXP_BAR) && original == Hud.ContextualInfo.EXPERIENCE) {
-            return Hud.ContextualInfo.EMPTY;
+        return ModernContextualBar.resolveForPresentation(
+                original,
+                HudComponentManager.isTweakEnabled(HudComponentTweak.DISABLE_EXP_BAR)
+        );
+    }
+
+    @ModifyExpressionValue(
+            method = "nextContextualInfoState",
+            at = @At(
+                    value = "INVOKE",
+                    target = "Lnet/minecraft/client/waypoints/ClientWaypointManager;hasWaypoints()Z"
+            )
+    )
+    private boolean hookClientPlayerLocatorBar(boolean serverHasWaypoints) {
+        return ClientPlayerLocatorBar.shouldShowLocator(serverHasWaypoints);
+    }
+
+    @WrapOperation(
+            method = "extractHotbarAndDecorations",
+            at = @At(
+                    value = "INVOKE",
+                    target = "Lnet/minecraft/client/gui/contextualbar/ContextualBar;extractBackground(" +
+                            "Lnet/minecraft/client/gui/GuiGraphicsExtractor;Lnet/minecraft/client/DeltaTracker;)V"
+            )
+    )
+    private void hideNativeContextualBackground(
+            ContextualBar contextualBar,
+            GuiGraphicsExtractor context,
+            DeltaTracker tickCounter,
+            Operation<Void> original
+    ) {
+        if (!ModernContextualBar.shouldRenderInBrowser()) {
+            original.call(contextualBar, context, tickCounter);
         }
-        return original;
+    }
+
+    @WrapOperation(
+            method = "extractHotbarAndDecorations",
+            at = @At(
+                    value = "INVOKE",
+                    target = "Lnet/minecraft/client/gui/contextualbar/ContextualBar;extractRenderState(" +
+                            "Lnet/minecraft/client/gui/GuiGraphicsExtractor;Lnet/minecraft/client/DeltaTracker;)V"
+            )
+    )
+    private void hideNativeContextualContents(
+            ContextualBar contextualBar,
+            GuiGraphicsExtractor context,
+            DeltaTracker tickCounter,
+            Operation<Void> original
+    ) {
+        if (!ModernContextualBar.shouldRenderInBrowser()) {
+            original.call(contextualBar, context, tickCounter);
+        }
     }
 
     @WrapOperation(method = "extractHotbarAndDecorations", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/multiplayer/MultiPlayerGameMode;hasExperience()Z"))
@@ -211,16 +264,16 @@ public abstract class MixinHud {
             return;
         }
 
-        // All values are measured, not calculated (with scale 2)
-        // TODO: fix scaled positions
-        final float guiScale = this.minecraft.getWindow().getGuiScale();
-
         float slotWidth = 22.5F;
         int offset = 98;
-        var bounds = hudComponent.getAlignment().getBounds(203f, 25f);
+        var bounds = HotbarItemLayout.getBounds(
+                hudComponent,
+                context.guiWidth(),
+                context.guiHeight()
+        );
 
-        int xCenter = (int) bounds.xCenter();
-        double y = bounds.yMin() + 5f + HudComponentManager.getHotbarItemYOffset(hudComponent);
+        float xCenter = bounds.xCenter();
+        double y = bounds.yMin() + 5f + HotbarItemLayout.getYOffset();
 
         int seed = 1;
         List<ItemStack> items = playerEntity.getInventory().getNonEquipmentItems();
@@ -231,7 +284,8 @@ public abstract class MixinHud {
 
         ItemStack offHandStack = playerEntity.getOffhandItem();
         if (!hookOffhandItem(offHandStack.isEmpty())) {
-            this.extractSlot(context, xCenter - offset - 32, (int) y, tickCounter, playerEntity, offHandStack, seed);
+            this.extractSlot(context, (int) (xCenter - offset - 32), (int) y,
+                    tickCounter, playerEntity, offHandStack, seed);
         }
     }
 

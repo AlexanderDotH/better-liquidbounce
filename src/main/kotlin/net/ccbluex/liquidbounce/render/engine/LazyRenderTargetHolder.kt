@@ -69,6 +69,7 @@ class LazyRenderTargetHolder private constructor(
         if (current == null) {
             val new = TextureTarget(name, width, height, depthFormat != null, colorFormat)
             this.raw = new
+            new.clearColorAndDepth()
             return new
         } else {
             if (width != current.width || height != current.height) {

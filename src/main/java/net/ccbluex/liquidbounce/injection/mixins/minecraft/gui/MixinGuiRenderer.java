@@ -26,6 +26,7 @@ import com.llamalad7.mixinextras.sugar.Local;
 import com.mojang.blaze3d.pipeline.RenderPipeline;
 import com.mojang.blaze3d.pipeline.RenderTarget;
 import net.ccbluex.liquidbounce.render.engine.BlurEffectRenderer;
+import net.ccbluex.liquidbounce.render.engine.gui.GuiGlowRenderer;
 import net.ccbluex.liquidbounce.render.gui.GuiCircleLutAtlas;
 import net.minecraft.client.gui.render.GuiRenderer;
 import net.minecraft.client.renderer.GameRenderer;
@@ -50,11 +51,16 @@ public abstract class MixinGuiRenderer {
     )
     private RenderTarget injectBlurRenderTarget(GameRenderer instance, Operation<RenderTarget> original) {
         BlurEffectRenderer blurEffectRenderer = BlurEffectRenderer.INSTANCE;
+        RenderTarget destination;
         if (blurEffectRenderer.shouldDrawBlur()) {
             blurEffectRenderer.setDrawingHudFramebuffer(true);
-            return blurEffectRenderer.getOverlayRenderTargetHolder().initAndGet();
+            destination = blurEffectRenderer.getOverlayRenderTargetHolder().initAndGet();
+        } else {
+            destination = original.call(instance);
         }
-        return original.call(instance);
+
+        GuiGlowRenderer.composite(destination);
+        return destination;
     }
 
     @Inject(

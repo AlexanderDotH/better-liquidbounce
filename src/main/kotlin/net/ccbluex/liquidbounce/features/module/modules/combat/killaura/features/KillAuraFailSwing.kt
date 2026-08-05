@@ -63,7 +63,7 @@ internal object KillAuraFailSwing : ToggleableValueGroup(ModuleKillAura, "FailSw
         currentAdditionalRange = this.additionalRange.random()
     }
 
-    fun dealWithFakeSwing(target: Entity?) {
+    suspend fun dealWithFakeSwing(target: Entity?) {
         if (!enabled || !canAttackNow()) {
             return
         }

@@ -12,6 +12,7 @@
 package net.ccbluex.liquidbounce.integration.theme.component
 
 import net.ccbluex.liquidbounce.features.module.modules.render.HudTheme
+import net.ccbluex.liquidbounce.utils.render.Alignment.ScreenAxisX
 import net.ccbluex.liquidbounce.utils.render.Alignment.ScreenAxisY
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Test
@@ -19,86 +20,67 @@ import org.junit.jupiter.api.Test
 class HotbarItemAlignmentTest {
 
     @Test
-    fun `bundled modern HUD compensates a bottom hotbar saved at zero offset`() {
-        val itemOffset = resolveHotbarItemYOffset(
-            hudTheme = HudTheme.MODERN,
-            bundledHud = true,
+    fun `moving a bottom hotbar moves its native items in browser layout coordinates`() {
+        val defaultBounds = resolveWebHudBounds(
+            screenWidth = 400f,
+            screenHeight = 200f,
+            width = 203f,
+            height = 25f,
+            horizontalAlignment = ScreenAxisX.CENTER_TRANSLATED,
+            horizontalOffset = 0,
             verticalAlignment = ScreenAxisY.BOTTOM,
-            verticalOffset = 0,
+            verticalOffset = 15,
         )
+        val movedBounds = resolveWebHudBounds(
+            screenWidth = 400f,
+            screenHeight = 200f,
+            width = 203f,
+            height = 25f,
+            horizontalAlignment = ScreenAxisX.CENTER_TRANSLATED,
+            horizontalOffset = 0,
+            verticalAlignment = ScreenAxisY.BOTTOM,
+            verticalOffset = 30,
+        )
+        val itemOffset = resolveHotbarItemYOffset(HudTheme.MODERN, bundledHud = true)
 
-        assertEquals(-15.5, itemOffset)
-        assertEquals(72, resolveBottomItemY(screenHeight = 100, verticalOffset = 0, itemOffset = itemOffset))
+        assertEquals(-8.0, itemOffset)
+        assertEquals(164.5, resolveItemY(defaultBounds.yMin, itemOffset))
+        assertEquals(157.0, resolveItemY(movedBounds.yMin, itemOffset))
     }
 
     @Test
-    fun `bundled modern HUD preserves its correction at the default bottom offset`() {
-        val itemOffset = resolveHotbarItemYOffset(
-            hudTheme = HudTheme.MODERN,
-            bundledHud = true,
+    fun `horizontal offsets use the same fixed browser layout scale`() {
+        val centered = resolveWebHudBounds(
+            screenWidth = 400f,
+            screenHeight = 200f,
+            width = 203f,
+            height = 25f,
+            horizontalAlignment = ScreenAxisX.CENTER_TRANSLATED,
+            horizontalOffset = 0,
+            verticalAlignment = ScreenAxisY.BOTTOM,
+            verticalOffset = 15,
+        )
+        val moved = resolveWebHudBounds(
+            screenWidth = 400f,
+            screenHeight = 200f,
+            width = 203f,
+            height = 25f,
+            horizontalAlignment = ScreenAxisX.CENTER_TRANSLATED,
+            horizontalOffset = 20,
             verticalAlignment = ScreenAxisY.BOTTOM,
             verticalOffset = 15,
         )
 
-        assertEquals(-8.0, itemOffset)
-        assertEquals(65, resolveBottomItemY(screenHeight = 100, verticalOffset = 15, itemOffset = itemOffset))
+        assertEquals(200f, centered.xCenter)
+        assertEquals(210f, moved.xCenter)
     }
 
     @Test
-    fun `bundled modern HUD keeps moved bottom hotbars aligned`() {
-        val itemOffset = resolveHotbarItemYOffset(
-            hudTheme = HudTheme.MODERN,
-            bundledHud = true,
-            verticalAlignment = ScreenAxisY.BOTTOM,
-            verticalOffset = 30,
-        )
-
-        assertEquals(-0.5, itemOffset)
-        assertEquals(57, resolveBottomItemY(screenHeight = 100, verticalOffset = 30, itemOffset = itemOffset))
+    fun `modern translation is constant while classic and external HUDs remain unchanged`() {
+        assertEquals(-8.0, resolveHotbarItemYOffset(HudTheme.MODERN, bundledHud = true))
+        assertEquals(0.0, resolveHotbarItemYOffset(HudTheme.CLASSIC, bundledHud = true))
+        assertEquals(0.0, resolveHotbarItemYOffset(HudTheme.MODERN, bundledHud = false))
     }
 
-    @Test
-    fun `non-bottom modern hotbars retain the visual theme translation`() {
-        ScreenAxisY.entries.filterNot { it == ScreenAxisY.BOTTOM }.forEach { verticalAlignment ->
-            assertEquals(
-                -8.0,
-                resolveHotbarItemYOffset(
-                    hudTheme = HudTheme.MODERN,
-                    bundledHud = true,
-                    verticalAlignment = verticalAlignment,
-                    verticalOffset = 0,
-                ),
-            )
-        }
-    }
-
-    @Test
-    fun `classic and external HUDs keep their existing native item correction`() {
-        ScreenAxisY.entries.forEach { verticalAlignment ->
-            assertEquals(
-                0.0,
-                resolveHotbarItemYOffset(
-                    hudTheme = HudTheme.CLASSIC,
-                    bundledHud = true,
-                    verticalAlignment = verticalAlignment,
-                    verticalOffset = 0,
-                ),
-            )
-            assertEquals(
-                0.0,
-                resolveHotbarItemYOffset(
-                    hudTheme = HudTheme.MODERN,
-                    bundledHud = false,
-                    verticalAlignment = verticalAlignment,
-                    verticalOffset = 0,
-                ),
-            )
-        }
-    }
-
-    private fun resolveBottomItemY(
-        screenHeight: Int,
-        verticalOffset: Int,
-        itemOffset: Double,
-    ): Int = (screenHeight - verticalOffset - 12 + itemOffset).toInt()
+    private fun resolveItemY(boundsY: Float, itemOffset: Double): Double = boundsY + 5.0 + itemOffset
 }

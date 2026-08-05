@@ -37,3 +37,23 @@ test("Modern hotbar selection frame moves smoothly while Classic remains immedia
     assert.match(modern, /@media\s*\(prefers-reduced-motion:\s*reduce\)[\s\S]*--modern-hud-motion:\s*0ms/);
     assert.doesNotMatch(modern, /transition[^;]*infinite/);
 });
+
+test("Modern hotbar owns one contextual island while Classic keeps its current XP row", () => {
+    const hud = read("Hud.svelte");
+    const hotbar = read("elements/hotbar/HotBar.svelte");
+    const contextual = read("elements/hotbar/ModernContextualBar.svelte");
+
+    assert.match(hud, /<HotBar\s+presentation=\{presentation\}\s*\/>/);
+    assert.match(hotbar, /export let presentation:\s*"classic" \| "modern"/);
+    assert.match(hotbar, /<ModernContextualBar\s+data=\{contextualBar\}/);
+    assert.match(
+        hotbar,
+        /ModernContextualBar[\s\S]*\{#if playerData\.gameMode !== "spectator"\}[\s\S]*class="hotbar-elements"/,
+    );
+    assert.match(hotbar, /presentation === "classic"[\s\S]*playerData\.experienceLevel > 0[\s\S]*<Status/);
+
+    assert.match(contextual, /data-mode=\{data\.mode\}/);
+    assert.match(contextual, /resource\/skin\?uuid=\{marker\.playerUuid\}/);
+    assert.match(contextual, /waypointEmoji\(marker\.style\)/);
+    assert.match(contextual, /marker\.elevation/);
+});

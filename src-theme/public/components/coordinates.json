@@ -1,0 +1,12 @@
+{
+  "name": "Coordinates",
+  "description": "Displays your current block coordinates.",
+  "enabled": false,
+  "singleton": true,
+  "alignment": {
+    "horizontalAlignment": "Left",
+    "horizontalOffset": 15,
+    "verticalAlignment": "Top",
+    "verticalOffset": 60
+  }
+}

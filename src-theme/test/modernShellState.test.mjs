@@ -8,12 +8,12 @@ import {
     normalizeClickGuiScaleFactor,
 } from "../src/routes/clickgui/themes/modern/modernShellState.ts";
 
-test("arrow navigation includes the upstream HUD editor tab", () => {
-    assert.equal(moveClickGuiView("clickgui", 1), "hud-editor");
-    assert.equal(moveClickGuiView("hud-editor", 1), "settings");
+test("arrow navigation stays within the primary command tabs", () => {
+    assert.equal(moveClickGuiView("clickgui", 1), "settings");
     assert.equal(moveClickGuiView("settings", 1), "clickgui");
     assert.equal(moveClickGuiView("clickgui", -1), "settings");
-    assert.equal(moveClickGuiView("settings", -1), "hud-editor");
+    assert.equal(moveClickGuiView("settings", -1), "clickgui");
+    assert.equal(moveClickGuiView("hud-editor", 1), "clickgui");
 });
 
 test("ClickGUI scaling keeps viewport math finite and uses Minecraft scale two as fallback", () => {

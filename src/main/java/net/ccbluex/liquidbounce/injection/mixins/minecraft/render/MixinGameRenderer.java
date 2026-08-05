@@ -33,6 +33,7 @@ import net.ccbluex.liquidbounce.features.module.modules.fun.ModuleDankBobbing;
 import net.ccbluex.liquidbounce.features.module.modules.render.*;
 import net.ccbluex.liquidbounce.render.WorldRenderEnvironment;
 import net.ccbluex.liquidbounce.render.engine.esp.EspShaderRenderer;
+import net.ccbluex.liquidbounce.render.engine.gui.GuiGlowRenderer;
 import net.ccbluex.liquidbounce.utils.aiming.RotationManager;
 import net.ccbluex.liquidbounce.utils.collection.Pools;
 import net.ccbluex.liquidbounce.utils.render.WorldToScreen;
@@ -86,6 +87,15 @@ public abstract class MixinGameRenderer {
     public void hookGameRender(CallbackInfo callbackInfo) {
         EspShaderRenderer.beginFrame();
         EventManager.INSTANCE.callEvent(GameRenderEvent.INSTANCE);
+    }
+
+    /**
+     * GUI elements are collected during extraction, before {@link #hookGameRender(CallbackInfo)} runs.
+     * Reset the GUI glow queue here so extracted masks survive until GuiRenderer draws them.
+     */
+    @Inject(method = "extract", at = @At("HEAD"))
+    private void beginGuiGlowFrame(CallbackInfo callbackInfo) {
+        GuiGlowRenderer.beginFrame();
     }
 
     @Inject(

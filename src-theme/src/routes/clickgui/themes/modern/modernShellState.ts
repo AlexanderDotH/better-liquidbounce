@@ -2,7 +2,7 @@ import type {ClickGuiView} from "../../theme/clickGuiThemeState";
 
 export const DEFAULT_CLICK_GUI_SCALE_FACTOR = 2;
 
-const CLICK_GUI_VIEWS: readonly ClickGuiView[] = ["clickgui", "hud-editor", "settings"];
+const CLICK_GUI_VIEWS: readonly ClickGuiView[] = ["clickgui", "settings"];
 
 export function normalizeClickGuiScaleFactor(scaleFactor: number): number {
     return Number.isFinite(scaleFactor) && scaleFactor > 0
@@ -32,6 +32,10 @@ export function moveClickGuiView(
     direction: -1 | 1,
 ): ClickGuiView {
     const currentIndex = CLICK_GUI_VIEWS.indexOf(current);
+    if (currentIndex < 0) {
+        return "clickgui";
+    }
+
     const nextIndex = (currentIndex + direction + CLICK_GUI_VIEWS.length)
         % CLICK_GUI_VIEWS.length;
 

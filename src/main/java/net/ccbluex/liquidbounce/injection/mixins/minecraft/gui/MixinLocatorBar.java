@@ -19,12 +19,22 @@
 
 package net.ccbluex.liquidbounce.injection.mixins.minecraft.gui;
 
+import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
+import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
+import net.ccbluex.liquidbounce.integration.theme.component.ClientPlayerLocatorBar;
 import net.ccbluex.liquidbounce.integration.theme.component.HudComponentManager;
+import net.minecraft.client.DeltaTracker;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.contextualbar.LocatorBar;
+import net.minecraft.client.waypoints.ClientWaypointManager;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.waypoints.TrackedWaypoint;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
+
+import java.util.function.Consumer;
 
 @Mixin(LocatorBar.class)
 public abstract class MixinLocatorBar {
@@ -41,6 +51,35 @@ public abstract class MixinLocatorBar {
         if (HudComponentManager.shouldSuppressLocatorBar()) {
             ci.cancel();
         }
+    }
+
+    @WrapOperation(
+            method = "extractRenderState",
+            at = @At(
+                    value = "INVOKE",
+                    target = "Lnet/minecraft/client/waypoints/ClientWaypointManager;forEachWaypoint(" +
+                            "Lnet/minecraft/world/entity/Entity;Ljava/util/function/Consumer;)V"
+            )
+    )
+    private void hookClientPlayerWaypoints(
+            ClientWaypointManager waypointManager,
+            Entity cameraEntity,
+            Consumer<TrackedWaypoint> renderer,
+            Operation<Void> original,
+            GuiGraphicsExtractor context,
+            DeltaTracker tickCounter
+    ) {
+        Consumer<TrackedWaypoint> rendererWithHeads = waypoint -> {
+            renderer.accept(waypoint);
+            ClientPlayerLocatorBar.extractPlayerHead(context, tickCounter, cameraEntity, waypoint);
+        };
+
+        original.call(waypointManager, cameraEntity, rendererWithHeads);
+        ClientPlayerLocatorBar.appendFallbackWaypoints(
+                waypointManager.hasWaypoints(),
+                cameraEntity,
+                rendererWithHeads
+        );
     }
 
 }

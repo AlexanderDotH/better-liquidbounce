@@ -485,6 +485,7 @@ object ClientRenderPipelines {
         withBindGroupLayout {
             withSampler("MaskSampler")
             withSampler("BlurSampler")
+            withSampler("CoreExclusionSampler")
         }
         withUniformBuffer(ClientUniformDefine.ESP_STYLE)
         withColorTargetState(

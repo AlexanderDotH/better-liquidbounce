@@ -31,8 +31,9 @@ import net.minecraft.world.entity.Entity
 import net.minecraft.world.entity.LivingEntity
 
 @Tag("attack")
-class AttackEntityEvent(
-    val entity: Entity
+class AttackEntityEvent @JvmOverloads constructor(
+    val entity: Entity,
+    val keepSprint: Boolean = false,
 ) : CancellableEvent()
 
 @Tag("entityMargin")

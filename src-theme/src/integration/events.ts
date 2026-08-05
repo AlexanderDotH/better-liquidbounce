@@ -1,6 +1,7 @@
 import type {
     BedState,
     ConfigurableSetting,
+    ContextualBarData,
     HudComponent,
     ItemStack,
     MinecraftKey,
@@ -59,6 +60,7 @@ export interface EventMap {
     //UserInterfaceEvents.kt
     fps: FpsChangeEvent;
     clientPlayerData: ClientPlayerDataEvent;
+    contextualBar: ContextualBarEvent;
     clientPlayerEffect: ClientPlayerEffectEvent;
     clientPlayerInventory: ClientPlayerInventoryEvent;
     title: TitleEventTitle;
@@ -138,6 +140,10 @@ export type ComponentsUpdateEvent =
 
 export interface ClientPlayerDataEvent {
     playerData: PlayerData;
+}
+
+export interface ContextualBarEvent {
+    contextualBar: ContextualBarData;
 }
 
 export interface ClientPlayerEffectEvent {

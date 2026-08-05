@@ -21,6 +21,7 @@ package net.ccbluex.liquidbounce.features.module.modules.render.nametags
 import net.ccbluex.liquidbounce.render.FontManager
 import net.ccbluex.liquidbounce.render.gui.ItemStackListRenderer.drawItemStackList
 import net.ccbluex.liquidbounce.render.drawRoundedRect
+import net.ccbluex.liquidbounce.render.engine.gui.GuiGlowRenderer
 import net.ccbluex.liquidbounce.render.engine.type.Color4b
 import net.ccbluex.liquidbounce.utils.client.mc
 import net.minecraft.client.gui.GuiGraphicsExtractor
@@ -94,6 +95,21 @@ internal fun GuiGraphicsExtractor.drawNametag(nametag: NametagRenderState, posX:
     val y1 = fontRenderer.height * BACKGROUND_Y_OFFSET_TOP
     val x2 = textWidth + BACKGROUND_X_PADDING
     val y2 = fontRenderer.height * BACKGROUND_Y_OFFSET_BOTTOM
+    val frame = ModuleNametags.frameAppearance
+    val frameRadius = frame.radius / fontScale
+
+    frame.glow?.let { glow ->
+        GuiGlowRenderer.requestRoundedFrame(
+            pose = pose(),
+            x1 = x1,
+            y1 = y1,
+            x2 = x2,
+            y2 = y2,
+            radius = frameRadius,
+            color = glow.color,
+            style = glow.style,
+        )
+    }
 
     // Background
     drawRoundedRect(
@@ -101,10 +117,10 @@ internal fun GuiGraphicsExtractor.drawNametag(nametag: NametagRenderState, posX:
         y1 = y1,
         x2 = x2,
         y2 = y2,
-        radius = ModuleNametags.backgroundRadius / fontScale,
-        fillColor = Color4b.DEFAULT_BG_COLOR,
-        outlineColor = Color4b.BLACK,
-        outlineWidth = ModuleNametags.borderWidth / fontScale,
+        radius = frameRadius,
+        fillColor = frame.fill,
+        outlineColor = frame.border,
+        outlineWidth = frame.borderWidth / fontScale,
     )
 
     // Text

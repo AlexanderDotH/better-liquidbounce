@@ -28,7 +28,6 @@ import net.ccbluex.liquidbounce.event.events.WorldRenderEvent
 import net.ccbluex.liquidbounce.event.handler
 import net.ccbluex.liquidbounce.features.module.ClientModule
 import net.ccbluex.liquidbounce.features.module.ModuleCategories
-import net.ccbluex.liquidbounce.features.module.modules.player.cheststealer.ModuleChestStealer
 import net.ccbluex.liquidbounce.features.module.modules.player.cheststealer.features.FeatureChestAura
 import net.ccbluex.liquidbounce.render.CachedMeshStorage
 import net.ccbluex.liquidbounce.render.ClientRenderPipelines
@@ -66,7 +65,6 @@ import net.minecraft.world.entity.animal.equine.AbstractChestedHorse
 import net.minecraft.world.entity.vehicle.boat.ChestBoat
 import net.minecraft.world.entity.vehicle.boat.ChestRaft
 import net.minecraft.world.entity.vehicle.minecart.AbstractMinecartContainer
-import net.minecraft.world.entity.vehicle.minecart.MinecartHopper
 import net.minecraft.world.level.block.RenderShape
 import net.minecraft.world.level.block.entity.AbstractFurnaceBlockEntity
 import net.minecraft.world.level.block.entity.BarrelBlockEntity
@@ -118,6 +116,7 @@ object ModuleStorageESP : ClientModule("StorageESP", ModuleCategories.RENDER, al
         object BrewingStand : ChestType("BrewingStand", Color4b(139, 69, 19))
         object Dispenser : ChestType("Dispenser", Color4b(Color.LIGHT_GRAY))
         object Hopper : ChestType("Hopper", Color4b(Color.GRAY))
+        object Minecart : ChestType("Minecart", Color4b(255, 85, 85))
         object ShulkerBox : ChestType("ShulkerBox", Color4b(Color(0x6e, 0x4d, 0x6e).brighter()))
         object Pot : ChestType("Pot", Color4b(209, 134, 0))
         object Bookshelf : ChestType("Bookshelf", Color4b(139, 90, 43))
@@ -132,6 +131,7 @@ object ModuleStorageESP : ClientModule("StorageESP", ModuleCategories.RENDER, al
         ChestType.BrewingStand,
         ChestType.Dispenser,
         ChestType.Hopper,
+        ChestType.Minecart,
         ChestType.ShulkerBox,
         ChestType.Pot,
         ChestType.Bookshelf,
@@ -142,7 +142,6 @@ object ModuleStorageESP : ClientModule("StorageESP", ModuleCategories.RENDER, al
         allTypes.forEach { tree(it) }
     }
 
-    private val requiresChestStealer by boolean("RequiresChestStealer", false)
     private val mergeAdjacent by boolean("MergeAdjacent", false).onChanged {
         markDirtyForModes()
     }
@@ -401,9 +400,8 @@ object ModuleStorageESP : ClientModule("StorageESP", ModuleCategories.RENDER, al
     @JvmStatic
     fun Entity?.categorize(): ChestType? {
         return when (this) {
-            // This includes any storage type minecart entity including ChestMinecartEntity
-            is MinecartHopper -> ChestType.Hopper
-            is AbstractMinecartContainer -> ChestType.Chest
+            // This includes chest and hopper minecarts, but excludes non-container minecarts.
+            is AbstractMinecartContainer -> ChestType.Minecart
             is ChestBoat -> ChestType.Chest
             is ChestRaft -> ChestType.Chest
             is AbstractChestedHorse -> ChestType.Chest.takeIf { hasChest() }
@@ -483,15 +481,6 @@ object ModuleStorageESP : ClientModule("StorageESP", ModuleCategories.RENDER, al
             markDirtyForModes()
         }
     }
-
-    override val running: Boolean
-        get() {
-            if (requiresChestStealer && !ModuleChestStealer.running) {
-                return false
-            }
-
-            return super.running
-        }
 
     fun showTracers() : Boolean {
         return this.running && allTypes.any { it.tracers }

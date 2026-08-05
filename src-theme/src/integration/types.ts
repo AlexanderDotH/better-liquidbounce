@@ -251,6 +251,28 @@ export interface PlayerData {
     scoreboard: Scoreboard;
 }
 
+export type ContextualBarMode = "empty" | "experience" | "locator" | "jumpableVehicle";
+
+export interface ContextualBarData {
+    mode: ContextualBarMode;
+    progress: number;
+    level: number;
+    cooldown: boolean;
+    markers: readonly LocatorMarker[];
+}
+
+export interface LocatorMarker {
+    id: string;
+    label: string;
+    offset: number;
+    elevation: "above" | "level" | "below";
+    distance: number;
+    color: number;
+    kind: "player" | "waypoint";
+    playerUuid: string | null;
+    style: string;
+}
+
 export interface StatusEffect {
     effect: string;
     localizedName: string;

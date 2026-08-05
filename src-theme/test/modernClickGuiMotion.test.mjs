@@ -181,18 +181,37 @@ test("Modern keeps the game visible beneath a centered command pill", () => {
     const tabbed = read("ModernTabbedClickGui.svelte");
     const command = read("ModernCommandBar.svelte");
     const shellBlock = cssBlock(tabbed, ".modern-clickgui");
+    const dockBlock = cssBlock(command, ".command-dock");
     const commandBlock = cssBlock(command, ".command-bar");
 
     assert.match(shellBlock, /background:\s*transparent;/);
     assert.doesNotMatch(tabbed, /\.modern-clickgui::before/);
-    assert.match(commandBlock, /left:\s*0;/);
-    assert.match(commandBlock, /right:\s*0;/);
-    assert.match(
-        commandBlock,
-        /width:\s*min\(960px,\s*calc\(100%\s*-\s*32px\)\);/,
-    );
-    assert.match(commandBlock, /margin-inline:\s*auto;/);
+    assert.match(dockBlock, /top:\s*16px;/);
+    assert.match(dockBlock, /right:\s*16px;/);
+    assert.match(dockBlock, /left:\s*16px;/);
+    assert.match(dockBlock, /grid-template-columns:/);
+    assert.match(commandBlock, /grid-column:\s*2;/);
+    assert.match(commandBlock, /width:\s*100%;/);
     assert.match(commandBlock, /border-radius:\s*999px;/);
+});
+
+test("HUD editor uses a dedicated top-right island and Reset layout is inset", () => {
+    const command = read("ModernCommandBar.svelte");
+    const tabbed = read("ModernTabbedClickGui.svelte");
+    const tabsDeclaration = command.match(
+        /const tabs:[\s\S]*?=\s*\[([\s\S]*?)\];/,
+    )?.[1] ?? "";
+
+    assert.doesNotMatch(tabsDeclaration, /hud-editor/);
+    assert.match(command, /id="modern-command-hud-editor"/);
+    assert.match(command, /class="hud-editor-island"/);
+    assert.match(command, /aria-controls="modern-hud-editor-view"/);
+    assert.match(command, /class:active=\{view === "hud-editor"\}/);
+    assert.match(cssBlock(command, ".hud-editor-island"), /grid-column:\s*3;/);
+    assert.match(cssBlock(command, ".hud-editor-island"), /justify-self:\s*end;/);
+    assert.match(cssBlock(command, ".actions"), /padding-inline-end:\s*8px;/);
+    assert.match(tabbed, /id="modern-hud-editor-view"/);
+    assert.match(tabbed, /aria-labelledby="modern-command-hud-editor"/);
 });
 
 test("Modern search suggestions escape the command pill while its sheen stays clipped", () => {

@@ -58,6 +58,7 @@ import net.ccbluex.liquidbounce.event.events.ClientShutdownEvent
 import net.ccbluex.liquidbounce.event.events.ClientStartEvent
 import net.ccbluex.liquidbounce.event.events.ClosedCaptionsEvent
 import net.ccbluex.liquidbounce.event.events.ComponentsUpdateEvent
+import net.ccbluex.liquidbounce.event.events.ContextualBarEvent
 import net.ccbluex.liquidbounce.event.events.DeathEvent
 import net.ccbluex.liquidbounce.event.events.DisconnectEvent
 import net.ccbluex.liquidbounce.event.events.DrawOutlinesEvent
@@ -234,6 +235,7 @@ internal val ALL_EVENT_CLASSES: Array<Class<out Event>> = arrayOf(
     FpsChangeEvent::class.java,
     FpsLimitEvent::class.java,
     ClientPlayerDataEvent::class.java,
+    ContextualBarEvent::class.java,
     ClientPlayerEffectEvent::class.java,
     RotationUpdateEvent::class.java,
     RefreshArrayListEvent::class.java,

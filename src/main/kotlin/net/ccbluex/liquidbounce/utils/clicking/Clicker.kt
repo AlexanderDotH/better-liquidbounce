@@ -198,6 +198,43 @@ open class Clicker<T>(
     }
 
     /**
+     * Suspendable counterpart to [click] for actions that complete across multiple game ticks.
+     * A failed attempt stops the current batch so expensive actions are retried on a later scheduler tick.
+     */
+    protected suspend fun clickSuspending(block: suspend () -> Boolean) {
+        val clicks = getClickAmount()
+
+        debugParameter("Current Clicks") { clicks }
+        debugParameter("Peek Clicks") { clickArray.get(1) }
+        debugParameter("Last Click Passed") { lastClickPassed }
+        debugParameter("Attack Cooldown") { mc.missTime }
+        debugParameter("Item Cooldown") { itemCooldown?.cooldownProgress() ?: 0.0f }
+
+        var successfulClicks = 0
+
+        try {
+            run clickBatch@{
+                repeat(clicks) {
+                    if (!passesAttackCooldown || itemCooldown?.isCooldownPassed() == false) {
+                        return@repeat
+                    }
+
+                    if (!block()) {
+                        return@clickBatch
+                    }
+
+                    successfulClicks++
+                    itemCooldown?.newCooldown()
+                    lastClickTime = System.currentTimeMillis()
+                    ticksSinceLastClick = 0
+                }
+            }
+        } finally {
+            clickAmount = successfulClicks
+        }
+    }
+
+    /**
      * Returns true when a click attempt can be executed right now.
      * This uses the same gating logic as [click] before invoking [block].
      */

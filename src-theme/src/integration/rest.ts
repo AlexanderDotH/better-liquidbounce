@@ -7,6 +7,7 @@ import type {
     ClientUpdate,
     ClientUser,
     ConfigurableSetting,
+    ContextualBarData,
     FileSelectDialog,
     FileSelectResult,
     FritzBoxReconnectRequest,
@@ -167,6 +168,15 @@ export async function getPlayerData(): Promise<PlayerData> {
     const data: PlayerData = await response.json();
 
     return data;
+}
+
+export async function getContextualBar(): Promise<ContextualBarData> {
+    const response = await fetch(`${API_BASE}/client/player/contextualBar`);
+    if (!response.ok) {
+        throw new Error(`Unable to load contextual bar: ${response.status}`);
+    }
+
+    return await response.json() as ContextualBarData;
 }
 
 export async function openFileDialog(body: FileSelectDialog): Promise<FileSelectResult> {

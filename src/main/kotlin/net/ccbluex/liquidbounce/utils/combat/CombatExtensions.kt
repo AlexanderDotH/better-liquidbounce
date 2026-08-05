@@ -254,7 +254,7 @@ fun attackEntity(entity: Entity, swing: SwingMode, keepSprint: Boolean = false) 
     }
 
     if (!entity.canBeAttackedWithVanillaPacket()
-        || EventManager.callEvent(AttackEntityEvent(entity)).isCancelled) {
+        || EventManager.callEvent(AttackEntityEvent(entity, keepSprint)).isCancelled) {
         return
     }
 

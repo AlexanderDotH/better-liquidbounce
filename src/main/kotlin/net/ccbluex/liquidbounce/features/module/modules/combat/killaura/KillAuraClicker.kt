@@ -19,6 +19,7 @@
 package net.ccbluex.liquidbounce.features.module.modules.combat.killaura
 
 import net.ccbluex.liquidbounce.features.module.modules.combat.ModuleAutoWeapon
+import net.ccbluex.liquidbounce.features.module.modules.combat.ModuleSuperHit
 import net.ccbluex.liquidbounce.features.module.modules.combat.killaura.KillAuraRotationsValueGroup.rotationTiming
 import net.ccbluex.liquidbounce.features.module.modules.combat.killaura.ModuleKillAura.simulateInventoryClosing
 import net.ccbluex.liquidbounce.features.module.modules.combat.killaura.features.KillAuraAutoBlock
@@ -89,11 +90,22 @@ object KillAuraClicker : Clicker<ModuleKillAura>(
             val ownEyePos = futurePos.add(0.0, player.getEyeHeight(player.pose).toDouble(), 0.0)
             val targetBox = target.getBoundingBoxAt(futureTargetPos)
 
+            val usesSuperHitRange = ModuleKillAura.shouldUseSuperHitFor(target)
+            val attackRange = if (usesSuperHitRange) {
+                ModuleSuperHit.maximumTargetRange
+            } else {
+                ModuleKillAura.range.interactionRange
+            }
+            val wallsRange = if (usesSuperHitRange) {
+                0.0
+            } else {
+                ModuleKillAura.range.interactionThroughWallsRange.toDouble()
+            }
             val isExitingRange = !canSeeBox(
                 eyes = ownEyePos,
                 box = targetBox,
-                range = ModuleKillAura.range.interactionRange.toDouble(),
-                wallsRange = ModuleKillAura.range.interactionThroughWallsRange.toDouble()
+                range = attackRange.toDouble(),
+                wallsRange = wallsRange,
             )
             debugParameter("Is Exiting Range On ${round(ticks)}") { isExitingRange }
             if (isExitingRange) {
@@ -113,7 +125,7 @@ object KillAuraClicker : Clicker<ModuleKillAura>(
      * - Unblocking if we are blocking and the tick on is 0
      */
     @Suppress("CognitiveComplexMethod")
-    fun prepareForAttack(rotation: Rotation? = null, attack: () -> Boolean) {
+    suspend fun prepareForAttack(rotation: Rotation? = null, attack: suspend () -> Boolean) {
         if (!canExecuteClickNow()) {
             // If we are not going to click, we don't need to prepare the environment
             return
@@ -159,32 +171,34 @@ object KillAuraClicker : Clicker<ModuleKillAura>(
             )
         }
 
-        // Run the attack
-        click(attack)
-
-        // 1. Rotate back
-        if (rotationTiming == KillAuraRotationsValueGroup.KillAuraRotationTiming.ON_TICK && rotation != null) {
-            network.send(
-                PosRot(
-                    player.x,
-                    player.y,
-                    player.z,
-                    player.withFixedYaw(rotation),
-                    player.xRot,
-                    player.onGround(),
-                    player.horizontalCollision
+        try {
+            // Run the attack
+            clickSuspending(attack)
+        } finally {
+            // 1. Rotate back
+            if (rotationTiming == KillAuraRotationsValueGroup.KillAuraRotationTiming.ON_TICK && rotation != null) {
+                network.send(
+                    PosRot(
+                        player.x,
+                        player.y,
+                        player.z,
+                        player.withFixedYaw(rotation),
+                        player.xRot,
+                        player.onGround(),
+                        player.horizontalCollision
+                    )
                 )
-            )
-        }
+            }
 
-        // 2. Start blocking again
-        if (KillAuraAutoBlock.blockImmediate) {
-            KillAuraAutoBlock.startBlocking()
-        }
+            // 2. Start blocking again
+            if (KillAuraAutoBlock.blockImmediate) {
+                KillAuraAutoBlock.startBlocking()
+            }
 
-        // 3. Open inventory again
-        if (wasSimulatedInventoryClose) {
-            network.send1_11_1OpenInventory()
+            // 3. Open inventory again
+            if (wasSimulatedInventoryClose) {
+                network.send1_11_1OpenInventory()
+            }
         }
     }
 

@@ -18,6 +18,8 @@
  */
 package net.ccbluex.liquidbounce.features.module.modules.render
 
+import net.ccbluex.liquidbounce.config.types.group.Mode
+import net.ccbluex.liquidbounce.config.types.group.ModeValueGroup
 import net.ccbluex.liquidbounce.event.events.WorldRenderEvent
 import net.ccbluex.liquidbounce.event.handler
 import net.ccbluex.liquidbounce.features.misc.FriendManager
@@ -27,8 +29,12 @@ import net.ccbluex.liquidbounce.render.GenericDistanceHSBColorMode
 import net.ccbluex.liquidbounce.render.GenericEntityHealthColorMode
 import net.ccbluex.liquidbounce.render.GenericRainbowColorMode
 import net.ccbluex.liquidbounce.render.GenericStaticColorMode
+import net.ccbluex.liquidbounce.render.WorldRenderEnvironment
 import net.ccbluex.liquidbounce.render.drawLines
 import net.ccbluex.liquidbounce.render.drawLinesWithWidth
+import net.ccbluex.liquidbounce.render.engine.esp.EspGlowContributionRole
+import net.ccbluex.liquidbounce.render.engine.esp.EspHaloStyleConfig
+import net.ccbluex.liquidbounce.render.engine.esp.EspShaderRenderer
 import net.ccbluex.liquidbounce.render.engine.type.Color4b
 import net.ccbluex.liquidbounce.render.engine.type.Vec3f
 import net.ccbluex.liquidbounce.render.renderEnvironment
@@ -47,7 +53,26 @@ import net.ccbluex.liquidbounce.utils.math.toVec3f
 
 object ModuleTracers : ClientModule("Tracers", ModuleCategories.RENDER) {
 
-    private val modes = choices("ColorMode", 0) {
+    private val renderModes = choices("Mode", 0) {
+        arrayOf(LineMode, GlowMode)
+    }
+
+    private object LineMode : Mode("Line") {
+        override val parent: ModeValueGroup<Mode>
+            get() = renderModes
+    }
+
+    private object GlowMode : Mode("Glow") {
+        override val parent: ModeValueGroup<Mode>
+            get() = renderModes
+
+        private val styleConfig = EspHaloStyleConfig(this)
+
+        val style
+            get() = styleConfig.style
+    }
+
+    private val colorModes = choices("ColorMode", 0) {
         arrayOf(
             GenericDistanceHSBColorMode.entity(it),
             GenericEntityHealthColorMode(it),
@@ -73,32 +98,111 @@ object ModuleTracers : ClientModule("Tracers", ModuleCategories.RENDER) {
             return@handler
         }
 
-        event.renderEnvironment {
-            val eyeVector = Vec3f.eyeVector(camera)
-
-            val maxDistanceSq = maximumDistance.sq()
+        val eyePosition = Vec3f.eyeVector(event.camera)
+        val cameraPosition = event.camera.position()
+        val maximumDistanceSq = maximumDistance.sq()
+        val segments = buildList {
             for (entity in RenderedEntities) {
-                val distanceSq = entity.position().cameraDistanceSq().toFloat()
-                if (distanceSq > maxDistanceSq) {
-                    continue
-                }
+                if (entity.position().cameraDistanceSq().toFloat() > maximumDistanceSq) continue
 
                 val color = if (FriendManager.isFriend(entity)) {
                     Color4b.BLUE
                 } else {
-                    EntityTaggingManager.getTag(entity).color ?: modes.activeMode.getColor(entity)
+                    EntityTaggingManager.getTag(entity).color ?: colorModes.activeMode.getColor(entity)
                 }
-
-                val pos = entity.interpolateCurrentPosition(event.partialTicks).subtract(camera.position()).toVec3f()
-                val topPos = pos.add(0f, entity.bbHeight, 0f)
-
-                if (lineWidth == 1.0f) {
-                    drawLines(color.argb, eyeVector, pos, pos, topPos)
-                } else {
-                    drawLinesWithWidth(color.argb, lineWidth, eyeVector, pos, pos, topPos)
-                }
+                val position = entity.interpolateCurrentPosition(event.partialTicks)
+                    .subtract(cameraPosition)
+                    .toVec3f()
+                add(
+                    TracerSegment(
+                        color = color,
+                        eyePosition = eyePosition,
+                        entityPosition = position,
+                    )
+                )
             }
         }
+        val batch = TracerRenderBatch(segments, lineWidth)
 
+        event.renderEnvironment {
+            drawTracerBatch(batch, glowMask = false)
+        }
+
+        if (renderModes.activeMode !== GlowMode) return@handler
+
+        batch.contributeGlowIfPresent {
+            EspShaderRenderer.contributeGlow(event, GlowMode.style, EspGlowContributionRole.HALO_ONLY) {
+                drawTracerBatch(it, glowMask = true)
+            }
+        }
     }
 }
+
+internal data class TracerSegment(
+    val color: Color4b,
+    val eyePosition: Vec3f,
+    val entityPosition: Vec3f,
+) {
+    val glowMaskColor: Color4b
+        get() = color.with(a = 255)
+}
+
+internal data class TracerRenderBatch(
+    val segments: List<TracerSegment>,
+    val lineWidth: Float,
+) {
+    val glowMaskLineWidth: Float
+        get() = maxOf(lineWidth, MIN_GLOW_MASK_LINE_WIDTH)
+
+    fun contributeGlowIfPresent(contribute: (TracerRenderBatch) -> Unit): Boolean {
+        if (segments.isEmpty()) return false
+
+        contribute(this)
+        return true
+    }
+}
+
+internal data class TracerLineDraw(
+    val color: Color4b,
+    val width: Float,
+    val start: Vec3f,
+    val end: Vec3f,
+)
+
+internal inline fun TracerRenderBatch.forEachLine(
+    glowMask: Boolean,
+    draw: (TracerLineDraw) -> Unit,
+) {
+    val renderLineWidth = if (glowMask) glowMaskLineWidth else lineWidth
+    for (segment in segments) {
+        draw(
+            TracerLineDraw(
+                color = if (glowMask) segment.glowMaskColor else segment.color,
+                width = renderLineWidth,
+                start = segment.eyePosition,
+                end = segment.entityPosition,
+            )
+        )
+    }
+}
+
+private fun WorldRenderEnvironment.drawTracerBatch(batch: TracerRenderBatch, glowMask: Boolean) {
+    batch.forEachLine(glowMask) { line ->
+        if (line.width == 1f) {
+            drawLines(
+                line.color.argb,
+                line.start,
+                line.end,
+            )
+        } else {
+            drawLinesWithWidth(
+                line.color.argb,
+                line.width,
+                line.start,
+                line.end,
+            )
+        }
+    }
+}
+
+private const val MIN_GLOW_MASK_LINE_WIDTH = 2f

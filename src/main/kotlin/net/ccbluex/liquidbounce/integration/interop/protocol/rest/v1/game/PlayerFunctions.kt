@@ -29,6 +29,7 @@ import net.ccbluex.liquidbounce.features.module.modules.combat.ModuleSwordBlock.
 import net.ccbluex.liquidbounce.features.module.modules.misc.nameprotect.ModuleNameProtect
 import net.ccbluex.liquidbounce.features.module.modules.misc.nameprotect.sanitizeForeignInput
 import net.ccbluex.liquidbounce.injection.mixins.minecraft.gui.MixinHudAccessor
+import net.ccbluex.liquidbounce.integration.theme.component.ModernContextualBar
 import net.ccbluex.liquidbounce.utils.client.mc
 import net.ccbluex.liquidbounce.utils.entity.armorItems
 import net.ccbluex.liquidbounce.utils.entity.getActualHealth
@@ -60,6 +61,11 @@ private fun Route.getPlayerData() = get {
     } else {
         call.respond(io.ktor.http.HttpStatusCode.NoContent)
     }
+}
+
+// GET /api/v1/client/player/contextualBar
+private fun Route.getContextualBar() = get("/contextualBar") {
+    call.respond(ModernContextualBar.snapshot())
 }
 
 // GET /api/v1/client/player/inventory
@@ -230,6 +236,7 @@ private fun Float.fixNaN() = if (isNaN()) 0f else this
 internal fun Route.playerRoutes() {
     route("/player") {
         getPlayerData()
+        getContextualBar()
         getPlayerInventory()
     }
     getCrosshairData()

@@ -262,6 +262,7 @@ import net.ccbluex.liquidbounce.features.module.modules.world.ModuleProjectilePu
 import net.ccbluex.liquidbounce.features.module.modules.world.ModuleStrongholdFinder
 import net.ccbluex.liquidbounce.features.module.modules.world.ModuleSurround
 import net.ccbluex.liquidbounce.features.module.modules.world.ModuleTimer
+import net.ccbluex.liquidbounce.features.module.modules.world.basefinder.ModuleBaseFinder
 import net.ccbluex.liquidbounce.features.module.modules.world.autobuild.ModuleAutoBuild
 import net.ccbluex.liquidbounce.features.module.modules.world.autofarm.ModuleAutoFarm
 import net.ccbluex.liquidbounce.features.module.modules.world.fucker.ModuleFucker
@@ -714,6 +715,7 @@ object ModuleManager : EventListener, Collection<ClientModule> by modules {
             ModulePacketMine,
             ModuleHoleFiller,
             ModuleStrongholdFinder,
+            ModuleBaseFinder,
             ModuleNoInterpolation,
         )
 

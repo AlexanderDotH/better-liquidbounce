@@ -61,6 +61,7 @@ import net.ccbluex.liquidbounce.features.command.commands.ingame.creative.Comman
 import net.ccbluex.liquidbounce.features.command.commands.ingame.fakeplayer.CommandFakePlayer
 import net.ccbluex.liquidbounce.features.command.commands.module.CommandAutoAccount
 import net.ccbluex.liquidbounce.features.command.commands.module.CommandAutoDisable
+import net.ccbluex.liquidbounce.features.command.commands.module.CommandBaseFinder
 import net.ccbluex.liquidbounce.features.command.commands.module.CommandInvsee
 import net.ccbluex.liquidbounce.features.command.commands.module.CommandXRay
 import net.ccbluex.liquidbounce.features.command.commands.module.teleport.CommandPlayerTeleport
@@ -141,6 +142,7 @@ object CommandManager : Collection<Command> by commandSet {
             CommandRemoteView,
             CommandResync,
             CommandXRay,
+            CommandBaseFinder,
             CommandTargets,
             CommandConfig,
             CommandLocalConfig,

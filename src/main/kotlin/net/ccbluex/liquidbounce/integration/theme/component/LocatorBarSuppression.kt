@@ -13,8 +13,9 @@ package net.ccbluex.liquidbounce.integration.theme.component
 
 import net.ccbluex.liquidbounce.features.module.modules.render.HudTheme
 
+@Suppress("UNUSED_PARAMETER")
 internal fun resolveLocatorBarSuppression(
     tweakEnabled: Boolean,
     hudTheme: HudTheme,
     bundledHud: Boolean,
-): Boolean = tweakEnabled && !(bundledHud && hudTheme == HudTheme.MODERN)
+): Boolean = tweakEnabled

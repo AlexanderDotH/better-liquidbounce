@@ -28,6 +28,7 @@ import net.ccbluex.liquidbounce.event.tickHandler
 import net.ccbluex.liquidbounce.features.module.ClientModule
 import net.ccbluex.liquidbounce.features.module.ModuleCategories
 import net.ccbluex.liquidbounce.features.module.modules.combat.ModuleAutoWeapon
+import net.ccbluex.liquidbounce.features.module.modules.combat.ModuleSuperHit
 import net.ccbluex.liquidbounce.features.module.modules.combat.criticals.ModuleCriticals.CriticalsSelectionMode
 import net.ccbluex.liquidbounce.features.module.modules.combat.elytratarget.ModuleElytraTarget
 import net.ccbluex.liquidbounce.features.module.modules.combat.killaura.KillAuraRotationsValueGroup.KillAuraRotationTiming.ON_TICK
@@ -132,6 +133,11 @@ object ModuleKillAura : ClientModule("KillAura", ModuleCategories.COMBAT) {
             range.interactionRange
         }
 
+    internal fun shouldUseSuperHitFor(target: LivingEntity): Boolean {
+        return ModuleSuperHit.running && ModuleSuperHit.isTargetInConfiguredRange(target) &&
+            player.squaredBoxedDistanceTo(target) > extendedInteractionRange.sq()
+    }
+
     override fun onDisabled() {
         targetTracker.reset()
         failedHits.clear()
@@ -204,7 +210,14 @@ object ModuleKillAura : ClientModule("KillAura", ModuleCategories.COMBAT) {
         }
 
         val rotation = (if (rotations.rotationTiming == ON_TICK) {
-            findRotation(target, range.interactionRange, range.interactionThroughWallsRange)?.rotation
+            val targeting = targetingParameters(
+                target,
+                normalRange = range.interactionRange,
+                normalWallsRange = range.interactionThroughWallsRange,
+            )
+            targeting?.let {
+                findRotation(target, it.range, it.wallsRange, it.allowAimThroughWalls)?.rotation
+            }
         } else {
             null
         } ?: RotationManager.currentRotation ?: player.rotation).normalize()
@@ -230,8 +243,11 @@ object ModuleKillAura : ClientModule("KillAura", ModuleCategories.COMBAT) {
     }
 
     val shouldBlockSprinting
-        get() = !ModuleElytraTarget.running
-            && criticalsSelectionMode.shouldStopSprinting(clicker, targetTracker.target)
+        get() = shouldBlockSprintForCriticals(
+            keepSprintEnabled = keepSprint,
+            elytraTargetRunning = ModuleElytraTarget.running,
+            criticalsRequestSprintStop = criticalsSelectionMode.shouldStopSprinting(clicker, targetTracker.target),
+        )
 
     @Suppress("unused")
     private val sprintHandler = handler<SprintEvent> { event ->
@@ -242,7 +258,7 @@ object ModuleKillAura : ClientModule("KillAura", ModuleCategories.COMBAT) {
     }
 
     @Suppress("CognitiveComplexMethod", "CyclomaticComplexMethod")
-    private fun attackTarget(target: Entity, rotation: Rotation) {
+    private suspend fun attackTarget(target: Entity, rotation: Rotation) {
         // Make it seem like we are blocking
         KillAuraAutoBlock.makeSeemBlock()
 
@@ -262,24 +278,13 @@ object ModuleKillAura : ClientModule("KillAura", ModuleCategories.COMBAT) {
             attackHitResult != null && range.isInRange(pos = attackHitResult.location)
         debugParameter("Is In Range") { isInRange }
 
+        val superHitTarget = target as? LivingEntity
+        val attackRoute = determineAttackRoute(superHitTarget, rotation, isInRange)
+        debugParameter("Attack Route") { attackRoute }
+
         // Check if our target is in range, otherwise deal with auto block
-        if (!isInRange) {
-            if (KillAuraAutoBlock.enabled && KillAuraAutoBlock.onScanRange &&
-                player.squaredBoxedDistanceTo(target) <= range.scanRange.sq()) {
-                if (KillAuraClicker.ticksSinceLastClick >= KillAuraAutoBlock.reblockTicks) {
-                    KillAuraAutoBlock.startBlocking()
-                }
-
-                return
-            }
-
-            // Make sure we are not blocking
-            val hasUnblocked = KillAuraAutoBlock.stopBlocking()
-            if (hasUnblocked && KillAuraAutoBlock.pauseOnUnblockTicks > 0) {
-                waitTicks = KillAuraAutoBlock.pauseOnUnblockTicks
-            }else if (KillAuraFailSwing.enabled) {
-                dealWithFakeSwing(target)
-            }
+        if (attackRoute == KillAuraAttackRoute.NONE) {
+            handleUnavailableTarget(target)
             return
         }
 
@@ -296,31 +301,85 @@ object ModuleKillAura : ClientModule("KillAura", ModuleCategories.COMBAT) {
                     return@prepareForAttack false
                 }
 
-                // Attack enemy
-                attackEntity(target, SwingMode.DO_NOT_HIDE, keepSprint && !shouldBlockSprinting)
-                range.update()
-                KillAuraNotifyWhenFail.failedHitsIncrement = 0
-                KillAuraAutoBlock.hasBlockedSinceAttack = false
+                val attackKeepSprint = keepSprint && !shouldBlockSprinting
+                executeKillAuraAttack(
+                    route = attackRoute,
+                    normalAttack = {
+                        attackEntity(target, SwingMode.DO_NOT_HIDE, attackKeepSprint)
+                        true
+                    },
+                    superHitAttack = {
+                        val livingTarget = superHitTarget ?: return@executeKillAuraAttack false
+                        ModuleSuperHit.tryAttack(livingTarget, rotation, attackKeepSprint)
+                    },
+                    onSuccess = {
+                        range.update()
+                        KillAuraNotifyWhenFail.failedHitsIncrement = 0
+                        KillAuraAutoBlock.hasBlockedSinceAttack = false
 
-                GenericDebugRecorder.recordDebugInfo(ModuleKillAura, "attackEntity", JsonObject().apply {
-                    add("player", GenericDebugRecorder.debugObject(player))
-                    add("targetPos", GenericDebugRecorder.debugObject(target))
-                })
-
-                true
+                        GenericDebugRecorder.recordDebugInfo(ModuleKillAura, "attackEntity", JsonObject().apply {
+                            add("player", GenericDebugRecorder.debugObject(player))
+                            add("targetPos", GenericDebugRecorder.debugObject(target))
+                        })
+                    },
+                )
             }
         } else if (KillAuraClicker.ticksSinceLastClick >= KillAuraAutoBlock.reblockTicks) {
             KillAuraAutoBlock.startBlocking()
         }
     }
 
+    private fun determineAttackRoute(
+        superHitTarget: LivingEntity?,
+        rotation: Rotation,
+        normalAttackPossible: Boolean,
+    ): KillAuraAttackRoute {
+        val superHitTargetPossible = !normalAttackPossible && superHitTarget != null &&
+            shouldUseSuperHitFor(superHitTarget) && isLookingAtEntity(
+                toEntity = superHitTarget,
+                rotation = rotation,
+                range = ModuleSuperHit.maximumTargetRange.toDouble(),
+                throughWallsRange = 0.0,
+            ) != null
+
+        return selectKillAuraAttackRoute(
+            normalAttackPossible = normalAttackPossible,
+            superHitRunning = ModuleSuperHit.running,
+            superHitTargetPossible = superHitTargetPossible,
+        )
+    }
+
+    private suspend fun handleUnavailableTarget(target: Entity) {
+        if (KillAuraAutoBlock.enabled && KillAuraAutoBlock.onScanRange &&
+            player.squaredBoxedDistanceTo(target) <= range.scanRange.sq()) {
+            if (KillAuraClicker.ticksSinceLastClick >= KillAuraAutoBlock.reblockTicks) {
+                KillAuraAutoBlock.startBlocking()
+            }
+
+            return
+        }
+
+        // Make sure we are not blocking
+        val hasUnblocked = KillAuraAutoBlock.stopBlocking()
+        if (hasUnblocked && KillAuraAutoBlock.pauseOnUnblockTicks > 0) {
+            waitTicks = KillAuraAutoBlock.pauseOnUnblockTicks
+        } else if (KillAuraFailSwing.enabled) {
+            dealWithFakeSwing(target)
+        }
+    }
+
     private fun updateTarget() {
         // Calculate maximum range based on enemy distance
-        val maximumRange = if (targetTracker.closestSquaredEnemyDistance > range.interactionRange.sq()) {
+        val normalMaximumRange = if (targetTracker.closestSquaredEnemyDistance > range.interactionRange.sq()) {
             range.scanRange
         } else {
             extendedInteractionRange
         }
+        val maximumRange = calculateKillAuraTargetingRange(
+            normalMaximumRange = normalMaximumRange,
+            superHitRunning = ModuleSuperHit.running,
+            superHitMaximumRange = ModuleSuperHit.maximumTargetRange,
+        )
 
         debugParameter("Maximum Range") { maximumRange }
         debugParameter("Range") { range }
@@ -331,7 +390,15 @@ object ModuleKillAura : ClientModule("KillAura", ModuleCategories.COMBAT) {
         val target = targetTracker.targets()
             .filter { entity -> entity.squaredBoxedDistanceTo(player) <= squaredMaxRange }
             .sortedBy { entity -> if (entity.squaredBoxedDistanceTo(player) <= squaredNormalRange) 0 else 1 }
-            .firstOrNull { entity -> processTarget(entity, maximumRange, range.interactionThroughWallsRange) }
+            .firstOrNull { entity ->
+                val targeting = targetingParameters(
+                    entity,
+                    normalRange = normalMaximumRange,
+                    normalWallsRange = range.interactionThroughWallsRange,
+                ) ?: return@firstOrNull false
+
+                processTarget(entity, targeting.range, targeting.wallsRange, targeting.allowAimThroughWalls)
+            }
 
         if (target != null) {
             targetTracker.target = target
@@ -355,9 +422,10 @@ object ModuleKillAura : ClientModule("KillAura", ModuleCategories.COMBAT) {
     private fun processTarget(
         entity: LivingEntity,
         range: Float,
-        wallsRange: Float
+        wallsRange: Float,
+        allowAimThroughWalls: Boolean = true,
     ): Boolean {
-        val (rotation, _) = findRotation(entity, range, wallsRange) ?: return false
+        val (rotation, _) = findRotation(entity, range, wallsRange, allowAimThroughWalls) ?: return false
         val ticks = rotations.calculateTicks(rotation)
         debugParameter("Rotation Ticks") { ticks }
 
@@ -401,7 +469,12 @@ object ModuleKillAura : ClientModule("KillAura", ModuleCategories.COMBAT) {
      *
      *  @return The best spot to attack the entity
      */
-    private fun findRotation(entity: Entity, range: Float, wallsRange: Float): RotationWithVector? {
+    private fun findRotation(
+        entity: Entity,
+        range: Float,
+        wallsRange: Float,
+        allowAimThroughWalls: Boolean = true,
+    ): RotationWithVector? {
         val eyes = player.eyePosition
         val point = pointTracker.findPoint(eyes, entity)
 
@@ -419,7 +492,7 @@ object ModuleKillAura : ClientModule("KillAura", ModuleCategories.COMBAT) {
             rotationPreference = rotationPreference
         )
 
-        return if (rotation == null && rotations.aimThroughWalls) {
+        return if (rotation == null && allowAimThroughWalls && rotations.aimThroughWalls) {
             val rotationThroughWalls = raytraceBox(
                 eyes = eyes,
                 box = point.box,
@@ -433,6 +506,19 @@ object ModuleKillAura : ClientModule("KillAura", ModuleCategories.COMBAT) {
         } else {
             rotation
         }
+    }
+
+    private fun targetingParameters(
+        entity: LivingEntity,
+        normalRange: Float,
+        normalWallsRange: Float,
+    ): TargetingParameters? {
+        if (shouldUseSuperHitFor(entity)) {
+            return TargetingParameters(ModuleSuperHit.maximumTargetRange, 0f, allowAimThroughWalls = false)
+        }
+
+        return TargetingParameters(normalRange, normalWallsRange, allowAimThroughWalls = true)
+            .takeIf { entity.squaredBoxedDistanceTo(player) <= normalRange.sq() }
     }
 
     /**
@@ -466,4 +552,61 @@ object ModuleKillAura : ClientModule("KillAura", ModuleCategories.COMBAT) {
         TRACE_ALL("All")
     }
 
+    private data class TargetingParameters(
+        val range: Float,
+        val wallsRange: Float,
+        val allowAimThroughWalls: Boolean,
+    )
+
+}
+
+internal fun shouldBlockSprintForCriticals(
+    keepSprintEnabled: Boolean,
+    elytraTargetRunning: Boolean,
+    criticalsRequestSprintStop: Boolean,
+): Boolean = !keepSprintEnabled && !elytraTargetRunning && criticalsRequestSprintStop
+
+internal enum class KillAuraAttackRoute {
+    NONE,
+    NORMAL,
+    SUPER_HIT,
+}
+
+internal fun selectKillAuraAttackRoute(
+    normalAttackPossible: Boolean,
+    superHitRunning: Boolean,
+    superHitTargetPossible: Boolean,
+): KillAuraAttackRoute = when {
+    normalAttackPossible -> KillAuraAttackRoute.NORMAL
+    superHitRunning && superHitTargetPossible -> KillAuraAttackRoute.SUPER_HIT
+    else -> KillAuraAttackRoute.NONE
+}
+
+internal fun calculateKillAuraTargetingRange(
+    normalMaximumRange: Float,
+    superHitRunning: Boolean,
+    superHitMaximumRange: Float,
+): Float = if (superHitRunning) {
+    maxOf(normalMaximumRange, superHitMaximumRange)
+} else {
+    normalMaximumRange
+}
+
+internal suspend fun executeKillAuraAttack(
+    route: KillAuraAttackRoute,
+    normalAttack: suspend () -> Boolean,
+    superHitAttack: suspend () -> Boolean,
+    onSuccess: () -> Unit,
+): Boolean {
+    val success = when (route) {
+        KillAuraAttackRoute.NONE -> false
+        KillAuraAttackRoute.NORMAL -> normalAttack()
+        KillAuraAttackRoute.SUPER_HIT -> superHitAttack()
+    }
+
+    if (success) {
+        onSuccess()
+    }
+
+    return success
 }

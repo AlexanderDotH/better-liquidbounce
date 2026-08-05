@@ -25,6 +25,7 @@ import net.ccbluex.liquidbounce.event.Event
 import net.ccbluex.liquidbounce.integration.interop.protocol.event.WebSocketEvent
 import net.ccbluex.liquidbounce.integration.interop.protocol.rest.v1.game.PlayerData
 import net.ccbluex.liquidbounce.integration.interop.protocol.rest.v1.game.PlayerInventoryData
+import net.ccbluex.liquidbounce.integration.theme.component.ModernContextualBarSnapshot
 import net.minecraft.network.chat.Component
 import net.minecraft.world.effect.MobEffectInstance
 
@@ -39,6 +40,10 @@ class FpsLimitEvent(var fps: Int) : Event()
 @Tag("clientPlayerData")
 @Suppress("unused")
 class ClientPlayerDataEvent(val playerData: PlayerData) : Event(), WebSocketEvent
+
+@Tag("contextualBar")
+@Suppress("unused")
+class ContextualBarEvent(val contextualBar: ModernContextualBarSnapshot) : Event(), WebSocketEvent
 
 @Tag("clientPlayerEffect")
 @Suppress("unused")
