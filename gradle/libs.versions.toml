@@ -29,6 +29,17 @@ ahocorasick = "0.6.3"
 fastutil4k = "0.2.8"
 discord-ipc = "-SNAPSHOT"
 
+# Seed cracking (pinned to SeedCrackerX's Minecraft 26.2-compatible SeedFinding stack)
+seedfinding-math = "851e9d0577dfdca50154e98f1d334bd31c641326"
+seedfinding-seed = "55f6242001f7eb4226df4ed0d023f1838a54a99d"
+seedfinding-core = "eee662999e9f3fe037476b6940dbd6d5e23cdbb6"
+seedfinding-noise = "dbab3996ea3abff5dd420db53c31d5498afd2fe5"
+seedfinding-biome = "17af8cb1110fdc983b7cb2b887d1fb2060e23ee3"
+seedfinding-terrain = "a03e440ec5b282e399382f2cc5ad0db91b438d2e"
+seedfinding-feature = "755d3611ac1c499c28289ccca5b738af6a5859b7"
+seedfinding-reversal = "75aa6ce47a9f53a1aa212765e9830e08f6c86299"
+latticg = "1.07"
+
 # Recommended mods
 modmenu = "20.0.0-beta.4"
 exploit_preventer_api = "1.0.0"
@@ -81,6 +92,16 @@ ahocorasick = { group = "org.ahocorasick", name = "ahocorasick", version.ref = "
 fastutil4k-extensionsOnly = { group = "net.ccbluex", name = "fastutil4k-extensions-only", version.ref = "fastutil4k" }
 fastutil4k-moreCollections = { group = "net.ccbluex", name = "fastutil4k-more-collections", version.ref = "fastutil4k" }
 discord-ipc = { group = "com.github.CCBlueX", name = "discord-ipc", version.ref = "discord-ipc" }
+
+seedfinding-mc-math = { group = "com.seedfinding", name = "mc_math", version.ref = "seedfinding-math" }
+seedfinding-mc-seed = { group = "com.seedfinding", name = "mc_seed", version.ref = "seedfinding-seed" }
+seedfinding-mc-core = { group = "com.seedfinding", name = "mc_core", version.ref = "seedfinding-core" }
+seedfinding-mc-noise = { group = "com.seedfinding", name = "mc_noise", version.ref = "seedfinding-noise" }
+seedfinding-mc-biome = { group = "com.seedfinding", name = "mc_biome", version.ref = "seedfinding-biome" }
+seedfinding-mc-terrain = { group = "com.seedfinding", name = "mc_terrain", version.ref = "seedfinding-terrain" }
+seedfinding-mc-feature = { group = "com.seedfinding", name = "mc_feature", version.ref = "seedfinding-feature" }
+seedfinding-mc-reversal = { group = "com.seedfinding", name = "mc_reversal", version.ref = "seedfinding-reversal" }
+latticg = { group = "com.seedfinding", name = "latticg", version.ref = "latticg" }
 
 polyglot = { group = "org.graalvm.polyglot", name = "polyglot", version.ref = "polyglot" }
 polyglot-tools = { group = "org.graalvm.polyglot", name = "tools-community", version.ref = "polyglot" }

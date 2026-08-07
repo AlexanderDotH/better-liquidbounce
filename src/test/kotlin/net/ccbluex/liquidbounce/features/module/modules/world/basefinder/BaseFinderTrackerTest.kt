@@ -147,6 +147,89 @@ class BaseFinderTrackerTest {
     }
 
     @Test
+    fun `encased compact starter base remains detectable at sixty percent`() {
+        val snapshot = BaseFinderTracker.scanBlocksForTest(
+            buildList {
+                add(BlockPos(0, -16, 0) to Blocks.CHEST.defaultBlockState())
+                listOf(
+                    BlockPos(-1, -16, 0),
+                    BlockPos(1, -16, 0),
+                    BlockPos(0, -17, 0),
+                    BlockPos(0, -16, -1),
+                    BlockPos(0, -16, 1),
+                    BlockPos(0, -15, 0),
+                ).forEach { add(it to Blocks.DEEPSLATE.defaultBlockState()) }
+                add(BlockPos(3, -16, 0) to Blocks.SHULKER_BOX.defaultBlockState())
+                add(BlockPos(4, -16, 0) to Blocks.FURNACE.defaultBlockState())
+                add(BlockPos(2, -16, 2) to Blocks.CRAFTING_TABLE.defaultBlockState())
+                add(BlockPos(3, -16, 2) to Blocks.BED.white().defaultBlockState())
+                add(BlockPos(4, -16, 2) to Blocks.BED.white().defaultBlockState())
+            },
+        )
+
+        assertTrue(snapshot.storage.anchors.any { it.key == "storage.chest" })
+        assertEquals(setOf("crafting", "bed", "smelting"), snapshot.utilities.categories)
+        assertTrue(snapshot.structural.bedGroup)
+
+        val candidate = BaseFinderScorer.scoreCluster(
+            snapshots = listOf(snapshot),
+            minimumConfidence = 60,
+            highSensitivity = true,
+        )
+        assertEquals(61, candidate.confidence)
+        assertTrue(candidate.accepted)
+    }
+
+    @Test
+    fun `active player portal with a chest is not classified as a ruined portal`() {
+        val snapshot = BaseFinderTracker.scanBlocksForTest(
+            buildList {
+                repeat(10) { index ->
+                    add(BlockPos(index, 64, 0) to Blocks.OBSIDIAN.defaultBlockState())
+                }
+                repeat(3) { offset ->
+                    add(BlockPos(0, 65 + offset, 2) to Blocks.NETHER_PORTAL.defaultBlockState())
+                    add(BlockPos(1, 65 + offset, 2) to Blocks.NETHER_PORTAL.defaultBlockState())
+                }
+                add(BlockPos(3, 64, 4) to Blocks.CHEST.defaultBlockState())
+            },
+        )
+
+        assertFalse(BaseFalsePositive.RUINED_PORTAL in snapshot.falsePositives)
+
+        val candidate = BaseFinderScorer.scoreCluster(
+            snapshots = listOf(snapshot),
+            minimumConfidence = 0,
+            highSensitivity = true,
+        )
+        assertEquals(13, candidate.confidence)
+        assertTrue(candidate.accepted)
+    }
+
+    @Test
+    fun `unlit ruined portal context remains excluded`() {
+        val snapshot = BaseFinderTracker.scanBlocksForTest(
+            buildList {
+                repeat(8) { index ->
+                    add(BlockPos(index, 64, 0) to Blocks.OBSIDIAN.defaultBlockState())
+                }
+                add(BlockPos(0, 64, 2) to Blocks.NETHERRACK.defaultBlockState())
+                add(BlockPos(1, 64, 2) to Blocks.GOLD_BLOCK.defaultBlockState())
+                add(BlockPos(2, 64, 2) to Blocks.CHEST.defaultBlockState())
+            },
+        )
+
+        assertTrue(BaseFalsePositive.RUINED_PORTAL in snapshot.falsePositives)
+        assertFalse(
+            BaseFinderScorer.scoreCluster(
+                snapshots = listOf(snapshot),
+                minimumConfidence = 0,
+                highSensitivity = true,
+            ).accepted,
+        )
+    }
+
+    @Test
     fun `expired activity records are removed from live snapshots`() {
         BaseFinderTracker.recordActivity(
             BaseFinderActivitySample(

@@ -117,7 +117,7 @@ object ModuleTracers : ClientModule("Tracers", ModuleCategories.RENDER) {
                     TracerSegment(
                         color = color,
                         eyePosition = eyePosition,
-                        entityPosition = position,
+                        targetPosition = position,
                     )
                 )
             }
@@ -141,7 +141,7 @@ object ModuleTracers : ClientModule("Tracers", ModuleCategories.RENDER) {
 internal data class TracerSegment(
     val color: Color4b,
     val eyePosition: Vec3f,
-    val entityPosition: Vec3f,
+    val targetPosition: Vec3f,
 ) {
     val glowMaskColor: Color4b
         get() = color.with(a = 255)
@@ -180,13 +180,13 @@ internal inline fun TracerRenderBatch.forEachLine(
                 color = if (glowMask) segment.glowMaskColor else segment.color,
                 width = renderLineWidth,
                 start = segment.eyePosition,
-                end = segment.entityPosition,
+                end = segment.targetPosition,
             )
         )
     }
 }
 
-private fun WorldRenderEnvironment.drawTracerBatch(batch: TracerRenderBatch, glowMask: Boolean) {
+internal fun WorldRenderEnvironment.drawTracerBatch(batch: TracerRenderBatch, glowMask: Boolean) {
     batch.forEachLine(glowMask) { line ->
         if (line.width == 1f) {
             drawLines(

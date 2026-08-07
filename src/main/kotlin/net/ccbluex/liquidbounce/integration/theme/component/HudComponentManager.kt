@@ -27,10 +27,11 @@ import net.ccbluex.liquidbounce.integration.screen.CustomScreenType
 import net.ccbluex.liquidbounce.integration.theme.Theme
 import net.ccbluex.liquidbounce.integration.theme.ThemeManager
 import net.ccbluex.liquidbounce.integration.theme.component.components.minimap.MinimapHudComponent
+import net.ccbluex.liquidbounce.integration.theme.component.components.seedcracker.SeedCrackerHudComponent
 
 object HudComponentManager {
 
-    val nativeComponents = listOf(MinimapHudComponent)
+    val nativeComponents = listOf(MinimapHudComponent, SeedCrackerHudComponent)
 
     val components: List<HudComponent>
         get() = nativeComponents + (ThemeManager.theme?.components ?: emptyList())

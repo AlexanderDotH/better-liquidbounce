@@ -46,6 +46,16 @@ import net.minecraft.world.phys.Vec3
 import net.minecraft.world.phys.shapes.Shapes
 import kotlin.jvm.optionals.getOrNull
 
+private const val VANILLA_CHECK_BYPASS_INTERVAL = 40
+private const val VANILLA_CHECK_BYPASS_Y_OFFSET = 0.04
+
+internal fun shouldRunVanillaFlyCheckBypass(enabled: Boolean, tickCount: Int) =
+    enabled && tickCount % VANILLA_CHECK_BYPASS_INTERVAL == 0
+
+internal fun applyVanillaFlyCheckBypass(packet: ServerboundMovePlayerPacket, previousY: Double) {
+    packet.y = previousY - VANILLA_CHECK_BYPASS_Y_OFFSET
+}
+
 internal object FlyVanilla : Mode("Vanilla") {
 
     private val glide by float("Glide", 0.0f, -1f..1f)
@@ -85,11 +95,12 @@ internal object FlyVanilla : Mode("Vanilla") {
             else -> glide.toDouble()
         }
 
-        // Most basic bypass for vanilla fly check
-        // This can also be done via packets, but this is easier.
-        if (bypassVanillaCheck && player.tickCount % 40 == 0) {
+        // Most basic bypass for vanilla fly check. Send the dip as a packet so FreeCam can keep the real body still.
+        if (shouldRunVanillaFlyCheckBypass(bypassVanillaCheck, player.tickCount)) {
             waitTicks(1)
-            player.deltaMovement.y = -0.04
+            network.send(MovePacketType.POSITION_AND_ON_GROUND.generatePacket().apply {
+                applyVanillaFlyCheckBypass(this, player.yLast)
+            })
             waitTicks(1)
         }
     }

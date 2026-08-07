@@ -21,7 +21,14 @@ package net.ccbluex.liquidbounce.config.types
 
 import net.ccbluex.liquidbounce.config.gson.stategies.Exclude
 import net.ccbluex.liquidbounce.utils.math.sq
+import java.util.function.Supplier
 import kotlin.properties.ReadOnlyProperty
+
+/** Optional inline guidance shown by a ranged setting once its value exceeds [threshold]. */
+data class RangedValueWarning(
+    val threshold: Double,
+    val message: Supplier<String>,
+)
 
 /**
  * Ranged value adds support for closed ranges
@@ -34,6 +41,10 @@ class RangedValue<T : Any>(
     @Exclude val suffix: String,
     valueType: ValueType
 ) : Value<T>(name, aliases, defaultValue, valueType) {
+
+    /** Kept out of saved configs but sent to the ClickGUI interop model. */
+    @Exclude
+    var warning: RangedValueWarning? = null
 
     @Suppress("UNCHECKED_CAST")
     override fun setByString(string: String) {

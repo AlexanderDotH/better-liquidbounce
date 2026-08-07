@@ -63,6 +63,7 @@ import net.ccbluex.liquidbounce.features.command.commands.module.CommandAutoAcco
 import net.ccbluex.liquidbounce.features.command.commands.module.CommandAutoDisable
 import net.ccbluex.liquidbounce.features.command.commands.module.CommandBaseFinder
 import net.ccbluex.liquidbounce.features.command.commands.module.CommandInvsee
+import net.ccbluex.liquidbounce.features.command.commands.module.CommandSeedCracker
 import net.ccbluex.liquidbounce.features.command.commands.module.CommandXRay
 import net.ccbluex.liquidbounce.features.command.commands.module.teleport.CommandPlayerTeleport
 import net.ccbluex.liquidbounce.features.command.commands.module.teleport.CommandTeleport
@@ -143,6 +144,7 @@ object CommandManager : Collection<Command> by commandSet {
             CommandResync,
             CommandXRay,
             CommandBaseFinder,
+            CommandSeedCracker,
             CommandTargets,
             CommandConfig,
             CommandLocalConfig,

@@ -35,7 +35,12 @@ class BaseFinderLedgerTest {
     @Test
     fun `versioned JSON round trip preserves a scoped finding and tolerates unknown fields`() = withLedger {
             ledger, _ ->
-        val original = finding(id = "home", serverKeyHash = ledger.hashScopeKey(SERVER), confidence = 91)
+        val original = finding(
+            id = "home",
+            serverKeyHash = ledger.hashScopeKey(SERVER),
+            confidence = 91,
+            bounds = BaseFinderBounds(BaseCoordinate(8, 60, -40), BaseCoordinate(20, 72, -24)),
+        )
 
         assertTrue(runBlocking { ledger.save(SERVER, DIMENSION, listOf(original)).await() }.isSuccess)
         val file = ledger.scopePath(SERVER, DIMENSION)
@@ -46,6 +51,23 @@ class BaseFinderLedgerTest {
 
         assertEquals(listOf(original), ledger.load(SERVER, DIMENSION))
         assertEquals(1, document.get("version").asInt)
+    }
+
+    @Test
+    fun `version one findings without dynamic bounds remain readable`() = withLedger { ledger, _ ->
+        val original = finding(id = "legacy", serverKeyHash = ledger.hashScopeKey(SERVER))
+        val file = ledger.scopePath(SERVER, DIMENSION)
+        Files.createDirectories(file.parent)
+        Files.writeString(file, BaseFinderGsonLedgerCodec.encode(BaseFinderLedgerDocument(findings = listOf(original))))
+
+        assertFalse(
+            JsonParser.parseString(Files.readString(file)).asJsonObject
+                .getAsJsonArray("findings")
+                .first().asJsonObject
+                .has("bounds"),
+        )
+        assertEquals(listOf(original), ledger.load(SERVER, DIMENSION))
+        assertEquals(null, ledger.load(SERVER, DIMENSION).single().bounds)
     }
 
     @Test
@@ -169,6 +191,7 @@ class BaseFinderLedgerTest {
         confidence: Int = 80,
         lastSeenAtMillis: Long = 200L,
         evidenceKeys: List<String> = listOf("Storage"),
+        bounds: BaseFinderBounds? = null,
     ) = BaseFinding(
         id = id,
         serverKeyHash = serverKeyHash,
@@ -180,6 +203,7 @@ class BaseFinderLedgerTest {
         firstSeenAtMillis = 100L,
         lastSeenAtMillis = lastSeenAtMillis,
         timesSeen = 2,
+        bounds = bounds,
     )
 
     private fun withLedger(

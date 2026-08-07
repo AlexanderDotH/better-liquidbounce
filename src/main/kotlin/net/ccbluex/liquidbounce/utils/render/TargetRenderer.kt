@@ -43,6 +43,10 @@ import net.ccbluex.liquidbounce.render.drawGradientCircle
 import net.ccbluex.liquidbounce.render.drawSquareTexture
 import net.ccbluex.liquidbounce.render.drawTexQuad
 import net.ccbluex.liquidbounce.render.drawTriangle
+import net.ccbluex.liquidbounce.render.engine.esp.EspGlowStyle
+import net.ccbluex.liquidbounce.render.engine.esp.EspGlowStyleConfig
+import net.ccbluex.liquidbounce.render.engine.esp.TargetGlowSelection
+import net.ccbluex.liquidbounce.render.engine.esp.TargetGlowSourceRegistry
 import net.ccbluex.liquidbounce.render.engine.font.HorizontalAnchor
 import net.ccbluex.liquidbounce.render.engine.font.VerticalAnchor
 import net.ccbluex.liquidbounce.render.engine.type.Color4b
@@ -92,7 +96,7 @@ class TargetRenderer(
         doNotIncludeAlways()
     }
 
-    private val appearance = modes(owner, "Mode", 3) {
+    private val appearance = modes(owner, "Mode", TARGET_RENDERING_DEFAULT_MODE_INDEX) {
         arrayOf(
             TargetRenderAppearance.World.Legacy(it),
             TargetRenderAppearance.World.Circle(owner, it),
@@ -102,7 +106,22 @@ class TargetRenderer(
             TargetRenderAppearance.World.Hearts(it),
             TargetRenderAppearance.Gui.Text(owner, it),
             TargetRenderAppearance.Gui.Arrow(it),
-        )
+            TargetRenderAppearance.World.Glow(it),
+        ).also { appearances ->
+            check(appearances.map(Mode::name) == TARGET_RENDERING_MODE_NAMES)
+        }
+    }
+
+    init {
+        TargetGlowSourceRegistry.register(::currentGlowSelection)
+    }
+
+    private fun currentGlowSelection(): TargetGlowSelection? {
+        if (!running) return null
+        val glow = appearance.activeMode as? TargetRenderAppearance.World.Glow ?: return null
+        val currentTarget = target() ?: return null
+
+        return TargetGlowSelection(currentTarget, glow.color, glow.style)
     }
 
     @Suppress("unused")
@@ -368,6 +387,19 @@ private sealed class TargetRenderAppearance<Ctx : Any>(name: String) : Mode(name
                 }
             }
 
+        }
+
+        class Glow(override val parent: ModeValueGroup<*>) : World("Glow") {
+
+            private val settings = TargetGlowSettings(this, defaultColor)
+
+            val color: Color4b
+                get() = settings.color
+
+            val style: EspGlowStyle
+                get() = settings.style
+
+            override fun WorldRenderEnvironment.render(entity: Entity, partialTicks: Float) = Unit
         }
 
         class Hearts(override val parent: ModeValueGroup<*>) : World("Hearts") {
@@ -660,10 +692,34 @@ private sealed class TargetRenderAppearance<Ctx : Any>(name: String) : Mode(name
     }
 }
 
+internal const val TARGET_RENDERING_DEFAULT_MODE_INDEX = 3
+
+internal val TARGET_RENDERING_MODE_NAMES = listOf(
+    "Legacy",
+    "Circle",
+    "Image",
+    "GlowingCircle",
+    "Ghost",
+    "Hearts",
+    "Text2D",
+    "Arrow",
+    "Glow",
+)
+
+internal class TargetGlowSettings(owner: ValueGroup, defaultColor: Color4b) {
+    val color by owner.color("Color", defaultColor)
+    private val styleConfig = EspGlowStyleConfig(owner)
+
+    val style: EspGlowStyle
+        get() = styleConfig.style
+}
+
 private val defaultColor = Color4b.LIQUID_BOUNCE.alpha(100)
 
-private val ghostModeTexture = LiquidBounce.resource("particles/glow.png")
-    .readNativeImage().asTexture { "TargetRenderer Ghost" }
+private val ghostModeTexture by lazy {
+    LiquidBounce.resource("particles/glow.png")
+        .readNativeImage().asTexture { "TargetRenderer Ghost" }
+}
 
 private sealed class HeightMode(name: String) : Mode(name) {
     abstract fun getHeight(entity: Entity, partialTicks: Float): Double

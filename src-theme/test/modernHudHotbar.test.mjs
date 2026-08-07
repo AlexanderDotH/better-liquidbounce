@@ -57,3 +57,18 @@ test("Modern hotbar owns one contextual island while Classic keeps its current X
     assert.match(contextual, /waypointEmoji\(marker\.style\)/);
     assert.match(contextual, /marker\.elevation/);
 });
+
+test("Modern experience bar uses the recovered space without changing its height", () => {
+    const contextual = read("elements/hotbar/ModernContextualBar.svelte");
+    const experienceBranch = contextual.match(
+        /\{#if data\.mode === "experience"\}([\s\S]*?)\{:else if data\.mode === "jumpableVehicle"\}/,
+    )?.[1];
+
+    assert.ok(experienceBranch);
+    assert.doesNotMatch(experienceBranch, /mode-(?:emoji|copy)/);
+    assert.match(experienceBranch, /aria-label="Experience level">\{data\.level\}/);
+    assert.match(experienceBranch, /contextual-progress contextual-progress--experience/);
+    assert.match(contextual, /\.contextual-island--experience\s*\{[\s\S]*grid-template-columns:\s*auto minmax\(0, 1fr\)/);
+    assert.match(contextual, /\.contextual-progress--experience span\s*\{[\s\S]*var\(--hotbar-experience-color\)/);
+    assert.match(contextual, /\.contextual-progress\s*\{[\s\S]*height:\s*8px/);
+});

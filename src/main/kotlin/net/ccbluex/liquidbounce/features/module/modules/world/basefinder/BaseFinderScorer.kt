@@ -34,12 +34,16 @@ internal object BaseFinderScorer {
     fun scoreCluster(
         snapshots: Collection<ChunkEvidenceSnapshot>,
         minimumConfidence: Int,
+        highSensitivity: Boolean = false,
     ): ScoredBaseCandidate {
         require(snapshots.isNotEmpty()) { "A base candidate requires at least one chunk" }
         require(minimumConfidence in 0..100) { "Minimum confidence must be between 0 and 100" }
 
         val combined = combine(snapshots)
-        val evidence = evaluate(combined)
+        val evidence = buildList {
+            addAll(evaluate(combined))
+            if (highSensitivity) CompactBaseProfile.evaluate(combined)?.let(::add)
+        }
         val seedCount = evidence.count { it.family.seedCapable }
         val diversityBonus = when {
             seedCount >= 4 -> 8
@@ -50,6 +54,11 @@ internal object BaseFinderScorer {
         val confidence = (evidence.sumOf(FamilyEvidence::score) + diversityBonus - penalty).coerceIn(0, 100)
         val storageScore = evidence.firstOrNull { it.family == BaseSignalFamily.STORAGE }?.score ?: 0
         val enoughIndependentEvidence = seedCount >= 2 || storageScore >= 24 && evidence.size >= 2
+        val hasPhysicalPlayerStorage = combined.storage.anchors.any(
+            BaseFinderEvidenceClassifier::isPhysicalPlayerStorageAnchor,
+        )
+        val highSensitivityAcceptance = highSensitivity && hasPhysicalPlayerStorage && combined.falsePositives.isEmpty()
+        val acceptanceGate = if (highSensitivity) highSensitivityAcceptance else enoughIndependentEvidence
 
         return ScoredBaseCandidate(
             anchor = selectAnchor(evidence, combined.chunk),
@@ -57,7 +66,8 @@ internal object BaseFinderScorer {
             tier = ConfidenceTier.from(confidence),
             evidence = evidence.map { EvidenceSummary(it.family, it.score, it.keys) },
             chunks = snapshots.mapTo(linkedSetOf()) { it.chunk },
-            accepted = confidence >= minimumConfidence && enoughIndependentEvidence,
+            accepted = confidence >= minimumConfidence && acceptanceGate,
+            bounds = DynamicBounds.fromEvidence(evidence),
         )
     }
 
@@ -90,6 +100,8 @@ internal object BaseFinderScorer {
         }
         val retained = findings - nearby.toSet()
         val stable = nearby.minWithOrNull(compareBy(BaseFinding::firstSeenAtMillis, BaseFinding::id))
+        val bounds = (nearby.mapNotNull(BaseFinding::bounds) + listOfNotNull(candidate.bounds))
+            .reduceOrNull(BaseFinderBounds::merge)
         val updated = BaseFinding(
             id = stable?.id ?: idFactory(),
             serverKeyHash = serverKeyHash,
@@ -101,6 +113,7 @@ internal object BaseFinderScorer {
             firstSeenAtMillis = nearby.minOfOrNull(BaseFinding::firstSeenAtMillis) ?: nowMillis,
             lastSeenAtMillis = nowMillis,
             timesSeen = nearby.sumOf(BaseFinding::timesSeen) + 1,
+            bounds = bounds,
         )
         return retained + updated
     }
@@ -311,4 +324,59 @@ internal object BaseFinderScorer {
     private const val DEFAULT_ANCHOR_Y = 64
     private const val MERGE_DISTANCE_CHUNKS = 3
     private const val OVERWORLD_DIMENSION = "minecraft:overworld"
+
+    private object CompactBaseProfile {
+
+        fun evaluate(snapshot: ChunkEvidenceSnapshot): FamilyEvidence? {
+            if (snapshot.falsePositives.isNotEmpty()) return null
+
+            val utilityAnchors = UTILITY_KEYS.mapNotNull { key ->
+                snapshot.utilities.anchors.firstOrNull { it.key == key }
+            }
+            if (utilityAnchors.size != UTILITY_KEYS.size) return null
+
+            val storageAnchor = snapshot.storage.anchors.asSequence()
+                .filter(BaseFinderEvidenceClassifier::isPhysicalPlayerStorageAnchor)
+                .firstOrNull { storage -> utilityAnchors.all { utility -> storage.isNear(utility) } }
+                ?: return null
+
+            return FamilyEvidence(
+                family = BaseSignalFamily.COMPACT_BASE,
+                score = SCORE,
+                anchors = listOf(storageAnchor) + utilityAnchors,
+                keys = listOf("profile.compact_inhabited_base"),
+            )
+        }
+
+        private fun EvidenceAnchor.isNear(other: EvidenceAnchor): Boolean {
+            val x = position.x.toLong() - other.position.x
+            val y = position.y.toLong() - other.position.y
+            val z = position.z.toLong() - other.position.z
+            return x * x + y * y + z * z <= RADIUS_SQUARED
+        }
+
+        private const val SCORE = 32
+        private const val RADIUS_SQUARED = 8L * 8L
+        private val UTILITY_KEYS = listOf("utility.crafting", "utility.bed", "utility.smelting")
+    }
+
+    private object DynamicBounds {
+
+        fun fromEvidence(evidence: Collection<FamilyEvidence>): BaseFinderBounds? = BaseFinderBounds.enclosing(
+            evidence.asSequence()
+                .filter { it.family in STATIC_FAMILIES }
+                .flatMap { it.anchors.asSequence() }
+                .filter { it.key != CONTAINER_VEHICLE_STORAGE_KEY }
+                .map(EvidenceAnchor::position)
+                .toList(),
+        )
+
+        private val STATIC_FAMILIES = setOf(
+            BaseSignalFamily.STORAGE,
+            BaseSignalFamily.UTILITIES,
+            BaseSignalFamily.AUTOMATION,
+            BaseSignalFamily.STRUCTURAL,
+        )
+        private const val CONTAINER_VEHICLE_STORAGE_KEY = "storage.container_vehicle"
+    }
 }

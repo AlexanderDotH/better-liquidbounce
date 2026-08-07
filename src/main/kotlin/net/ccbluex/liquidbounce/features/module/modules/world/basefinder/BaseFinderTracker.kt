@@ -218,6 +218,13 @@ internal object BaseFinderTracker : ChunkScanner.BlockChangeSubscriber {
         samples.forEach { (category, position) -> add(category, position) }
     }.toEvidence()
 
+    internal fun scanBlocksForTest(
+        blocks: List<Pair<BlockPos, BlockState>>,
+        dimensionKey: String = "minecraft:overworld",
+    ): ChunkEvidenceSnapshot = ChunkAccumulator(ChunkCoordinate(0, 0), dimensionKey).apply {
+        blocks.forEach { (position, state) -> accept(position, state) }
+    }.toSnapshot()
+
     private fun scanChunk(chunk: LevelChunk): ChunkEvidenceSnapshot {
         val accumulator = ChunkAccumulator(
             chunk.pos.toCoordinate(),
@@ -466,7 +473,7 @@ internal object BaseFinderTracker : ChunkScanner.BlockChangeSubscriber {
                 ),
                 structural = StructuralSignal(
                     portalShape = structuralCounts.getOrDefault("portal", 0) >= 2,
-                    bedGroup = structuralCounts.getOrDefault("bed", 0) >= 3,
+                    bedGroup = structuralCounts.getOrDefault("bed", 0) >= 2,
                     infrastructure = structuralCounts.getOrDefault("infrastructure", 0) > 0,
                     decorationCluster = structuralCounts.getOrDefault("decoration", 0) >= 3,
                     anchors = structuralAnchors.toList(),
@@ -546,6 +553,9 @@ internal object BaseFinderTracker : ChunkScanner.BlockChangeSubscriber {
             val rails = automationCounts.getOrDefault("rail", 0)
             val portalBlocks = structuralCounts.getOrDefault("portal", 0)
             val obsidian = pathCounts.getOrDefault("obsidian", 0)
+            val netherrack = pathCounts.getOrDefault("netherrack", 0)
+            val goldBlocks = pathCounts.getOrDefault("gold_block", 0)
+            val ruinedPortalMaterials = obsidian >= 8 && portalBlocks == 0 && netherrack > 0 && goldBlocks > 0
             val netherBricks = pathCounts.filterKeys { it.endsWith("nether_bricks") }.values.sum()
             val endCityBlocks = pathCounts.filterKeys { it.startsWith("purpur_") }.values.sum()
 
@@ -553,7 +563,7 @@ internal object BaseFinderTracker : ChunkScanner.BlockChangeSubscriber {
             if (pathCounts.getOrDefault("spawner", 0) > 0 || rails >= 12 && automationCategories.size == 1) {
                 add(BaseFalsePositive.MINESHAFT_OR_DUNGEON)
             }
-            if (obsidian >= 8 && portalBlocks > 0 && storagePoints <= 3 && utilityCategories.size <= 1) {
+            if (ruinedPortalMaterials && storagePoints <= 3 && utilityCategories.size <= 1) {
                 add(BaseFalsePositive.RUINED_PORTAL)
             }
             if ((netherBricks >= 64 && pathCounts.getOrDefault("nether_wart", 0) >= 8) || endCityBlocks >= 64) {
@@ -619,7 +629,7 @@ internal object BaseFinderTracker : ChunkScanner.BlockChangeSubscriber {
         "loom", "smithing_table", "stonecutter", "composter",
     )
     private val STRUCTURE_CONTEXT_PATHS = VILLAGE_WORKSTATIONS + setOf(
-        "spawner", "obsidian", "nether_wart", "nether_bricks", "red_nether_bricks",
+        "spawner", "obsidian", "netherrack", "gold_block", "nether_wart", "nether_bricks", "red_nether_bricks",
         "purpur_block", "purpur_pillar", "purpur_stairs", "purpur_slab",
     )
 }

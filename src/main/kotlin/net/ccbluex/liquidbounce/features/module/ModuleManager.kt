@@ -259,6 +259,7 @@ import net.ccbluex.liquidbounce.features.module.modules.world.ModuleLiquidPlace
 import net.ccbluex.liquidbounce.features.module.modules.world.ModuleNoInterpolation
 import net.ccbluex.liquidbounce.features.module.modules.world.ModuleNoSlowBreak
 import net.ccbluex.liquidbounce.features.module.modules.world.ModuleProjectilePuncher
+import net.ccbluex.liquidbounce.features.module.modules.world.ModuleSeedCracker
 import net.ccbluex.liquidbounce.features.module.modules.world.ModuleStrongholdFinder
 import net.ccbluex.liquidbounce.features.module.modules.world.ModuleSurround
 import net.ccbluex.liquidbounce.features.module.modules.world.ModuleTimer
@@ -715,6 +716,7 @@ object ModuleManager : EventListener, Collection<ClientModule> by modules {
             ModulePacketMine,
             ModuleHoleFiller,
             ModuleStrongholdFinder,
+            ModuleSeedCracker,
             ModuleBaseFinder,
             ModuleNoInterpolation,
         )

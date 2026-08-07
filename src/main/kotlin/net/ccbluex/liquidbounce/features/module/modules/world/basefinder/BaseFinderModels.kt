@@ -10,6 +10,7 @@
  */
 package net.ccbluex.liquidbounce.features.module.modules.world.basefinder
 
+import net.ccbluex.liquidbounce.config.types.list.Tagged
 import net.minecraft.core.BlockPos
 import kotlin.math.max
 
@@ -23,6 +24,7 @@ internal enum class BaseSignalFamily(
     ENTITIES(12, true),
     STRUCTURAL(12, true),
     GEOMETRY(10, true),
+    COMPACT_BASE(32, false),
     ACTIVITY(6, false),
     CHUNK_TRAILS(4, false),
 }
@@ -50,6 +52,11 @@ internal enum class ConfidenceTier {
     }
 }
 
+internal enum class BaseFinderBoxMode(override val tag: String) : Tagged {
+    FIXED("Fixed"),
+    DYNAMIC("Dynamic box"),
+}
+
 /** Integer world position which cannot retain a scanner-owned mutable [BlockPos]. */
 internal data class BaseCoordinate(val x: Int, val y: Int, val z: Int) {
     val blockPos: BlockPos
@@ -60,6 +67,60 @@ internal data class BaseCoordinate(val x: Int, val y: Int, val z: Int) {
 
     companion object {
         fun of(position: BlockPos) = BaseCoordinate(position.x, position.y, position.z)
+    }
+}
+
+/** Inclusive block-coordinate bounds for a detected, stationary base footprint. */
+internal data class BaseFinderBounds(
+    val minimum: BaseCoordinate,
+    val maximum: BaseCoordinate,
+) {
+    init {
+        requireValid()
+    }
+
+    fun merge(other: BaseFinderBounds) = BaseFinderBounds(
+        minimum = BaseCoordinate(
+            minOf(minimum.x, other.minimum.x),
+            minOf(minimum.y, other.minimum.y),
+            minOf(minimum.z, other.minimum.z),
+        ),
+        maximum = BaseCoordinate(
+            maxOf(maximum.x, other.maximum.x),
+            maxOf(maximum.y, other.maximum.y),
+            maxOf(maximum.z, other.maximum.z),
+        ),
+    )
+
+    fun requireValid() {
+        require(minimum.x <= maximum.x)
+        require(minimum.y <= maximum.y)
+        require(minimum.z <= maximum.z)
+    }
+
+    companion object {
+        fun enclosing(positions: Iterable<BaseCoordinate>): BaseFinderBounds? {
+            val iterator = positions.iterator()
+            if (!iterator.hasNext()) return null
+
+            val first = iterator.next()
+            var minimum = first
+            var maximum = first
+            while (iterator.hasNext()) {
+                val position = iterator.next()
+                minimum = BaseCoordinate(
+                    minOf(minimum.x, position.x),
+                    minOf(minimum.y, position.y),
+                    minOf(minimum.z, position.z),
+                )
+                maximum = BaseCoordinate(
+                    maxOf(maximum.x, position.x),
+                    maxOf(maximum.y, position.y),
+                    maxOf(maximum.z, position.z),
+                )
+            }
+            return BaseFinderBounds(minimum, maximum)
+        }
     }
 }
 
@@ -171,6 +232,7 @@ internal data class ScoredBaseCandidate(
     val evidence: List<EvidenceSummary>,
     val chunks: Set<ChunkCoordinate>,
     val accepted: Boolean,
+    val bounds: BaseFinderBounds? = null,
 )
 
 internal data class BaseFinding(
@@ -184,6 +246,14 @@ internal data class BaseFinding(
     val firstSeenAtMillis: Long,
     val lastSeenAtMillis: Long,
     val timesSeen: Int,
+    val bounds: BaseFinderBounds? = null,
+)
+
+/** Localized, render-only representation of one persisted evidence family. */
+internal data class BaseFinderLabelEvidence(
+    val family: String,
+    val score: Int,
+    val detections: List<String>,
 )
 
 internal data class BaseFinderMarker(
@@ -192,6 +262,8 @@ internal data class BaseFinderMarker(
     val confidence: Int,
     val topEvidenceKeys: List<String>,
     val updatedAtMillis: Long,
+    val evidenceDetails: List<BaseFinderLabelEvidence> = emptyList(),
+    val bounds: BaseFinderBounds? = null,
 )
 
 internal data class BaseFinderRenderSnapshot(

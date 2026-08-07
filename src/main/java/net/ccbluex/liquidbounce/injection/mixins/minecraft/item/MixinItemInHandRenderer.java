@@ -24,7 +24,9 @@ import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
 import com.llamalad7.mixinextras.sugar.Local;
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.math.Axis;
+import net.ccbluex.liquidbounce.features.module.modules.combat.ModuleSpearKill;
 import net.ccbluex.liquidbounce.features.module.modules.combat.ModuleSwordBlock;
+import net.ccbluex.liquidbounce.features.module.modules.player.ModuleFastUse;
 import net.ccbluex.liquidbounce.features.module.modules.render.ModuleAnimations;
 import net.ccbluex.liquidbounce.features.module.modules.render.ModuleSilentHotbar;
 import net.ccbluex.liquidbounce.utils.client.SilentHotbar;
@@ -220,6 +222,9 @@ public abstract class MixinItemInHandRenderer {
         if (ModuleSwordBlock.shouldAnimateSwordBlock(player)) {
             return true;
         }
+        if (player == Minecraft.getInstance().player && ModuleSpearKill.shouldAnimateRaisedSpear()) {
+            return true;
+        }
 
         return original;
     }
@@ -232,6 +237,12 @@ public abstract class MixinItemInHandRenderer {
     private InteractionHand hookActiveHand(InteractionHand original, @Local(argsOnly = true, name = "player") AbstractClientPlayer player) {
         if (ModuleSwordBlock.shouldAnimateSwordBlock(player)) {
             return InteractionHand.MAIN_HAND;
+        }
+        if (player == Minecraft.getInstance().player) {
+            InteractionHand raisedHand = ModuleSpearKill.raisedSpearHand();
+            if (raisedHand != null) {
+                return raisedHand;
+            }
         }
 
         return original;
@@ -248,6 +259,19 @@ public abstract class MixinItemInHandRenderer {
         }
 
         return original;
+    }
+
+    @ModifyArg(method = "submitArmWithItem", at = @At(
+        value = "INVOKE",
+        target = "Lnet/minecraft/client/model/effects/SpearAnimations;firstPersonUse(FLcom/mojang/blaze3d/vertex/PoseStack;FLnet/minecraft/world/entity/HumanoidArm;Lnet/minecraft/world/item/ItemStack;)V"
+    ), index = 2)
+    private float hookFastUseSpearAnimation(float ticksUsingItem, @Local(argsOnly = true, name = "hand") InteractionHand hand) {
+        // In 26.2, argument 0 is kinetic-hit feedback and argument 2 is the actual use progress.
+        // SpearKill decides the raised pose; FastUse only fills in when SpearKill is idle.
+        if (ModuleSpearKill.getControlsSpearAnimation()) {
+            return ModuleSpearKill.getSpearAnimationTicks(hand, ticksUsingItem);
+        }
+        return ModuleFastUse.getSpearAnimationTicks(hand, ticksUsingItem);
     }
 
 

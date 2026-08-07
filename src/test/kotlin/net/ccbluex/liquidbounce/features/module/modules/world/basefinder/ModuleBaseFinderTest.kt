@@ -18,6 +18,8 @@
  */
 package net.ccbluex.liquidbounce.features.module.modules.world.basefinder
 
+import com.google.gson.JsonArray
+import com.google.gson.JsonObject
 import net.ccbluex.liquidbounce.config.types.Value
 import net.ccbluex.liquidbounce.config.types.RangedValue
 import net.ccbluex.liquidbounce.config.types.group.ValueGroup
@@ -37,14 +39,15 @@ class ModuleBaseFinderTest {
     }
 
     @Test
-    fun `BaseFinder is a World module tagged by its inclusive confidence threshold`() {
+    fun `BaseFinder is a World module with high sensitivity and a zero confidence default`() {
         assertEquals("BaseFinder", ModuleBaseFinder.name)
         assertEquals(ModuleCategories.WORLD, ModuleBaseFinder.category)
         val confidence = ModuleBaseFinder.setting("MinimumConfidence") as RangedValue<*>
-        assertEquals(65, confidence.get())
+        assertEquals(0, confidence.get())
         assertEquals(0..100, confidence.range)
         assertEquals("%", confidence.suffix)
-        assertEquals("65", ModuleBaseFinder.tag)
+        assertEquals(true, ModuleBaseFinder.setting("HighSensitivity").get())
+        assertEquals("0", ModuleBaseFinder.tag)
     }
 
     @Test
@@ -78,10 +81,16 @@ class ModuleBaseFinderTest {
         assertEquals(32, glowBox.setting("RenderLimit").get())
         assertEquals(4, glowBox.setting("BoxRadius").get())
         assertEquals(6, glowBox.setting("BoxHeight").get())
+        assertEquals(BaseFinderBoxMode.FIXED, glowBox.setting("BoxMode").get())
+        assertEquals(1, glowBox.setting("DynamicPadding").get())
         assertEquals(Color4b(255, 186, 32), glowBox.setting("LowConfidenceColor").get())
         assertEquals(Color4b(255, 60, 180), glowBox.setting("HighConfidenceColor").get())
         assertEquals(true, glowBox.setting("ShowLabels").get())
         assertEquals(8, glowBox.setting("MaxLabels").get())
+        assertEquals("", glowBox.setting("LabelText").get())
+        assertEquals(1f, glowBox.setting("LabelScale").get())
+        assertEquals(true, glowBox.setting("ShowEvidenceDetails").get())
+        assertEquals(4, glowBox.setting("MaxEvidenceDetails").get())
 
         val pulse = glowBox.group("Pulse")
         assertEquals(true, pulse.setting("Enabled").get())
@@ -130,13 +139,58 @@ class ModuleBaseFinderTest {
         val snapshots = listOf(ChunkEvidenceSnapshot(ChunkCoordinate(0, 0)))
         val enabled = BaseSignalFamily.entries.toSet()
 
-        val original = baseFinderEvidenceFingerprint(snapshots, 65, enabled)
+        val original = baseFinderEvidenceFingerprint(snapshots, 0, true, enabled)
 
-        assertTrue(original != baseFinderEvidenceFingerprint(snapshots, 66, enabled))
-        assertTrue(original != baseFinderEvidenceFingerprint(snapshots, 65, enabled - BaseSignalFamily.ACTIVITY))
+        assertTrue(original != baseFinderEvidenceFingerprint(snapshots, 1, true, enabled))
+        assertTrue(original != baseFinderEvidenceFingerprint(snapshots, 0, false, enabled))
+        assertTrue(original != baseFinderEvidenceFingerprint(snapshots, 0, true, enabled - BaseSignalFamily.ACTIVITY))
+    }
+
+    @Test
+    fun `legacy default confidence migrates only when high sensitivity is absent`() {
+        val legacyDefault = baseFinderConfig(minimumConfidence = 65)
+
+        migrateLegacyBaseFinderSensitivity(legacyDefault)
+
+        assertEquals(0, storedBaseFinderValue(legacyDefault, "MinimumConfidence").asInt)
+
+        listOf(0, 1, 64, 66, 100).forEach { confidence ->
+            val custom = baseFinderConfig(minimumConfidence = confidence)
+
+            migrateLegacyBaseFinderSensitivity(custom)
+
+            assertEquals(confidence, storedBaseFinderValue(custom, "MinimumConfidence").asInt)
+        }
+
+        val modern = baseFinderConfig(minimumConfidence = 65, highSensitivity = false)
+
+        migrateLegacyBaseFinderSensitivity(modern)
+
+        assertEquals(65, storedBaseFinderValue(modern, "MinimumConfidence").asInt)
     }
 
     private fun ValueGroup.setting(name: String): Value<*> = inner.single { it.name == name } as Value<*>
 
     private fun ValueGroup.group(name: String): ValueGroup = inner.single { it.name == name } as ValueGroup
+
+    private fun baseFinderConfig(minimumConfidence: Int, highSensitivity: Boolean? = null) = JsonObject().apply {
+        addProperty("name", "BaseFinder")
+        add("value", JsonArray().apply {
+            add(storedBaseFinderValue("MinimumConfidence", minimumConfidence))
+            highSensitivity?.let { add(storedBaseFinderValue("HighSensitivity", it)) }
+        })
+    }
+
+    private fun storedBaseFinderValue(name: String, value: Any) = JsonObject().apply {
+        addProperty("name", name)
+        when (value) {
+            is Boolean -> addProperty("value", value)
+            is Int -> addProperty("value", value)
+        }
+    }
+
+    private fun storedBaseFinderValue(config: JsonObject, name: String) = config.getAsJsonArray("value")
+        .map { it.asJsonObject }
+        .single { it["name"].asString == name }
+        .get("value")
 }

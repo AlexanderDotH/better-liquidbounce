@@ -38,6 +38,11 @@ public final class EspMaskTargetSelector {
         }
 
         var request = EspMaskRequest.NONE;
+        var targetGlow = TargetGlowSourceRegistry.selectionFor(entity);
+        if (targetGlow != null) {
+            request = request.withGlow(targetGlow.color().argb());
+        }
+
         if (entity instanceof LivingEntity livingEntity && CombatExtensionsKt.shouldBeShown(livingEntity)) {
             int color = ModuleESP.INSTANCE.getColor(livingEntity).argb();
             if (EspGlowMode.INSTANCE.getRunning() && EspGlowMode.INSTANCE.shouldRender(livingEntity)) {

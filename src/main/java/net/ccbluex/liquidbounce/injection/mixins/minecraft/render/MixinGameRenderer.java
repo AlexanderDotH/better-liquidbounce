@@ -206,6 +206,7 @@ public abstract class MixinGameRenderer {
     private void injectBobView(CameraRenderState cameraState, PoseStack poseStack, CallbackInfo ci) {
         if (ModuleNoBob.INSTANCE.getRunning() ||
             ModuleTracers.INSTANCE.getRunning() ||
+            ModuleBlockESP.INSTANCE.showTracers() ||
             (ModuleItemESP.INSTANCE.getRunning() && ModuleItemESP.INSTANCE.getShowTracers()) ||
             ModuleStorageESP.INSTANCE.showTracers()) {
 

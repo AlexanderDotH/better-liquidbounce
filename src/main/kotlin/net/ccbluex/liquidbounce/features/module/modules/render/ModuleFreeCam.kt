@@ -49,6 +49,7 @@ import net.ccbluex.liquidbounce.utils.entity.rotation
 import net.ccbluex.liquidbounce.utils.entity.withStrafe
 import net.ccbluex.liquidbounce.utils.input.InputTracker.isPressedOnAny
 import net.ccbluex.liquidbounce.utils.input.isPressed
+import net.ccbluex.liquidbounce.utils.kotlin.EventPriorityConvention.FINAL_DECISION
 import net.ccbluex.liquidbounce.utils.kotlin.EventPriorityConvention.FIRST_PRIORITY
 import net.ccbluex.liquidbounce.utils.kotlin.EventPriorityConvention.OBJECTION_AGAINST_EVERYTHING
 import net.ccbluex.liquidbounce.utils.kotlin.Priority
@@ -70,6 +71,11 @@ import kotlin.math.abs
  *
  * Allows you to move out of your body.
  */
+internal inline fun suppressFreeCamPlayerMovement(event: PlayerMoveEvent, setVelocity: (Vec3) -> Unit) {
+    event.movement = Vec3.ZERO
+    setVelocity(Vec3.ZERO)
+}
+
 object ModuleFreeCam : ClientModule("FreeCam", ModuleCategories.RENDER, disableOnQuit = true) {
 
     private val speed by float("Speed", 1f, 0.1f..2f)
@@ -237,6 +243,11 @@ object ModuleFreeCam : ClientModule("FreeCam", ModuleCategories.RENDER, disableO
         event.directionalInput = DirectionalInput.NONE
         event.jump = false
         event.sneak = false
+    }
+
+    @Suppress("unused")
+    private val moveHandler = handler<PlayerMoveEvent>(priority = FINAL_DECISION) { event ->
+        suppressFreeCamPlayerMovement(event) { player.deltaMovement = it }
     }
 
     @Suppress("unused")

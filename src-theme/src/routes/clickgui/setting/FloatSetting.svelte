@@ -15,6 +15,11 @@
 
     let slider: HTMLElement;
     let apiSlider: API;
+    let warningMessage: string | undefined;
+
+    $: warningMessage = cSetting.warning !== undefined && cSetting.value > cSetting.warning.threshold
+        ? cSetting.warning.message
+        : undefined;
 
     onMount(() => {
         let step = 0.01;
@@ -54,7 +59,7 @@
     });
 </script>
 
-<div class="setting" class:has-suffix={cSetting.suffix !== ""}>
+<div class="setting" class:has-suffix={cSetting.suffix !== ""} class:has-warning={warningMessage !== undefined}>
     <div class="name">{$spaceSeperatedNames ? convertToSpacedString(cSetting.name) : cSetting.name}</div>
     <div class="value">
         <ValueInput valueType="float" value={cSetting.value}
@@ -64,6 +69,9 @@
         <div class="suffix">{cSetting.suffix}</div>
     {/if}
     <div bind:this={slider} class="slider"></div>
+    {#if warningMessage !== undefined}
+        <div class="warning" role="status">{warningMessage}</div>
+    {/if}
 </div>
 
 <style lang="scss">
@@ -86,6 +94,20 @@
             "a b c"
             "d d d";
         grid-template-columns: 1fr max-content max-content;
+    }
+
+    .setting.has-warning {
+        grid-template-areas:
+            "a b"
+            "d d"
+            "e e";
+    }
+
+    .setting.has-suffix.has-warning {
+        grid-template-areas:
+            "a b c"
+            "d d d"
+            "e e e";
     }
 
     .suffix,
@@ -111,5 +133,13 @@
     .slider {
         grid-area: d;
         padding-right: var(--clickgui-slider-end-padding, 10px);
+    }
+
+    .warning {
+        grid-area: e;
+        color: var(--warning-color);
+        font-size: var(--clickgui-control-font-size, 12px);
+        font-weight: 500;
+        padding-top: 4px;
     }
 </style>

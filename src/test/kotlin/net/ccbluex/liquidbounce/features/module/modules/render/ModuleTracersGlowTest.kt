@@ -83,12 +83,12 @@ class ModuleTracersGlowTest {
         val first = TracerSegment(
             color = Color4b(12, 34, 56, 78),
             eyePosition = Vec3f(1f, 2f, 3f),
-            entityPosition = Vec3f(4f, 5f, 6f),
+            targetPosition = Vec3f(4f, 5f, 6f),
         )
         val second = TracerSegment(
             color = Color4b(90, 80, 70, 60),
             eyePosition = Vec3f(1f, 2f, 3f),
-            entityPosition = Vec3f(7f, 8f, 9f),
+            targetPosition = Vec3f(7f, 8f, 9f),
         )
         val batch = TracerRenderBatch(listOf(first, second), lineWidth = 4.5f)
         var contributionCount = 0
@@ -113,7 +113,7 @@ class ModuleTracersGlowTest {
         val segment = TracerSegment(
             color = Color4b.WHITE,
             eyePosition = Vec3f.ZERO,
-            entityPosition = Vec3f.Z_AXIS,
+            targetPosition = Vec3f.Z_AXIS,
         )
 
         assertEquals(2f, TracerRenderBatch(listOf(segment), lineWidth = 1f).glowMaskLineWidth)

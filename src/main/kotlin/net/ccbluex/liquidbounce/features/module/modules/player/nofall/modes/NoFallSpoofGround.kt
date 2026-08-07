@@ -21,8 +21,10 @@ package net.ccbluex.liquidbounce.features.module.modules.player.nofall.modes
 import net.ccbluex.liquidbounce.config.types.group.Mode
 import net.ccbluex.liquidbounce.config.types.group.ModeValueGroup
 import net.ccbluex.liquidbounce.event.events.PacketEvent
+import net.ccbluex.liquidbounce.event.events.WorldChangeEvent
 import net.ccbluex.liquidbounce.event.handler
-import net.minecraft.network.protocol.game.ServerboundMovePlayerPacket
+import net.ccbluex.liquidbounce.utils.kotlin.EventPriorityConvention.READ_FINAL_STATE
+import net.ccbluex.liquidbounce.utils.kotlin.EventPriorityConvention.SAFETY_FEATURE
 
 /**
  * SpoofGround mode for the NoFall module.
@@ -31,19 +33,33 @@ import net.minecraft.network.protocol.game.ServerboundMovePlayerPacket
 internal object NoFallSpoofGround : NoFallMode("SpoofGround") {
     private val fallDistance = modes("FallDistance", Smart, arrayOf(Smart, Constant))
     private val resetFallDistance by boolean("ResetFallDistance", true)
+    private val deliveryTracker = GroundPacketDeliveryTracker()
 
-    // Packet handler to intercept and modify PlayerMoveC2SPacket
-    val packetHandler = handler<PacketEvent> {
-        // Retrieve the packet from the event
-        val packet = it.packet
+    override fun disable() {
+        deliveryTracker.clear()
+        super.disable()
+    }
 
-        // Check if the packet is a PlayerMoveC2SPacket
-        if (packet is ServerboundMovePlayerPacket && player.fallDistance >= fallDistance.activeMode.value) {
-            // Modify the 'onGround' flag to true, preventing fall damage
-            packet.onGround = true
-            if (resetFallDistance) {
-                player.resetFallDistance()
-            }
+    @Suppress("unused")
+    private val worldChangeHandler = handler<WorldChangeEvent> {
+        deliveryTracker.clear()
+    }
+
+    @Suppress("unused")
+    private val safetyPacketHandler = handler<PacketEvent>(priority = SAFETY_FEATURE) { event ->
+        val packet = event.outgoingMovementPacket ?: return@handler
+
+        if (player.fallDistance >= fallDistance.activeMode.value) {
+            deliveryTracker.protect(packet)
+        }
+    }
+
+    @Suppress("unused")
+    private val finalPacketHandler = handler<PacketEvent>(priority = READ_FINAL_STATE) { event ->
+        val packet = event.outgoingMovementPacket ?: return@handler
+
+        if (deliveryTracker.confirmFinalState(packet, event.isCancelled) && resetFallDistance) {
+            player.resetFallDistance()
         }
     }
 

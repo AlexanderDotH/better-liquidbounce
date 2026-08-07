@@ -59,7 +59,8 @@ class BaseFinderScorerTest {
                     chunkTrails = ChunkTrailsSignal(boundary = true, trailEndpoint = true),
                 ),
             ),
-            minimumConfidence = 1,
+            minimumConfidence = 0,
+            highSensitivity = true,
         )
 
         assertFalse(candidate.accepted)
@@ -67,9 +68,210 @@ class BaseFinderScorerTest {
     }
 
     @Test
-    fun `isolated chest bed portal sound farm and rail signals never create findings`() {
+    fun `high sensitivity accepts a lone chest through its inclusive confidence threshold`() {
+        val chest = snapshot(
+            storage = StorageSignal(
+                weightedPoints = 3,
+                anchors = listOf(storageAnchor("chest")),
+            ),
+        )
+
+        val candidate = BaseFinderScorer.scoreCluster(
+            snapshots = listOf(chest),
+            minimumConfidence = 0,
+            highSensitivity = true,
+        )
+
+        assertEquals(8, candidate.confidence)
+        assertEquals(ConfidenceTier.POSSIBLE, candidate.tier)
+        assertTrue(candidate.accepted)
+        assertTrue(
+            BaseFinderScorer.scoreCluster(
+                snapshots = listOf(chest),
+                minimumConfidence = 8,
+                highSensitivity = true,
+            ).accepted,
+        )
+        assertFalse(
+            BaseFinderScorer.scoreCluster(
+                snapshots = listOf(chest),
+                minimumConfidence = 9,
+                highSensitivity = true,
+            ).accepted,
+        )
+    }
+
+    @Test
+    fun `high sensitivity accepts storage pairs and starter bases`() {
+        val fixtures = mapOf(
+            "storage pair" to snapshot(
+                storage = StorageSignal(
+                    weightedPoints = 6,
+                    anchors = listOf(storageAnchor("chest"), storageAnchor("barrel")),
+                ),
+            ),
+            "starter base" to snapshot(
+                storage = StorageSignal(
+                    weightedPoints = 4,
+                    anchors = listOf(storageAnchor("chest"), storageAnchor("furnace", 1)),
+                ),
+                utilities = UtilitiesSignal(categories = setOf("crafting", "bed")),
+            ),
+        )
+
+        fixtures.forEach { (name, fixture) ->
+            assertTrue(
+                BaseFinderScorer.scoreCluster(
+                    snapshots = listOf(fixture),
+                    minimumConfidence = 0,
+                    highSensitivity = true,
+                ).accepted,
+                name,
+            )
+        }
+    }
+
+    @Test
+    fun `high sensitivity scores a nearby lived in compact base above sixty`() {
+        val candidate = BaseFinderScorer.scoreCluster(
+            snapshots = listOf(compactBase()),
+            minimumConfidence = 60,
+            highSensitivity = true,
+        )
+
+        assertEquals(61, candidate.confidence)
+        assertTrue(candidate.accepted)
+        assertTrue(candidate.evidence.any { it.family == BaseSignalFamily.COMPACT_BASE })
+        assertFalse(
+            BaseFinderScorer.scoreCluster(
+                snapshots = listOf(compactBase()),
+                minimumConfidence = 62,
+                highSensitivity = true,
+            ).accepted,
+        )
+    }
+
+    @Test
+    fun `dynamic footprint contains static base signals but excludes support outliers`() {
+        val candidate = BaseFinderScorer.scoreCluster(
+            snapshots = listOf(
+                compactBase().copy(
+                    entities = EntitiesSignal(
+                        anchors = listOf(evidenceAnchor(90, 64, 90, 2, "entity.container_vehicle")),
+                    ),
+                    geometry = GeometrySignal(
+                        anchors = listOf(evidenceAnchor(100, 20, 100, 5, "geometry.cave_disturbance")),
+                    ),
+                    activity = ActivitySignal(
+                        repeatedCategories = 1,
+                        anchors = listOf(evidenceAnchor(110, 64, 110, 2, "activity.container")),
+                    ),
+                    chunkTrails = ChunkTrailsSignal(
+                        boundary = true,
+                        anchors = listOf(evidenceAnchor(120, 64, 120, 1, "chunk_trail")),
+                    ),
+                ),
+            ),
+            minimumConfidence = 0,
+            highSensitivity = true,
+        )
+
+        assertEquals(
+            BaseFinderBounds(BaseCoordinate(0, 64, 0), BaseCoordinate(2, 64, 1)),
+            candidate.bounds,
+        )
+    }
+
+    @Test
+    fun `compact base profile does not combine far apart storage and utilities`() {
+        val storage = snapshot(
+            chunk = ChunkCoordinate(0, 0),
+            storage = StorageSignal(
+                weightedPoints = 8,
+                anchors = listOf(
+                    evidenceAnchor(0, 64, 0, 3, "storage.chest"),
+                    evidenceAnchor(1, 64, 0, 4, "storage.purple_shulker_box"),
+                    evidenceAnchor(2, 64, 0, 1, "storage.furnace"),
+                ),
+            ),
+        )
+        val utilities = snapshot(
+            chunk = ChunkCoordinate(1, 0),
+            utilities = UtilitiesSignal(
+                categories = setOf("crafting", "bed", "smelting"),
+                anchors = listOf(
+                    evidenceAnchor(20, 64, 0, 3, "utility.crafting"),
+                    evidenceAnchor(21, 64, 0, 3, "utility.bed"),
+                    evidenceAnchor(22, 64, 0, 3, "utility.smelting"),
+                ),
+            ),
+            structural = StructuralSignal(
+                bedGroup = true,
+                anchors = listOf(evidenceAnchor(21, 64, 0, 3, "structural.bed")),
+            ),
+        )
+
+        val candidate = BaseFinderScorer.scoreCluster(
+            snapshots = listOf(storage, utilities),
+            minimumConfidence = 60,
+            highSensitivity = true,
+        )
+
+        assertEquals(29, candidate.confidence)
+        assertFalse(candidate.accepted)
+        assertFalse(candidate.evidence.any { it.family == BaseSignalFamily.COMPACT_BASE })
+    }
+
+    @Test
+    fun `generated structures do not receive the compact base profile`() {
+        BaseFalsePositive.entries.forEach { falsePositive ->
+            val candidate = BaseFinderScorer.scoreCluster(
+                snapshots = listOf(compactBase(falsePositives = setOf(falsePositive))),
+                minimumConfidence = 0,
+                highSensitivity = true,
+            )
+
+            assertFalse(candidate.evidence.any { it.family == BaseSignalFamily.COMPACT_BASE }, falsePositive.name)
+            assertFalse(candidate.accepted, falsePositive.name)
+        }
+    }
+
+    @Test
+    fun `high sensitivity rejects nonphysical containers and support-only evidence`() {
+        val signals = mapOf(
+            "furnace" to snapshot(
+                storage = StorageSignal(1, listOf(storageAnchor("furnace", 1))),
+            ),
+            "hopper" to snapshot(
+                storage = StorageSignal(3, listOf(storageAnchor("hopper"))),
+            ),
+            "container vehicle" to snapshot(
+                storage = StorageSignal(3, listOf(storageAnchor("container_vehicle"))),
+                entities = EntitiesSignal(
+                    diversityPoints = 2,
+                    densityPoints = 1,
+                    hasContainerVehicleOrChestedMount = true,
+                ),
+            ),
+            "activity-only" to snapshot(activity = ActivitySignal(repeatedCategories = 3)),
+            "trail-only" to snapshot(chunkTrails = ChunkTrailsSignal(boundary = true, trailEndpoint = true)),
+        )
+
+        signals.forEach { (name, signal) ->
+            assertFalse(
+                BaseFinderScorer.scoreCluster(
+                    snapshots = listOf(signal),
+                    minimumConfidence = 0,
+                    highSensitivity = true,
+                ).accepted,
+                name,
+            )
+        }
+    }
+
+    @Test
+    fun `legacy gate rejects isolated bed portal sound farm and rail signals`() {
         val isolatedSignals = listOf(
-            snapshot(storage = StorageSignal(weightedPoints = 3)),
             snapshot(structural = StructuralSignal(bedGroup = true)),
             snapshot(structural = StructuralSignal(portalShape = true)),
             snapshot(activity = ActivitySignal(repeatedCategories = 3)),
@@ -114,10 +316,18 @@ class BaseFinderScorerTest {
     }
 
     @Test
-    fun `single strong storage family is rejected`() {
+    fun `disabling high sensitivity retains the legacy independent evidence gate`() {
         val candidate = BaseFinderScorer.scoreCluster(
-            listOf(snapshot(storage = StorageSignal(weightedPoints = 10_000))),
-            minimumConfidence = 1,
+            listOf(
+                snapshot(
+                    storage = StorageSignal(
+                        weightedPoints = 10_000,
+                        anchors = listOf(storageAnchor("chest", 10_000)),
+                    ),
+                ),
+            ),
+            minimumConfidence = 0,
+            highSensitivity = false,
         )
 
         assertFalse(candidate.accepted)
@@ -193,22 +403,22 @@ class BaseFinderScorerTest {
     }
 
     @Test
-    fun `each generated structure control remains below the default threshold`() {
+    fun `generated structure classifications veto physical storage at zero threshold`() {
         BaseFalsePositive.entries.forEach { falsePositive ->
             val candidate = BaseFinderScorer.scoreCluster(
                 listOf(
                     snapshot(
-                        storage = StorageSignal(weightedPoints = 40),
-                        utilities = UtilitiesSignal((1..6).map { "utility-$it" }.toSet()),
-                        automation = AutomationSignal(8, 8, organizedPattern = true),
-                        geometry = GeometrySignal(caveDisturbance = true, artificialPattern = true),
+                        storage = StorageSignal(
+                            weightedPoints = 3,
+                            anchors = listOf(storageAnchor("chest")),
+                        ),
                         falsePositives = setOf(falsePositive),
-                    )
+                    ),
                 ),
-                minimumConfidence = 65,
+                minimumConfidence = 0,
+                highSensitivity = true,
             )
 
-            assertTrue(candidate.confidence < 65, falsePositive.name)
             assertFalse(candidate.accepted, falsePositive.name)
         }
     }
@@ -312,6 +522,10 @@ class BaseFinderScorerTest {
             firstSeenAtMillis = 100,
             lastSeenAtMillis = 200,
             timesSeen = 2,
+            bounds = BaseFinderBounds(
+                minimum = BaseCoordinate(0, 64, 0),
+                maximum = BaseCoordinate(3, 65, 2),
+            ),
         )
         val candidate = BaseFinderScorer.scoreCluster(
             listOf(
@@ -341,6 +555,10 @@ class BaseFinderScorerTest {
         assertEquals(100, findings.single().firstSeenAtMillis)
         assertEquals(3, findings.single().timesSeen)
         assertEquals(300, findings.single().lastSeenAtMillis)
+        assertEquals(
+            BaseFinderBounds(BaseCoordinate(0, 64, 0), BaseCoordinate(48, 65, 2)),
+            findings.single().bounds,
+        )
     }
 
     private fun snapshot(
@@ -368,4 +586,36 @@ class BaseFinderScorerTest {
         falsePositives,
         dimensionKey,
     )
+
+    private fun storageAnchor(path: String, weight: Int = 3) =
+        EvidenceAnchor(BaseCoordinate(0, 64, 0), weight, "storage.$path")
+
+    private fun compactBase(
+        falsePositives: Set<BaseFalsePositive> = emptySet(),
+    ) = snapshot(
+        storage = StorageSignal(
+            weightedPoints = 8,
+            anchors = listOf(
+                evidenceAnchor(0, 64, 0, 3, "storage.chest"),
+                evidenceAnchor(1, 64, 0, 4, "storage.purple_shulker_box"),
+                evidenceAnchor(2, 64, 0, 1, "storage.furnace"),
+            ),
+        ),
+        utilities = UtilitiesSignal(
+            categories = setOf("crafting", "bed", "smelting"),
+            anchors = listOf(
+                evidenceAnchor(0, 64, 1, 3, "utility.crafting"),
+                evidenceAnchor(1, 64, 1, 3, "utility.bed"),
+                evidenceAnchor(2, 64, 1, 3, "utility.smelting"),
+            ),
+        ),
+        structural = StructuralSignal(
+            bedGroup = true,
+            anchors = listOf(evidenceAnchor(1, 64, 1, 3, "structural.bed")),
+        ),
+        falsePositives = falsePositives,
+    )
+
+    private fun evidenceAnchor(x: Int, y: Int, z: Int, weight: Int, key: String) =
+        EvidenceAnchor(BaseCoordinate(x, y, z), weight, key)
 }

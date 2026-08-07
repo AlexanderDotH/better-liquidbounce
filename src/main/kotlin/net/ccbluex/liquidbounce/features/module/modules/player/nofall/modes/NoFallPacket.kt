@@ -20,22 +20,58 @@ package net.ccbluex.liquidbounce.features.module.modules.player.nofall.modes
 
 import net.ccbluex.liquidbounce.config.types.group.Mode
 import net.ccbluex.liquidbounce.config.types.group.ModeValueGroup
+import net.ccbluex.liquidbounce.event.events.PacketEvent
+import net.ccbluex.liquidbounce.event.events.WorldChangeEvent
+import net.ccbluex.liquidbounce.event.handler
 import net.ccbluex.liquidbounce.event.tickHandler
+import net.ccbluex.liquidbounce.features.module.modules.combat.ModuleSpearKill
+import net.ccbluex.liquidbounce.utils.kotlin.EventPriorityConvention.READ_FINAL_STATE
+import net.ccbluex.liquidbounce.utils.kotlin.EventPriorityConvention.SAFETY_FEATURE
 import net.ccbluex.liquidbounce.utils.network.MovePacketType
 
 internal object NoFallPacket : NoFallMode("Packet") {
     private val packetType by enumChoice("PacketType", MovePacketType.FULL)
     private val filter = modes("Filter", FallDistance, arrayOf(FallDistance, Always))
+    private val deliveryTracker = GroundPacketDeliveryTracker()
+
+    override fun disable() {
+        deliveryTracker.clear()
+        super.disable()
+    }
+
+    @Suppress("unused")
+    private val worldChangeHandler = handler<WorldChangeEvent> {
+        deliveryTracker.clear()
+    }
 
     val repeatable = tickHandler {
-        if (filter.activeMode.isActive) {
-            network.send(packetType.generatePacket().apply {
-                onGround = true
-            })
+        if (!filter.activeMode.isActive || !shouldSendNoFallPacketDuringSpearKill(ModuleSpearKill.usesPacketMovement)) {
+            return@tickHandler
+        }
 
-            if (filter.activeMode is FallDistance && FallDistance.resetFallDistance) {
-                player.resetFallDistance()
-            }
+        val packet = packetType.generatePacket()
+        deliveryTracker.protect(packet)
+        network.send(packet)
+
+        // PacketEvent dispatch is synchronous. If no event was emitted, retain no stale attempt and retry next tick.
+        deliveryTracker.discard(packet)
+    }
+
+    @Suppress("unused")
+    private val safetyPacketHandler = handler<PacketEvent>(priority = SAFETY_FEATURE) { event ->
+        val packet = event.outgoingMovementPacket ?: return@handler
+        deliveryTracker.reassertGround(packet)
+    }
+
+    @Suppress("unused")
+    private val finalPacketHandler = handler<PacketEvent>(priority = READ_FINAL_STATE) { event ->
+        val packet = event.outgoingMovementPacket ?: return@handler
+        if (!deliveryTracker.confirmFinalState(packet, event.isCancelled)) {
+            return@handler
+        }
+
+        if (filter.activeMode is FallDistance && FallDistance.resetFallDistance) {
+            player.resetFallDistance()
         }
     }
 
@@ -75,3 +111,7 @@ internal object NoFallPacket : NoFallMode("Packet") {
             get() = true
     }
 }
+
+/** A SpearKill packet route owns its virtual movement stream, so NoFall must not inject a second one. */
+internal fun shouldSendNoFallPacketDuringSpearKill(spearKillPacketRouteActive: Boolean): Boolean =
+    !spearKillPacketRouteActive

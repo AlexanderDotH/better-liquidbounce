@@ -26,6 +26,7 @@ import com.llamalad7.mixinextras.sugar.Local;
 import net.ccbluex.liquidbounce.common.ChunkUpdateFlag;
 import net.ccbluex.liquidbounce.event.EventManager;
 import net.ccbluex.liquidbounce.event.events.*;
+import net.ccbluex.liquidbounce.features.module.modules.combat.SpearKillSetbackHook;
 import net.ccbluex.liquidbounce.features.module.modules.combat.crystalaura.trigger.triggers.*;
 import net.ccbluex.liquidbounce.features.module.modules.exploit.disabler.disablers.DisablerSpigotSpam;
 import net.ccbluex.liquidbounce.features.module.modules.misc.betterchat.ModuleBetterChat;
@@ -246,11 +247,13 @@ public abstract class MixinClientPacketListener extends ClientCommonPacketListen
     @Inject(method = "handleMovePlayer", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/multiplayer/ClientPacketListener;setValuesFromPositionPacket(Lnet/minecraft/world/entity/PositionMoveRotation;Ljava/util/Set;Lnet/minecraft/world/entity/Entity;Z)Z"))
     private void injectPlayerPositionLook(
         ClientboundPlayerPositionPacket packet, CallbackInfo ci, @Local(name = "player") Player player) {
+        SpearKillSetbackHook.beforeCorrection(packet, player);
         rotationThreadLocal.set(new Rotation(player.getYRot(), player.getXRot(), true));
     }
 
     @Inject(method = "handleMovePlayer", at = @At("RETURN"))
     private void injectNoRotateSet(ClientboundPlayerPositionPacket packet, CallbackInfo ci, @Local(name = "player") Player player) {
+        SpearKillSetbackHook.afterCorrection(packet, player);
         ServerPlayerModelStateTracker.correct(player.position(), player.getYRot(), player.getXRot());
 
         if (!ModuleNoRotateSet.INSTANCE.getRunning() || Minecraft.getInstance().gui.screen() instanceof LevelLoadingScreen) {

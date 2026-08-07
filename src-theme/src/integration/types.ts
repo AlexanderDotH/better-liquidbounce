@@ -127,9 +127,15 @@ export interface ColorSetting extends Setting<number> {
 export interface BooleanSetting extends Setting<boolean> {
 }
 
+export interface RangedSettingWarning {
+    threshold: number;
+    message: string;
+}
+
 export interface FloatSetting extends Setting<number> {
     range: Range;
     suffix: string;
+    warning?: RangedSettingWarning;
 }
 
 export interface FloatRangeSetting extends Setting<Range> {

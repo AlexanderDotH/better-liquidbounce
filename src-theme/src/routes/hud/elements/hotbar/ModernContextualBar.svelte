@@ -32,18 +32,15 @@
 {#key data.mode}
     <section
             class="contextual-island"
+            class:contextual-island--experience={data.mode === "experience"}
             class:contextual-island--locator={data.mode === "locator"}
             data-mode={data.mode}
             aria-label="Contextual information"
             transition:fly={{y: 4, duration: motionDuration}}
     >
         {#if data.mode === "experience"}
-            <div class="mode-summary">
-                <span class="mode-emoji" aria-hidden="true">✨</span>
-                <span class="mode-copy">Experience</span>
-                <strong class="mode-value" aria-label="Experience level">{data.level}</strong>
-            </div>
-            <div class="contextual-progress" aria-label="Experience progress">
+            <strong class="mode-value mode-value--experience" aria-label="Experience level">{data.level}</strong>
+            <div class="contextual-progress contextual-progress--experience" aria-label="Experience progress">
                 <span style="width: {progress * 100}%"></span>
             </div>
         {:else if data.mode === "jumpableVehicle"}
@@ -123,6 +120,11 @@
     box-shadow: var(--modern-hud-shadow, 0 12px 30px rgba(0, 0, 0, 0.24));
   }
 
+  .contextual-island--experience {
+    grid-template-columns: auto minmax(0, 1fr);
+    gap: 8px;
+  }
+
   .mode-summary,
   .locator-heading {
     display: flex;
@@ -162,6 +164,10 @@
     font-weight: 700;
   }
 
+  .mode-value--experience {
+    margin-left: 0;
+  }
+
   .contextual-progress {
     height: 8px;
     overflow: hidden;
@@ -182,6 +188,15 @@
   .contextual-progress--jump span {
     background: linear-gradient(90deg, #64c6b0, #8be0c1);
     box-shadow: 0 0 10px rgba(100, 198, 176, 0.28);
+  }
+
+  .contextual-progress--experience span {
+    background: linear-gradient(
+      90deg,
+      color-mix(in srgb, var(--hotbar-experience-color) 72%, #d6f5ae),
+      var(--hotbar-experience-color),
+    );
+    box-shadow: 0 0 10px color-mix(in srgb, var(--hotbar-experience-color) 35%, transparent);
   }
 
   .contextual-progress--cooldown span {

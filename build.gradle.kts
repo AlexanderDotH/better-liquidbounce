@@ -20,6 +20,7 @@
 import com.github.gradle.node.npm.task.NpmTask
 import dev.detekt.gradle.DetektCreateBaselineTask
 import groovy.json.JsonOutput
+import org.gradle.api.artifacts.ModuleDependency
 import org.gradle.api.tasks.PathSensitivity
 import org.gradle.jvm.tasks.Jar
 import org.gradle.kotlin.dsl.support.listFilesOrdered
@@ -41,11 +42,32 @@ base {
 
 /** Includes dependency recursively in the JAR file */
 val jij = configurations.create("jij")
+val seedFindingUnrelocated = configurations.create("seedFindingUnrelocated") {
+    isCanBeConsumed = false
+    isCanBeResolved = true
+    isTransitive = false
+}
 
 jij.excludeProvidedLibs()
 
+val seedFindingReferenceCoordinates = listOf(
+    "com.seedfinding:mc_math:${libs.versions.seedfinding.math.get()}",
+    "com.seedfinding:mc_seed:${libs.versions.seedfinding.seed.get()}",
+    "com.seedfinding:mc_core:${libs.versions.seedfinding.core.get()}",
+    "com.seedfinding:mc_noise:${libs.versions.seedfinding.noise.get()}",
+    "com.seedfinding:mc_biome:${libs.versions.seedfinding.biome.get()}",
+    "com.seedfinding:mc_terrain:${libs.versions.seedfinding.terrain.get()}",
+    "com.seedfinding:mc_feature:${libs.versions.seedfinding.feature.get()}",
+    "com.seedfinding:mc_reversal:${libs.versions.seedfinding.reversal.get()}",
+    "com.seedfinding:latticg:${libs.versions.latticg.get()}",
+)
+
 allprojects {
     repositories {
+        // Produced by relocateSeedFindingJars before Loom resolves the matching include dependency.
+        flatDir {
+            dirs(layout.buildDirectory.dir("generated/seedcracker"))
+        }
         mavenCentral()
         mavenLocal()
         maven {
@@ -83,6 +105,18 @@ allprojects {
         maven {
             url = uri("https://maven.shedaniel.me/")
         }
+        maven {
+            name = "LattiCG"
+            url = uri("https://maven.latticg.com/")
+        }
+        maven {
+            name = "SeedFinding Releases"
+            url = uri("https://maven.seedfinding.com/")
+        }
+        maven {
+            name = "SeedFinding Snapshots"
+            url = uri("https://maven-snapshots.seedfinding.com/")
+        }
     }
 }
 
@@ -91,6 +125,13 @@ loom {
 }
 
 dependencies {
+    fun addSeedFinding(dependency: Any) {
+        val declared = create(dependency)
+        require(declared is ModuleDependency) { "SeedFinding dependency must be a module: $dependency" }
+        declared.isTransitive = false
+        seedFindingUnrelocated.dependencies.add(declared)
+    }
+
     // Minecraft
     minecraft(libs.minecraft)
 
@@ -163,6 +204,18 @@ dependencies {
     jij(libs.fastutil4k.moreCollections)
     jij(libs.discord.ipc)
 
+    // SeedCracker: exact Minecraft 26.2-compatible SeedFinding stack. It is relocated before JIJ packaging so
+    // ViaFabricPlus' own, older com.seedfinding classes cannot alter the solver at runtime.
+    addSeedFinding(libs.seedfinding.mc.math.get())
+    addSeedFinding(libs.seedfinding.mc.seed.get())
+    addSeedFinding(libs.seedfinding.mc.core.get())
+    addSeedFinding(libs.seedfinding.mc.noise.get())
+    addSeedFinding(libs.seedfinding.mc.biome.get())
+    addSeedFinding(libs.seedfinding.mc.terrain.get())
+    addSeedFinding(libs.seedfinding.mc.feature.get())
+    addSeedFinding(libs.seedfinding.mc.reversal.get())
+    addSeedFinding(libs.latticg.get())
+
     // Test libraries
     testImplementation(kotlin("test"))
     testImplementation(libs.fabric.loader.junit)
@@ -170,6 +223,23 @@ dependencies {
 }
 
 addResolvedDependencies(jij, "compileOnly", "include", "api")
+
+val relocateSeedFindingJars = tasks.register<RelocateSeedFindingJarsTask>("relocateSeedFindingJars") {
+    sourceJars.from(seedFindingUnrelocated)
+    sourceCoordinates.set(seedFindingReferenceCoordinates)
+    outputJar.set(layout.buildDirectory.file("generated/seedcracker/seedcracker-seedfinding-26.2.jar"))
+}
+val relocatedSeedFindingJar = files(relocateSeedFindingJars.flatMap { it.outputJar })
+
+dependencies {
+    compileOnly(relocatedSeedFindingJar)
+    include("net.ccbluex:seedcracker-seedfinding:26.2")
+    testImplementation(relocatedSeedFindingJar)
+}
+
+tasks.matching { it.name in setOf("compileKotlin", "compileTestKotlin", "processIncludeJars") }.configureEach {
+    dependsOn(relocateSeedFindingJars)
+}
 
 tasks.processResources {
     dependsOn("buildTheme")

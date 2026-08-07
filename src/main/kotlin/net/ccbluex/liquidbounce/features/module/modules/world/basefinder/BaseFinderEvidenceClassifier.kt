@@ -50,12 +50,22 @@ internal object BaseFinderEvidenceClassifier {
 
     fun storageWeight(state: BlockState): Int = storageWeight(state.registryPath())
 
+    fun isPhysicalPlayerStorageAnchor(anchor: EvidenceAnchor): Boolean {
+        val key = anchor.key
+        if (!key.startsWith(STORAGE_ANCHOR_PREFIX)) return false
+
+        return isPhysicalPlayerStoragePath(key.removePrefix(STORAGE_ANCHOR_PREFIX))
+    }
+
     private fun storageWeight(path: String): Int = when (path) {
         "ender_chest", "shulker_box", "dyed_shulker_box" -> 4
         "chest", "trapped_chest", "barrel", "hopper", "copper_chest" -> 3
         "furnace", "blast_furnace", "smoker", "brewing_stand", "crafter", "dispenser", "dropper" -> 1
         else -> if (path.endsWith("_shulker_box")) 4 else 0
     }
+
+    private fun isPhysicalPlayerStoragePath(path: String): Boolean =
+        path in PHYSICAL_PLAYER_STORAGE_PATHS || path == "shulker_box" || path.endsWith("_shulker_box")
 
     fun utilityCategory(state: BlockState): String? = utilityCategory(state.registryPath())
 
@@ -67,6 +77,7 @@ internal object BaseFinderEvidenceClassifier {
             path == "lodestone" -> "lodestone"
             path == "ender_chest" -> "ender_chest"
             path == "brewing_stand" -> "brewing"
+            path == "furnace" || path == "blast_furnace" || path == "smoker" -> "smelting"
             path == "respawn_anchor" -> "respawn_anchor"
             path.endsWith("_bed") -> "bed"
             path == "note_block" || path == "jukebox" -> "music"
@@ -121,6 +132,16 @@ internal object BaseFinderEvidenceClassifier {
     private fun BlockState.registryPath(): String = BuiltInRegistries.BLOCK.getKey(block).path
 
     private fun isSign(path: String): Boolean = path.endsWith("_sign") || path.endsWith("_hanging_sign")
+
+    private const val STORAGE_ANCHOR_PREFIX = "storage."
+
+    private val PHYSICAL_PLAYER_STORAGE_PATHS = setOf(
+        "chest",
+        "trapped_chest",
+        "barrel",
+        "copper_chest",
+        "ender_chest",
+    )
 
     private val CROP_PATHS = setOf(
         "wheat",

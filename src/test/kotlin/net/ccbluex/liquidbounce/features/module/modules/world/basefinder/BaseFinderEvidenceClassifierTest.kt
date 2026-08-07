@@ -13,7 +13,9 @@ package net.ccbluex.liquidbounce.features.module.modules.world.basefinder
 import net.ccbluex.liquidbounce.test.MinecraftBootstrap
 import net.minecraft.world.level.block.Blocks
 import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertNull
+import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 
 class BaseFinderEvidenceClassifierTest {
@@ -35,10 +37,36 @@ class BaseFinderEvidenceClassifierTest {
     }
 
     @Test
+    fun `physical player storage anchors exclude utility and entity containers`() {
+        listOf(
+            "chest",
+            "trapped_chest",
+            "barrel",
+            "copper_chest",
+            "ender_chest",
+            "shulker_box",
+            "red_shulker_box",
+        ).forEach { path ->
+            assertTrue(BaseFinderEvidenceClassifier.isPhysicalPlayerStorageAnchor(storageAnchor(path)), path)
+        }
+
+        listOf("hopper", "furnace", "container_vehicle").forEach { path ->
+            assertFalse(BaseFinderEvidenceClassifier.isPhysicalPlayerStorageAnchor(storageAnchor(path)), path)
+        }
+        assertFalse(
+            BaseFinderEvidenceClassifier.isPhysicalPlayerStorageAnchor(
+                EvidenceAnchor(BaseCoordinate(0, 64, 0), 3, "entity.container_vehicle"),
+            ),
+        )
+    }
+
+    @Test
     fun `crafted utilities collapse variants into stable categories`() {
         assertEquals("anvil", BaseFinderEvidenceClassifier.utilityCategory(Blocks.ANVIL.defaultBlockState()))
         assertEquals("anvil", BaseFinderEvidenceClassifier.utilityCategory(Blocks.CHIPPED_ANVIL.defaultBlockState()))
         assertEquals("bed", BaseFinderEvidenceClassifier.utilityCategory(Blocks.BED.red().defaultBlockState()))
+        assertEquals("smelting", BaseFinderEvidenceClassifier.utilityCategory(Blocks.FURNACE.defaultBlockState()))
+        assertEquals("smelting", BaseFinderEvidenceClassifier.utilityCategory(Blocks.SMOKER.defaultBlockState()))
         assertEquals("sign", BaseFinderEvidenceClassifier.utilityCategory(Blocks.OAK_SIGN.defaultBlockState()))
         assertNull(BaseFinderEvidenceClassifier.utilityCategory(Blocks.STONE.defaultBlockState()))
     }
@@ -77,4 +105,7 @@ class BaseFinderEvidenceClassifierTest {
         assertEquals("portal", BaseFinderEvidenceClassifier.activityCategory("block.portal.ambient"))
         assertNull(BaseFinderEvidenceClassifier.activityCategory("ambient.cave"))
     }
+
+    private fun storageAnchor(path: String) =
+        EvidenceAnchor(BaseCoordinate(0, 64, 0), 3, "storage.$path")
 }

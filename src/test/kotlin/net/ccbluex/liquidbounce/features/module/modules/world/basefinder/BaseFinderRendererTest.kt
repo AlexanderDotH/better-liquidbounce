@@ -82,6 +82,44 @@ class BaseFinderRendererTest {
     }
 
     @Test
+    fun `dynamic box wraps the detected footprint with padding and centers its label`() {
+        val marker = marker("dynamic", x = 100.0, y = 64.0, z = -200.0).copy(
+            bounds = BaseFinderBounds(
+                minimum = BaseCoordinate(96, 62, -205),
+                maximum = BaseCoordinate(108, 69, -197),
+            ),
+        )
+        val request = request(marker).copy(
+            cameraPosition = Vec3(90.0, 60.0, -190.0),
+            settings = settings.copy(
+                boxMode = BaseFinderBoxMode.DYNAMIC,
+                dynamicPadding = 1,
+            ),
+        )
+
+        val entry = BaseFinderRenderPlanner.plan(request).entries.single()
+
+        assertBox(AABB(95.0, 61.0, -206.0, 110.0, 71.0, -195.0), entry.worldBox)
+        assertBox(AABB(5.0, 1.0, -16.0, 20.0, 11.0, -5.0), entry.cameraRelativeBox)
+        assertEquals(Vec3(102.5, 71.25, -200.5), entry.labelPosition)
+    }
+
+    @Test
+    fun `dynamic box falls back to fixed geometry for legacy findings without bounds`() {
+        val entry = BaseFinderRenderPlanner.plan(
+            request(marker("legacy", x = 100.0, y = 64.0, z = -200.0)).copy(
+                settings = settings.copy(
+                    boxMode = BaseFinderBoxMode.DYNAMIC,
+                    dynamicPadding = 8,
+                ),
+            ),
+        ).entries.single()
+
+        assertBox(AABB(96.5, 63.75, -203.5, 104.5, 70.0, -195.5), entry.worldBox)
+        assertEquals(Vec3(100.5, 70.25, -199.5), entry.labelPosition)
+    }
+
+    @Test
     fun `confidence gradient reaches both colors and handles a threshold of one hundred`() {
         val low = BaseFinderRenderPlanner.plan(request(marker("low", confidence = 65))).entries.single()
         val high = BaseFinderRenderPlanner.plan(request(marker("high", confidence = 100))).entries.single()
@@ -145,6 +183,43 @@ class BaseFinderRendererTest {
     }
 
     @Test
+    fun `labels expose configurable evidence details at their configured scale`() {
+        val marker = marker("details").copy(
+            evidenceDetails = listOf(
+                BaseFinderLabelEvidence("Storage", 13, listOf("Chest", "Purple shulker box", "Furnace")),
+                BaseFinderLabelEvidence("Utilities", 9, listOf("Crafting", "Bed", "Smelting")),
+            ),
+        )
+        val label = BaseFinderRenderPlanner.plan(
+            request(marker).copy(
+                settings = settings.copy(
+                    baseLabel = "Hideout",
+                    labelScale = 1.5f,
+                    showEvidenceDetails = true,
+                    maxEvidenceDetails = 1,
+                ),
+            ),
+        ).labels.single()
+
+        assertEquals("Hideout 80% • 0m", label.headline)
+        assertEquals(1.5f, label.scale)
+        assertEquals(listOf("Storage 13: Chest + Purple shulker box + Furnace"), label.evidenceLines)
+    }
+
+    @Test
+    fun `labels can hide evidence details without hiding coordinates`() {
+        val marker = marker("details").copy(
+            evidenceDetails = listOf(BaseFinderLabelEvidence("Storage", 13, listOf("Chest"))),
+        )
+        val label = BaseFinderRenderPlanner.plan(
+            request(marker).copy(settings = settings.copy(showEvidenceDetails = false)),
+        ).labels.single()
+
+        assertEquals("0 64 0 • Storage + Automation", label.details)
+        assertTrue(label.evidenceLines.isEmpty())
+    }
+
+    @Test
     fun `empty batch contributes zero times and a populated batch exactly once`() {
         var emptyContributions = 0
         val empty = BaseFinderRenderPlanner.plan(request(marker("below", confidence = 64)))
@@ -181,6 +256,10 @@ class BaseFinderRendererTest {
                 confidence = 91,
                 topEvidenceKeys = listOf("Storage"),
                 updatedAtMillis = 456L,
+                bounds = BaseFinderBounds(
+                    minimum = BaseCoordinate(8, 68, -7),
+                    maximum = BaseCoordinate(14, 72, -1),
+                ),
             )
         )
         val snapshot = BaseFinderRenderSnapshot(
@@ -197,6 +276,10 @@ class BaseFinderRendererTest {
         assertEquals(BaseFinderRenderScope("snapshot-server", "minecraft:the_end", 9L, 3L), request.scope)
         assertEquals(Vec3(12.0, 70.0, -4.0), request.markers.single().anchor)
         assertEquals(91, request.markers.single().confidence)
+        assertEquals(
+            BaseFinderBounds(BaseCoordinate(8, 68, -7), BaseCoordinate(14, 72, -1)),
+            request.markers.single().bounds,
+        )
         assertEquals(789L, request.nowMillis)
     }
 

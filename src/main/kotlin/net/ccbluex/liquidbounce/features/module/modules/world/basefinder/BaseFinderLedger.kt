@@ -306,6 +306,7 @@ internal class BaseFinderLedger(
         require(finding.confidence in 0..100)
         require(finding.timesSeen >= 0)
         require(finding.firstSeenAtMillis <= finding.lastSeenAtMillis)
+        finding.bounds?.requireValid()
         finding.evidence.forEach { evidence ->
             require(evidence.score >= 0)
             require(evidence.keys.none(String::isBlank))

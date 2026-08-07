@@ -22,6 +22,7 @@ import net.ccbluex.liquidbounce.render.engine.esp.EspGlowStyle
 import net.ccbluex.liquidbounce.render.engine.esp.EspShaderRenderer
 import net.ccbluex.liquidbounce.render.engine.type.Color4b
 import net.ccbluex.liquidbounce.render.renderEnvironment
+import net.ccbluex.liquidbounce.render.withPush
 import net.ccbluex.liquidbounce.utils.client.mc
 import net.ccbluex.liquidbounce.utils.render.WorldToScreen
 import net.minecraft.world.phys.AABB
@@ -49,6 +50,8 @@ internal data class BaseFinderRenderMarker(
     val confidence: Int,
     val topEvidenceKeys: List<String>,
     val updatedAtMillis: Long,
+    val evidenceDetails: List<BaseFinderLabelEvidence> = emptyList(),
+    val bounds: BaseFinderBounds? = null,
     val revision: Long = 0L,
 )
 
@@ -69,6 +72,11 @@ internal data class BaseFinderRenderSettings(
     val baseLabel: String = "Base",
     val unknownEvidenceLabel: String = "Unknown",
     val distanceSuffix: String = "m",
+    val labelScale: Float = 1f,
+    val showEvidenceDetails: Boolean = true,
+    val maxEvidenceDetails: Int = 4,
+    val boxMode: BaseFinderBoxMode = BaseFinderBoxMode.FIXED,
+    val dynamicPadding: Int = 1,
 )
 
 /** All mutable client state is reduced to this request before the pure planning step. */
@@ -106,6 +114,8 @@ internal data class BaseFinderRenderRequest(
                     confidence = marker.confidence,
                     topEvidenceKeys = java.util.List.copyOf(marker.topEvidenceKeys),
                     updatedAtMillis = marker.updatedAtMillis,
+                    evidenceDetails = marker.evidenceDetails.immutableCopy(),
+                    bounds = marker.bounds,
                     revision = snapshot.revision,
                 )
             }
@@ -150,6 +160,8 @@ internal data class BaseFinderRenderLabel(
     val headline: String,
     val details: String,
     val color: Color4b,
+    val evidenceLines: List<String> = emptyList(),
+    val scale: Float = 1f,
 )
 
 internal data class BaseFinderRenderBatch(
@@ -220,28 +232,39 @@ internal object BaseFinderRenderPlanner {
         request: BaseFinderRenderRequest,
     ): BaseFinderRenderEntry {
         val settings = request.settings
-        val worldBox = createWorldBox(marker.anchor, settings.boxRadius, settings.boxHeight)
+        val worldBox = createWorldBox(marker, settings)
         val pulseMultiplier = if (settings.pulse) {
             pulseMultiplier(marker.id, request.nowMillis, settings.pulseSpeedHz, settings.pulseAmount)
         } else {
             1.0
         }
         return BaseFinderRenderEntry(
-            marker = marker.copy(topEvidenceKeys = java.util.List.copyOf(marker.topEvidenceKeys)),
+            marker = marker.copy(
+                topEvidenceKeys = java.util.List.copyOf(marker.topEvidenceKeys),
+                evidenceDetails = marker.evidenceDetails.immutableCopy(),
+            ),
             distance = sqrt(distanceSq),
             worldBox = worldBox,
             cameraRelativeBox = worldBox.move(request.cameraPosition.reverse()),
             labelPosition = Vec3(
-                marker.anchor.x + 0.5,
-                marker.anchor.y + settings.boxHeight + 0.25,
-                marker.anchor.z + 0.5,
+                (worldBox.minX + worldBox.maxX) * 0.5,
+                worldBox.maxY + LABEL_VERTICAL_OFFSET,
+                (worldBox.minZ + worldBox.maxZ) * 0.5,
             ),
             color = confidenceColor(marker.confidence, settings),
             pulseMultiplier = pulseMultiplier,
         )
     }
 
-    private fun createWorldBox(anchor: Vec3, radius: Double, height: Double): AABB {
+    private fun createWorldBox(marker: BaseFinderRenderMarker, settings: BaseFinderRenderSettings): AABB {
+        if (settings.boxMode == BaseFinderBoxMode.DYNAMIC) {
+            marker.bounds?.let { return createDynamicWorldBox(it, settings.dynamicPadding) }
+        }
+
+        return createFixedWorldBox(marker.anchor, settings.boxRadius, settings.boxHeight)
+    }
+
+    private fun createFixedWorldBox(anchor: Vec3, radius: Double, height: Double): AABB {
         return AABB(
             anchor.x + 0.5 - radius,
             anchor.y - 0.25,
@@ -249,6 +272,18 @@ internal object BaseFinderRenderPlanner {
             anchor.x + 0.5 + radius,
             anchor.y + height,
             anchor.z + 0.5 + radius,
+        )
+    }
+
+    private fun createDynamicWorldBox(bounds: BaseFinderBounds, padding: Int): AABB {
+        val margin = padding.coerceAtLeast(0).toDouble()
+        return AABB(
+            bounds.minimum.x - margin,
+            bounds.minimum.y - margin,
+            bounds.minimum.z - margin,
+            bounds.maximum.x + 1.0 + margin,
+            bounds.maximum.y + 1.0 + margin,
+            bounds.maximum.z + 1.0 + margin,
         )
     }
 
@@ -273,12 +308,38 @@ internal object BaseFinderRenderPlanner {
             "${entry.distance.roundToInt()}${settings.distanceSuffix}"
         val details = "${marker.anchor.x.toInt()} ${marker.anchor.y.toInt()} " +
             "${marker.anchor.z.toInt()} • $evidence"
-        return BaseFinderRenderLabel(entry.labelPosition, headline, details, entry.outlineColor)
+        val evidenceLines = if (settings.showEvidenceDetails) {
+            marker.evidenceDetails
+                .take(settings.maxEvidenceDetails.coerceAtLeast(0))
+                .map(::formatEvidenceLine)
+        } else {
+            emptyList()
+        }
+        return BaseFinderRenderLabel(
+            position = entry.labelPosition,
+            headline = headline,
+            details = details,
+            color = entry.outlineColor,
+            evidenceLines = evidenceLines,
+            scale = settings.labelScale.coerceIn(MINIMUM_LABEL_SCALE, MAXIMUM_LABEL_SCALE),
+        )
+    }
+
+    private fun formatEvidenceLine(evidence: BaseFinderLabelEvidence): String {
+        val detections = evidence.detections.joinToString(" + ")
+        return if (detections.isEmpty()) {
+            "${evidence.family} ${evidence.score}"
+        } else {
+            "${evidence.family} ${evidence.score}: $detections"
+        }
     }
 
     private const val TWO_PI = PI * 2.0
     private const val UNSIGNED_INT_MASK = 0xffffffffL
     private const val UNSIGNED_INT_MAX = 0xffffffffL.toDouble()
+    private const val MINIMUM_LABEL_SCALE = 0.5f
+    private const val MAXIMUM_LABEL_SCALE = 2.5f
+    private const val LABEL_VERTICAL_OFFSET = 0.25
 }
 
 /** Thin adapter that submits one immutable batch to direct, glow, and overlay render APIs. */
@@ -308,18 +369,30 @@ internal object BaseFinderRenderer {
             val screen = WorldToScreen.calculateScreenPos(label.position) ?: continue
             if (screen.x !in 0f..width || screen.y !in 0f..height) continue
 
-            val headlineX = (screen.x - mc.font.width(label.headline) * 0.5f).roundToInt()
-            val detailsX = (screen.x - mc.font.width(label.details) * 0.5f).roundToInt()
-            val headlineY = screen.y.roundToInt()
-            event.context.text(mc.font, label.headline, headlineX, headlineY, label.color.argb, true)
-            event.context.text(
-                mc.font,
-                label.details,
-                detailsX,
-                headlineY + mc.font.lineHeight + 1,
-                Color4b.WHITE.argb,
-                true,
-            )
+            event.context.pose().withPush {
+                translate(screen.x, screen.y)
+                scale(label.scale, label.scale)
+
+                val lineHeight = mc.font.lineHeight + 1
+                event.context.drawCenteredText(label.headline, 0, label.color)
+                event.context.drawCenteredText(label.details, lineHeight, Color4b.WHITE)
+                label.evidenceLines.forEachIndexed { index, line ->
+                    event.context.drawCenteredText(line, lineHeight * (index + 2), Color4b.WHITE)
+                }
+            }
         }
     }
+
+    private fun net.minecraft.client.gui.GuiGraphicsExtractor.drawCenteredText(
+        content: String,
+        y: Int,
+        color: Color4b,
+    ) {
+        val x = (-mc.font.width(content) * 0.5f).roundToInt()
+        text(mc.font, content, x, y, color.argb, true)
+    }
 }
+
+private fun List<BaseFinderLabelEvidence>.immutableCopy(): List<BaseFinderLabelEvidence> = java.util.List.copyOf(
+    map { evidence -> evidence.copy(detections = java.util.List.copyOf(evidence.detections)) },
+)

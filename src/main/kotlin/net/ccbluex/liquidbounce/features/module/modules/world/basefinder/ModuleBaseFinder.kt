@@ -18,6 +18,7 @@
  */
 package net.ccbluex.liquidbounce.features.module.modules.world.basefinder
 
+import com.google.gson.JsonObject
 import net.ccbluex.liquidbounce.config.types.group.ToggleableValueGroup
 import net.ccbluex.liquidbounce.event.events.GameTickEvent
 import net.ccbluex.liquidbounce.event.events.NotificationEvent
@@ -52,8 +53,9 @@ import kotlin.math.floor
 @Suppress("TooManyFunctions")
 object ModuleBaseFinder : ClientModule("BaseFinder", ModuleCategories.WORLD) {
 
-    private val minimumConfidenceSetting = int("MinimumConfidence", 65, 0..100, "%").apply(::tagBy)
+    private val minimumConfidenceSetting = int("MinimumConfidence", 0, 0..100, "%").apply(::tagBy)
     internal val minimumConfidence by minimumConfidenceSetting
+    internal val highSensitivity by boolean("HighSensitivity", true)
 
     internal val storage by boolean("Storage", true)
     internal val utilities by boolean("Utilities", true)
@@ -82,10 +84,16 @@ object ModuleBaseFinder : ClientModule("BaseFinder", ModuleCategories.WORLD) {
         internal val renderLimit by int("RenderLimit", 32, 1..128, "markers")
         internal val boxRadius by int("BoxRadius", 4, 1..16, "blocks")
         internal val boxHeight by int("BoxHeight", 6, 1..32, "blocks")
+        internal val boxMode by enumChoice("BoxMode", BaseFinderBoxMode.FIXED)
+        internal val dynamicPadding by int("DynamicPadding", 1, 0..8, "blocks")
         internal val lowConfidenceColor by color("LowConfidenceColor", Color4b(255, 186, 32))
         internal val highConfidenceColor by color("HighConfidenceColor", Color4b(255, 60, 180))
         internal val showLabels by boolean("ShowLabels", true)
         internal val maxLabels by int("MaxLabels", 8, 1..32)
+        internal val labelText by text("LabelText", "")
+        internal val labelScale by float("LabelScale", 1f, 0.5f..2.5f)
+        internal val showEvidenceDetails by boolean("ShowEvidenceDetails", true)
+        internal val maxEvidenceDetails by int("MaxEvidenceDetails", 4, 1..8)
 
         internal object Pulse : ToggleableValueGroup(GlowBox, "Pulse", true) {
             internal val speed by float("Speed", 0.8f, 0.25f..3f, "Hz")
@@ -104,6 +112,11 @@ object ModuleBaseFinder : ClientModule("BaseFinder", ModuleCategories.WORLD) {
 
     init {
         tree(GlowBox)
+    }
+
+    override fun prepareDeserialize(jsonObject: JsonObject) {
+        super.prepareDeserialize(jsonObject)
+        migrateLegacyBaseFinderSensitivity(jsonObject)
     }
 
     override fun onEnabled() {
@@ -255,7 +268,12 @@ object ModuleBaseFinder : ClientModule("BaseFinder", ModuleCategories.WORLD) {
 
     private fun processEvidenceIfChanged() {
         val snapshots = BaseFinderTracker.currentSnapshots().map(::applyDetectorSettings)
-        val fingerprint = baseFinderEvidenceFingerprint(snapshots, minimumConfidence, enabledFamilies())
+        val fingerprint = baseFinderEvidenceFingerprint(
+            snapshots,
+            minimumConfidence,
+            highSensitivity,
+            enabledFamilies(),
+        )
         if (fingerprint == lastEvidenceFingerprint) return
         lastEvidenceFingerprint = fingerprint
 
@@ -263,7 +281,7 @@ object ModuleBaseFinder : ClientModule("BaseFinder", ModuleCategories.WORLD) {
         val before = findings
         val now = System.currentTimeMillis()
         for (cluster in BaseFinderScorer.cluster(relevant)) {
-            val candidate = BaseFinderScorer.scoreCluster(cluster, minimumConfidence)
+            val candidate = BaseFinderScorer.scoreCluster(cluster, minimumConfidence, highSensitivity)
             if (!candidate.accepted) continue
             val beforeUpsert = findings
             findings = BaseFinderScorer.upsertFinding(
@@ -346,6 +364,15 @@ object ModuleBaseFinder : ClientModule("BaseFinder", ModuleCategories.WORLD) {
             .take(2)
             .map { familyLabel(it.family) },
         updatedAtMillis = lastSeenAtMillis,
+        evidenceDetails = evidence.sortedByDescending(EvidenceSummary::score)
+            .map { summary ->
+                BaseFinderLabelEvidence(
+                    family = familyLabel(summary.family),
+                    score = summary.score,
+                    detections = summary.keys.map(::evidenceLabel),
+                )
+            },
+        bounds = bounds,
     )
 
     private fun currentRenderSettings() = BaseFinderRenderSettings(
@@ -354,14 +381,19 @@ object ModuleBaseFinder : ClientModule("BaseFinder", ModuleCategories.WORLD) {
         renderLimit = GlowBox.renderLimit,
         boxRadius = GlowBox.boxRadius.toDouble(),
         boxHeight = GlowBox.boxHeight.toDouble(),
+        boxMode = GlowBox.boxMode,
+        dynamicPadding = GlowBox.dynamicPadding,
         lowConfidenceColor = GlowBox.lowConfidenceColor,
         highConfidenceColor = GlowBox.highConfidenceColor,
         showLabels = GlowBox.showLabels,
         maxLabels = GlowBox.maxLabels,
+        labelScale = GlowBox.labelScale,
+        showEvidenceDetails = GlowBox.showEvidenceDetails,
+        maxEvidenceDetails = GlowBox.maxEvidenceDetails,
         pulse = GlowBox.Pulse.running,
         pulseSpeedHz = GlowBox.Pulse.speed.toDouble(),
         pulseAmount = GlowBox.Pulse.amount / 100.0,
-        baseLabel = message("label.base").string,
+        baseLabel = GlowBox.labelText.ifBlank { message("label.base").string },
         unknownEvidenceLabel = message("family.unknown").string,
         distanceSuffix = message("label.blocks").string,
     )
@@ -389,6 +421,10 @@ object ModuleBaseFinder : ClientModule("BaseFinder", ModuleCategories.WORLD) {
     private fun familyLabel(family: BaseSignalFamily): String =
         message("family.${family.name.lowercase()}").string
 
+    private fun evidenceLabel(key: String): String = key.substringAfter('.', key)
+        .replace('_', ' ')
+        .replaceFirstChar { character -> character.titlecase() }
+
     internal fun <T> immutableCopy(source: Collection<T>): List<T> = java.util.List.copyOf(source)
 }
 
@@ -397,8 +433,29 @@ internal fun baseFinderBlockCoordinate(value: Double): Int = floor(value).toInt(
 internal fun baseFinderEvidenceFingerprint(
     snapshots: List<ChunkEvidenceSnapshot>,
     minimumConfidence: Int,
+    highSensitivity: Boolean,
     enabledFamilies: Set<BaseSignalFamily>,
-): Int = listOf(snapshots, minimumConfidence, enabledFamilies).hashCode()
+): Int = listOf(snapshots, minimumConfidence, highSensitivity, enabledFamilies).hashCode()
+
+internal fun migrateLegacyBaseFinderSensitivity(jsonObject: JsonObject) {
+    val storedValues = jsonObject["value"]?.takeIf { it.isJsonArray }?.asJsonArray ?: return
+    val valuesByName = storedValues
+        .filter { it.isJsonObject }
+        .map { it.asJsonObject }
+        .associateBy { it["name"]?.asString.orEmpty() }
+    if ("HighSensitivity" in valuesByName) return
+
+    val legacyMinimumConfidence = valuesByName["MinimumConfidence"] ?: return
+    val storedConfidence = legacyMinimumConfidence["value"]
+        ?.takeIf { it.isJsonPrimitive && it.asJsonPrimitive.isNumber }
+        ?.asInt
+        ?: return
+    if (storedConfidence == LEGACY_BASE_FINDER_MINIMUM_CONFIDENCE) {
+        legacyMinimumConfidence.addProperty("value", 0)
+    }
+}
+
+private const val LEGACY_BASE_FINDER_MINIMUM_CONFIDENCE = 65
 
 /** Tracks only presentation state; persisted findings remain the source of truth. */
 internal class BaseFinderAnnouncementState {

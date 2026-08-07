@@ -20,6 +20,7 @@ import net.ccbluex.liquidbounce.event.events.ClientShutdownEvent
 import net.ccbluex.liquidbounce.event.events.WorldRenderEvent
 import net.ccbluex.liquidbounce.event.handler
 import net.ccbluex.liquidbounce.features.module.MinecraftShortcuts
+import net.ccbluex.liquidbounce.features.module.modules.render.ModuleBlockESP
 import net.ccbluex.liquidbounce.features.module.modules.render.ModuleStorageESP
 import net.ccbluex.liquidbounce.features.module.modules.render.esp.modes.EspGlowMode
 import net.ccbluex.liquidbounce.features.module.modules.render.esp.modes.EspOutlineMode
@@ -67,6 +68,7 @@ object EspShaderRenderer : MinecraftShortcuts, EventListener {
 
     @JvmStatic
     fun beginFrame() {
+        TargetGlowSourceRegistry.beginFrame()
         glowFrameLanes.reset()
         hasOutline = false
         outlineStyle = EspOutlineStyle.DEFAULT
@@ -83,8 +85,9 @@ object EspShaderRenderer : MinecraftShortcuts, EventListener {
     }
 
     private fun captureGlow(bridge: PreparedFrameAddition, mainTarget: RenderTarget) {
+        val targetGlowStyles = TargetGlowSourceRegistry.consumeContributedStyles()
         val hasNodes = bridge.`liquid_bounce$hasEspGlow`()
-        if (!hasNodes && !ModuleStorageESP.GlowMode.running) return
+        if (!hasNodes && !ModuleStorageESP.GlowMode.running && !ModuleBlockESP.ShaderEspMode.running) return
 
         val target = prepareGlowMask(glowFrameLanes.full, glowMask, mainTarget.width, mainTarget.height)
         if (hasNodes) {
@@ -94,11 +97,14 @@ object EspShaderRenderer : MinecraftShortcuts, EventListener {
         }
 
         val hasStorageMask = ModuleStorageESP.GlowMode.running && ModuleStorageESP.GlowMode.drawMask(target)
-        if (hasNodes || hasStorageMask) {
+        val hasBlockMask = ModuleBlockESP.ShaderEspMode.running && ModuleBlockESP.ShaderEspMode.drawMask(target)
+        if (hasNodes || hasStorageMask || hasBlockMask) {
             glowFrameLanes.full.contribute(
                 EspShaderStyleResolver.resolveGlow(
                     EspGlowMode.style.takeIf { EspGlowMode.running },
                     ModuleStorageESP.GlowMode.style.takeIf { ModuleStorageESP.GlowMode.running },
+                    ModuleBlockESP.ShaderEspMode.style.takeIf { ModuleBlockESP.ShaderEspMode.running },
+                    *targetGlowStyles.toTypedArray(),
                 )
             )
         }
