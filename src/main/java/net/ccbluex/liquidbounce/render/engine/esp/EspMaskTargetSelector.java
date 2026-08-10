@@ -11,6 +11,7 @@
 
 package net.ccbluex.liquidbounce.render.engine.esp;
 
+import net.ccbluex.liquidbounce.common.EspMaskLayer;
 import net.ccbluex.liquidbounce.common.EspMaskRequest;
 import net.ccbluex.liquidbounce.features.module.modules.render.ModuleStorageESP;
 import net.ccbluex.liquidbounce.features.module.modules.render.esp.ModuleESP;
@@ -19,6 +20,7 @@ import net.ccbluex.liquidbounce.features.module.modules.render.esp.modes.EspOutl
 import net.ccbluex.liquidbounce.utils.combat.CombatExtensionsKt;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import org.jspecify.annotations.Nullable;
 
@@ -29,6 +31,8 @@ import org.jspecify.annotations.Nullable;
  */
 public final class EspMaskTargetSelector {
 
+    private static final int PROTECTED_SURFACE_COLOR = 0xFFFFFFFF;
+
     private EspMaskTargetSelector() {
     }
 
@@ -38,17 +42,21 @@ public final class EspMaskTargetSelector {
         }
 
         var request = EspMaskRequest.NONE;
+        if (entity instanceof Player) {
+            request = request.with(EspMaskLayer.PROTECTED_SURFACE, PROTECTED_SURFACE_COLOR);
+        }
+
         var targetGlow = TargetGlowSourceRegistry.selectionFor(entity);
         if (targetGlow != null) {
-            request = request.withGlow(targetGlow.color().argb());
+            request = request.with(EspMaskLayer.TARGET_GLOW, targetGlow.color().argb());
         }
 
         if (entity instanceof LivingEntity livingEntity && CombatExtensionsKt.shouldBeShown(livingEntity)) {
             int color = ModuleESP.INSTANCE.getColor(livingEntity).argb();
             if (EspGlowMode.INSTANCE.getRunning() && EspGlowMode.INSTANCE.shouldRender(livingEntity)) {
-                request = request.withGlow(color);
+                request = request.with(EspMaskLayer.PLAYER_GLOW, color);
             } else if (EspOutlineMode.INSTANCE.getRunning() && EspOutlineMode.INSTANCE.shouldRender(livingEntity)) {
-                request = request.withOutline(color);
+                request = request.with(EspMaskLayer.PLAYER_OUTLINE, color);
             }
         }
 
@@ -57,10 +65,12 @@ public final class EspMaskTargetSelector {
             return request;
         }
 
+        request = request.with(EspMaskLayer.PROTECTED_SURFACE, PROTECTED_SURFACE_COLOR);
+
         if (ModuleStorageESP.GlowMode.INSTANCE.getRunning()) {
-            request = request.withGlow(category.getColor().argb());
+            request = request.with(EspMaskLayer.STORAGE_GLOW, category.getColor().argb());
         } else if (ModuleStorageESP.OutlineMode.INSTANCE.getRunning()) {
-            request = request.withOutline(category.getColor().argb());
+            request = request.with(EspMaskLayer.STORAGE_OUTLINE, category.getColor().argb());
         }
 
         return request;
@@ -71,21 +81,24 @@ public final class EspMaskTargetSelector {
             return EspMaskRequest.NONE;
         }
 
+        var request = EspMaskRequest.NONE;
         var category = ModuleStorageESP.categorize(blockEntity);
         if (category == null
             || !category.shouldRender(blockEntity.getBlockPos())
             || category.getColor().isTransparent()) {
-            return EspMaskRequest.NONE;
+            return request;
         }
 
+        request = request.with(EspMaskLayer.PROTECTED_SURFACE, PROTECTED_SURFACE_COLOR);
+
         if (ModuleStorageESP.GlowMode.INSTANCE.getRunning()) {
-            return EspMaskRequest.NONE.withGlow(category.getColor().argb());
+            return request.with(EspMaskLayer.STORAGE_GLOW, category.getColor().argb());
         }
 
         if (ModuleStorageESP.OutlineMode.INSTANCE.getRunning()) {
-            return EspMaskRequest.NONE.withOutline(category.getColor().argb());
+            return request.with(EspMaskLayer.STORAGE_OUTLINE, category.getColor().argb());
         }
 
-        return EspMaskRequest.NONE;
+        return request;
     }
 }

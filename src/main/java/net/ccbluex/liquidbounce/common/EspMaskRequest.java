@@ -11,32 +11,37 @@
 
 package net.ccbluex.liquidbounce.common;
 
-/**
- * Colors requested for LiquidBounce's two independent ESP mask phases.
- * A zero color means that the geometry must not be submitted to that phase.
- */
-public record EspMaskRequest(int glowColor, int outlineColor) {
+import java.util.EnumMap;
+import java.util.Map;
 
-    public static final EspMaskRequest NONE = new EspMaskRequest(0, 0);
+/**
+ * Per-source colors requested for LiquidBounce's independent ESP mask phases.
+ */
+public record EspMaskRequest(Map<EspMaskLayer, Integer> colors) {
+
+    public static final EspMaskRequest NONE = new EspMaskRequest(Map.of());
+
+    public EspMaskRequest {
+        colors = Map.copyOf(colors);
+    }
 
     public boolean isEmpty() {
-        return glowColor == 0 && outlineColor == 0;
+        return colors.isEmpty();
     }
 
-    public EspMaskRequest withGlow(int color) {
-        if (color == 0 || glowColor != 0) {
+    public int color(EspMaskLayer layer) {
+        return colors.getOrDefault(layer, 0);
+    }
+
+    public EspMaskRequest with(EspMaskLayer layer, int color) {
+        if (color == 0 || colors.containsKey(layer)) {
             return this;
         }
 
-        return new EspMaskRequest(opaque(color), outlineColor);
-    }
-
-    public EspMaskRequest withOutline(int color) {
-        if (color == 0 || outlineColor != 0) {
-            return this;
-        }
-
-        return new EspMaskRequest(glowColor, opaque(color));
+        var updated = new EnumMap<EspMaskLayer, Integer>(EspMaskLayer.class);
+        updated.putAll(colors);
+        updated.put(layer, opaque(color));
+        return new EspMaskRequest(updated);
     }
 
     private static int opaque(int color) {

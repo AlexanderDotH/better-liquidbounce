@@ -467,6 +467,35 @@ object ClientRenderPipelines {
     }
 
     @JvmField
+    val GuiBackdropDownsample = newPipeline("gui/backdrop_downsample") {
+        screenQuadSnippet()
+        withFragmentShader(ClientShaders.Fragment.GuiBackdropDownsample)
+        withBindGroupLayout { withSampler("SceneSampler") }
+        withColorTargetState(
+            ColorTargetState(optional(), GpuFormat.RGBA16_FLOAT, ColorTargetState.WRITE_ALL)
+        )
+        withDepthStencilState(optional())
+    }
+
+    @JvmField
+    val GuiBackdropBlurComposite = newPipeline("gui/backdrop_blur_composite") {
+        screenQuadSnippet()
+        withFragmentShader(ClientShaders.Fragment.GuiBackdropBlurComposite)
+        withBindGroupLayout {
+            withSampler("BlurSampler")
+            withSampler("MaskSampler")
+        }
+        withColorTargetState(
+            ColorTargetState(
+                optional(BlendFunction.TRANSLUCENT),
+                GpuFormat.RGBA8_UNORM,
+                ColorTargetState.WRITE_COLOR,
+            )
+        )
+        withDepthStencilState(optional())
+    }
+
+    @JvmField
     val EspGaussianBlur = newPipeline("esp/gaussian_blur") {
         screenQuadSnippet()
         withFragmentShader(ClientShaders.Fragment.EspGaussianBlur)
@@ -493,6 +522,21 @@ object ClientRenderPipelines {
                 optional(BlendFunction.TRANSLUCENT_PREMULTIPLIED_ALPHA),
                 GpuFormat.RGBA8_UNORM,
                 ColorTargetState.WRITE_COLOR,
+            )
+        )
+        withDepthStencilState(optional())
+    }
+
+    @JvmField
+    val EspMaskUnion = newPipeline("esp/mask_union") {
+        screenQuadSnippet()
+        withFragmentShader(ClientShaders.Fragment.EspMaskUnion)
+        withBindGroupLayout { withSampler("MaskSampler") }
+        withColorTargetState(
+            ColorTargetState(
+                optional(BlendFunction.TRANSLUCENT_PREMULTIPLIED_ALPHA),
+                GpuFormat.RGBA8_UNORM,
+                ColorTargetState.WRITE_ALL,
             )
         )
         withDepthStencilState(optional())

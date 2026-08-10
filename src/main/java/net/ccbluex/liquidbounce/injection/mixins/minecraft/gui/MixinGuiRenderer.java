@@ -51,15 +51,16 @@ public abstract class MixinGuiRenderer {
     )
     private RenderTarget injectBlurRenderTarget(GameRenderer instance, Operation<RenderTarget> original) {
         BlurEffectRenderer blurEffectRenderer = BlurEffectRenderer.INSTANCE;
+        RenderTarget mainTarget = original.call(instance);
         RenderTarget destination;
         if (blurEffectRenderer.shouldDrawBlur()) {
             blurEffectRenderer.setDrawingHudFramebuffer(true);
             destination = blurEffectRenderer.getOverlayRenderTargetHolder().initAndGet();
         } else {
-            destination = original.call(instance);
+            destination = mainTarget;
         }
 
-        GuiGlowRenderer.composite(destination);
+        GuiGlowRenderer.composite(mainTarget, destination);
         return destination;
     }
 

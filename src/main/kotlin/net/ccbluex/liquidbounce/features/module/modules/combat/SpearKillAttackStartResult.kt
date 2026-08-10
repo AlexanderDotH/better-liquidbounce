@@ -19,9 +19,12 @@
 
 package net.ccbluex.liquidbounce.features.module.modules.combat
 
+import net.minecraft.world.phys.Vec3
+
 internal enum class SpearKillAttackStartResult {
     STARTED,
     RETRY_LATER,
+    BLOCKED,
     REJECTED,
 }
 
@@ -54,20 +57,104 @@ internal fun compareSpearKillLookRayPriority(
     }
 }
 
-/** Validates that the built A* route still fits inside the kinetic spear's remaining damage window. */
+/** Builds a collision-validated direct Packet route and its exact inverse return path. */
+internal fun buildSpearKillDirectPacketRoute(
+    origin: Vec3,
+    direction: Vec3,
+    distance: Double,
+    maxSpeed: Double,
+    segmentValidator: SpearKillAStarSegmentValidator,
+): SpearKillAStarPacketRoute? {
+    if (!origin.hasFiniteSpearKillCoordinates() || !direction.hasFiniteSpearKillCoordinates() ||
+        !distance.isPositiveFinite() || !maxSpeed.isPositiveFinite()
+    ) {
+        return null
+    }
+
+    val directionLength = direction.length()
+    if (!directionLength.isFinite() || directionLength <= 0.0) return null
+
+    val endpoint = origin.add(direction.scale(distance / directionLength))
+    if (!endpoint.hasFiniteSpearKillCoordinates()) return null
+
+    return buildSpearKillAStarPacketRoute(
+        origin = origin,
+        outboundWaypoints = listOf(endpoint),
+        maxSpeed = maxSpeed,
+        segmentValidator = segmentValidator,
+    )
+}
+
+/** Applies the server-facing kinetic hold consistently to every direct Packet session. */
+internal fun startSpearKillDirectPacketSession(
+    session: SpearKillPacketBootSession,
+    route: SpearKillAStarPacketRoute,
+    stepWaitTicks: Int,
+) {
+    session.startPhysicalReturn(
+        path = route.roundTripMovements,
+        outboundSteps = route.outboundMovements.size,
+        strikeHoldTicks = SPEAR_KILL_PACKET_STRIKE_HOLD_TICKS,
+        stepWaitTicks = stepWaitTicks,
+    )
+}
+
+internal fun hasSpearKillDirectPacketDamageWindow(
+    ticksUsingItem: Int,
+    damageUseDuration: Int,
+    stepCount: Int,
+    stepWaitTicks: Int,
+): Boolean = hasSpearKillScheduleDamageWindow(
+    ticksUsingItem = ticksUsingItem,
+    damageUseDuration = damageUseDuration,
+    hitTick = spearKillDirectPacketHitTicks(stepCount, stepWaitTicks),
+)
+
+private fun Vec3.hasFiniteSpearKillCoordinates(): Boolean = x.isFinite() && y.isFinite() && z.isFinite()
+
+private fun Double.isPositiveFinite(): Boolean = isFinite() && this > 0.0
+
+/**
+ * When a Packet session is hard-aborted, snap the local player back to the session origin if the
+ * session had already displaced them (physical return) or still carries a non-zero offset.
+ * Otherwise a mid-return clear leaves the client floating at the last confirmed offset.
+ */
+internal fun spearKillSessionAbortSnapPosition(
+    sessionOrigin: Vec3?,
+    committedOffset: Vec3,
+    physicalReturnConfigured: Boolean,
+): Vec3? {
+    if (sessionOrigin == null) return null
+    val offsetFinite = committedOffset.x.isFinite() &&
+        committedOffset.y.isFinite() &&
+        committedOffset.z.isFinite()
+    if (!offsetFinite) return sessionOrigin
+    if (committedOffset.lengthSqr() > 1.0E-12 || physicalReturnConfigured) {
+        return sessionOrigin
+    }
+    return null
+}
+
+/** Validates that a schedule hit tick still fits inside the kinetic spear's remaining damage window. */
 internal fun hasSpearKillAStarDamageWindow(
     ticksUsingItem: Int,
     damageUseDuration: Int,
     outboundStepCount: Int,
     stepWaitTicks: Int,
     confirmationTicks: Int,
-): Boolean = hasSpearKillDamageWindow(
-    ticksUsingItem = ticksUsingItem,
-    damageUseDuration = damageUseDuration,
-    arrivalTicks = spearKillAStarArrivalTicks(
+    preStrikeHoldTicks: Int = 0,
+    terminalSuffixCount: Int = 1,
+): Boolean {
+    val schedule = buildSpearKillPathSchedule(
         outboundStepCount = outboundStepCount,
         stepWaitTicks = stepWaitTicks,
-        preStrikeHoldTicks = 0,
-    ),
-    confirmationTicks = confirmationTicks,
-)
+        terminalSuffixCount = terminalSuffixCount.coerceIn(1, outboundStepCount.coerceAtLeast(1)),
+        preStrikeHoldTicks = preStrikeHoldTicks,
+        strikeHoldTicks = confirmationTicks,
+    ) ?: return false
+    return hasSpearKillScheduleDamageWindow(
+        ticksUsingItem = ticksUsingItem,
+        damageUseDuration = damageUseDuration,
+        hitTick = schedule.hitTick,
+    )
+}

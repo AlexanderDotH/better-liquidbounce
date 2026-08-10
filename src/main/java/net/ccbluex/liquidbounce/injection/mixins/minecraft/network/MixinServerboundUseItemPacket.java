@@ -21,6 +21,7 @@ package net.ccbluex.liquidbounce.injection.mixins.minecraft.network;
 
 import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
+import net.ccbluex.liquidbounce.features.module.modules.combat.ModuleSpearKill;
 import net.ccbluex.liquidbounce.features.module.modules.movement.noslow.modes.shared.NoSlowSharedInvalidHand;
 import net.ccbluex.liquidbounce.utils.aiming.RotationManager;
 import net.ccbluex.liquidbounce.utils.aiming.data.Rotation;
@@ -50,7 +51,10 @@ public abstract class MixinServerboundUseItemPacket {
 
     @Inject(method = "<init>(Lnet/minecraft/world/InteractionHand;IFF)V", at = @At("RETURN"))
     private void modifyRotation(InteractionHand hand, int sequence, float yaw, float pitch, CallbackInfo ci) {
-        Rotation rotation = RotationManager.INSTANCE.getCurrentRotation();
+        Rotation rotation = ModuleSpearKill.routeRotationOverride();
+        if (rotation == null) {
+            rotation = RotationManager.INSTANCE.getCurrentRotation();
+        }
         if (rotation == null) {
             return;
         }

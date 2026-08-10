@@ -91,6 +91,14 @@ class ModuleBlockESPTest {
     }
 
     @Test
+    fun `legacy Glow keeps a crisp outline without painting the block surface`() {
+        assertEquals(4f, ModuleBlockESP.GlowMode.style.radius)
+        assertEquals(0f, ModuleBlockESP.GlowMode.style.intensity)
+        assertEquals(2f, ModuleBlockESP.GlowMode.style.coreSize)
+        assertEquals(1f, ModuleBlockESP.GlowMode.style.opacity)
+    }
+
+    @Test
     fun `module definition removes portal checkbox and adds shader esp without replacing glow`() {
         val moduleClass = Class.forName(ModuleBlockESP::class.java.name, false, javaClass.classLoader)
 

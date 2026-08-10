@@ -40,6 +40,7 @@ import net.ccbluex.liquidbounce.utils.client.usesViaFabricPlus
 import net.ccbluex.liquidbounce.utils.inventory.HotbarItemSlot
 import net.ccbluex.liquidbounce.utils.inventory.InventoryAction
 import net.ccbluex.liquidbounce.utils.inventory.ItemSlot
+import net.ccbluex.liquidbounce.utils.inventory.OffhandReservationManager
 import net.ccbluex.liquidbounce.utils.inventory.PlayerInventoryConstraints
 import net.ccbluex.liquidbounce.utils.inventory.Slots
 import net.ccbluex.liquidbounce.utils.item.getPotionEffects
@@ -163,6 +164,10 @@ object ModuleOffhand : ClientModule("Offhand", ModuleCategories.PLAYER, aliases 
 
     @Suppress("unused")
     private val autoTotemHandler = handler<ScheduleInventoryActionEvent>(priority = 100) {
+        if (!canScheduleInventoryActions()) {
+            return@handler
+        }
+
         activeMode = Mode.entries.firstOrNull(Mode::shouldEquip) ?: staticMode
         if (activeMode == Mode.NONE && Totem.Health.switchBack && lastMode == Mode.TOTEM) {
             activeMode = Mode.BACK
@@ -241,6 +246,8 @@ object ModuleOffhand : ClientModule("Offhand", ModuleCategories.PLAYER, aliases 
     private data class LastSwitch(val item: Item, val slot: ItemSlot)
 
     fun isOperating() = running && activeMode != Mode.NONE
+
+    internal fun canScheduleInventoryActions() = !OffhandReservationManager.isReservedByOther(this)
 
     private enum class Mode(
         val modeName: String,

@@ -51,7 +51,7 @@
 
     async function fetchModuleSettings() {
         configurable = await getModuleSettings(name);
-        hasSettings = configurable.value.filter(v => v.name !== "Bind" && v.name !== "Hidden").length > 0;
+        hasSettings = configurable.value.some(setting => setting.name !== "Bind");
     }
 
     async function updateModuleSettings() {

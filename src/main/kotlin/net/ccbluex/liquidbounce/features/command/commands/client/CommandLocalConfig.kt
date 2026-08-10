@@ -22,20 +22,22 @@ import kotlinx.coroutines.async
 import net.ccbluex.liquidbounce.api.core.ioScope
 import net.ccbluex.liquidbounce.api.models.client.AutoSettings
 import net.ccbluex.liquidbounce.config.ConfigSystem
-import net.ccbluex.liquidbounce.config.autoconfig.AutoConfig
-import net.ccbluex.liquidbounce.config.autoconfig.AutoConfig.serializeAutoConfig
 import net.ccbluex.liquidbounce.config.autoconfig.AutoConfigMetadata
 import net.ccbluex.liquidbounce.config.autoconfig.IncludeConfiguration
+import net.ccbluex.liquidbounce.config.autoconfig.LocalConfigCodec
+import net.ccbluex.liquidbounce.config.autoconfig.LocalConfigLoadSelection
 import net.ccbluex.liquidbounce.config.gson.publicGson
 import net.ccbluex.liquidbounce.features.command.Command
 import net.ccbluex.liquidbounce.features.command.CommandException
 import net.ccbluex.liquidbounce.features.command.CommandManager
+import net.ccbluex.liquidbounce.features.command.Parameter.Verificator.Result
 import net.ccbluex.liquidbounce.features.command.builder.CommandBuilder
 import net.ccbluex.liquidbounce.features.command.builder.ParameterBuilder
 import net.ccbluex.liquidbounce.features.command.builder.boolean
-import net.ccbluex.liquidbounce.features.command.builder.modules
 import net.ccbluex.liquidbounce.features.command.preset.pagedQuery
 import net.ccbluex.liquidbounce.features.module.ClientModule
+import net.ccbluex.liquidbounce.features.module.ModuleCategories
+import net.ccbluex.liquidbounce.features.module.ModuleManager
 import net.ccbluex.liquidbounce.utils.text.asPlainText
 import net.ccbluex.liquidbounce.utils.client.chat
 import net.ccbluex.liquidbounce.utils.client.clickablePath
@@ -48,6 +50,7 @@ import net.ccbluex.liquidbounce.utils.text.plus
 import net.ccbluex.liquidbounce.utils.client.regular
 import net.ccbluex.liquidbounce.utils.text.textOf
 import net.ccbluex.liquidbounce.utils.client.variable
+import net.ccbluex.liquidbounce.utils.client.warning
 import net.ccbluex.liquidbounce.utils.kotlin.unmodifiable
 import net.ccbluex.liquidbounce.utils.text.AsyncLoadingText
 import net.ccbluex.liquidbounce.utils.text.PlainText
@@ -67,6 +70,18 @@ import java.time.ZoneId
  * Allows you to load, list, and create local configurations.
  */
 object CommandLocalConfig : Command.Factory {
+
+    private const val RENDER_SELECTION = "render"
+
+    internal sealed interface LoadSelectionToken {
+        data object Render : LoadSelectionToken
+
+        data class Modules(val modules: Set<ClientModule>) : LoadSelectionToken
+    }
+
+    internal class RenderOptInRequiredException(
+        val modules: Set<ClientModule>,
+    ) : IllegalArgumentException()
 
     override fun createCommand(): Command {
         return CommandBuilder
@@ -146,7 +161,7 @@ object CommandLocalConfig : Command.Factory {
                 }
 
                 file.createNewFile()
-                serializeAutoConfig(file.bufferedWriter(), includeConfiguration)
+                LocalConfigCodec.serialize(file.bufferedWriter(), includeConfiguration)
                 chat(regular(command.result("created", variable(name))))
             } catch (e: Exception) {
                 chat(regular(command.result("failedToCreate", variable(name))))
@@ -207,13 +222,24 @@ object CommandLocalConfig : Command.Factory {
                 .build()
         )
         .parameter(
-            ParameterBuilder.modules()
+            ParameterBuilder.begin<LoadSelectionToken>("selection")
+                .verifiedBy { sourceText -> parseLoadSelectionToken(sourceText) }
+                .autocompletedWith { begin, _ -> autocompleteLoadSelection(begin) }
+                .vararg()
                 .optional()
                 .build()
         )
         .handler {
             val name = args[0] as String
-            val modules = args.getOrNull(1) as Set<ClientModule>? ?: emptySet()
+            val selectionTokens = (args.getOrNull(1) as? Array<*>)
+                ?.filterIsInstance<LoadSelectionToken>()
+                .orEmpty()
+            val selection = try {
+                combineLoadSelection(selectionTokens)
+            } catch (exception: RenderOptInRequiredException) {
+                val moduleNames = exception.modules.joinToString(", ") { it.name }
+                throw CommandException(command.result("renderRequiresOptIn", variable(moduleNames)))
+            }
 
             ConfigSystem.userConfigsFolder.resolve("$name.json").runCatching {
                 if (!exists()) {
@@ -222,17 +248,75 @@ object CommandLocalConfig : Command.Factory {
                 }
 
                 bufferedReader().use { r ->
-                    AutoConfig.withLoading {
-                        AutoConfig.loadAutoConfig(r, modules)
-                    }
+                    LocalConfigCodec.load(r, selection)
                 }
             }.onFailure { error ->
                 logger.error("Failed to load config $name", error)
                 chat(markAsError(command.result("failedToLoad", variable(name))))
-            }.onSuccess {
-                chat(regular(command.result("loaded", variable(name))))
+            }.onSuccess { result ->
+                val resultKey = if (selection.includeRender) "loadedWithRender" else "loaded"
+                chat(regular(command.result(resultKey, variable(name))))
+
+                if (selection.includeRender && !result.hasRenderSnapshot) {
+                    chat(warning(command.result("renderMissing", variable(name))))
+                }
             }
         }
         .build()
+
+    internal fun parseLoadSelectionToken(
+        sourceText: String,
+        modules: Iterable<ClientModule> = ModuleManager,
+    ): Result<out LoadSelectionToken> {
+        if (sourceText.equals(RENDER_SELECTION, ignoreCase = true)) {
+            return Result.Ok(LoadSelectionToken.Render)
+        }
+
+        val resolvedModules = sourceText.split(',').mapNotNullTo(linkedSetOf()) { moduleName ->
+            modules.find { module -> module.name.equals(moduleName, ignoreCase = true) }
+        }
+
+        return if (resolvedModules.isEmpty()) {
+            Result.Error("'$sourceText' contains no valid Module")
+        } else {
+            Result.Ok(LoadSelectionToken.Modules(resolvedModules))
+        }
+    }
+
+    internal fun combineLoadSelection(tokens: Iterable<LoadSelectionToken>): LocalConfigLoadSelection {
+        val includeRender = tokens.any { it === LoadSelectionToken.Render }
+        val selectedModules = tokens.asSequence()
+            .filterIsInstance<LoadSelectionToken.Modules>()
+            .flatMap { it.modules.asSequence() }
+            .toCollection(linkedSetOf())
+        val selectedRenderModules = selectedModules.filterTo(linkedSetOf()) {
+            it.category == ModuleCategories.RENDER
+        }
+
+        if (!includeRender && selectedRenderModules.isNotEmpty()) {
+            throw RenderOptInRequiredException(selectedRenderModules)
+        }
+
+        selectedModules.removeAll(selectedRenderModules)
+        return LocalConfigLoadSelection(selectedModules, includeRender)
+    }
+
+    internal fun autocompleteLoadSelection(
+        begin: String,
+        modules: Iterable<ClientModule> = ModuleManager,
+    ): List<String> {
+        val splitAt = begin.lastIndexOf(',') + 1
+        val prefix = begin.substring(0, splitAt)
+        val modulePrefix = begin.substring(splitAt)
+        val suggestions = modules.asSequence()
+            .filter { it.name.startsWith(modulePrefix, ignoreCase = true) }
+            .mapTo(mutableListOf()) { prefix + it.name }
+
+        if (splitAt == 0 && RENDER_SELECTION.startsWith(begin, ignoreCase = true)) {
+            suggestions.add(0, RENDER_SELECTION)
+        }
+
+        return suggestions.distinct()
+    }
 
 }

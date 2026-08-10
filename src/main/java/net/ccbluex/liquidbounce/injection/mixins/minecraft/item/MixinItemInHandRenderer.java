@@ -28,6 +28,7 @@ import net.ccbluex.liquidbounce.features.module.modules.combat.ModuleSpearKill;
 import net.ccbluex.liquidbounce.features.module.modules.combat.ModuleSwordBlock;
 import net.ccbluex.liquidbounce.features.module.modules.player.ModuleFastUse;
 import net.ccbluex.liquidbounce.features.module.modules.render.ModuleAnimations;
+import net.ccbluex.liquidbounce.features.module.modules.render.ModuleAnimationsKt;
 import net.ccbluex.liquidbounce.features.module.modules.render.ModuleSilentHotbar;
 import net.ccbluex.liquidbounce.utils.client.SilentHotbar;
 import net.ccbluex.liquidbounce.utils.item.ItemCategorizationsKt;
@@ -104,7 +105,7 @@ public abstract class MixinItemInHandRenderer {
                 poseStack.translate(0f, 0f, mainHand.getMainHandItemScale());
             } else if (InteractionHand.MAIN_HAND == hand && mainHand.getRunning()) {
                 liquid_bounce$applyTransformations(poseStack, mainHand.getMainHandX(), mainHand.getMainHandY(), mainHand.getMainHandItemScale(), mainHand.getMainHandPositiveX(), mainHand.getMainHandPositiveY(), mainHand.getMainHandPositiveZ());
-            } else if (offHand.getRunning()) {
+            } else if (ModuleAnimationsKt.shouldApplyOffHandTransform(hand, isInBothHands, offHand.getRunning())) {
                 liquid_bounce$applyTransformations(poseStack, offHand.getOffHandX(), offHand.getOffHandY(), offHand.getOffHandItemScale(), offHand.getOffHandPositiveX(), offHand.getOffHandPositiveY(), offHand.getOffHandPositiveZ());
             }
         }

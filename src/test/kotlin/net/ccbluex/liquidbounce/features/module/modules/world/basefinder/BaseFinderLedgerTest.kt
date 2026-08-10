@@ -71,6 +71,90 @@ class BaseFinderLedgerTest {
     }
 
     @Test
+    fun `literal version one findings without score details remain readable`() = withLedger { ledger, _ ->
+        val file = ledger.scopePath(SERVER, DIMENSION)
+        Files.createDirectories(file.parent)
+        Files.writeString(
+            file,
+            """
+            {
+              "version": 1,
+              "findings": [{
+                "id": "legacy-v1",
+                "serverKeyHash": "stored-scope-is-replaced",
+                "dimensionKey": "$DIMENSION",
+                "anchor": {"x": 12, "y": 64, "z": -34},
+                "confidence": 80,
+                "tier": "LIKELY",
+                "evidence": [{"family": "STORAGE", "score": 24, "keys": ["Storage"]}],
+                "firstSeenAtMillis": 100,
+                "lastSeenAtMillis": 200,
+                "timesSeen": 2
+              }]
+            }
+            """.trimIndent(),
+        )
+
+        val loaded = ledger.load(SERVER, DIMENSION).single()
+
+        assertEquals("legacy-v1", loaded.id)
+        assertEquals(ledger.hashScopeKey(SERVER), loaded.serverKeyHash)
+        assertEquals(null, loaded.evidence.single().contributions)
+        assertEquals(null, loaded.scoreBreakdown)
+    }
+
+    @Test
+    fun `enriched score details survive persistence and JSON export`() = withLedger { ledger, _ ->
+        val original = enrichedFinding(ledger.hashScopeKey(SERVER))
+
+        assertTrue(runBlocking { ledger.save(SERVER, DIMENSION, listOf(original)).await() }.isSuccess)
+        assertEquals(listOf(original), ledger.load(SERVER, DIMENSION))
+
+        val export = ledger.exportBlocking(SERVER, DIMENSION, BaseFinderExportFormat.JSON)
+        val findingJson = JsonParser.parseString(Files.readString(export)).asJsonObject
+            .getAsJsonArray("findings")
+            .single()
+            .asJsonObject
+        val contributions = findingJson.getAsJsonArray("evidence")
+            .single()
+            .asJsonObject
+            .getAsJsonArray("contributions")
+
+        assertEquals(6, contributions.size())
+        assertEquals(64, contributions.first().asJsonObject["observations"].asInt)
+        assertEquals(-21, contributions.last().asJsonObject["score"].asInt)
+        assertEquals(89, findingJson.getAsJsonObject("scoreBreakdown")["confidenceCap"].asInt)
+    }
+
+    @Test
+    fun `enriched findings require exact contribution and breakdown reconciliation`() = withLedger { ledger, _ ->
+        val original = enrichedFinding(ledger.hashScopeKey(SERVER))
+        val contributionMismatch = original.copy(
+            id = "bad-contributions",
+            evidence = original.evidence.map { summary ->
+                summary.copy(contributions = summary.contributions.orEmpty().dropLast(1))
+            },
+        )
+        val breakdownMismatch = original.copy(
+            id = "bad-breakdown",
+            scoreBreakdown = BaseScoreBreakdown(
+                evidenceSubtotal = 85,
+                diversityBonus = 0,
+                falsePositivePenalty = 5,
+                rawScore = 80,
+                confidenceCap = 89,
+                finalConfidence = 80,
+            ),
+        )
+
+        runBlocking {
+            ledger.save(SERVER, DIMENSION, listOf(contributionMismatch, breakdownMismatch)).await()
+        }
+
+        assertTrue(ledger.load(SERVER, DIMENSION).isEmpty())
+    }
+
+    @Test
     fun `server and dimension scopes remain isolated`() = withLedger { ledger, _ ->
         val first = finding("first", ledger.hashScopeKey(SERVER))
         val secondServer = "other.example:25565"
@@ -166,6 +250,34 @@ class BaseFinderLedgerTest {
     }
 
     @Test
+    fun `CSV preserves existing columns and appends detailed score fields`() = withLedger { ledger, _ ->
+        val stored = enrichedFinding(ledger.hashScopeKey(SERVER))
+        runBlocking { ledger.save(SERVER, DIMENSION, listOf(stored)).await() }
+
+        val csv = Files.readString(ledger.exportBlocking(SERVER, DIMENSION, BaseFinderExportFormat.CSV))
+        val lines = csv.lineSequence().filter(String::isNotBlank).toList()
+
+        assertEquals(
+            "id,serverKeyHash,dimensionKey,x,y,z,confidence,tier,evidence," +
+                "firstSeenAtMillis,lastSeenAtMillis,timesSeen," +
+                "detailedEvidence,rawScore,modifiers,confidenceCap",
+            lines.first(),
+        )
+        assertTrue(
+            lines.single { it != lines.first() }.endsWith(
+                ",\"SEED_MISMATCH:89[" +
+                    "seed_mismatch.unexpected_solid=+40@64+" +
+                    "seed_mismatch.missing_solid=+25@128+" +
+                    "seed_mismatch.utility_mismatch=+25@4+" +
+                    "seed_mismatch.component_size=+15@196+" +
+                    "seed_mismatch.horizontal_spread=+5@12+" +
+                    "seed_mismatch.features_cap=-21]\",\"84\"," +
+                    "\"diversityBonus=+0|falsePositivePenalty=-5\",\"89\"",
+            ),
+        )
+    }
+
+    @Test
     fun `clear cancels pending writes and reports whether current scope existed`() = withLedger(
         debounceMillis = 1_000,
     ) { ledger, root ->
@@ -204,6 +316,41 @@ class BaseFinderLedgerTest {
         lastSeenAtMillis = lastSeenAtMillis,
         timesSeen = 2,
         bounds = bounds,
+    )
+
+    private fun enrichedFinding(serverKeyHash: String) = BaseFinding(
+        id = "seed-evidence",
+        serverKeyHash = serverKeyHash,
+        dimensionKey = DIMENSION,
+        anchor = BaseCoordinate(12, 64, -34),
+        confidence = 84,
+        tier = ConfidenceTier.LIKELY,
+        evidence = listOf(
+            EvidenceSummary(
+                family = BaseSignalFamily.SEED_MISMATCH,
+                score = 89,
+                keys = listOf("seed_mismatch"),
+                contributions = listOf(
+                    ScoreContribution("seed_mismatch.unexpected_solid", 40, 64),
+                    ScoreContribution("seed_mismatch.missing_solid", 25, 128),
+                    ScoreContribution("seed_mismatch.utility_mismatch", 25, 4),
+                    ScoreContribution("seed_mismatch.component_size", 15, 196),
+                    ScoreContribution("seed_mismatch.horizontal_spread", 5, 12),
+                    ScoreContribution("seed_mismatch.features_cap", -21),
+                ),
+            ),
+        ),
+        firstSeenAtMillis = 100L,
+        lastSeenAtMillis = 200L,
+        timesSeen = 2,
+        scoreBreakdown = BaseScoreBreakdown(
+            evidenceSubtotal = 89,
+            diversityBonus = 0,
+            falsePositivePenalty = 5,
+            rawScore = 84,
+            confidenceCap = 89,
+            finalConfidence = 84,
+        ),
     )
 
     private fun withLedger(

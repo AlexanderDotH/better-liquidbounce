@@ -20,6 +20,8 @@ package net.ccbluex.liquidbounce.features.module.modules.world.basefinder
 
 import net.minecraft.core.registries.BuiltInRegistries
 import net.minecraft.world.entity.Entity
+import net.minecraft.world.entity.EntityType
+import net.minecraft.world.entity.EntityTypes
 import net.minecraft.world.entity.animal.equine.AbstractChestedHorse
 import net.minecraft.world.entity.decoration.ArmorStand
 import net.minecraft.world.entity.decoration.ItemFrame
@@ -49,6 +51,39 @@ internal object BaseFinderEvidenceClassifier {
     }
 
     fun storageWeight(state: BlockState): Int = storageWeight(state.registryPath())
+
+    fun isStoragePath(path: String): Boolean = storageWeight(path) > 0
+
+    fun isUtilityPath(path: String): Boolean = utilityCategory(path) != null
+
+    fun isAutomationPath(path: String): Boolean = automationCategory(path) != null
+
+    /**
+     * Natural blocks whose occupancy changes as vegetation grows or world features settle.
+     *
+     * This deliberately excludes processed products such as planks, stripped stems, bamboo blocks, and
+     * dried-kelp blocks. Those are stable player-placeable materials and remain useful BaseFinder evidence.
+     */
+    internal fun isNaturalGrowthPath(path: String): Boolean {
+        if (path.startsWith("potted_")) return false
+        return path in NATURAL_GROWTH_PATHS ||
+            path.endsWith("_leaves") ||
+            path.endsWith("_sapling") ||
+            path.endsWith("_flower") ||
+            path.endsWith("flower") ||
+            path.endsWith("_tulip") ||
+            path.endsWith("_orchid") ||
+            path.endsWith("_daisy") ||
+            path.endsWith("_blossom") ||
+            path.endsWith("eyeblossom") ||
+            path.endsWith("_bush") ||
+            path.endsWith("_roots") ||
+            path.endsWith("_fungus") ||
+            path.endsWith("_vines") ||
+            path.endsWith("_vines_plant") ||
+            path.contains("seagrass") ||
+            path.contains("coral")
+    }
 
     fun isPhysicalPlayerStorageAnchor(anchor: EvidenceAnchor): Boolean {
         val key = anchor.key
@@ -95,7 +130,7 @@ internal object BaseFinderEvidenceClassifier {
             path == "hopper" -> "hopper"
             path == "dispenser" || path == "dropper" || path == "crafter" -> "machine"
             path.endsWith("rail") -> "rail"
-            path == "farmland" || path in CROP_PATHS -> "crop"
+            path == "farmland" -> "crop"
             else -> null
     }
 
@@ -121,11 +156,22 @@ internal object BaseFinderEvidenceClassifier {
         }
     }
 
-    fun entityCategory(entity: Entity): BaseFinderEntityCategory? = when (entity) {
-        is AbstractMinecartContainer, is ChestBoat, is ChestRaft -> BaseFinderEntityCategory.CONTAINER_VEHICLE
-        is AbstractChestedHorse -> BaseFinderEntityCategory.CHESTED_MOUNT.takeIf { entity.hasChest() }
-        is ArmorStand -> BaseFinderEntityCategory.ARMOR_STAND
-        is ItemFrame -> BaseFinderEntityCategory.ITEM_FRAME
+    fun entityCategory(entity: Entity): BaseFinderEntityCategory? {
+        minecartCategory(entity.type)?.let { return it }
+        return when (entity) {
+            // Keep modded container-minecart subclasses useful even when they use a custom EntityType.
+            is AbstractMinecartContainer -> BaseFinderEntityCategory.CONTAINER_MINECART
+            is ChestBoat, is ChestRaft -> BaseFinderEntityCategory.CONTAINER_VEHICLE
+            is AbstractChestedHorse -> BaseFinderEntityCategory.CHESTED_MOUNT.takeIf { entity.hasChest() }
+            is ArmorStand -> BaseFinderEntityCategory.ARMOR_STAND
+            is ItemFrame -> BaseFinderEntityCategory.ITEM_FRAME
+            else -> null
+        }
+    }
+
+    internal fun minecartCategory(type: EntityType<*>): BaseFinderEntityCategory? = when (type) {
+        EntityTypes.CHEST_MINECART, EntityTypes.HOPPER_MINECART -> BaseFinderEntityCategory.CONTAINER_MINECART
+        EntityTypes.FURNACE_MINECART -> BaseFinderEntityCategory.FURNACE_MINECART
         else -> null
     }
 
@@ -143,20 +189,78 @@ internal object BaseFinderEvidenceClassifier {
         "ender_chest",
     )
 
-    private val CROP_PATHS = setOf(
+    private val NATURAL_GROWTH_PATHS = setOf(
+        "short_grass",
+        "tall_grass",
+        "short_dry_grass",
+        "tall_dry_grass",
+        "fern",
+        "large_fern",
+        "dead_bush",
+        "bush",
+        "firefly_bush",
         "wheat",
         "carrots",
         "potatoes",
         "beetroots",
+        "torchflower_crop",
+        "pitcher_crop",
         "nether_wart",
         "sugar_cane",
         "cactus",
+        "cactus_flower",
         "pumpkin",
         "melon",
+        "pumpkin_stem",
+        "melon_stem",
+        "attached_pumpkin_stem",
+        "attached_melon_stem",
         "cocoa",
         "bamboo",
+        "bamboo_sapling",
         "kelp",
         "kelp_plant",
+        "seagrass",
+        "tall_seagrass",
+        "sweet_berry_bush",
+        "vine",
+        "glow_lichen",
+        "lily_pad",
+        "sea_pickle",
+        "mangrove_propagule",
+        "azalea",
+        "flowering_azalea",
+        "moss_block",
+        "moss_carpet",
+        "pale_moss_block",
+        "pale_moss_carpet",
+        "pale_hanging_moss",
+        "big_dripleaf",
+        "big_dripleaf_stem",
+        "small_dripleaf",
+        "hanging_roots",
+        "spore_blossom",
+        "pink_petals",
+        "wildflowers",
+        "leaf_litter",
+        "brown_mushroom",
+        "red_mushroom",
+        "brown_mushroom_block",
+        "red_mushroom_block",
+        "crimson_fungus",
+        "warped_fungus",
+        "crimson_roots",
+        "warped_roots",
+        "nether_sprouts",
+        "weeping_vines",
+        "weeping_vines_plant",
+        "twisting_vines",
+        "twisting_vines_plant",
+        "nether_wart_block",
+        "warped_wart_block",
+        "shroomlight",
+        "chorus_plant",
+        "chorus_flower",
     )
 }
 
@@ -168,9 +272,16 @@ internal data class BaseFinderBlockClassification(
     val structuralCategory: String?,
 )
 
-internal enum class BaseFinderEntityCategory(val container: Boolean) {
-    CONTAINER_VEHICLE(true),
-    CHESTED_MOUNT(true),
-    ARMOR_STAND(false),
-    ITEM_FRAME(false),
+internal enum class BaseFinderEntityCategory(
+    val container: Boolean,
+    val stashMinecart: Boolean,
+    val storageWeight: Int,
+    val storageKey: String?,
+) {
+    CONTAINER_MINECART(true, true, 3, "storage.minecart_container"),
+    FURNACE_MINECART(false, true, 1, "storage.minecart_furnace"),
+    CONTAINER_VEHICLE(true, false, 3, "storage.container_vehicle"),
+    CHESTED_MOUNT(true, false, 3, "storage.container_vehicle"),
+    ARMOR_STAND(false, false, 0, null),
+    ITEM_FRAME(false, false, 0, null),
 }

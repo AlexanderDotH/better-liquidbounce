@@ -1,5 +1,6 @@
 <script lang="ts">
     import type {ModuleSetting} from "../../../../integration/types";
+    import ActionSetting from "../ActionSetting.svelte";
     import BooleanSetting from "../BooleanSetting.svelte";
     import ChoiceSetting from "../ChoiceSetting.svelte";
     import ChooseSetting from "../ChooseSetting.svelte";
@@ -30,6 +31,8 @@
 <div in:slide={{duration: 200, axis: "y"}} out:slide={{duration: 200, axis: "y"}}>
     {#if setting.valueType === "BOOLEAN"}
         <BooleanSetting bind:setting={setting} on:change/>
+    {:else if setting.valueType === "ACTION"}
+        <ActionSetting bind:setting={setting} on:change/>
     {:else if setting.valueType === "CHOICE"}
         <ChoiceSetting {path} bind:setting={setting} on:change/>
     {:else if setting.valueType === "FILE"}

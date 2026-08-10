@@ -36,6 +36,7 @@ import net.ccbluex.liquidbounce.utils.inventory.ArmorItemSlot
 import net.ccbluex.liquidbounce.utils.inventory.HotbarItemSlot
 import net.ccbluex.liquidbounce.utils.inventory.InventoryAction
 import net.ccbluex.liquidbounce.utils.inventory.ItemSlot
+import net.ccbluex.liquidbounce.utils.inventory.OffhandReservationManager
 import net.ccbluex.liquidbounce.utils.inventory.PlayerInventoryConstraints
 import net.ccbluex.liquidbounce.utils.inventory.findNonEmptySlotsInInventory
 import net.ccbluex.liquidbounce.utils.kotlin.Priority
@@ -95,6 +96,7 @@ object ModuleInventoryCleaner : ClientModule(
     val cleanupTemplateFromSettings: CleanupPlanPlacementTemplate
         get() {
             val slotTargets = buildSlotTargetMap()
+            val isOffhandProtected = ModuleOffhand.isOperating() || OffhandReservationManager.isReserved
 
             val forbiddenSlots = buildSet<ItemSlot> {
                 for ((slot, choice) in slotTargets) {
@@ -104,15 +106,15 @@ object ModuleInventoryCleaner : ClientModule(
                 // Disallow tampering with armor slots since auto armor already handles them
                 this += ArmorItemSlot.entries
 
-                if (ModuleOffhand.isOperating()) {
-                    // Disallow tampering with off-hand slot when AutoTotem is active
+                if (isOffhandProtected) {
+                    // Disallow tampering while another feature owns the offhand.
                     this.add(HotbarItemSlot.OFFHAND)
                 }
             }
 
             val forbiddenSlotsToFill = setOfNotNull(
-                // Disallow tampering with off-hand slot when AutoTotem is active
-                if (ModuleOffhand.isOperating()) HotbarItemSlot.OFFHAND else null
+                // Disallow filling while another feature owns the offhand.
+                if (isOffhandProtected) HotbarItemSlot.OFFHAND else null
             )
 
             val constraintProvider = AmountConstraintProvider(

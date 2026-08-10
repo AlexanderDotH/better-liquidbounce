@@ -12,6 +12,7 @@
 package net.ccbluex.liquidbounce.render.engine.esp
 
 import net.ccbluex.liquidbounce.common.EspMaskCaptureContext
+import net.ccbluex.liquidbounce.common.EspMaskLayer
 import net.ccbluex.liquidbounce.common.EspMaskRequest
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertSame
@@ -27,8 +28,8 @@ class EspMaskCaptureContextTest {
 
     @Test
     fun `nested capture restores the outer request`() {
-        val outer = EspMaskRequest(0xFF11_2233.toInt(), 0)
-        val inner = EspMaskRequest(0, 0xFF44_5566.toInt())
+        val outer = EspMaskRequest.NONE.with(EspMaskLayer.PLAYER_GLOW, 0xFF11_2233.toInt())
+        val inner = EspMaskRequest.NONE.with(EspMaskLayer.STORAGE_OUTLINE, 0xFF44_5566.toInt())
 
         EspMaskCaptureContext.run(outer) {
             assertEquals(outer, EspMaskCaptureContext.current())
@@ -43,7 +44,7 @@ class EspMaskCaptureContextTest {
 
     @Test
     fun `exception cannot leak a capture request`() {
-        val request = EspMaskRequest(0xFFAA_BBCC.toInt(), 0)
+        val request = EspMaskRequest.NONE.with(EspMaskLayer.TARGET_GLOW, 0xFFAA_BBCC.toInt())
 
         assertThrows<IllegalStateException> {
             EspMaskCaptureContext.run(request) { error("boom") }
@@ -53,18 +54,27 @@ class EspMaskCaptureContextTest {
     }
 
     @Test
-    fun `mask effects merge independently and preserve the first color`() {
+    fun `player target and storage colors retain separate mask ownership`() {
         val request = EspMaskRequest.NONE
-            .withGlow(0x4011_2233)
-            .withGlow(0xFFAA_BBCC.toInt())
-            .withOutline(0x8044_5566.toInt())
+            .with(EspMaskLayer.PLAYER_GLOW, 0x4011_2233)
+            .with(EspMaskLayer.TARGET_GLOW, 0xFFAA_BBCC.toInt())
+            .with(EspMaskLayer.STORAGE_OUTLINE, 0x8044_5566.toInt())
 
-        assertEquals(0xFF11_2233.toInt(), request.glowColor)
-        assertEquals(0xFF44_5566.toInt(), request.outlineColor)
+        assertEquals(0xFF11_2233.toInt(), request.color(EspMaskLayer.PLAYER_GLOW))
+        assertEquals(0xFFAA_BBCC.toInt(), request.color(EspMaskLayer.TARGET_GLOW))
+        assertEquals(0xFF44_5566.toInt(), request.color(EspMaskLayer.STORAGE_OUTLINE))
     }
 
     @Test
     fun `transparent requests do not create a mask`() {
-        assertSame(EspMaskRequest.NONE, EspMaskRequest.NONE.withGlow(0).withOutline(0))
+        assertSame(EspMaskRequest.NONE, EspMaskRequest.NONE.with(EspMaskLayer.PLAYER_GLOW, 0))
+    }
+
+    @Test
+    fun `surface protection is independent from colored Player ESP`() {
+        val request = EspMaskRequest.NONE.with(EspMaskLayer.PROTECTED_SURFACE, 0xFFFF_FFFF.toInt())
+
+        assertEquals(0xFFFF_FFFF.toInt(), request.color(EspMaskLayer.PROTECTED_SURFACE))
+        assertEquals(0, request.color(EspMaskLayer.PLAYER_GLOW))
     }
 }

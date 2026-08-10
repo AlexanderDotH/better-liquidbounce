@@ -108,6 +108,7 @@ internal fun GuiGraphicsExtractor.drawNametag(nametag: NametagRenderState, posX:
             radius = frameRadius,
             color = glow.color,
             style = glow.style,
+            backgroundBlurRadius = glow.backgroundBlurRadius,
         )
     }
 

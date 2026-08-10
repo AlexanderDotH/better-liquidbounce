@@ -11,13 +11,11 @@
 
 package net.ccbluex.liquidbounce.interfaces;
 
+import net.ccbluex.liquidbounce.common.EspMaskLayer;
+
 public interface PreparedFrameAddition {
 
-    boolean liquid_bounce$hasEspGlow();
+    boolean liquid_bounce$hasEspMask(EspMaskLayer layer);
 
-    boolean liquid_bounce$hasEspOutline();
-
-    void liquid_bounce$executeEspGlow();
-
-    void liquid_bounce$executeEspOutline();
+    void liquid_bounce$executeEspMask(EspMaskLayer layer);
 }

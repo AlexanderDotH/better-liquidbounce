@@ -31,6 +31,7 @@ enum class ValueType(
 ) {
 
     // Primitive Types
+    ACTION(HumanInputDeserializer.booleanDeserializer, AutoCompletionProvider.booleanCompleter),
     BOOLEAN(HumanInputDeserializer.booleanDeserializer, AutoCompletionProvider.booleanCompleter),
     FLOAT(HumanInputDeserializer.floatDeserializer, AutoCompletionProvider.rangedCompleter),
     FLOAT_RANGE(HumanInputDeserializer.floatRangeDeserializer, AutoCompletionProvider.rangedCompleter),

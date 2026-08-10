@@ -82,6 +82,7 @@ import net.minecraft.world.level.block.entity.ShulkerBoxBlockEntity
 import net.minecraft.world.level.block.state.BlockState
 import net.minecraft.world.phys.AABB
 import net.minecraft.world.phys.shapes.VoxelShape
+import org.joml.Matrix4f
 import java.awt.Color
 
 /**
@@ -95,7 +96,9 @@ object ModuleStorageESP : ClientModule("StorageESP", ModuleCategories.RENDER, al
     private val modes = choices("Mode", GlowMode, arrayOf(BoxMode, OutlineMode, GlowMode))
 
     sealed class ChestType(name: String, defaultColor: Color4b) : ToggleableValueGroup(this, name, enabled = true) {
-        val color by color("Color", defaultColor)
+        val color by color("Color", defaultColor).onChanged {
+            markDirtyForModes()
+        }
         val tracers by boolean("Tracers", false)
 
         @JvmOverloads
@@ -198,7 +201,7 @@ object ModuleStorageESP : ClientModule("StorageESP", ModuleCategories.RENDER, al
                     distanceFade = distanceFade,
                 ) {
                     getDynamicTransformsUniform(
-                        modelView = event.poseStack.last().pose(),
+                        modelView = Matrix4f(event.modelViewMatrix),
                     )
                 }
             }
@@ -209,7 +212,7 @@ object ModuleStorageESP : ClientModule("StorageESP", ModuleCategories.RENDER, al
                 distanceFade = distanceFade,
             ) {
                 getDynamicTransformsUniform(
-                    modelView = event.poseStack.last().pose(),
+                    modelView = Matrix4f(event.modelViewMatrix),
                 )
             }
 

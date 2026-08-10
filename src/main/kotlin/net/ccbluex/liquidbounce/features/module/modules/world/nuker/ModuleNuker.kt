@@ -18,6 +18,9 @@
  */
 package net.ccbluex.liquidbounce.features.module.modules.world.nuker
 
+import net.ccbluex.liquidbounce.event.events.BlockAttackEvent
+import net.ccbluex.liquidbounce.event.events.BlockBreakingProgressEvent
+import net.ccbluex.liquidbounce.event.handler
 import net.ccbluex.liquidbounce.features.module.ClientModule
 import net.ccbluex.liquidbounce.features.module.ModuleCategories
 import net.ccbluex.liquidbounce.features.module.modules.world.nuker.area.FloorNukerArea
@@ -25,13 +28,13 @@ import net.ccbluex.liquidbounce.features.module.modules.world.nuker.area.SphereN
 import net.ccbluex.liquidbounce.features.module.modules.world.nuker.mode.InstantNukerMode
 import net.ccbluex.liquidbounce.features.module.modules.world.nuker.mode.LegitNukerMode
 import net.ccbluex.liquidbounce.utils.block.SwingMode
-import net.ccbluex.liquidbounce.utils.collection.Filter
-import net.ccbluex.liquidbounce.utils.collection.blockSortedSetOf
 import net.ccbluex.liquidbounce.utils.render.BreakingProgress
 import net.ccbluex.liquidbounce.utils.render.BreakingProgressRenderer
 import net.ccbluex.liquidbounce.utils.render.placement.PlacementRenderer
 import net.minecraft.core.BlockPos
+import net.minecraft.world.level.block.Block
 import net.minecraft.world.level.block.state.BlockState
+import net.minecraft.world.phys.BlockHitResult
 
 /**
  * Nuker module
@@ -47,8 +50,8 @@ object ModuleNuker : ClientModule("Nuker", ModuleCategories.WORLD, disableOnQuit
         SphereNukerArea,
         arrayOf(SphereNukerArea, FloorNukerArea)
     )
-    private val filter by enumChoice("Filter", Filter.BLACKLIST)
-    private val blocks by blocks("Blocks", blockSortedSetOf())
+    private val blockRule by enumChoice("BlockRule", NukerBlockRule.SAME_BLOCK)
+    private var selectedBlock: Block? = null
 
     val swingMode by enumChoice("Swing", SwingMode.DO_NOT_HIDE)
     val ignoreOpenInventory by boolean("IgnoreOpenInventory", true)
@@ -75,8 +78,28 @@ object ModuleNuker : ClientModule("Nuker", ModuleCategories.WORLD, disableOnQuit
             targetRenderer.addBlock(value ?: return)
         }
 
-    fun isValid(blockState: BlockState): Boolean {
-        return filter.invoke(blockState.block, blocks)
+    fun isValid(blockState: BlockState) = blockRule.accepts(blockState.block, selectedBlock)
+
+    @Suppress("unused")
+    private val blockAttackHandler = handler<BlockAttackEvent> { event ->
+        rememberManuallyMinedBlock(event.pos)
+    }
+
+    @Suppress("unused")
+    private val blockBreakingProgressHandler = handler<BlockBreakingProgressEvent> { event ->
+        rememberManuallyMinedBlock(event.pos)
+    }
+
+    private fun rememberManuallyMinedBlock(pos: BlockPos) {
+        val crosshairPos = (mc.hitResult as? BlockHitResult)?.blockPos
+        if (!isManualNukerSelection(mc.options.keyAttack.isDown, crosshairPos, pos)) {
+            return
+        }
+
+        val state = world.getBlockState(pos)
+        if (!state.isAir) {
+            selectedBlock = state.block
+        }
     }
 
     override fun onDisabled() {

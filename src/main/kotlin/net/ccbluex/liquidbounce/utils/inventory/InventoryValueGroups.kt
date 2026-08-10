@@ -56,12 +56,17 @@ import java.util.function.Predicate
  * This can be used to ensure that the player is not moving or rotating while interacting with the inventory.
  * It Also allows setting delays for opening, clicking and closing the inventory.
  */
-open class InventoryConstraints : ValueGroup("Constraints") {
+open class InventoryConstraints(
+    startDelayDefault: IntRange = 1..2,
+    clickDelayDefault: IntRange = 2..4,
+    closeDelayDefault: IntRange = 1..2,
+    missChanceDefault: IntRange = 0..0,
+) : ValueGroup("Constraints") {
 
-    internal val startDelay by intRange("StartDelay", 1..2, 0..20, "ticks")
-    internal val clickDelay by intRange("ClickDelay", 2..4, 0..20, "ticks")
-    internal val closeDelay by intRange("CloseDelay", 1..2, 0..20, "ticks")
-    internal val missChance by intRange("MissChance", 0..0, 0..100, "%")
+    internal val startDelay by intRange("StartDelay", startDelayDefault, 0..20, "ticks")
+    internal val clickDelay by intRange("ClickDelay", clickDelayDefault, 0..20, "ticks")
+    internal val closeDelay by intRange("CloseDelay", closeDelayDefault, 0..20, "ticks")
+    internal val missChance by intRange("MissChance", missChanceDefault, 0..100, "%")
 
     internal val requirements by multiEnumChoice<InventoryRequirements>(
         "Requires",
@@ -84,7 +89,12 @@ open class InventoryConstraints : ValueGroup("Constraints") {
  * Additional constraints for the player inventory. This should be used when interacting with the player inventory
  * instead of a generic container.
  */
-class PlayerInventoryConstraints : InventoryConstraints() {
+class PlayerInventoryConstraints(
+    startDelayDefault: IntRange = 1..2,
+    clickDelayDefault: IntRange = 2..4,
+    closeDelayDefault: IntRange = 1..2,
+    missChanceDefault: IntRange = 0..0,
+) : InventoryConstraints(startDelayDefault, clickDelayDefault, closeDelayDefault, missChanceDefault) {
     val requiresOpenInventory get() = InventoryRequirements.OPEN_INVENTORY in requirements
 
     override fun requirementChoices(): EnumSet<InventoryRequirements> = enumSetAllOf()

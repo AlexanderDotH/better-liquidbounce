@@ -19,69 +19,77 @@
 
 package net.ccbluex.liquidbounce.features.module.modules.combat
 
-import net.ccbluex.liquidbounce.utils.block.AStarPathBuilder
 import net.ccbluex.liquidbounce.utils.math.bottomCenter
 import net.minecraft.core.BlockPos
-import net.minecraft.world.phys.AABB
+import net.minecraft.core.Vec3i
 import net.minecraft.world.phys.Vec3
+import kotlin.math.sqrt
 
 /**
- * Finds collision-aware block routes for SpearKill's Packet mode.
+ * Finds collision-aware block routes for SpearKill's Packet mode via bidirectional A*.
  *
- * [AStarPathBuilder] reads the live world, so callers must invoke [plan] on the client thread.
- * The resulting waypoint list deliberately omits the origin, matching the path-builder contract.
+ * World lookups run on the client thread. The waypoint list omits the origin, matching the
+ * historical path-builder contract.
  */
 internal class SpearKillAStarRoutePlanner(
-    override val allowDiagonal: Boolean,
+    val allowDiagonal: Boolean,
     val maxCost: Int,
-) : AStarPathBuilder {
+    val maxIterations: Int = SPEAR_KILL_A_STAR_MAX_ITERATIONS,
+    val stopRange: Double = SPEAR_KILL_A_STAR_STOP_RANGE,
+    private val isPassable: (Vec3i) -> Boolean = ::spearKillWorldIsPassable,
+    private val canTraverse: (Vec3, Vec3) -> Boolean = { _, _ -> true },
+) {
 
-    override val maxIterations: Int
-        get() = SPEAR_KILL_A_STAR_MAX_ITERATIONS
-
-    override val stopRange: Double
-        get() = SPEAR_KILL_A_STAR_STOP_RANGE
+    private val passabilityCache = HashMap<BlockPos, Boolean>()
 
     fun plan(origin: Vec3, destination: Vec3): List<Vec3>? {
         if (maxCost <= 0 || !origin.isFinite() || !destination.isFinite()) return null
 
         val start = BlockPos.containing(origin)
         val end = BlockPos.containing(destination)
-        val route = findPath(
+        if (end.closerThan(start, stopRange)) return emptyList()
+
+        fun nodePosition(node: Vec3i): Vec3 = when (node) {
+            start -> origin
+            end -> destination
+            else -> node.bottomCenter
+        }
+
+        val path = bidirectionalAStarShortestPath(
             start = start,
             end = end,
-            maxCost = maxCost,
-        )
+            neighbors = { position: Vec3i ->
+                spearKillBidirectionalNeighbors(
+                    position = position,
+                    allowDiagonal = allowDiagonal,
+                    isPassable = ::isPassableCached,
+                    canTraverse = { from, to ->
+                        val fromPosition = nodePosition(from)
+                        val toPosition = nodePosition(to)
+                        canTraverse(fromPosition, toPosition) && canTraverse(toPosition, fromPosition)
+                    },
+                )
+            },
+            forwardHeuristic = { spearKillAStarHeuristic(it, end) },
+            backwardHeuristic = { spearKillAStarHeuristic(it, start) },
+            maxIterations = maxIterations,
+            maxCost = maxCost.toDouble(),
+        ) ?: return null
+
+        // Exclude start node to preserve the original API contract.
+        val route = path.nodes.drop(1)
         if (route.isEmpty() && !end.closerThan(start, stopRange)) return null
+        return route.map(::nodePosition)
+    }
 
-        return route.map { it.bottomCenter }
+    private fun isPassableCached(position: Vec3i): Boolean {
+        val immutable = BlockPos(position.x, position.y, position.z)
+        return passabilityCache.getOrPut(immutable) { isPassable(immutable) }
     }
 }
 
-/** Validates one virtual player movement segment before SpearKill emits it. */
-internal fun interface SpearKillAStarSegmentValidator {
-    fun isClear(from: Vec3, to: Vec3): Boolean
-}
-
-/**
- * Creates a collision validator for virtual movement relative to [origin].
- *
- * [hasCollision] receives the swept current-player bounding box, making the world lookup an
- * injected detail and keeping [buildSpearKillAStarPacketMovements] independently testable.
- */
-internal fun createSpearKillAStarSegmentValidator(
-    origin: Vec3,
-    playerBoundingBox: AABB,
-    hasCollision: (AABB) -> Boolean,
-): SpearKillAStarSegmentValidator = SpearKillAStarSegmentValidator { from, to ->
-    if (!from.isFinite() || !to.isFinite()) {
-        false
-    } else {
-        val fromBox = playerBoundingBox.move(from.subtract(origin))
-        val toBox = playerBoundingBox.move(to.subtract(origin))
-        !hasCollision(fromBox.minmax(toBox))
-    }
-}
+/** Euclidean distance remains admissible for unit, diagonal, and squared-cost movement edges. */
+internal fun spearKillAStarHeuristic(from: Vec3i, to: Vec3i): Double = sqrt(from.distSqr(to).toDouble())
 
 /** Validates the one exact Packet step immediately before SpearKill sends it. */
 internal fun isSpearKillPacketStepClear(
@@ -205,13 +213,21 @@ internal fun buildSpearKillAStarPacketRoute(
         maxSpeed = maxSpeed,
         segmentValidator = segmentValidator,
     ) ?: return null
-    val destination = outboundWaypoints.last()
 
-    val inbound = outbound.asReversed().map { it.scale(-1.0) }
-    var returnPosition = destination
-    for (movement in inbound) {
+    val outboundEndpoint = outbound.fold(origin, Vec3::add)
+    if (outboundEndpoint.distanceToSqr(outboundWaypoints.last()) >
+        SPEAR_KILL_A_STAR_POSITION_EPSILON_SQUARED
+    ) {
+        return null
+    }
+
+    val inbound = ArrayList<Vec3>(outbound.size)
+    var returnPosition = outboundEndpoint
+    for (outboundMovement in outbound.asReversed()) {
+        val movement = outboundMovement.scale(-1.0)
         val nextPosition = returnPosition.add(movement)
         if (!segmentValidator.isClear(returnPosition, nextPosition)) return null
+        inbound += movement
         returnPosition = nextPosition
     }
     if (returnPosition.distanceToSqr(origin) > SPEAR_KILL_A_STAR_POSITION_EPSILON_SQUARED) return null
@@ -228,8 +244,11 @@ internal fun shouldReplanSpearKillAStarTarget(
     plannedPosition: Vec3,
     currentPosition: Vec3,
     ticksSincePlan: Int,
+    plannedVelocity: Vec3 = Vec3.ZERO,
 ): Boolean = ticksSincePlan >= SPEAR_KILL_A_STAR_REPLAN_INTERVAL_TICKS &&
-    plannedPosition.distanceToSqr(currentPosition) >= SPEAR_KILL_A_STAR_REPLAN_DISTANCE_SQUARED
+    plannedPosition
+        .add(plannedVelocity.scale(ticksSincePlan.toDouble()))
+        .distanceToSqr(currentPosition) >= SPEAR_KILL_A_STAR_REPLAN_DISTANCE_SQUARED
 
 internal fun buildSpearKillAStarOutboundMovements(
     origin: Vec3,
@@ -255,12 +274,22 @@ internal fun buildSpearKillAStarOutboundMovements(
     return outbound.takeIf { it.isNotEmpty() }
 }
 
-/** A* Packet movement is the sole mode allowed to bypass the direct-path target checks. */
+/**
+ * Attack-start gates after look-ray selection.
+ * - A*: no LOS/travel gate (pathfinder owns reachability)
+ * - Packet (non-A*): LOS only — virtual steps do not need a clear body corridor
+ * - Motion: LOS + clear direct travel
+ */
 internal fun isSpearKillAStarTargetEligible(
     hasLineOfSight: Boolean,
     hasClearDirectTravel: Boolean,
     packetAStarEnabled: Boolean,
-): Boolean = packetAStarEnabled || hasLineOfSight && hasClearDirectTravel
+    packetMovementMode: Boolean = false,
+): Boolean = when {
+    packetAStarEnabled -> true
+    packetMovementMode -> hasLineOfSight
+    else -> hasLineOfSight && hasClearDirectTravel
+}
 
 private fun appendSpearKillAStarBoundedMovements(
     from: Vec3,
@@ -314,9 +343,7 @@ private fun isSpearKillAStarSameDirection(first: Vec3, second: Vec3): Boolean {
 
 private fun Vec3.isFinite(): Boolean = x.isFinite() && y.isFinite() && z.isFinite()
 
-private const val SPEAR_KILL_A_STAR_MAX_ITERATIONS = 500
-private const val SPEAR_KILL_A_STAR_STOP_RANGE = 1.0
 private const val SPEAR_KILL_A_STAR_POSITION_EPSILON = 1.0E-9
 private const val SPEAR_KILL_A_STAR_POSITION_EPSILON_SQUARED = 1.0E-18
-private const val SPEAR_KILL_A_STAR_REPLAN_INTERVAL_TICKS = 1
-private const val SPEAR_KILL_A_STAR_REPLAN_DISTANCE_SQUARED = 0.25 * 0.25
+private const val SPEAR_KILL_A_STAR_REPLAN_INTERVAL_TICKS = 3
+private const val SPEAR_KILL_A_STAR_REPLAN_DISTANCE_SQUARED = 0.5 * 0.5

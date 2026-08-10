@@ -99,11 +99,10 @@ public abstract class MixinGameRenderer {
     }
 
     @Inject(
-        method = "render",
+        method = "renderLevel",
         at = @At(
             value = "INVOKE",
-            target = "Lnet/minecraft/client/renderer/LevelRenderer;doEntityOutline()V",
-            shift = At.Shift.AFTER
+            target = "Lnet/minecraft/client/renderer/GameRenderer;renderItemInHand(Lnet/minecraft/client/renderer/state/level/CameraRenderState;FLorg/joml/Matrix4fc;)V"
         )
     )
     private void compositeEspShaders(CallbackInfo ci) {
@@ -139,11 +138,13 @@ public abstract class MixinGameRenderer {
         @Local(name = "projectionMatrix") Matrix4f projectionMatrix,
         @Local(name = "modelViewMatrix") Matrix4fc modelViewMatrix
     ) {
+        // Pose stack stays identity for camera-relative vertex building. View rotation is applied
+        // once via WorldRenderEvent.modelViewMatrix → shader ModelViewMat (same contract as BlockESP).
         var newMatStack = Pools.MatStack.borrow();
         try {
-            newMatStack.mulPose(modelViewMatrix);
             try (var event = new WorldRenderEvent(
                 newMatStack,
+                modelViewMatrix,
                 this.mainCamera,
                 deltaTracker.getGameTimeDeltaPartialTick(false),
                 this.mainRenderTarget

@@ -66,9 +66,7 @@
 
     let settingsPath = $derived(modernModuleExpansionKey(name));
     let hasSettings = $derived(
-        configurable?.value.some(setting =>
-            setting.name !== "Bind" && setting.name !== "Hidden"
-        ) ?? false,
+        configurable ? hasConfigurableSettings(configurable) : false,
     );
 
     const settingsSaveQueue = createLatestValueSaveQueue<ConfigurableSetting>({
@@ -275,9 +273,7 @@
     }
 
     function hasConfigurableSettings(settings: ConfigurableSetting): boolean {
-        return settings.value.some(setting =>
-            setting.name !== "Bind" && setting.name !== "Hidden"
-        );
+        return settings.value.some(setting => setting.name !== "Bind");
     }
 
     function describeError(error: unknown, fallback: string): string {

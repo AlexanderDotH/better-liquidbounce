@@ -34,6 +34,17 @@ test("setting transitions stay local when an ancestor theme or panel is removed"
     }
 });
 
+test("confirmed action reloads replace stale nested settings and synchronize integer sliders", () => {
+    const action = read("setting/ActionSetting.svelte");
+    const configurable = read("setting/ConfigurableSetting.svelte");
+    const integer = read("setting/IntSetting.svelte");
+
+    assert.match(action, /\$:\s*actionSetting\s*=\s*setting\s+as\s+ActionSetting/);
+    assert.match(configurable, /\$:\s*cSetting\s*=\s*setting\s+as\s+ConfigurableSetting/);
+    assert.match(integer, /\$:\s*cSetting\s*=\s*setting\s+as\s+IntSetting/);
+    assert.match(integer, /apiSlider\.set\(cSetting\.value,\s*false\)/);
+});
+
 test("the production build keeps the dev fixture out of its entry graph", () => {
     const app = read("../../App.svelte");
     const viteConfig = readFileSync(

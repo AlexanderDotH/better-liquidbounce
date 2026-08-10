@@ -25,6 +25,7 @@ internal data class GuiGlowFrameRequest(
     val radius: Float,
     val color: Color4b,
     val style: EspGlowStyle,
+    val backgroundBlurRadius: Float,
 ) {
     companion object {
         fun axisAligned(
@@ -35,6 +36,7 @@ internal data class GuiGlowFrameRequest(
             radius: Float,
             color: Color4b,
             style: EspGlowStyle,
+            backgroundBlurRadius: Float,
         ) = GuiGlowFrameRequest(
             corners = floatArrayOf(x1, y1, x1, y2, x2, y2, x2, y1),
             width = x2 - x1,
@@ -42,6 +44,7 @@ internal data class GuiGlowFrameRequest(
             radius = radius,
             color = color.with(a = 255),
             style = style,
+            backgroundBlurRadius = backgroundBlurRadius,
         )
 
         fun transformed(
@@ -53,6 +56,7 @@ internal data class GuiGlowFrameRequest(
             radius: Float,
             color: Color4b,
             style: EspGlowStyle,
+            backgroundBlurRadius: Float,
         ): GuiGlowFrameRequest {
             val topLeft = pose.transformPosition(x1, y1, Vector2f())
             val bottomLeft = pose.transformPosition(x1, y2, Vector2f())
@@ -75,6 +79,7 @@ internal data class GuiGlowFrameRequest(
                 radius = radius * minOf(widthScale, heightScale),
                 color = color.with(a = 255),
                 style = style,
+                backgroundBlurRadius = backgroundBlurRadius,
             )
         }
 
@@ -86,6 +91,7 @@ internal data class GuiGlowFrameRequest(
 internal data class GuiGlowFrameBatch(
     val requests: List<GuiGlowFrameRequest>,
     val style: EspGlowStyle,
+    val backgroundBlurRadius: Float,
 )
 
 /** Owns the CPU-side lifecycle of one GUI glow frame independently of GPU resources. */
@@ -123,6 +129,7 @@ internal class GuiGlowFrameState {
         val batch = GuiGlowFrameBatch(
             requests = requests.toList(),
             style = EspShaderStyleResolver.resolveGlow(*requests.map { it.style }.toTypedArray()),
+            backgroundBlurRadius = requests.maxOf { it.backgroundBlurRadius },
         )
         requests.clear()
         maskPrepared = false

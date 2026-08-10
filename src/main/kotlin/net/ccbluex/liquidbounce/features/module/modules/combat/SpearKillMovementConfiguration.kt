@@ -89,6 +89,7 @@ internal class SpearKillMovementConfiguration(eventListener: EventListener?) {
     internal class AStar(parent: EventListener) : ToggleableValueGroup(parent, "AStar", false) {
         val maxCost by int("MaxCost", 250, 50..500)
         val diagonal by boolean("Diagonal", false)
+        val lineOfSightShortcuts by boolean("LineOfSightShortcuts", false)
         val renderPath by boolean("RenderPath", false)
     }
 }

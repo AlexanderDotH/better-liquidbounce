@@ -24,6 +24,7 @@ internal enum class NametagFrameKind {
 internal data class NametagFrameGlow(
     val color: Color4b,
     val style: EspGlowStyle,
+    val backgroundBlurRadius: Float,
 )
 
 internal data class NametagFrameAppearance(
@@ -33,6 +34,10 @@ internal data class NametagFrameAppearance(
     val radius: Float,
     val glow: NametagFrameGlow?,
 )
+
+internal const val MODERN_FRAME_BACKGROUND_OPACITY_PERCENT = 84
+internal const val MODERN_FRAME_BACKGROUND_BLUR_RADIUS = 12f
+internal const val MODERN_FRAME_RADIUS = 6f
 
 private val MODERN_FILL = Color4b(15, 18, 23, 214)
 private val MODERN_BORDER = Color4b(255, 255, 255, 26)
@@ -44,6 +49,9 @@ internal fun resolveNametagFrameAppearance(
     classicRadius: Float,
     glowColor: Color4b = MODERN_BLUE_ACCENT,
     glowStyle: EspGlowStyle = EspGlowStyle.DEFAULT,
+    glowBackgroundOpacityPercent: Int = MODERN_FRAME_BACKGROUND_OPACITY_PERCENT,
+    glowBackgroundBlurRadius: Float = MODERN_FRAME_BACKGROUND_BLUR_RADIUS,
+    glowFrameRadius: Float = MODERN_FRAME_RADIUS,
 ): NametagFrameAppearance = when (kind) {
     NametagFrameKind.CLASSIC -> NametagFrameAppearance(
         fill = Color4b.DEFAULT_BG_COLOR,
@@ -55,7 +63,11 @@ internal fun resolveNametagFrameAppearance(
 
     NametagFrameKind.MODERN -> modernNametagFrame()
     NametagFrameKind.GLOW -> modernNametagFrame().copy(
-        glow = NametagFrameGlow(glowColor.with(a = 255), glowStyle),
+        fill = MODERN_FILL.with(a = opacityPercentageToAlpha(glowBackgroundOpacityPercent)),
+        border = Color4b.TRANSPARENT,
+        borderWidth = 0f,
+        radius = glowFrameRadius,
+        glow = NametagFrameGlow(glowColor.with(a = 255), glowStyle, glowBackgroundBlurRadius),
     )
 }
 
@@ -63,9 +75,12 @@ private fun modernNametagFrame() = NametagFrameAppearance(
     fill = MODERN_FILL,
     border = MODERN_BORDER,
     borderWidth = 1f,
-    radius = 6f,
+    radius = MODERN_FRAME_RADIUS,
     glow = null,
 )
+
+private fun opacityPercentageToAlpha(opacityPercentage: Int): Int =
+    (opacityPercentage.coerceIn(0, 100) * 255 + 50) / 100
 
 /**
  * Moves the two former root frame values into the Classic choice. The new Frame value deliberately

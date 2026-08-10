@@ -31,6 +31,7 @@ import net.ccbluex.fastutil.mapToArray
 import net.ccbluex.fastutil.toEnumSet
 import net.ccbluex.liquidbounce.config.ConfigSystem
 import net.ccbluex.liquidbounce.config.gson.publicGson
+import net.ccbluex.liquidbounce.config.types.ActionValue
 import net.ccbluex.liquidbounce.config.types.BindValue
 import net.ccbluex.liquidbounce.config.types.PlayerValue
 import net.ccbluex.liquidbounce.config.types.Config
@@ -401,6 +402,14 @@ open class ValueGroup(
         default: Boolean,
         aliases: List<String> = emptyList(),
     ) = value(name, default, ValueType.BOOLEAN, aliases)
+
+    fun action(
+        name: String,
+        aliases: List<String> = emptyList(),
+        callback: () -> Unit,
+    ) = ActionValue(name, aliases, callback).apply {
+        this@ValueGroup.inner.add(this)
+    }
 
     fun float(
         name: String,

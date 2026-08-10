@@ -21,8 +21,11 @@ package net.ccbluex.liquidbounce.features.module.modules.combat
 
 import net.minecraft.world.phys.AABB
 import net.minecraft.world.phys.Vec3
-import kotlin.math.abs
+import kotlin.math.PI
+import kotlin.math.atan2
 import kotlin.math.ceil
+import kotlin.math.cos
+import kotlin.math.sin
 
 /** A collision-safe point A* reaches before the spear performs its final forward movement. */
 internal data class SpearKillAStarAttackApproach(
@@ -59,10 +62,11 @@ internal fun createSpearKillAStarAttackApproachCandidates(
     playerEyeOffset: Vec3,
     preferredDirection: Vec3,
     terminalLungeDistance: Double = SPEAR_KILL_A_STAR_DEFAULT_TERMINAL_LUNGE_DISTANCE,
+    bearingCount: Int = SPEAR_KILL_A_STAR_APPROACH_BEARING_COUNT,
 ): List<SpearKillAStarAttackApproach> {
     if (!targetEyePosition.isFinite() || !playerEyeOffset.isFinite()) return emptyList()
 
-    return spearKillAStarLungeDirections(preferredDirection).mapNotNull { direction ->
+    return spearKillAStarLungeDirections(preferredDirection, bearingCount).mapNotNull { direction ->
         val terminalEyePosition = targetEyePosition.subtract(direction.scale(SPEAR_KILL_A_STAR_TARGET_STAND_OFF))
         val hitPoint = targetBox.clip(
             terminalEyePosition,
@@ -81,8 +85,12 @@ internal fun filterSpearKillAStarApproachesByTerminalClearance(
 }
 
 /**
- * Guarantees the server receives one isolated, full-speed terminal movement in the approach direction.
+ * Ensures the outbound route ends with the approach's terminal lunge.
+ *
+ * The lunge length is independent of [stepLimit]; Packet emission may split it into full steps plus
+ * an exact remainder that lands on [SpearKillAStarAttackApproach.terminalWaypoint].
  */
+@Suppress("ReturnCount")
 internal fun isSpearKillAStarTerminalStepValid(
     outboundMovements: List<Vec3>,
     approach: SpearKillAStarAttackApproach,
@@ -91,10 +99,27 @@ internal fun isSpearKillAStarTerminalStepValid(
     if (outboundMovements.isEmpty() || !stepLimit.isFinite() || stepLimit <= 0.0) return false
 
     val expectedMovement = approach.terminalWaypoint.subtract(approach.plannerGoal)
-    val terminalMovement = outboundMovements.last()
-    return expectedMovement.isFinite() &&
-        abs(expectedMovement.length() - stepLimit) <= SPEAR_KILL_A_STAR_TERMINAL_SPEED_EPSILON &&
-        terminalMovement.distanceToSqr(expectedMovement) <= SPEAR_KILL_A_STAR_TERMINAL_SPEED_EPSILON_SQUARED
+    if (!expectedMovement.isFinite() ||
+        expectedMovement.lengthSqr() <= SPEAR_KILL_A_STAR_TERMINAL_SPEED_EPSILON_SQUARED
+    ) {
+        return false
+    }
+
+    var accumulated = Vec3.ZERO
+    for (step in outboundMovements.asReversed()) {
+        if (!step.isFinite() || step.length() > stepLimit + SPEAR_KILL_A_STAR_TERMINAL_SPEED_EPSILON) {
+            return false
+        }
+
+        accumulated = step.add(accumulated)
+        if (accumulated.distanceToSqr(expectedMovement) <= SPEAR_KILL_A_STAR_TERMINAL_SPEED_EPSILON_SQUARED) {
+            return true
+        }
+        if (accumulated.length() > expectedMovement.length() + SPEAR_KILL_A_STAR_TERMINAL_SPEED_EPSILON) {
+            return false
+        }
+    }
+    return false
 }
 
 /** Estimates target travel time using the Packet mode's one shared inter-step wait. */
@@ -131,26 +156,27 @@ internal fun hasSpearKillDamageWindow(
     return ticksUsingItem + arrivalTicks + confirmationTicks <= damageUseDuration
 }
 
-private fun spearKillAStarLungeDirections(preferredDirection: Vec3): List<Vec3> {
-    if (!preferredDirection.isFinite() ||
+/** Evenly spaced horizontal bearings with [preferredDirection] first. */
+internal fun spearKillAStarLungeDirections(
+    preferredDirection: Vec3,
+    bearingCount: Int = SPEAR_KILL_A_STAR_APPROACH_BEARING_COUNT,
+): List<Vec3> {
+    if (bearingCount <= 0 ||
+        !preferredDirection.isFinite() ||
         preferredDirection.lengthSqr() <= SPEAR_KILL_A_STAR_APPROACH_EPSILON_SQUARED
     ) {
         return emptyList()
     }
 
     val forward = preferredDirection.horizontalDirection() ?: Vec3(1.0, 0.0, 0.0)
-    val lateral = Vec3(-forward.z, 0.0, forward.x)
-        .normalize()
-    val candidates = listOf(
-        forward,
-        lateral,
-        lateral.scale(-1.0),
-        forward.scale(-1.0),
-    )
-    return buildList {
-        candidates.forEach { candidate ->
-            if (none { it.distanceToSqr(candidate) <= SPEAR_KILL_A_STAR_APPROACH_EPSILON_SQUARED }) {
-                add(candidate)
+    val baseAngle = atan2(forward.z, forward.x)
+    return buildList(bearingCount) {
+        add(forward)
+        for (step in 1..bearingCount / 2) {
+            val offset = 2.0 * PI * step / bearingCount
+            add(Vec3(cos(baseAngle + offset), 0.0, sin(baseAngle + offset)))
+            if (size < bearingCount && step * 2 != bearingCount) {
+                add(Vec3(cos(baseAngle - offset), 0.0, sin(baseAngle - offset)))
             }
         }
     }
@@ -163,6 +189,7 @@ private fun Vec3.horizontalDirection(): Vec3? = Vec3(x, 0.0, z)
 private fun Vec3.isFinite(): Boolean = x.isFinite() && y.isFinite() && z.isFinite()
 
 private const val SPEAR_KILL_A_STAR_DEFAULT_TERMINAL_LUNGE_DISTANCE = 7.0
+internal const val SPEAR_KILL_A_STAR_APPROACH_BEARING_COUNT = 12
 // Vanilla spears ignore the first two blocks of their attack ray. Stop just outside that inner
 // dead-zone so the terminal pose lands close enough for reliable kinetic hits.
 private const val SPEAR_KILL_A_STAR_TARGET_STAND_OFF = 2.25

@@ -64,3 +64,41 @@ internal fun spearKillAnimationTicks(
     if (!shouldRaise || delayTicks < 0) return originalTicks
     return delayTicks.toFloat()
 }
+
+/**
+ * Idle keep-alive for the finite kinetic use window: release + re-use the same hand right before
+ * expiry. Never refresh mid-path — that would drop ticks under delayTicks and abort Packet/A*.
+ */
+internal fun shouldRefreshSpearKillServerUse(
+    attackPathActive: Boolean,
+    isUseKeyDown: Boolean,
+    ticksUsingItem: Int,
+    damageUseDuration: Int,
+): Boolean = !attackPathActive &&
+    isUseKeyDown &&
+    damageUseDuration > 0 &&
+    ticksUsingItem >= damageUseDuration - 1
+
+/**
+ * After a keep-alive refresh, ticks drop below [delayTicks]. That is still a valid charge — do not
+ * tear down preview/path state unless the player actually stopped using the spear.
+ */
+internal fun shouldResetSpearKillOnUndercharge(
+    ticksUsingItem: Int,
+    delayTicks: Int,
+    isUsingSpear: Boolean,
+    isUseKeyDown: Boolean,
+): Boolean = ticksUsingItem <= delayTicks && !(isUsingSpear && isUseKeyDown)
+
+/** Speeds the kinetic delay while idle-charging so keep-alive restarts become attack-ready quickly. */
+internal fun shouldAccelerateSpearKillCharge(
+    attackPathActive: Boolean,
+    isUseKeyDown: Boolean,
+    isUsingSpear: Boolean,
+    ticksUsingItem: Int,
+    delayTicks: Int,
+): Boolean = !attackPathActive &&
+    isUseKeyDown &&
+    isUsingSpear &&
+    delayTicks >= 0 &&
+    ticksUsingItem <= delayTicks

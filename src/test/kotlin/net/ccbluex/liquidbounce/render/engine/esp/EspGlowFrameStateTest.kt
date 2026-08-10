@@ -56,8 +56,8 @@ class EspGlowFrameStateTest {
     }
 
     @Test
-    fun `five percent tracer halo remains independent from stronger full world glow`() {
-        val lanes = EspGlowFrameLanes()
+    fun `portal player storage and base finder keep independent masks and styles`() {
+        val sources = EspGlowFrameSources()
         val fullWorldGlow = EspGlowStyle(
             radius = 24f,
             softness = 1.5f,
@@ -73,17 +73,94 @@ class EspGlowFrameStateTest {
             opacity = 0.05f,
         )
 
-        lanes.contribute(EspGlowContributionRole.FULL, fullWorldGlow)
-        lanes.contribute(EspGlowContributionRole.HALO_ONLY, tracerHalo)
+        assertTrue(sources.prepareMask(EspGlowSource.PLAYER_ESP))
+        assertTrue(sources.prepareMask(EspGlowSource.BLOCK_ESP))
+        assertTrue(sources.prepareMask(EspGlowSource.STORAGE_ESP))
+        assertTrue(sources.prepareMask(EspGlowSource.BASE_FINDER))
 
-        assertEquals(fullWorldGlow, lanes.full.style)
-        assertEquals(tracerHalo, lanes.haloOnly.style)
-        assertTrue(lanes.hasAnyContribution)
+        sources.contribute(EspGlowSource.PLAYER_ESP, fullWorldGlow)
+        sources.contribute(EspGlowSource.BLOCK_ESP, tracerHalo)
+        sources.contribute(EspGlowSource.STORAGE_ESP, tracerHalo.copy(opacity = 0.35f))
+        sources.contribute(EspGlowSource.BASE_FINDER, fullWorldGlow.copy(radius = 18f))
 
-        lanes.reset()
+        assertEquals(fullWorldGlow, sources.state(EspGlowSource.PLAYER_ESP).style)
+        assertEquals(tracerHalo, sources.state(EspGlowSource.BLOCK_ESP).style)
+        assertEquals(0.35f, sources.state(EspGlowSource.STORAGE_ESP).style.opacity)
+        assertEquals(18f, sources.state(EspGlowSource.BASE_FINDER).style.radius)
+        assertFalse(sources.prepareMask(EspGlowSource.PLAYER_ESP))
+        assertTrue(sources.hasAnyContribution)
 
-        assertFalse(lanes.full.hasContribution)
-        assertFalse(lanes.haloOnly.hasContribution)
-        assertFalse(lanes.hasAnyContribution)
+        sources.reset()
+
+        assertFalse(sources.state(EspGlowSource.PLAYER_ESP).hasContribution)
+        assertFalse(sources.state(EspGlowSource.BLOCK_ESP).hasContribution)
+        assertFalse(sources.hasAnyContribution)
+    }
+
+    @Test
+    fun `Block ESP yields to BlockOverlay and nested model owners`() {
+        val activeSources = listOf(
+            EspGlowSource.BASE_FINDER,
+            EspGlowSource.BLOCK_ESP,
+            EspGlowSource.BLOCK_OUTLINE,
+            EspGlowSource.STORAGE_ESP,
+            EspGlowSource.TARGET_GLOW,
+            EspGlowSource.PLAYER_ESP,
+        )
+
+        assertEquals(
+            listOf(
+                EspGlowSource.BLOCK_OUTLINE,
+                EspGlowSource.STORAGE_ESP,
+                EspGlowSource.TARGET_GLOW,
+                EspGlowSource.PLAYER_ESP,
+            ),
+            EspGlowProtectionPlan.exclusionSources(EspGlowSource.BLOCK_ESP, activeSources),
+        )
+    }
+
+    @Test
+    fun `large early masks cannot suppress later nested ESP owners`() {
+        val activeSources = listOf(
+            EspGlowSource.BASE_FINDER,
+            EspGlowSource.BLOCK_ESP,
+            EspGlowSource.BLOCK_OUTLINE,
+            EspGlowSource.STORAGE_ESP,
+        )
+
+        assertEquals(
+            listOf(
+                EspGlowSource.BLOCK_ESP,
+                EspGlowSource.BLOCK_OUTLINE,
+                EspGlowSource.STORAGE_ESP,
+            ),
+            EspGlowProtectionPlan.exclusionSources(EspGlowSource.BASE_FINDER, activeSources),
+        )
+        assertFalse(
+            EspGlowSource.BASE_FINDER in
+                EspGlowProtectionPlan.exclusionSources(EspGlowSource.STORAGE_ESP, activeSources)
+        )
+    }
+
+    @Test
+    fun `BlockOverlay mask protects its surface even when its own Glow pass is disabled`() {
+        val sources = EspGlowFrameSources()
+
+        sources.prepareMask(EspGlowSource.BLOCK_OUTLINE)
+
+        assertEquals(listOf(EspGlowSource.BLOCK_OUTLINE), sources.maskSources)
+        assertTrue(sources.activeSources.isEmpty())
+        assertFalse(sources.hasAnyContribution)
+    }
+
+    @Test
+    fun `tracer yields to a visible Player ESP surface`() {
+        assertEquals(
+            listOf(EspGlowSource.PLAYER_ESP),
+            EspGlowProtectionPlan.exclusionSources(
+                EspGlowSource.TRACERS,
+                listOf(EspGlowSource.PLAYER_ESP),
+            ),
+        )
     }
 }

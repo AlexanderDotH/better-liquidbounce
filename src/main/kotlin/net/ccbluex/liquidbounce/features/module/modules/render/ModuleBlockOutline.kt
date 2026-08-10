@@ -32,6 +32,7 @@ import net.ccbluex.liquidbounce.render.drawShape
 import net.ccbluex.liquidbounce.render.drawShapeSide
 import net.ccbluex.liquidbounce.render.engine.esp.EspGlowStyle
 import net.ccbluex.liquidbounce.render.engine.esp.EspGlowStyleConfig
+import net.ccbluex.liquidbounce.render.engine.esp.EspGlowSource
 import net.ccbluex.liquidbounce.render.engine.esp.EspShaderRenderer
 import net.ccbluex.liquidbounce.render.engine.type.Color4b
 import net.ccbluex.liquidbounce.render.renderEnvironment
@@ -116,7 +117,7 @@ object ModuleBlockOutline : ClientModule("BlockOutline", ModuleCategories.RENDER
                     drawHighlight(shape, side, localHitPos, color, outlineColor)
                 }
             }
-            event.renderGlow {
+            event.renderShaderMask {
                 withPositionRelativeToCamera(blockPos) {
                     drawHighlight(shape, side, localHitPos, it, null)
                 }
@@ -152,7 +153,7 @@ object ModuleBlockOutline : ClientModule("BlockOutline", ModuleCategories.RENDER
         event.renderEnvironment {
             drawHighlight(translatedPosition, side, color, outlineColor)
         }
-        event.renderGlow {
+        event.renderShaderMask {
             drawHighlight(translatedPosition, side, it, null)
         }
     }
@@ -184,15 +185,18 @@ object ModuleBlockOutline : ClientModule("BlockOutline", ModuleCategories.RENDER
         }
     }
 
-    private fun WorldRenderEvent.renderGlow(draw: WorldRenderEnvironment.(Color4b) -> Unit) {
-        if (!Glow.running) return
-
+    private fun WorldRenderEvent.renderShaderMask(draw: WorldRenderEnvironment.(Color4b) -> Unit) {
         val maskColor = when {
             !color.isTransparent -> color.with(a = 255)
             !outlineColor.isTransparent -> outlineColor.with(a = 255)
             else -> return
         }
-        EspShaderRenderer.contributeGlow(this, Glow.style) {
+
+        EspShaderRenderer.contributeGlow(
+            this,
+            EspGlowSource.BLOCK_OUTLINE,
+            Glow.style.takeIf { Glow.running },
+        ) {
             draw(maskColor)
         }
     }

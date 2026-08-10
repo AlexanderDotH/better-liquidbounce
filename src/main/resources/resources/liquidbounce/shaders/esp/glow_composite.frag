@@ -37,9 +37,10 @@ void main() {
         if (candidate.a > nearest.a) nearest = candidate;
     }
 
-    float outside = 1.0 - smoothstep(0.02, 0.65, center.a);
+    float protectedSurface = texture(CoreExclusionSampler, texCoord).a;
+    float outside = 1.0 - smoothstep(0.02, 0.65, max(center.a, protectedSurface));
     float haloAlpha = clamp(min(0.72, blurred.a * 1.18) * glowParams.y * glowParams.z * outside, 0.0, 1.0);
-    float coreAlpha = smoothstep(0.02, 0.92, nearest.a - center.a) * 0.95 * glowParams.z;
+    float coreAlpha = smoothstep(0.02, 0.92, nearest.a - center.a) * 0.95 * glowParams.z * outside;
 
     vec4 halo = vec4(straightColor(blurred) * haloAlpha, haloAlpha);
     vec3 coreColor = nearest.a > 0.0001 ? nearest.rgb / nearest.a : straightColor(blurred);

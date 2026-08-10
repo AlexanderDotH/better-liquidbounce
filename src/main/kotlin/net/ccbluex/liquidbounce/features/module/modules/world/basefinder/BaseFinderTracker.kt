@@ -61,6 +61,7 @@ internal object BaseFinderTracker : ChunkScanner.BlockChangeSubscriber {
     private val revisions = ConcurrentHashMap<Long, Long>()
     private val dirtyChunks = ConcurrentSkipListSet<Long>()
     private val loadedChunks = ConcurrentHashMap.newKeySet<Long>()
+    private val seedMismatchUpdatePositions = ConcurrentHashMap<Long, MutableSet<Long>>()
     private val liquidUpdateChunks = ConcurrentHashMap.newKeySet<Long>()
     private val staticSnapshots = ConcurrentHashMap<Long, ChunkEvidenceSnapshot>()
     private val blockEntityStorageSignals = ConcurrentHashMap<Long, StorageSignal>()
@@ -72,7 +73,15 @@ internal object BaseFinderTracker : ChunkScanner.BlockChangeSubscriber {
         get() = epoch.get()
 
     override fun recordBlock(pos: BlockPos, state: BlockState, cleared: Boolean) {
+        // The comparator deliberately ignores plants, natural wood, falling blocks, generated cobweb,
+        // dripstone, sulfur, and bee homes. Their random/world ticks therefore cannot change either the
+        // heuristic snapshot or SeedMismatch result and must not invalidate a 3x3 comparison neighborhood.
+        val blockId = BuiltInRegistries.BLOCK.getId(state.block)
+        if (BaseFinderBlockRegistry.isUnstableSeedComparison(blockId)) return
+
         val chunk = ChunkCoordinate(pos.x shr 4, pos.z shr 4)
+        seedMismatchUpdatePositions.computeIfAbsent(chunk.pack()) { ConcurrentHashMap.newKeySet<Long>() }
+            .add(pos.asLong())
         markDirtyNeighborhood(chunk)
 
         val fluid = state.fluidState
@@ -94,6 +103,7 @@ internal object BaseFinderTracker : ChunkScanner.BlockChangeSubscriber {
         invalidateChunk(key)
         dirtyChunks -= key
         loadedChunks -= key
+        seedMismatchUpdatePositions.remove(key)
         liquidUpdateChunks -= key
         staticSnapshots.remove(key)
         blockEntityStorageSignals.remove(key)
@@ -116,6 +126,7 @@ internal object BaseFinderTracker : ChunkScanner.BlockChangeSubscriber {
         revisions.clear()
         dirtyChunks.clear()
         loadedChunks.clear()
+        seedMismatchUpdatePositions.clear()
         liquidUpdateChunks.clear()
         staticSnapshots.clear()
         blockEntityStorageSignals.clear()
@@ -205,7 +216,18 @@ internal object BaseFinderTracker : ChunkScanner.BlockChangeSubscriber {
     internal fun drainDirtyChunksForTest(limit: Int): List<ChunkCoordinate> =
         drainDirtyChunkKeys(limit).map { it.toCoordinate() }
 
-    internal fun scanTicketForTest(chunk: ChunkCoordinate): BaseFinderScanTicket = currentTicket(chunk)
+    fun ticketFor(chunk: ChunkCoordinate): BaseFinderScanTicket = currentTicket(chunk)
+
+    /** Immutable locations updated by the client after this chunk was first observed. */
+    fun seedMismatchUpdatePositionsFor(chunk: ChunkCoordinate): Set<Long> {
+        val positions = seedMismatchUpdatePositions[chunk.pack()] ?: return emptySet()
+        return java.util.Set.copyOf(positions)
+    }
+
+    /** Reject a frozen compare after a newer block update has invalidated its chunk revision. */
+    fun isTicketCurrent(ticket: BaseFinderScanTicket): Boolean = isCurrent(ticket)
+
+    internal fun scanTicketForTest(chunk: ChunkCoordinate): BaseFinderScanTicket = ticketFor(chunk)
 
     internal fun isCurrentForTest(ticket: BaseFinderScanTicket): Boolean = isCurrent(ticket)
 
@@ -251,8 +273,12 @@ internal object BaseFinderTracker : ChunkScanner.BlockChangeSubscriber {
         val entityStorage = entityStorageSignals[key] ?: StorageSignal()
         return base.copy(
             storage = StorageSignal(
-                authoritativeStorage.weightedPoints + entityStorage.weightedPoints,
-                authoritativeStorage.anchors + entityStorage.anchors,
+                weightedPoints = authoritativeStorage.weightedPoints + entityStorage.weightedPoints,
+                anchors = authoritativeStorage.anchors + entityStorage.anchors,
+                observationsByKey = mergeCounts(
+                    authoritativeStorage.observationsByKey,
+                    entityStorage.observationsByKey,
+                ),
             ),
             entities = entitySignals[key] ?: EntitiesSignal(),
             activity = activitySignal(key, now),
@@ -369,6 +395,12 @@ internal object BaseFinderTracker : ChunkScanner.BlockChangeSubscriber {
 
     private fun Long.toCoordinate() = ChunkCoordinate(ChunkPos.getX(this), ChunkPos.getZ(this))
 
+    private fun mergeCounts(vararg counts: Map<String, Int>): Map<String, Int> = buildMap {
+        counts.forEach { grouped ->
+            grouped.forEach { (key, count) -> merge(key, count, Int::plus) }
+        }
+    }
+
     private data class ActivityKey(val chunkKey: Long, val category: String)
 
     private data class ActivityRecord(val position: BaseCoordinate, val timestampMillis: Long)
@@ -376,17 +408,28 @@ internal object BaseFinderTracker : ChunkScanner.BlockChangeSubscriber {
     private class EntityAccumulator {
         private val categories = HashSet<BaseFinderEntityCategory>()
         private val anchors = ArrayList<EvidenceAnchor>()
+        private val storageAnchors = ArrayList<EvidenceAnchor>()
+        private val storageObservations = HashMap<String, Int>()
         private var count = 0
-        private var containerCount = 0
+        private var storagePoints = 0
+        private var stashMinecartCount = 0
         private var hasContainer = false
 
         fun add(category: BaseFinderEntityCategory, position: BaseCoordinate) {
             categories += category
             count++
             hasContainer = hasContainer || category.container
-            if (category.container) containerCount++
+            if (category.stashMinecart) stashMinecartCount++
             if (anchors.size < MAX_ANCHORS_PER_FAMILY) {
                 anchors += EvidenceAnchor(position, ENTITY_ANCHOR_WEIGHT, "entity.${category.name.lowercase()}")
+            }
+            val storageKey = category.storageKey
+            if (storageKey != null && category.storageWeight > 0) {
+                storagePoints += category.storageWeight
+                storageObservations.merge(storageKey, 1, Int::plus)
+                if (storageAnchors.size < MAX_ANCHORS_PER_FAMILY) {
+                    storageAnchors += EvidenceAnchor(position, category.storageWeight, storageKey)
+                }
             }
         }
 
@@ -396,13 +439,15 @@ internal object BaseFinderTracker : ChunkScanner.BlockChangeSubscriber {
                 densityPoints = densityPoints(count, 4),
                 hasContainerVehicleOrChestedMount = hasContainer,
                 anchors = anchors.toList(),
+                stashMinecartCount = stashMinecartCount,
             )
-            val containerAnchors = anchors
-                .filter { it.key.contains("container_vehicle") || it.key.contains("chested_mount") }
-                .map { it.copy(weight = CONTAINER_ENTITY_STORAGE_WEIGHT, key = "storage.container_vehicle") }
             return BaseFinderSampledEntityEvidence(
                 entities = entitySignal,
-                storage = StorageSignal(containerCount * CONTAINER_ENTITY_STORAGE_WEIGHT, containerAnchors),
+                storage = StorageSignal(
+                    weightedPoints = storagePoints,
+                    anchors = storageAnchors.toList(),
+                    observationsByKey = storageObservations.toMap(),
+                ),
             )
         }
     }
@@ -410,15 +455,21 @@ internal object BaseFinderTracker : ChunkScanner.BlockChangeSubscriber {
     private class StorageAccumulator {
         private var points = 0
         private val anchors = ArrayList<EvidenceAnchor>()
+        private val observations = HashMap<String, Int>()
 
         fun add(weight: Int, position: BaseCoordinate, path: String) {
             points += weight
+            observations.merge("storage.$path", 1, Int::plus)
             if (anchors.size < MAX_ANCHORS_PER_FAMILY) {
                 anchors += EvidenceAnchor(position, weight, "storage.$path")
             }
         }
 
-        fun toSignal() = StorageSignal(points, anchors.toList())
+        fun toSignal() = StorageSignal(
+            weightedPoints = points,
+            anchors = anchors.toList(),
+            observationsByKey = observations.toMap(),
+        )
     }
 
     private class ChunkAccumulator(
@@ -428,12 +479,14 @@ internal object BaseFinderTracker : ChunkScanner.BlockChangeSubscriber {
         private var storagePoints = 0
         private var storageCount = 0
         private val storageAnchors = ArrayList<EvidenceAnchor>()
+        private val storageObservations = HashMap<String, Int>()
         private val utilityCategories = HashSet<String>()
         private val utilityAnchors = ArrayList<EvidenceAnchor>()
         private val automationCategories = HashSet<String>()
         private val automationCounts = HashMap<String, Int>()
         private val automationPositions = LinkedHashSet<BaseCoordinate>()
         private val automationAnchors = ArrayList<EvidenceAnchor>()
+        private val railPositions = LinkedHashSet<BaseCoordinate>()
         private val structuralCounts = HashMap<String, Int>()
         private val structuralAnchors = ArrayList<EvidenceAnchor>()
         private val craftedPositions = LinkedHashSet<BaseCoordinate>()
@@ -457,19 +510,26 @@ internal object BaseFinderTracker : ChunkScanner.BlockChangeSubscriber {
         }
 
         fun toSnapshot(): ChunkEvidenceSnapshot {
-            val automationAligned = hasAlignedRun(automationPositions, MIN_ALIGNED_AUTOMATION)
-            val artificialPattern = automationAligned || hasAlignedRun(craftedPositions, MIN_ALIGNED_CRAFTED)
-            val caveDisturbance = undergroundAirCount in CAVE_AIR_RANGE && craftedPositions.size >= 3
             val falsePositives = detectFalsePositives()
+            val generatedMineshaft = BaseFalsePositive.MINESHAFT_OR_DUNGEON in falsePositives
+            val effective = effectiveBlockEvidence(generatedMineshaft)
+            val automationAligned = hasAlignedRun(effective.automationPositions, MIN_ALIGNED_AUTOMATION)
+            val artificialPattern = automationAligned ||
+                hasAlignedRun(effective.craftedPositions, MIN_ALIGNED_CRAFTED)
+            val caveDisturbance = undergroundAirCount in CAVE_AIR_RANGE && effective.craftedPositions.size >= 3
             return ChunkEvidenceSnapshot(
                 chunk = chunk,
-                storage = StorageSignal(storagePoints, storageAnchors.toList()),
+                storage = StorageSignal(
+                    weightedPoints = storagePoints,
+                    anchors = storageAnchors.toList(),
+                    observationsByKey = storageObservations.toMap(),
+                ),
                 utilities = UtilitiesSignal(utilityCategories.toSet(), utilityAnchors.toList()),
                 automation = AutomationSignal(
-                    diversityPoints = (automationCategories.size * 2).coerceAtMost(8),
-                    densityPoints = densityPoints(automationCounts.values.sum(), 8),
+                    diversityPoints = (effective.automationCategories.size * 2).coerceAtMost(8),
+                    densityPoints = densityPoints(effective.automationCount, 8),
                     organizedPattern = automationAligned,
-                    anchors = automationAnchors.toList(),
+                    anchors = effective.automationAnchors,
                 ),
                 structural = StructuralSignal(
                     portalShape = structuralCounts.getOrDefault("portal", 0) >= 2,
@@ -481,10 +541,33 @@ internal object BaseFinderTracker : ChunkScanner.BlockChangeSubscriber {
                 geometry = GeometrySignal(
                     caveDisturbance = caveDisturbance,
                     artificialPattern = artificialPattern,
-                    anchors = geometryAnchors(caveDisturbance, artificialPattern),
+                    anchors = geometryAnchors(
+                        cave = caveDisturbance,
+                        artificial = artificialPattern,
+                        effectiveCraftedPositions = effective.craftedPositions,
+                    ),
                 ),
                 falsePositives = falsePositives,
                 dimensionKey = dimensionKey,
+            )
+        }
+
+        private fun effectiveBlockEvidence(generatedMineshaft: Boolean): EffectiveBlockEvidence {
+            if (!generatedMineshaft) {
+                return EffectiveBlockEvidence(
+                    automationCategories = automationCategories.toSet(),
+                    automationCount = automationCounts.values.sum(),
+                    automationPositions = automationPositions.toSet(),
+                    automationAnchors = automationAnchors.toList(),
+                    craftedPositions = craftedPositions.toSet(),
+                )
+            }
+            return EffectiveBlockEvidence(
+                automationCategories = automationCategories - RAIL_CATEGORY,
+                automationCount = automationCounts.filterKeys { it != RAIL_CATEGORY }.values.sum(),
+                automationPositions = automationPositions - railPositions,
+                automationAnchors = automationAnchors.filterNot { it.key == RAIL_ANCHOR_KEY },
+                craftedPositions = craftedPositions - railPositions,
             )
         }
 
@@ -495,7 +578,12 @@ internal object BaseFinderTracker : ChunkScanner.BlockChangeSubscriber {
         }
 
         private fun recordPath(path: String) {
-            if (path in STRUCTURE_CONTEXT_PATHS || path.endsWith("_rail") || path.endsWith("_bricks")) {
+            if (
+                path in STRUCTURE_CONTEXT_PATHS ||
+                path in MINESHAFT_CONTEXT_PATHS ||
+                path.endsWith("_rail") ||
+                path.endsWith("_bricks")
+            ) {
                 pathCounts.merge(path, 1, Int::plus)
             }
         }
@@ -504,7 +592,9 @@ internal object BaseFinderTracker : ChunkScanner.BlockChangeSubscriber {
             if (classified.storageWeight <= 0) return
             storagePoints += classified.storageWeight
             storageCount++
-            addAnchor(storageAnchors, position, classified.storageWeight, "storage.${classified.path}")
+            val key = "storage.${classified.path}"
+            storageObservations.merge(key, 1, Int::plus)
+            addAnchor(storageAnchors, position, classified.storageWeight, key)
             craftedPositions += position
         }
 
@@ -522,6 +612,7 @@ internal object BaseFinderTracker : ChunkScanner.BlockChangeSubscriber {
             automationCounts.merge(category, 1, Int::plus)
             automationPositions += position
             addAnchor(automationAnchors, position, AUTOMATION_ANCHOR_WEIGHT, "automation.$category")
+            if (category == RAIL_CATEGORY) railPositions += position
             craftedPositions += position
         }
 
@@ -532,9 +623,13 @@ internal object BaseFinderTracker : ChunkScanner.BlockChangeSubscriber {
             craftedPositions += position
         }
 
-        private fun geometryAnchors(cave: Boolean, artificial: Boolean): List<EvidenceAnchor> = buildList {
+        private fun geometryAnchors(
+            cave: Boolean,
+            artificial: Boolean,
+            effectiveCraftedPositions: Set<BaseCoordinate>,
+        ): List<EvidenceAnchor> = buildList {
             if (artificial) {
-                craftedPositions.firstOrNull()?.let {
+                effectiveCraftedPositions.firstOrNull()?.let {
                     add(EvidenceAnchor(it, GEOMETRY_ANCHOR_WEIGHT, "geometry.artificial_pattern"))
                 }
             }
@@ -560,7 +655,7 @@ internal object BaseFinderTracker : ChunkScanner.BlockChangeSubscriber {
             val endCityBlocks = pathCounts.filterKeys { it.startsWith("purpur_") }.values.sum()
 
             if (beds >= 2 && crops >= 8 && workstations >= 2) add(BaseFalsePositive.VILLAGE)
-            if (pathCounts.getOrDefault("spawner", 0) > 0 || rails >= 12 && automationCategories.size == 1) {
+            if (hasGeneratedMineshaftContext()) {
                 add(BaseFalsePositive.MINESHAFT_OR_DUNGEON)
             }
             if (ruinedPortalMaterials && storagePoints <= 3 && utilityCategories.size <= 1) {
@@ -576,6 +671,17 @@ internal object BaseFinderTracker : ChunkScanner.BlockChangeSubscriber {
             if (automationCounts.values.maxOrNull()?.let { it >= 16 } == true && automationCategories.size == 1) {
                 add(BaseFalsePositive.HOMOGENEOUS_SIGNAL)
             }
+        }
+
+        private fun hasGeneratedMineshaftContext(): Boolean {
+            val rails = automationCounts.getOrDefault(RAIL_CATEGORY, 0)
+            val cobwebs = pathCounts.getOrDefault("cobweb", 0)
+            val supports = MINESHAFT_SUPPORT_PATHS.sumOf { pathCounts.getOrDefault(it, 0) }
+            val spawner = pathCounts.getOrDefault("spawner", 0) > 0
+            val railOnlyGallery = rails >= 12 && automationCategories.size == 1
+            val cobwebGallery = cobwebs >= 2 && (rails >= 2 || supports >= 4)
+            val supportedRailGallery = rails >= 8 && supports >= 4
+            return spawner || railOnlyGallery || cobwebGallery || supportedRailGallery
         }
 
         private fun addAnchor(
@@ -600,6 +706,14 @@ internal object BaseFinderTracker : ChunkScanner.BlockChangeSubscriber {
         return false
     }
 
+    private data class EffectiveBlockEvidence(
+        val automationCategories: Set<String>,
+        val automationCount: Int,
+        val automationPositions: Set<BaseCoordinate>,
+        val automationAnchors: List<EvidenceAnchor>,
+        val craftedPositions: Set<BaseCoordinate>,
+    )
+
     private fun densityPoints(count: Int, maximum: Int): Int = when {
         count >= 32 -> maximum
         count >= 16 -> minOf(maximum, 6)
@@ -614,7 +728,6 @@ internal object BaseFinderTracker : ChunkScanner.BlockChangeSubscriber {
     private const val ACTIVITY_ANCHOR_WEIGHT = 2
     private const val CHUNK_TRAIL_ANCHOR_WEIGHT = 1
     private const val ENTITY_ANCHOR_WEIGHT = 2
-    private const val CONTAINER_ENTITY_STORAGE_WEIGHT = 3
     private const val UTILITY_ANCHOR_WEIGHT = 3
     private const val AUTOMATION_ANCHOR_WEIGHT = 2
     private const val STRUCTURAL_ANCHOR_WEIGHT = 3
@@ -622,6 +735,8 @@ internal object BaseFinderTracker : ChunkScanner.BlockChangeSubscriber {
     private const val CAVE_MAX_Y = 32
     private const val MIN_ALIGNED_AUTOMATION = 4
     private const val MIN_ALIGNED_CRAFTED = 6
+    private const val RAIL_CATEGORY = "rail"
+    private const val RAIL_ANCHOR_KEY = "automation.rail"
     private val CAVE_AIR_RANGE = 24..768
     private val NEIGHBOR_OFFSETS = listOf(-1 to 0, 1 to 0, 0 to -1, 0 to 1)
     private val VILLAGE_WORKSTATIONS = setOf(
@@ -632,6 +747,10 @@ internal object BaseFinderTracker : ChunkScanner.BlockChangeSubscriber {
         "spawner", "obsidian", "netherrack", "gold_block", "nether_wart", "nether_bricks", "red_nether_bricks",
         "purpur_block", "purpur_pillar", "purpur_stairs", "purpur_slab",
     )
+    private val MINESHAFT_SUPPORT_PATHS = setOf(
+        "oak_planks", "oak_fence", "dark_oak_planks", "dark_oak_fence",
+    )
+    private val MINESHAFT_CONTEXT_PATHS = MINESHAFT_SUPPORT_PATHS + "cobweb"
 }
 
 internal data class BaseFinderSampledEntityEvidence(

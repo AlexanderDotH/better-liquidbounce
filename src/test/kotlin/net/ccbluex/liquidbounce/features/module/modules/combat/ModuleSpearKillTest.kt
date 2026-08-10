@@ -26,11 +26,17 @@ import net.ccbluex.liquidbounce.config.gson.interopGson
 import net.ccbluex.liquidbounce.config.types.RangedValue
 import net.ccbluex.liquidbounce.config.types.group.ModeValueGroup
 import net.ccbluex.liquidbounce.config.types.group.ToggleableValueGroup
+import net.ccbluex.liquidbounce.common.ShapeFlag
 import net.ccbluex.liquidbounce.render.engine.esp.EspGlowStyle
 import net.ccbluex.liquidbounce.render.engine.type.Color4b
 import net.ccbluex.liquidbounce.test.MinecraftBootstrap
 import net.ccbluex.liquidbounce.test.assertVec3Equals
 import net.ccbluex.liquidbounce.utils.aiming.data.Rotation
+import net.ccbluex.liquidbounce.utils.aiming.features.MovementCorrection
+import net.ccbluex.liquidbounce.utils.block.WeightedEdge
+import net.ccbluex.liquidbounce.utils.block.aStarShortestPath
+import net.minecraft.core.BlockPos
+import net.minecraft.core.Vec3i
 import net.minecraft.network.protocol.game.ClientboundPlayerPositionPacket
 import net.minecraft.network.protocol.game.ServerboundMovePlayerPacket
 import net.minecraft.world.InteractionHand
@@ -40,9 +46,11 @@ import net.minecraft.world.phys.AABB
 import net.minecraft.world.phys.Vec3
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
+import org.junit.jupiter.api.Assertions.assertNotNull
 import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
+import kotlin.math.abs
 
 @Suppress("LargeClass")
 class ModuleSpearKillTest {
@@ -72,7 +80,13 @@ class ModuleSpearKillTest {
             configuration.packet.elytra.inner.map { it.name },
         )
         assertEquals(
-            listOf("Enabled", "MaxCost", "Diagonal", "RenderPath"),
+            listOf(
+                "Enabled",
+                "MaxCost",
+                "Diagonal",
+                "LineOfSightShortcuts",
+                "RenderPath",
+            ),
             configuration.packet.aStar.inner.map { it.name },
         )
         val motionStepLimit = configuration.motion.inner.single { it.name == "StepLimit" } as RangedValue<Float>
@@ -96,6 +110,7 @@ class ModuleSpearKillTest {
         assertFalse(serializedAStar.settingValue("Enabled").asBoolean)
         assertEquals(250, serializedAStar.settingValue("MaxCost").asInt)
         assertFalse(serializedAStar.settingValue("Diagonal").asBoolean)
+        assertFalse(serializedAStar.settingValue("LineOfSightShortcuts").asBoolean)
         assertFalse(serializedAStar.settingValue("RenderPath").asBoolean)
         assertEquals(
             10f,
@@ -252,6 +267,41 @@ class ModuleSpearKillTest {
     }
 
     @Test
+    fun `aborting a displaced Packet session snaps back to the session origin`() {
+        val origin = Vec3(10.0, 64.0, -3.0)
+        assertEquals(
+            origin,
+            spearKillSessionAbortSnapPosition(
+                sessionOrigin = origin,
+                committedOffset = Vec3(2.0, 1.5, 0.0),
+                physicalReturnConfigured = false,
+            ),
+        )
+        assertEquals(
+            origin,
+            spearKillSessionAbortSnapPosition(
+                sessionOrigin = origin,
+                committedOffset = Vec3.ZERO,
+                physicalReturnConfigured = true,
+            ),
+        )
+        assertNull(
+            spearKillSessionAbortSnapPosition(
+                sessionOrigin = origin,
+                committedOffset = Vec3.ZERO,
+                physicalReturnConfigured = false,
+            ),
+        )
+        assertNull(
+            spearKillSessionAbortSnapPosition(
+                sessionOrigin = null,
+                committedOffset = Vec3(1.0, 0.0, 0.0),
+                physicalReturnConfigured = true,
+            ),
+        )
+    }
+
+    @Test
     fun `AStar target eligibility bypasses direct gates only when enabled`() {
         assertTrue(isSpearKillAStarTargetEligible(
             hasLineOfSight = true,
@@ -273,6 +323,188 @@ class ModuleSpearKillTest {
             hasClearDirectTravel = false,
             packetAStarEnabled = true,
         ))
+        // Packet non-A* remains selectable on LOS; its route preflight owns body-corridor rejection.
+        assertTrue(isSpearKillAStarTargetEligible(
+            hasLineOfSight = true,
+            hasClearDirectTravel = false,
+            packetAStarEnabled = false,
+            packetMovementMode = true,
+        ))
+        assertFalse(isSpearKillAStarTargetEligible(
+            hasLineOfSight = false,
+            hasClearDirectTravel = true,
+            packetAStarEnabled = false,
+            packetMovementMode = true,
+        ))
+    }
+
+    @Test
+    fun `dead Packet target is defeated before removal world and range failures`() {
+        assertEquals(
+            SpearKillPacketTargetState.DEFEATED,
+            classifySpearKillPacketTargetState(
+                isAlive = false,
+                isRemoved = true,
+                isInCurrentWorld = false,
+                isWithinRange = false,
+            ),
+        )
+    }
+
+    @Test
+    fun `alive invalid Packet targets are unreachable`() {
+        listOf(
+            classifySpearKillPacketTargetState(
+                isAlive = true,
+                isRemoved = true,
+                isInCurrentWorld = true,
+                isWithinRange = true,
+            ),
+            classifySpearKillPacketTargetState(
+                isAlive = true,
+                isRemoved = false,
+                isInCurrentWorld = false,
+                isWithinRange = true,
+            ),
+            classifySpearKillPacketTargetState(
+                isAlive = true,
+                isRemoved = false,
+                isInCurrentWorld = true,
+                isWithinRange = false,
+            ),
+        ).forEach { state ->
+            assertEquals(SpearKillPacketTargetState.UNREACHABLE, state)
+        }
+
+        assertEquals(
+            SpearKillPacketTargetState.ACTIVE,
+            classifySpearKillPacketTargetState(
+                isAlive = true,
+                isRemoved = false,
+                isInCurrentWorld = true,
+                isWithinRange = true,
+            ),
+        )
+    }
+
+    @Test
+    fun `SpearKill accelerates charge only while idle and under the kinetic delay`() {
+        assertTrue(
+            shouldAccelerateSpearKillCharge(
+                attackPathActive = false,
+                isUseKeyDown = true,
+                isUsingSpear = true,
+                ticksUsingItem = 2,
+                delayTicks = 3,
+            ),
+        )
+        assertFalse(
+            shouldAccelerateSpearKillCharge(
+                attackPathActive = true,
+                isUseKeyDown = true,
+                isUsingSpear = true,
+                ticksUsingItem = 2,
+                delayTicks = 3,
+            ),
+        )
+        assertFalse(
+            shouldAccelerateSpearKillCharge(
+                attackPathActive = false,
+                isUseKeyDown = true,
+                isUsingSpear = true,
+                ticksUsingItem = 4,
+                delayTicks = 3,
+            ),
+        )
+        assertFalse(
+            shouldAccelerateSpearKillCharge(
+                attackPathActive = false,
+                isUseKeyDown = false,
+                isUsingSpear = true,
+                ticksUsingItem = 2,
+                delayTicks = 3,
+            ),
+        )
+    }
+
+    @Test
+    fun `undercharged spear use does not tear down while still charging`() {
+        assertFalse(
+            shouldResetSpearKillOnUndercharge(
+                ticksUsingItem = 2,
+                delayTicks = 3,
+                isUsingSpear = true,
+                isUseKeyDown = true,
+            ),
+        )
+        assertTrue(
+            shouldResetSpearKillOnUndercharge(
+                ticksUsingItem = 2,
+                delayTicks = 3,
+                isUsingSpear = false,
+                isUseKeyDown = true,
+            ),
+        )
+        assertTrue(
+            shouldResetSpearKillOnUndercharge(
+                ticksUsingItem = 2,
+                delayTicks = 3,
+                isUsingSpear = true,
+                isUseKeyDown = false,
+            ),
+        )
+        assertFalse(
+            shouldResetSpearKillOnUndercharge(
+                ticksUsingItem = 4,
+                delayTicks = 3,
+                isUsingSpear = true,
+                isUseKeyDown = true,
+            ),
+        )
+    }
+
+    @Test
+    fun `SpearKill refreshes idle server use before the kinetic window expires`() {
+        assertTrue(
+            shouldRefreshSpearKillServerUse(
+                attackPathActive = false,
+                isUseKeyDown = true,
+                ticksUsingItem = 19,
+                damageUseDuration = 20,
+            ),
+        )
+        assertFalse(
+            shouldRefreshSpearKillServerUse(
+                attackPathActive = false,
+                isUseKeyDown = true,
+                ticksUsingItem = 18,
+                damageUseDuration = 20,
+            ),
+        )
+        assertFalse(
+            shouldRefreshSpearKillServerUse(
+                attackPathActive = false,
+                isUseKeyDown = false,
+                ticksUsingItem = 19,
+                damageUseDuration = 20,
+            ),
+        )
+        assertFalse(
+            shouldRefreshSpearKillServerUse(
+                attackPathActive = true,
+                isUseKeyDown = true,
+                ticksUsingItem = 19,
+                damageUseDuration = 20,
+            ),
+        )
+        assertFalse(
+            shouldRefreshSpearKillServerUse(
+                attackPathActive = false,
+                isUseKeyDown = true,
+                ticksUsingItem = 0,
+                damageUseDuration = 0,
+            ),
+        )
     }
 
     @Test
@@ -353,6 +585,414 @@ class ModuleSpearKillTest {
                 destination = Vec3(5.9, 64.0, 8.9),
             ),
         )
+    }
+
+    @Test
+    fun `bidirectional AStar meets through a U-bend under a tight shared budget`() {
+        // Cheap dead-end fan-out at S forces unidirectional search to exhaust the budget before the
+        // corridor; bidirectional still meets from the goal side within the same shared budget.
+        val deadEnds = (1..40).map { "X$it" }
+        val corridor = listOf("S", "A", "B", "C", "D", "E", "F", "G")
+        val edges = mutableMapOf<String, MutableList<WeightedEdge<String>>>()
+        fun link(from: String, to: String, cost: Double) {
+            edges.getOrPut(from) { mutableListOf() }.add(WeightedEdge(to, cost))
+            edges.getOrPut(to) { mutableListOf() }.add(WeightedEdge(from, cost))
+        }
+        for (index in 0 until corridor.lastIndex) {
+            link(corridor[index], corridor[index + 1], 1.0)
+        }
+        deadEnds.forEach { link("S", it, 0.5) }
+
+        val zeroHeuristic = java.util.function.ToDoubleFunction<String> { 0.0 }
+        val neighbors = { node: String -> edges[node].orEmpty() }
+        val budget = 25
+
+        assertNull(
+            aStarShortestPath(
+                start = "S",
+                isGoal = { it == "G" },
+                neighbors = neighbors,
+                heuristic = zeroHeuristic,
+                maxIterations = budget,
+                maxCost = 100.0,
+            ),
+        )
+
+        val path = bidirectionalAStarShortestPath(
+            start = "S",
+            end = "G",
+            neighbors = neighbors,
+            forwardHeuristic = zeroHeuristic,
+            backwardHeuristic = zeroHeuristic,
+            maxIterations = budget,
+            maxCost = 100.0,
+        )
+
+        assertNotNull(path)
+        assertEquals("S", path!!.nodes.first())
+        assertEquals("G", path.nodes.last())
+        assertTrue(path.nodes.none { it in deadEnds })
+    }
+
+    @Test
+    fun `bidirectional AStar stops once the best meeting path is proven`() {
+        var neighborCalls = 0
+        val path = bidirectionalAStarShortestPath(
+            start = 0,
+            end = 10,
+            neighbors = { node ->
+                neighborCalls++
+                buildList {
+                    if (node > -1_000) add(WeightedEdge(node - 1, 1.0))
+                    if (node < 1_000) add(WeightedEdge(node + 1, 1.0))
+                }
+            },
+            forwardHeuristic = java.util.function.ToDoubleFunction { node -> kotlin.math.abs(10 - node).toDouble() },
+            backwardHeuristic = java.util.function.ToDoubleFunction { node -> kotlin.math.abs(node).toDouble() },
+            maxIterations = 500,
+            maxCost = 100.0,
+        )
+
+        assertNotNull(path)
+        assertEquals(10.0, path!!.totalCost, 1e-9)
+        assertTrue(neighborCalls < 30, "Search kept expanding after proving the best path: $neighborCalls")
+    }
+
+    @Test
+    fun `SpearKill AStar heuristic is admissible for long unit corridors`() {
+        assertEquals(
+            10.0,
+            spearKillAStarHeuristic(Vec3i(0, 0, 0), Vec3i(10, 0, 0)),
+            1e-9,
+        )
+        assertEquals(
+            kotlin.math.sqrt(2.0),
+            spearKillAStarHeuristic(Vec3i.ZERO, Vec3i(1, 0, 1)),
+            1e-9,
+        )
+    }
+
+    @Test
+    fun `route planner caches passability across approach bearings`() {
+        var passabilityChecks = 0
+        val planner = SpearKillAStarRoutePlanner(
+            allowDiagonal = false,
+            maxCost = 250,
+            isPassable = {
+                passabilityChecks++
+                true
+            },
+        )
+        val origin = Vec3(0.5, 64.0, 0.5)
+        val destination = Vec3(8.5, 64.0, 0.5)
+
+        assertNotNull(planner.plan(origin, destination))
+        val checksAfterFirstPlan = passabilityChecks
+        assertNotNull(planner.plan(origin, destination))
+
+        assertEquals(checksAfterFirstPlan, passabilityChecks)
+    }
+
+    @Test
+    fun `route planner excludes server-rejected edges and finds a detour`() {
+        val planner = SpearKillAStarRoutePlanner(
+            allowDiagonal = false,
+            maxCost = 250,
+            isPassable = { position ->
+                position.y == 64 && position.x in 0..3 && position.z in 0..1
+            },
+            canTraverse = { from, to ->
+                val crossesRejectedEdge = from.z == 0.5 && to.z == 0.5 &&
+                    setOf(from.x, to.x) == setOf(1.5, 2.5)
+                !crossesRejectedEdge
+            },
+        )
+
+        val route = planner.plan(
+            origin = Vec3(0.5, 64.0, 0.5),
+            destination = Vec3(3.5, 64.0, 0.5),
+        )
+
+        assertNotNull(route)
+        assertTrue(route!!.any { it.z == 1.5 })
+    }
+
+    @Test
+    fun `SpearKill AStar neighbors never jump through intermediate vertical blocks`() {
+        val neighbors = spearKillBidirectionalNeighbors(
+            position = Vec3i.ZERO,
+            allowDiagonal = false,
+            isPassable = { true },
+        )
+
+        assertEquals(6, neighbors.size)
+        assertTrue(neighbors.all { edge ->
+            val offset = edge.node.subtract(Vec3i.ZERO)
+            kotlin.math.abs(offset.x) + kotlin.math.abs(offset.y) + kotlin.math.abs(offset.z) == 1
+        })
+    }
+
+    @Test
+    fun `AStar approach bearings are twelve evenly spaced directions with preferred first`() {
+        val preferred = Vec3(1.0, 0.0, 0.0)
+        val bearings = spearKillAStarLungeDirections(preferred)
+
+        assertEquals(SPEAR_KILL_A_STAR_APPROACH_BEARING_COUNT, bearings.size)
+        assertEquals(12, bearings.size)
+        assertVec3Equals(preferred, bearings.first(), 1e-9)
+        assertEquals(bearings[1].x, bearings[2].x, 1e-9)
+        assertEquals(bearings[1].z, -bearings[2].z, 1e-9)
+        assertEquals(0.0, bearings.last().distanceTo(preferred.scale(-1.0)), 1e-9)
+        assertTrue(bearings.all { kotlin.math.abs(it.length() - 1.0) < 1e-9 && it.y == 0.0 })
+    }
+
+    @Test
+    fun `clear direct run-up bypasses the block search`() {
+        var routeSearches = 0
+        val route = resolveSpearKillAStarApproachRoute(
+            origin = Vec3.ZERO,
+            plannerGoal = Vec3(20.0, 0.0, 0.0),
+            segmentValidator = SpearKillAStarSegmentValidator { _, _ -> true },
+            routeSearch = {
+                routeSearches++
+                null
+            },
+        )
+
+        assertEquals(emptyList<Vec3>(), route)
+        assertEquals(0, routeSearches)
+    }
+
+    @Test
+    fun `swept segment validator follows the corridor instead of its full bounding rectangle`() {
+        val playerBox = AABB(-0.3, 0.0, -0.3, 0.3, 1.8, 0.3)
+        val offCorridorObstacle = AABB(0.0, 0.0, 9.0, 1.0, 2.0, 10.0)
+        val onCorridorObstacle = AABB(4.5, 0.0, 4.5, 5.5, 2.0, 5.5)
+        val from = Vec3.ZERO
+        val to = Vec3(10.0, 0.0, 10.0)
+
+        val offCorridorValidator = createSpearKillAStarSegmentValidator(
+            origin = from,
+            playerBoundingBox = playerBox,
+            hasCollision = { it.intersects(offCorridorObstacle) },
+            resolveMovement = { _, movement -> movement },
+        )
+        val onCorridorValidator = createSpearKillAStarSegmentValidator(
+            origin = from,
+            playerBoundingBox = playerBox,
+            hasCollision = { it.intersects(onCorridorObstacle) },
+            resolveMovement = { _, movement -> movement },
+        )
+
+        assertTrue(offCorridorValidator.isClear(from, to))
+        assertFalse(onCorridorValidator.isClear(from, to))
+    }
+
+    @Test
+    fun `long diagonal validation never submits one huge rectangle to the world`() {
+        var largestHorizontalArea = 0.0
+        val validator = createSpearKillAStarSegmentValidator(
+            origin = Vec3.ZERO,
+            playerBoundingBox = AABB(-0.3, 0.0, -0.3, 0.3, 1.8, 0.3),
+            hasCollision = { box ->
+                largestHorizontalArea = maxOf(
+                    largestHorizontalArea,
+                    (box.maxX - box.minX) * (box.maxZ - box.minZ),
+                )
+                false
+            },
+            resolveMovement = { _, movement -> movement },
+        )
+
+        assertTrue(validator.isClear(Vec3.ZERO, Vec3(100.0, 0.0, 100.0)))
+        assertTrue(largestHorizontalArea < 16.0, "Submitted area was $largestHorizontalArea")
+    }
+
+    @Test
+    fun `segment validator rejects movement clipped by server collision resolution`() {
+        var resolvedBox: AABB? = null
+        val validator = createSpearKillAStarSegmentValidator(
+            origin = Vec3.ZERO,
+            playerBoundingBox = AABB(-0.3, 0.0, -0.3, 0.3, 1.8, 0.3),
+            hasCollision = { false },
+            resolveMovement = { box, movement ->
+                resolvedBox = box
+                movement.multiply(0.5, 1.0, 1.0)
+            },
+        )
+
+        assertFalse(validator.isClear(Vec3.ZERO, Vec3(4.0, 0.0, 0.0)))
+        assertTrue(resolvedBox!!.xsize > 0.6)
+        assertEquals(1.8, resolvedBox!!.ysize, 1e-9)
+    }
+
+    @Test
+    fun `vanilla shape scope ignores client walk-through solidification`() {
+        val previous = ShapeFlag.noShapeChange
+        ShapeFlag.noShapeChange = false
+        try {
+            val seen = withVanillaSpearKillBlockShapes {
+                assertTrue(ShapeFlag.noShapeChange)
+                "ok"
+            }
+            assertEquals("ok", seen)
+            assertFalse(ShapeFlag.noShapeChange)
+        } finally {
+            ShapeFlag.noShapeChange = previous
+        }
+    }
+
+    @Test
+    fun `server collision margin grows for diagonal elevation edges`() {
+        val axisAligned = spearKillAStarServerCollisionMargin(Vec3(1.0, 0.0, 0.0))
+        val diagonal = spearKillAStarServerCollisionMargin(Vec3(1.0, 0.0, 1.0))
+        val diagonalElevation = spearKillAStarServerCollisionMargin(Vec3(1.0, 1.0, 1.0))
+
+        assertTrue(axisAligned.horizontal < diagonal.horizontal)
+        assertTrue(diagonal.horizontal < diagonalElevation.horizontal)
+        assertEquals(0.0, axisAligned.vertical, 1e-9)
+        assertTrue(diagonalElevation.vertical > 0.0)
+    }
+
+    @Test
+    fun `direct Packet mirrors vanilla horizontal residual tolerance and ignores vertical clipping`() {
+        val requested = Vec3(4.0, 0.4, 0.0)
+
+        assertTrue(
+            isSpearKillDirectPacketMovementAccepted(
+                requestedMovement = requested,
+                resolvedMovement = Vec3(3.75, 0.0, 0.0),
+            ),
+        )
+        assertFalse(
+            isSpearKillDirectPacketMovementAccepted(
+                requestedMovement = requested,
+                resolvedMovement = Vec3(3.749, 0.4, 0.0),
+            ),
+        )
+    }
+
+    @Test
+    fun `direct Packet validates one complete edge without rejecting a traversable terrain lip`() {
+        val origin = Vec3.ZERO
+        val destination = Vec3(4.0, 0.0, 0.0)
+        val terrainLip = AABB(1.0, 0.0, -0.3, 1.5, 0.4, 0.3)
+        var destinationChecks = 0
+        var resolveCalls = 0
+        var resolvedRequest: Vec3? = null
+
+        val validator = createSpearKillDirectPacketSegmentValidator(
+            origin = origin,
+            playerBoundingBox = AABB(-0.3, 0.0, -0.3, 0.3, 1.8, 0.3),
+            hasDestinationCollision = { box ->
+                destinationChecks++
+                box.intersects(terrainLip)
+            },
+            resolveMovement = { _, movement ->
+                resolveCalls++
+                resolvedRequest = movement
+                movement
+            },
+        )
+
+        assertTrue(validator.isClear(origin, destination))
+        assertEquals(1, destinationChecks)
+        assertEquals(1, resolveCalls)
+        assertVec3Equals(destination, resolvedRequest!!, 1e-9)
+    }
+
+    @Test
+    fun `direct Packet rejects an occupied endpoint and wall-sized horizontal clipping`() {
+        val origin = Vec3.ZERO
+        val destination = Vec3(4.0, 0.0, 0.0)
+        val playerBox = AABB(-0.3, 0.0, -0.3, 0.3, 1.8, 0.3)
+        val occupiedDestination = createSpearKillDirectPacketSegmentValidator(
+            origin = origin,
+            playerBoundingBox = playerBox,
+            hasDestinationCollision = { true },
+            resolveMovement = { _, movement -> movement },
+        )
+        val clippedByWall = createSpearKillDirectPacketSegmentValidator(
+            origin = origin,
+            playerBoundingBox = playerBox,
+            hasDestinationCollision = { false },
+            resolveMovement = { _, movement -> movement.multiply(0.5, 1.0, 1.0) },
+        )
+
+        assertFalse(occupiedDestination.isClear(origin, destination))
+        assertFalse(clippedByWall.isClear(origin, destination))
+    }
+
+    @Test
+    fun `elevation plus horizontal movement requires both axis order resolves`() {
+        val from = Vec3.ZERO
+        val to = Vec3(1.0, 1.0, 0.0)
+        var resolveCalls = 0
+        val validator = createSpearKillAStarSegmentValidator(
+            origin = from,
+            playerBoundingBox = AABB(-0.3, 0.0, -0.3, 0.3, 1.8, 0.3),
+            hasCollision = { false },
+            resolveMovement = { _, movement ->
+                resolveCalls++
+                // Clip only the pure horizontal leg that starts after climbing — Y-then-XZ fails,
+                // matching stepped sand lips that reject a single 3D packet.
+                if (abs(movement.y) <= 1e-9 && abs(movement.x) > 0.0) {
+                    movement.multiply(0.5, 1.0, 1.0)
+                } else {
+                    movement
+                }
+            },
+        )
+
+        assertFalse(validator.isClear(from, to))
+        assertTrue(resolveCalls > 1)
+    }
+
+    @Test
+    fun `AStar neighbors always consult canTraverse for passable edges`() {
+        val origin = BlockPos(0, 64, 0)
+        val openCells = setOf(
+            origin,
+            origin.offset(1, 0, 0),
+            origin.offset(0, 1, 0),
+            origin.offset(0, 0, 1),
+            origin.offset(1, 0, 1),
+        )
+        val blocked = origin.offset(1, 0, 0)
+        val neighbors = spearKillBidirectionalNeighbors(
+            position = origin,
+            allowDiagonal = true,
+            isPassable = { it in openCells },
+            canTraverse = { _, to -> to != blocked },
+        )
+
+        assertFalse(neighbors.any { it.node == blocked })
+        assertTrue(neighbors.any { it.node == origin.offset(0, 1, 0) })
+        assertTrue(neighbors.any { it.node == origin.offset(1, 0, 1) })
+    }
+
+    @Test
+    fun `line of sight shortcuts pull non-collinear clear corridors`() {
+        val origin = Vec3(0.0, 64.0, 0.0)
+        val waypoints = listOf(
+            Vec3(1.0, 64.0, 0.0),
+            Vec3(2.0, 64.0, 1.0),
+            Vec3(3.0, 64.0, 1.0),
+            Vec3(4.0, 64.0, 0.0),
+        )
+        val alwaysClear = SpearKillAStarSegmentValidator { _, _ -> true }
+        val collinear = simplifySpearKillAStarWaypoints(origin, waypoints, maxSpeed = 2.0, alwaysClear)
+        val los = simplifySpearKillAStarWaypointsWithLineOfSight(origin, waypoints, alwaysClear)
+
+        assertTrue(los.size < collinear.size)
+        // LOS may jump farther than StepLimit; packet expansion splits afterward.
+        assertEquals(listOf(Vec3(4.0, 64.0, 0.0)), los)
+
+        val blockedFar = SpearKillAStarSegmentValidator { from, to ->
+            from.distanceTo(to) <= 1.5
+        }
+        val blockedLos = simplifySpearKillAStarWaypointsWithLineOfSight(origin, waypoints, blockedFar)
+        assertEquals(waypoints, blockedLos)
     }
 
     @Test
@@ -470,7 +1110,7 @@ class ModuleSpearKillTest {
     }
 
     @Test
-    fun `AStar accepts only a full StepLimit terminal movement matching the attack approach`() {
+    fun `AStar accepts a terminal lunge split into StepLimit packets plus remainder`() {
         val approach = SpearKillAStarAttackApproach(
             plannerGoal = Vec3(0.0, 64.0, 0.0),
             terminalWaypoint = Vec3(7.0, 64.0, 0.0),
@@ -481,16 +1121,61 @@ class ModuleSpearKillTest {
             approach = approach,
             stepLimit = 7.0,
         ))
-        assertFalse(isSpearKillAStarTerminalStepValid(
+        assertTrue(isSpearKillAStarTerminalStepValid(
             outboundMovements = listOf(Vec3(-5.0, 0.0, 0.0), Vec3(4.0, 0.0, 0.0), Vec3(3.0, 0.0, 0.0)),
             approach = approach,
-            stepLimit = 7.0,
+            stepLimit = 4.0,
+        ))
+        assertTrue(isSpearKillAStarTerminalStepValid(
+            outboundMovements = listOf(Vec3(3.0, 0.0, 0.0), Vec3(3.0, 0.0, 0.0), Vec3(1.0, 0.0, 0.0)),
+            approach = approach,
+            stepLimit = 3.0,
         ))
         assertFalse(isSpearKillAStarTerminalStepValid(
             outboundMovements = listOf(Vec3(-5.0, 0.0, 0.0), Vec3(0.0, 0.0, 7.0)),
             approach = approach,
             stepLimit = 7.0,
         ))
+        assertFalse(isSpearKillAStarTerminalStepValid(
+            outboundMovements = listOf(Vec3(8.0, 0.0, 0.0)),
+            approach = approach,
+            stepLimit = 7.0,
+        ))
+    }
+
+    @Test
+    fun `AStar terminal lunge length follows MaxSpeed while StepLimit only chunks packets`() {
+        val hitPoint = Vec3(10.0, 65.5, 0.0)
+        val eyeOffset = Vec3(0.0, 1.5, 0.0)
+        val approach = createSpearKillAStarAttackApproach(
+            targetHitPoint = hitPoint,
+            playerEyeOffset = eyeOffset,
+            lookDirection = Vec3(1.0, 0.0, 0.0),
+            terminalLungeDistance = 10.0,
+        )!!
+        val route = buildSpearKillAStarPacketRoute(
+            origin = approach.plannerGoal,
+            outboundWaypoints = listOf(approach.terminalWaypoint),
+            maxSpeed = 3.0,
+            segmentValidator = SpearKillAStarSegmentValidator { _, _ -> true },
+        )!!
+
+        assertEquals(10.0, approach.plannerGoal.distanceTo(approach.terminalWaypoint), 1e-9)
+        assertEquals(
+            listOf(
+                Vec3(3.0, 0.0, 0.0),
+                Vec3(3.0, 0.0, 0.0),
+                Vec3(3.0, 0.0, 0.0),
+                Vec3(1.0, 0.0, 0.0),
+            ),
+            route.outboundMovements,
+        )
+        assertTrue(isSpearKillAStarTerminalStepValid(route.outboundMovements, approach, stepLimit = 3.0))
+        assertVec3Equals(
+            approach.terminalWaypoint.subtract(approach.plannerGoal),
+            route.outboundMovements.fold(Vec3.ZERO, Vec3::add),
+            1e-9,
+        )
     }
 
     @Test
@@ -521,9 +1206,28 @@ class ModuleSpearKillTest {
             preferredDirection = Vec3(0.0, 1.0, 0.0),
         )
 
-        assertEquals(4, approaches.size)
+        assertEquals(SPEAR_KILL_A_STAR_APPROACH_BEARING_COUNT, approaches.size)
         assertTrue(approaches.all { approach ->
             approach.terminalWaypoint.subtract(approach.plannerGoal).y == 0.0
+        })
+    }
+
+    @Test
+    fun `AStar approach candidates preserve MaxSpeed terminal length on every bearing`() {
+        val maxSpeed = 10.0
+        val approaches = createSpearKillAStarAttackApproachCandidates(
+            targetBox = AABB(10.0, 64.0, 0.0, 11.0, 66.0, 1.0),
+            targetEyePosition = Vec3(10.5, 65.5, 0.5),
+            playerEyeOffset = Vec3(0.0, 1.62, 0.0),
+            preferredDirection = Vec3(1.0, 0.0, 0.0),
+            terminalLungeDistance = maxSpeed,
+        )
+
+        assertEquals(SPEAR_KILL_A_STAR_APPROACH_BEARING_COUNT, approaches.size)
+        assertTrue(approaches.all { approach ->
+            kotlin.math.abs(
+                approach.terminalWaypoint.subtract(approach.plannerGoal).length() - maxSpeed,
+            ) < 1e-9
         })
     }
 
@@ -680,6 +1384,25 @@ class ModuleSpearKillTest {
     }
 
     @Test
+    fun `packet route validates outbound and exact-inverse return corridors`() {
+        var validationCalls = 0
+        val route = buildSpearKillAStarPacketRoute(
+            origin = Vec3.ZERO,
+            outboundWaypoints = listOf(Vec3(2.0, 0.0, 0.0), Vec3(5.0, 0.0, 0.0)),
+            maxSpeed = 3.0,
+            segmentValidator = SpearKillAStarSegmentValidator { _, _ ->
+                validationCalls++
+                true
+            },
+        )
+
+        assertNotNull(route)
+        // Two outbound packet edges plus their exact inverse returns. Reverse is not free under
+        // server-faithful collision (sand lips / stairs can clip one direction only).
+        assertEquals(4, validationCalls)
+    }
+
+    @Test
     fun `Elytra AStar long edge uses two full safe steps followed by its remainder`() {
         val route = buildSpearKillAStarPacketRoute(
             origin = Vec3.ZERO,
@@ -701,12 +1424,114 @@ class ModuleSpearKillTest {
     }
 
     @Test
-    fun `AStar follow replans moved targets at a bounded interval`() {
+    fun `AStar follow replans moved targets with distance and tick hysteresis`() {
         val planned = Vec3(10.0, 64.0, 4.0)
 
         assertFalse(shouldReplanSpearKillAStarTarget(planned, planned.add(0.1, 0.0, 0.0), 20))
-        assertTrue(shouldReplanSpearKillAStarTarget(planned, planned.add(1.0, 0.0, 0.0), 1))
-        assertTrue(shouldReplanSpearKillAStarTarget(planned, planned.add(0.0, 1.0, 0.0), 1))
+        assertFalse(shouldReplanSpearKillAStarTarget(planned, planned.add(1.0, 0.0, 0.0), 2))
+        assertFalse(shouldReplanSpearKillAStarTarget(planned, planned.add(0.49, 0.0, 0.0), 3))
+        assertTrue(shouldReplanSpearKillAStarTarget(planned, planned.add(1.0, 0.0, 0.0), 3))
+        assertTrue(shouldReplanSpearKillAStarTarget(planned, planned.add(0.0, 1.0, 0.0), 3))
+    }
+
+    @Test
+    fun `AStar follow does not replan steady target motion already predicted by the route`() {
+        val planned = Vec3(10.0, 64.0, 4.0)
+        val velocity = Vec3(0.2, 0.0, 0.0)
+
+        assertFalse(shouldReplanSpearKillAStarTarget(
+            plannedPosition = planned,
+            currentPosition = planned.add(0.6, 0.0, 0.0),
+            ticksSincePlan = 3,
+            plannedVelocity = velocity,
+        ))
+        assertTrue(shouldReplanSpearKillAStarTarget(
+            plannedPosition = planned,
+            currentPosition = planned.add(0.6, 0.0, 1.0),
+            ticksSincePlan = 3,
+            plannedVelocity = velocity,
+        ))
+    }
+
+    @Test
+    fun `clear direct Packet corridor uses bounded outbound and exact inverse return`() {
+        val route = buildSpearKillDirectPacketRoute(
+            origin = Vec3(4.0, 64.0, -2.0),
+            direction = Vec3(1.0, 0.0, 0.0),
+            distance = 25.0,
+            maxSpeed = 10.0,
+            segmentValidator = SpearKillAStarSegmentValidator { _, _ -> true },
+        )!!
+        val expectedOutbound = listOf(
+            Vec3(10.0, 0.0, 0.0),
+            Vec3(10.0, 0.0, 0.0),
+            Vec3(5.0, 0.0, 0.0),
+        )
+
+        assertEquals(expectedOutbound, route.outboundMovements)
+        assertEquals(
+            expectedOutbound + expectedOutbound.asReversed().map { it.scale(-1.0) } + Vec3.ZERO,
+            route.roundTripMovements,
+        )
+    }
+
+    @Test
+    fun `direct Packet preflight rejects a later blocked outbound edge`() {
+        val origin = Vec3(4.0, 64.0, -2.0)
+        val validatedEdges = mutableListOf<Pair<Vec3, Vec3>>()
+
+        val route = buildSpearKillDirectPacketRoute(
+            origin = origin,
+            direction = Vec3(1.0, 0.0, 0.0),
+            distance = 25.0,
+            maxSpeed = 10.0,
+            segmentValidator = SpearKillAStarSegmentValidator { from, to ->
+                validatedEdges += from to to
+                from.x < origin.x + 10.0
+            },
+        )
+
+        assertNull(route)
+        assertEquals(
+            listOf(
+                origin to origin.add(10.0, 0.0, 0.0),
+                origin.add(10.0, 0.0, 0.0) to origin.add(20.0, 0.0, 0.0),
+            ),
+            validatedEdges,
+        )
+    }
+
+    @Test
+    fun `direct Packet preflight rejects an inverse-only collision`() {
+        val origin = Vec3(4.0, 64.0, -2.0)
+
+        assertNull(
+            buildSpearKillDirectPacketRoute(
+                origin = origin,
+                direction = Vec3(1.0, 0.0, 0.0),
+                distance = 25.0,
+                maxSpeed = 10.0,
+                segmentValidator = SpearKillAStarSegmentValidator { from, to -> to.x >= from.x },
+            ),
+        )
+    }
+
+    @Test
+    fun `blocked direct Packet route produces a blocked start result`() {
+        val route = buildSpearKillDirectPacketRoute(
+            origin = Vec3.ZERO,
+            direction = Vec3(1.0, 0.0, 0.0),
+            distance = 10.0,
+            maxSpeed = 10.0,
+            segmentValidator = SpearKillAStarSegmentValidator { _, _ -> false },
+        )
+        val startResult = if (route == null) {
+            SpearKillAttackStartResult.BLOCKED
+        } else {
+            SpearKillAttackStartResult.STARTED
+        }
+
+        assertEquals(SpearKillAttackStartResult.BLOCKED, startResult)
     }
 
     @Test
@@ -778,6 +1603,19 @@ class ModuleSpearKillTest {
             assertVec3Equals(deltas[index].scale(-1.0), deltas[deltas.lastIndex - index], 1e-9)
         }
         assertVec3Equals(Vec3.ZERO, deltas.fold(Vec3.ZERO, Vec3::add), 1e-9)
+    }
+
+    @Test
+    fun `AStar packet route rejects a server-blocked inverse return edge`() {
+        val origin = Vec3(0.25, 64.0, 0.75)
+        val waypoint = Vec3(1.5, 64.0, 0.75)
+
+        assertNull(buildSpearKillAStarPacketRoute(
+            origin = origin,
+            outboundWaypoints = listOf(waypoint),
+            maxSpeed = 2.0,
+            segmentValidator = SpearKillAStarSegmentValidator { from, to -> to.x >= from.x },
+        ))
     }
 
     @Test
@@ -1054,36 +1892,18 @@ class ModuleSpearKillTest {
     }
 
     @Test
-    fun `AStar uses a distance-scaled cone to select unseen targets behind terrain`() {
+    fun `target selection uses a fixed hitbox pad not a distance-scaled cone`() {
         val eye = Vec3(0.0, 1.6, 0.0)
-        val lookEnd = Vec3(100.0, 1.6, 0.0)
-        val hiddenTarget = AABB(49.7, 0.0, 1.5, 50.3, 1.8, 2.1)
-        val behindMountain = AABB(49.0, 0.0, 8.0, 49.6, 1.8, 8.6)
+        val lookEnd = Vec3(50.0, 1.6, 0.0)
+        val margin = spearKillTargetSelectionMargin()
+        // Slightly outside the vanilla box, still inside the fixed pad.
+        val insidePad = AABB(20.0, 0.0, 0.40, 20.6, 1.8, 1.00)
+        val outsidePad = AABB(20.0, 0.0, 0.90, 20.6, 1.8, 1.50)
 
-        assertNull(spearKillLookRayPriority(
-            hiddenTarget,
-            eye,
-            lookEnd,
-            hitboxMargin = spearKillTargetSelectionMargin(50.0, packetAStarEnabled = false),
-        ))
-        assertTrue(spearKillLookRayPriority(
-            hiddenTarget,
-            eye,
-            lookEnd,
-            hitboxMargin = spearKillTargetSelectionMargin(50.0, packetAStarEnabled = true),
-        ) != null)
-        assertNull(spearKillLookRayPriority(
-            behindMountain,
-            eye,
-            lookEnd,
-            hitboxMargin = spearKillTargetSelectionMargin(50.0, packetAStarEnabled = false),
-        ))
-        assertTrue(spearKillLookRayPriority(
-            behindMountain,
-            eye,
-            lookEnd,
-            hitboxMargin = spearKillTargetSelectionMargin(50.0, packetAStarEnabled = true),
-        ) != null)
+        assertEquals(0.75, margin, 1e-9)
+        assertEquals(margin, spearKillTargetSelectionMargin())
+        assertTrue(spearKillLookRayPriority(insidePad, eye, lookEnd, hitboxMargin = margin) != null)
+        assertNull(spearKillLookRayPriority(outsidePad, eye, lookEnd, hitboxMargin = margin))
     }
 
     @Test
@@ -1445,6 +2265,28 @@ class ModuleSpearKillTest {
     }
 
     @Test
+    fun `direct Packet prediction includes the terminal strike hold`() {
+        assertEquals(2, spearKillDirectPacketHitTicks(stepCount = 1, stepWaitTicks = 0))
+        assertEquals(11, spearKillDirectPacketHitTicks(stepCount = 4, stepWaitTicks = 2))
+    }
+
+    @Test
+    fun `direct Packet start waits for a damage window that reaches the server hit tick`() {
+        assertTrue(hasSpearKillDirectPacketDamageWindow(
+            ticksUsingItem = 8,
+            damageUseDuration = 10,
+            stepCount = 1,
+            stepWaitTicks = 0,
+        ))
+        assertFalse(hasSpearKillDirectPacketDamageWindow(
+            ticksUsingItem = 9,
+            damageUseDuration = 10,
+            stepCount = 1,
+            stepWaitTicks = 0,
+        ))
+    }
+
+    @Test
     fun `AStar prediction includes every shared Packet wait`() {
         assertEquals(4, spearKillAStarPredictionTicks(distance = 28.0, maxSpeed = 7.0, stepWaitTicks = 0))
         assertEquals(10, spearKillAStarPredictionTicks(distance = 28.0, maxSpeed = 7.0, stepWaitTicks = 2))
@@ -1461,6 +2303,204 @@ class ModuleSpearKillTest {
             outboundStepCount = 6,
             stepWaitTicks = 2,
             preStrikeHoldTicks = 1,
+        ))
+    }
+
+    @Test
+    fun `path schedule places pre-hold before multi-step terminal suffix`() {
+        val schedule = buildSpearKillPathSchedule(
+            outboundStepCount = 6,
+            stepWaitTicks = 1,
+            terminalSuffixCount = 3,
+            preStrikeHoldTicks = 2,
+            strikeHoldTicks = 2,
+        )!!
+
+        assertEquals(listOf(0, 2, 4, 8, 10, 12), schedule.stepStartTicks)
+        assertEquals(8, schedule.terminalStartTick)
+        assertEquals(14, schedule.hitTick)
+        assertEquals(14, schedule.totalOutboundTicks)
+    }
+
+    @Test
+    fun `candidate lower bound includes approach terminal packets waits and strike hold`() {
+        assertEquals(
+            6,
+            spearKillAStarCandidateLowerBoundHitTick(
+                routeOrigin = Vec3.ZERO,
+                plannerGoal = Vec3(20.0, 0.0, 0.0),
+                stepLimit = 10.0,
+                terminalLungeDistance = 10.0,
+                stepWaitTicks = 1,
+                strikeHoldTicks = 2,
+            ),
+        )
+    }
+
+    @Test
+    fun `approach refinement reacts only to horizontal seed drift over half a block`() {
+        val seed = Vec3(5.0, 64.0, 5.0)
+
+        assertFalse(shouldRefineSpearKillAStarApproach(seed, seed.add(0.5, 10.0, 0.0)))
+        assertTrue(shouldRefineSpearKillAStarApproach(seed, seed.add(0.51, 0.0, 0.0)))
+    }
+
+    @Test
+    fun `earliest pre-strike hold is zero for an immediately feasible schedule`() {
+        val hold = findEarliestSpearKillPreStrikeHold(
+            outboundStepCount = 4,
+            stepWaitTicks = 0,
+            terminalSuffixCount = 1,
+            strikeHoldTicks = 2,
+        ) { true }
+
+        assertEquals(0, hold)
+    }
+
+    @Test
+    fun `earliest pre-strike hold honors a mandatory aim-lock tick`() {
+        val hold = findEarliestSpearKillPreStrikeHold(
+            outboundStepCount = 4,
+            stepWaitTicks = 0,
+            terminalSuffixCount = 1,
+            strikeHoldTicks = 2,
+            minPreStrikeHoldTicks = 1,
+        ) { true }
+
+        assertEquals(1, hold)
+    }
+
+    @Test
+    fun `earliest pre-strike hold increases until the schedule becomes feasible`() {
+        val hold = findEarliestSpearKillPreStrikeHold(
+            outboundStepCount = 3,
+            stepWaitTicks = 0,
+            terminalSuffixCount = 1,
+            strikeHoldTicks = 2,
+            maxPreStrikeHoldTicks = SPEAR_KILL_MAX_PRE_STRIKE_HOLD,
+        ) { schedule -> schedule.hitTick >= 7 }
+
+        assertEquals(3, hold)
+        assertTrue(hold!! <= SPEAR_KILL_MAX_PRE_STRIKE_HOLD)
+    }
+
+    @Test
+    fun `terminal suffix count matches trailing MaxSpeed corridor packets`() {
+        val approach = SpearKillAStarAttackApproach(
+            plannerGoal = Vec3(0.0, 64.0, 0.0),
+            terminalWaypoint = Vec3(10.0, 64.0, 0.0),
+        )
+        val outbound = listOf(
+            Vec3(2.0, 0.0, 0.0),
+            Vec3(3.0, 0.0, 0.0),
+            Vec3(3.0, 0.0, 0.0),
+            Vec3(3.0, 0.0, 0.0),
+            Vec3(1.0, 0.0, 0.0),
+        )
+
+        assertEquals(4, countSpearKillAStarTerminalSuffix(outbound, approach, stepLimit = 3.0))
+        assertNull(countSpearKillAStarTerminalSuffix(outbound.dropLast(1), approach, stepLimit = 3.0))
+    }
+
+    @Test
+    fun `schedule damage window gates on hitTick`() {
+        assertTrue(hasSpearKillScheduleDamageWindow(
+            ticksUsingItem = 10,
+            damageUseDuration = 40,
+            hitTick = 30,
+        ))
+        assertFalse(hasSpearKillScheduleDamageWindow(
+            ticksUsingItem = 20,
+            damageUseDuration = 40,
+            hitTick = 21,
+        ))
+        assertTrue(hasSpearKillAStarDamageWindow(
+            ticksUsingItem = 10,
+            damageUseDuration = 40,
+            outboundStepCount = 4,
+            stepWaitTicks = 0,
+            confirmationTicks = 2,
+            preStrikeHoldTicks = 0,
+            terminalSuffixCount = 1,
+        ))
+    }
+
+    @Test
+    fun `terminal commit requires live aim charge and remaining damage window`() {
+        assertTrue(canCommitSpearKillTerminalLunge(
+            isUsingSpear = true,
+            ticksUsingItem = 8,
+            delayTicks = 5,
+            damageUseDuration = 20,
+            remainingHitTicks = 4,
+            hasLiveAttackRay = true,
+            aimAligned = true,
+        ))
+        assertFalse(canCommitSpearKillTerminalLunge(
+            isUsingSpear = true,
+            ticksUsingItem = 5,
+            delayTicks = 5,
+            damageUseDuration = 20,
+            remainingHitTicks = 4,
+            hasLiveAttackRay = true,
+            aimAligned = true,
+        ))
+        assertFalse(canCommitSpearKillTerminalLunge(
+            isUsingSpear = true,
+            ticksUsingItem = 18,
+            delayTicks = 5,
+            damageUseDuration = 20,
+            remainingHitTicks = 4,
+            hasLiveAttackRay = true,
+            aimAligned = true,
+        ))
+        assertFalse(canCommitSpearKillTerminalLunge(
+            isUsingSpear = true,
+            ticksUsingItem = 8,
+            delayTicks = 5,
+            damageUseDuration = 20,
+            remainingHitTicks = 4,
+            hasLiveAttackRay = false,
+            aimAligned = true,
+        ))
+    }
+
+    @Test
+    fun `terminal commit aim must point at the predicted target center`() {
+        val eye = Vec3(0.0, 65.5, 0.0)
+        val movement = Vec3(7.0, 0.0, 0.0)
+
+        assertTrue(isSpearKillTerminalAimAligned(
+            eye = eye,
+            terminalMovement = movement,
+            targetPoint = Vec3(2.5, 65.5, 0.0),
+        ))
+        assertFalse(isSpearKillTerminalAimAligned(
+            eye = eye,
+            terminalMovement = movement,
+            targetPoint = Vec3(2.5, 65.5, 0.2),
+        ))
+    }
+
+    @Test
+    fun `timed plan selection prefers earlier hits then fewer outbound steps`() {
+        assertTrue(isBetterSpearKillTimedAStarPlan(
+            candidateHitTick = 10,
+            candidateOutboundSteps = 8,
+            bestHitTick = 12,
+            bestOutboundSteps = 4,
+        ))
+        assertFalse(isBetterSpearKillTimedAStarPlan(
+            candidateHitTick = 12,
+            candidateOutboundSteps = 3,
+            bestHitTick = 10,
+            bestOutboundSteps = 8,
+        ))
+        assertTrue(isBetterSpearKillTimedAStarPlan(
+            candidateHitTick = 10,
+            candidateOutboundSteps = 3,
+            bestHitTick = 10,
+            bestOutboundSteps = 5,
         ))
     }
 
@@ -1516,6 +2556,46 @@ class ModuleSpearKillTest {
     }
 
     @Test
+    fun `unsafe pending outbound step returns along only confirmed movement`() {
+        val firstMovement = Vec3(2.0, 1.0, 0.0)
+        val unsafeMovement = Vec3(4.0, 0.0, 0.0)
+        val session = SpearKillPacketBootSession()
+        session.startPhysicalReturn(
+            path = listOf(
+                firstMovement,
+                unsafeMovement,
+                unsafeMovement.scale(-1.0),
+                firstMovement.scale(-1.0),
+                Vec3.ZERO,
+            ),
+            outboundSteps = 2,
+        )
+
+        assertVec3Equals(firstMovement, session.prepareNextStep()!!, 1e-9)
+        session.confirmStep(delivered = true)
+        val unsafeOffset = firstMovement.add(unsafeMovement)
+        assertVec3Equals(unsafeOffset, session.prepareNextStep()!!, 1e-9)
+        assertFalse(isSpearKillPacketStepClear(
+            sessionOrigin = Vec3.ZERO,
+            committedOffset = firstMovement,
+            candidateOffset = unsafeOffset,
+            maxStepLength = 10.0,
+            segmentValidator = SpearKillAStarSegmentValidator { _, _ -> false },
+        ))
+
+        session.confirmStep(delivered = false)
+        session.beginExactReturn()
+
+        assertTrue(session.recovering)
+        assertVec3Equals(Vec3.ZERO, session.prepareNextStep()!!, 1e-9)
+        assertVec3Equals(firstMovement.scale(-1.0), session.pendingMovement!!, 1e-9)
+        session.confirmStep(delivered = true)
+        assertVec3Equals(Vec3.ZERO, session.committedOffset, 1e-9)
+        assertVec3Equals(Vec3.ZERO, session.consumePhysicalPositionOffset()!!, 1e-9)
+        assertFalse(session.active)
+    }
+
+    @Test
     fun `AStar refuses to replace a pending or returning packet path`() {
         val session = SpearKillPacketBootSession()
         session.startPhysicalReturn(
@@ -1562,6 +2642,34 @@ class ModuleSpearKillTest {
     }
 
     @Test
+    fun `direct Packet preserves terminal motion through its strike hold before exact return`() {
+        val outbound = Vec3(6.0, 0.0, 0.0)
+        val session = SpearKillPacketBootSession()
+        val route = SpearKillAStarPacketRoute(
+            outboundMovements = listOf(outbound),
+            roundTripMovements = listOf(outbound, outbound.scale(-1.0), Vec3.ZERO),
+        )
+
+        startSpearKillDirectPacketSession(
+            session = session,
+            route = route,
+            stepWaitTicks = 0,
+        )
+        assertVec3Equals(outbound, session.prepareNextStep()!!, 1e-9)
+        session.confirmStep(delivered = true)
+
+        repeat(SPEAR_KILL_PACKET_STRIKE_HOLD_TICKS) {
+            assertNull(session.prepareNextStep())
+            assertTrue(session.holdingStrike)
+            assertEquals(spearKillKineticHeading(outbound), session.pathHeading)
+        }
+
+        assertVec3Equals(Vec3.ZERO, session.prepareNextStep()!!, 1e-9)
+        assertVec3Equals(outbound.scale(-1.0), session.pendingMovement!!, 1e-9)
+        assertFalse(session.holdingStrike)
+    }
+
+    @Test
     fun `AStar isolates its terminal lunge behind a suppressed movement barrier`() {
         val session = SpearKillPacketBootSession()
         session.start(
@@ -1574,6 +2682,7 @@ class ModuleSpearKillTest {
             ),
             outboundSteps = 2,
             preStrikeHoldTicks = 2,
+            terminalSuffixSteps = 1,
         )
 
         assertVec3Equals(Vec3(-4.0, 0.0, 0.0), session.prepareNextStep()!!, 1e-9)
@@ -1585,6 +2694,150 @@ class ModuleSpearKillTest {
         assertTrue(session.holdingKineticBarrier)
         assertVec3Equals(Vec3(3.0, 0.0, 0.0), session.prepareNextStep()!!, 1e-9)
         assertFalse(session.holdingKineticBarrier)
+    }
+
+    @Test
+    fun `AStar pre-strike hold gates the entire multi-step terminal suffix`() {
+        val session = SpearKillPacketBootSession()
+        session.start(
+            path = listOf(
+                Vec3(1.0, 0.0, 0.0),
+                Vec3(3.0, 0.0, 0.0),
+                Vec3(3.0, 0.0, 0.0),
+                Vec3(1.0, 0.0, 0.0),
+                Vec3(-1.0, 0.0, 0.0),
+                Vec3(-3.0, 0.0, 0.0),
+                Vec3(-3.0, 0.0, 0.0),
+                Vec3(-1.0, 0.0, 0.0),
+                Vec3.ZERO,
+            ),
+            outboundSteps = 4,
+            stepWaitTicks = 0,
+            preStrikeHoldTicks = 2,
+            terminalSuffixSteps = 3,
+        )
+
+        assertVec3Equals(Vec3(1.0, 0.0, 0.0), session.prepareNextStep()!!, 1e-9)
+        session.confirmStep(delivered = true)
+
+        assertNull(session.prepareNextStep())
+        assertTrue(session.holdingKineticBarrier)
+        assertNull(session.prepareNextStep())
+        assertTrue(session.holdingKineticBarrier)
+
+        assertVec3Equals(Vec3(4.0, 0.0, 0.0), session.prepareNextStep()!!, 1e-9)
+        session.confirmStep(delivered = true)
+        assertVec3Equals(Vec3(7.0, 0.0, 0.0), session.prepareNextStep()!!, 1e-9)
+        session.confirmStep(delivered = true)
+        assertVec3Equals(Vec3(8.0, 0.0, 0.0), session.prepareNextStep()!!, 1e-9)
+    }
+
+    @Test
+    fun `AStar terminal lunge cannot move before aim lock and live authorization`() {
+        val terminalMovement = Vec3(7.0, 0.0, 0.0)
+        val session = SpearKillPacketBootSession()
+        session.start(
+            path = listOf(terminalMovement, terminalMovement.scale(-1.0), Vec3.ZERO),
+            outboundSteps = 1,
+            preStrikeHoldTicks = 1,
+            terminalSuffixSteps = 1,
+            requireTerminalAuthorization = true,
+        )
+
+        assertTrue(session.awaitingTerminalCommitAuthorization)
+        assertFalse(session.terminalAimLockComplete)
+        assertFalse(session.authorizeTerminalCommit())
+
+        assertNull(session.prepareNextStep())
+        assertTrue(session.holdingPreStrike)
+        assertTrue(session.terminalAimLockComplete)
+
+        assertNull(session.prepareNextStep())
+        assertTrue(session.awaitingTerminalCommitAuthorization)
+        assertTrue(session.authorizeTerminalCommit())
+        assertVec3Equals(terminalMovement, session.prepareNextStep()!!, 1e-9)
+    }
+
+    @Test
+    fun `AStar replanning freezes before terminal suffix begins`() {
+        val session = SpearKillPacketBootSession()
+        session.start(
+            path = listOf(
+                Vec3(1.0, 0.0, 0.0),
+                Vec3(3.0, 0.0, 0.0),
+                Vec3(3.0, 0.0, 0.0),
+                Vec3(1.0, 0.0, 0.0),
+                Vec3.ZERO,
+            ),
+            outboundSteps = 4,
+            terminalSuffixSteps = 3,
+        )
+
+        assertTrue(session.canReplaceRemainingApproach)
+        session.prepareNextStep()
+        session.confirmStep(delivered = true)
+
+        assertFalse(session.canReplaceRemainingApproach)
+    }
+
+    @Test
+    fun `AStar replanning waits until the current packet cadence is ready`() {
+        val session = SpearKillPacketBootSession()
+        session.start(
+            path = listOf(
+                Vec3(1.0, 0.0, 0.0),
+                Vec3(1.0, 0.0, 0.0),
+                Vec3(1.0, 0.0, 0.0),
+                Vec3.ZERO,
+            ),
+            outboundSteps = 3,
+            stepWaitTicks = 2,
+            terminalSuffixSteps = 1,
+        )
+
+        session.prepareNextStep()
+        session.confirmStep(delivered = true)
+        assertFalse(session.canReplaceRemainingApproach)
+        assertNull(session.prepareNextStep())
+        assertFalse(session.canReplaceRemainingApproach)
+        assertNull(session.prepareNextStep())
+        assertTrue(session.canReplaceRemainingApproach)
+    }
+
+    @Test
+    fun `AStar replan applies pre-hold and terminal suffix count to the replacement outbound`() {
+        val session = SpearKillPacketBootSession()
+        session.startPhysicalReturn(
+            path = listOf(
+                Vec3(1.0, 0.0, 0.0),
+                Vec3(1.0, 0.0, 0.0),
+                Vec3(-1.0, 0.0, 0.0),
+                Vec3(-1.0, 0.0, 0.0),
+                Vec3.ZERO,
+            ),
+            outboundSteps = 2,
+        )
+        session.prepareNextStep()
+        session.confirmStep(delivered = true)
+
+        assertTrue(session.replaceRemainingOutbound(
+            outboundMovements = listOf(
+                Vec3(2.0, 0.0, 0.0),
+                Vec3(3.0, 0.0, 0.0),
+                Vec3(3.0, 0.0, 0.0),
+            ),
+            strikeHoldTicks = 2,
+            preStrikeHoldTicks = 1,
+            terminalSuffixSteps = 2,
+        ))
+
+        assertVec3Equals(Vec3(3.0, 0.0, 0.0), session.prepareNextStep()!!, 1e-9)
+        session.confirmStep(delivered = true)
+        assertNull(session.prepareNextStep())
+        assertTrue(session.holdingKineticBarrier)
+        assertVec3Equals(Vec3(6.0, 0.0, 0.0), session.prepareNextStep()!!, 1e-9)
+        session.confirmStep(delivered = true)
+        assertVec3Equals(Vec3(9.0, 0.0, 0.0), session.prepareNextStep()!!, 1e-9)
     }
 
     @Test
@@ -1611,19 +2864,9 @@ class ModuleSpearKillTest {
     }
 
     @Test
-    fun `AStar strike hold suppresses only ambient movement packets`() {
-        assertTrue(shouldSuppressSpearKillAStarStrikeHoldPacket(
-            packetAStarAttackActive = true,
-            holdingStrike = true,
-        ))
-        assertFalse(shouldSuppressSpearKillAStarStrikeHoldPacket(
-            packetAStarAttackActive = false,
-            holdingStrike = true,
-        ))
-        assertFalse(shouldSuppressSpearKillAStarStrikeHoldPacket(
-            packetAStarAttackActive = true,
-            holdingStrike = false,
-        ))
+    fun `every Packet strike hold suppresses ambient movement packets`() {
+        assertTrue(shouldSuppressSpearKillStrikeHoldPacket(holdingStrike = true))
+        assertFalse(shouldSuppressSpearKillStrikeHoldPacket(holdingStrike = false))
     }
 
     @Test
@@ -2125,12 +3368,13 @@ class ModuleSpearKillTest {
             stepWaitTicks = 1,
         )
 
+        assertEquals(Rotation.fromRotationVec(Vec3(3.0, 0.0, 0.0)), session.pathHeading)
         session.prepareNextStep()
         val forwardHeading = session.pathHeading!!
         assertEquals(Rotation.fromRotationVec(Vec3(3.0, 0.0, 0.0)), forwardHeading)
         session.confirmStep(delivered = true)
         assertNull(session.prepareNextStep())
-        assertEquals(forwardHeading, session.pathHeading)
+        assertEquals(Rotation.fromRotationVec(Vec3(0.0, 2.0, 3.0)), session.pathHeading)
 
         session.prepareNextStep()
         assertEquals(Rotation.fromRotationVec(Vec3(0.0, 2.0, 3.0)), session.pathHeading)
@@ -2144,6 +3388,44 @@ class ModuleSpearKillTest {
         assertNull(session.prepareNextStep())
         session.prepareNextStep()
         assertEquals(Rotation.fromRotationVec(Vec3(0.0, -2.0, -3.0)), session.pathHeading)
+    }
+
+    @Test
+    fun `Packet pre-strike hold locks rotation onto the terminal lunge`() {
+        val approachMovement = Vec3(0.0, 0.0, 4.0)
+        val terminalMovement = Vec3(4.0, 0.0, 0.0)
+        val session = SpearKillPacketBootSession()
+        session.start(
+            path = listOf(
+                approachMovement,
+                terminalMovement,
+                terminalMovement.scale(-1.0),
+                approachMovement.scale(-1.0),
+                Vec3.ZERO,
+            ),
+            outboundSteps = 2,
+            preStrikeHoldTicks = 2,
+            terminalSuffixSteps = 1,
+        )
+
+        session.prepareNextStep()
+        session.confirmStep(delivered = true)
+
+        assertEquals(Rotation.fromRotationVec(terminalMovement), session.pathHeading)
+        assertNull(session.prepareNextStep())
+        assertEquals(Rotation.fromRotationVec(terminalMovement), session.pathHeading)
+    }
+
+    @Test
+    fun `route rotation override is instant silent and persistent for one tick`() {
+        val heading = Rotation(65f, -12f)
+        val target = spearKillRouteRotationTarget(heading)
+
+        assertEquals(heading, target.rotation)
+        assertTrue(target.processors.isEmpty())
+        assertEquals(1, target.ticksUntilReset)
+        assertFalse(target.considerInventory)
+        assertEquals(MovementCorrection.OFF, target.movementCorrection)
     }
 
     @Test

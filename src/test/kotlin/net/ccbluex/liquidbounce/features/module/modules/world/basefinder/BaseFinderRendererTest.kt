@@ -15,10 +15,8 @@ import net.minecraft.world.phys.AABB
 import net.minecraft.world.phys.Vec3
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
-import org.junit.jupiter.api.Assertions.assertNotEquals
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
-import kotlin.math.roundToInt
 
 class BaseFinderRendererTest {
 
@@ -33,9 +31,6 @@ class BaseFinderRendererTest {
         highConfidenceColor = Color4b(0xFF, 0x3C, 0xB4),
         showLabels = true,
         maxLabels = 8,
-        pulse = true,
-        pulseSpeedHz = 0.8,
-        pulseAmount = 0.15,
     )
 
     @Test
@@ -133,24 +128,12 @@ class BaseFinderRendererTest {
     }
 
     @Test
-    fun `stable pulse remains between eighty five and one hundred percent`() {
-        val first = BaseFinderRenderPlanner.pulseMultiplier("alpha", 1_234L, speedHz = 0.8, amount = 0.15)
-        val repeated = BaseFinderRenderPlanner.pulseMultiplier("alpha", 1_234L, speedHz = 0.8, amount = 0.15)
-        val anotherPhase = BaseFinderRenderPlanner.pulseMultiplier("beta", 1_234L, speedHz = 0.8, amount = 0.15)
-
-        assertEquals(first, repeated)
-        assertTrue(first in 0.85..1.0)
-        assertTrue(anotherPhase in 0.85..1.0)
-        assertNotEquals(first, anotherPhase)
-    }
-
-    @Test
     fun `direct colors and glow mask share confidence color with intended alpha`() {
         val entry = BaseFinderRenderPlanner.plan(request(marker("color"), nowMillis = 0L)).entries.single()
 
-        assertEquals(entry.color.with(a = (24 * entry.pulseMultiplier).roundToInt()), entry.faceColor)
-        assertEquals(entry.color.with(a = (150 * entry.pulseMultiplier).roundToInt()), entry.outlineColor)
-        assertEquals(entry.color.with(a = (255 * entry.pulseMultiplier).roundToInt()), entry.glowMaskColor)
+        assertEquals(entry.color.with(a = 24), entry.faceColor)
+        assertEquals(entry.color.with(a = 150), entry.outlineColor)
+        assertEquals(entry.color.with(a = 255), entry.glowMaskColor)
     }
 
     @Test
@@ -186,8 +169,8 @@ class BaseFinderRendererTest {
     fun `labels expose configurable evidence details at their configured scale`() {
         val marker = marker("details").copy(
             evidenceDetails = listOf(
-                BaseFinderLabelEvidence("Storage", 13, listOf("Chest", "Purple shulker box", "Furnace")),
-                BaseFinderLabelEvidence("Utilities", 9, listOf("Crafting", "Bed", "Smelting")),
+                BaseFinderRenderEvidence("Storage", 13, listOf("Chest", "Purple shulker box", "Furnace")),
+                BaseFinderRenderEvidence("Utilities", 9, listOf("Crafting", "Bed", "Smelting")),
             ),
         )
         val label = BaseFinderRenderPlanner.plan(
@@ -203,13 +186,45 @@ class BaseFinderRendererTest {
 
         assertEquals("Hideout 80% • 0m", label.headline)
         assertEquals(1.5f, label.scale)
-        assertEquals(listOf("Storage 13: Chest + Purple shulker box + Furnace"), label.evidenceLines)
+        assertEquals(listOf("Storage +13: Chest + Purple shulker box + Furnace"), label.evidenceLines)
+    }
+
+    @Test
+    fun `labels bound scored family and contribution lines with observation counts`() {
+        val marker = marker("scored-details").copy(
+            evidenceDetails = listOf(
+                BaseFinderRenderEvidence(
+                    family = "Seed mismatch",
+                    score = 65,
+                    showFamilyScore = false,
+                    contributions = listOf(
+                        BaseFinderRenderContribution("Unexpected solid", 40, "143 blocks"),
+                        BaseFinderRenderContribution("Missing solid", 25, "204 blocks"),
+                        BaseFinderRenderContribution("Coherent component", 0, "87 cells"),
+                    ),
+                ),
+                BaseFinderRenderEvidence("Compact base", 32),
+            ),
+        )
+
+        val label = BaseFinderRenderPlanner.plan(
+            request(marker).copy(settings = settings.copy(maxEvidenceDetails = 3)),
+        ).labels.single()
+
+        assertEquals(
+            listOf(
+                "Seed mismatch",
+                "Unexpected solid +40 · 143 blocks",
+                "Missing solid +25 · 204 blocks",
+            ),
+            label.evidenceLines,
+        )
     }
 
     @Test
     fun `labels can hide evidence details without hiding coordinates`() {
         val marker = marker("details").copy(
-            evidenceDetails = listOf(BaseFinderLabelEvidence("Storage", 13, listOf("Chest"))),
+            evidenceDetails = listOf(BaseFinderRenderEvidence("Storage", 13, listOf("Chest"))),
         )
         val label = BaseFinderRenderPlanner.plan(
             request(marker).copy(settings = settings.copy(showEvidenceDetails = false)),
@@ -238,17 +253,82 @@ class BaseFinderRendererTest {
     @Test
     fun `render batch keeps an immutable evidence snapshot`() {
         val evidence = mutableListOf("Storage", "Automation")
-        val source = marker("snapshot").copy(topEvidenceKeys = evidence)
+        val contributions = mutableListOf(BaseFinderRenderContribution("Unexpected solid", 40, "143 blocks"))
+        val source = marker("snapshot").copy(
+            topEvidenceKeys = evidence,
+            evidenceDetails = listOf(
+                BaseFinderRenderEvidence(
+                    "Seed mismatch",
+                    65,
+                    contributions = contributions,
+                    showFamilyScore = false,
+                ),
+            ),
+        )
 
         val batch = BaseFinderRenderPlanner.plan(request(source))
         evidence.clear()
+        contributions.clear()
 
         assertEquals(listOf("Storage", "Automation"), batch.entries.single().marker.topEvidenceKeys)
         assertEquals("0 64 0 • Storage + Automation", batch.labels.single().details)
+        assertEquals(
+            listOf("Seed mismatch", "Unexpected solid +40 · 143 blocks"),
+            batch.labels.single().evidenceLines,
+        )
+    }
+
+    @Test
+    fun `all mismatch kinds remain renderable and score details cannot alter their overlay`() {
+        val overlaySettings = SeedMismatchRenderSettings(
+            maximumDistance = 32.0,
+            renderLimit = 8,
+            missingSolidColor = Color4b(1, 2, 3),
+            unexpectedSolidColor = Color4b(4, 5, 6),
+            utilityMismatchColor = Color4b(7, 8, 9),
+            materialSwapColor = Color4b(10, 11, 12),
+        )
+        val cells = SeedMismatchKind.entries.mapIndexed { index, kind ->
+            SeedMismatchCell(BaseCoordinate(index, 64, 0), kind)
+        }
+        val camera = Vec3(0.5, 64.5, 0.5)
+        val baseline = BaseFinderSeedMismatchRenderPlanner.plan(cells, camera, overlaySettings)
+
+        BaseFinderRenderPlanner.plan(
+            request(
+                marker("scored").copy(
+                    evidenceDetails = listOf(
+                        BaseFinderRenderEvidence(
+                            "Seed mismatch",
+                            89,
+                            contributions = listOf(
+                                BaseFinderRenderContribution("Unexpected solid", 40, "64 blocks"),
+                            ),
+                        ),
+                    ),
+                ),
+            ),
+        )
+        val afterScoringProjection = BaseFinderSeedMismatchRenderPlanner.plan(cells, camera, overlaySettings)
+
+        assertEquals(baseline, afterScoringProjection)
+        assertEquals(SeedMismatchKind.entries, baseline.entries.map { it.cell.kind })
+        assertEquals(
+            listOf(
+                overlaySettings.missingSolidColor,
+                overlaySettings.unexpectedSolidColor,
+                overlaySettings.utilityMismatchColor,
+                overlaySettings.materialSwapColor,
+            ),
+            baseline.entries.map { it.color },
+        )
     }
 
     @Test
     fun `domain snapshot converts coordinates and scope without sharing marker lists`() {
+        val labelContributions = mutableListOf(
+            BaseFinderLabelContribution("Unexpected solid", 40, "143 blocks"),
+        )
         val markers = mutableListOf(
             BaseFinderMarker(
                 id = "domain",
@@ -256,6 +336,14 @@ class BaseFinderRendererTest {
                 confidence = 91,
                 topEvidenceKeys = listOf("Storage"),
                 updatedAtMillis = 456L,
+                evidenceDetails = listOf(
+                    BaseFinderLabelEvidence(
+                        family = "Seed mismatch",
+                        score = 85,
+                        detections = emptyList(),
+                        contributions = labelContributions,
+                    ),
+                ),
                 bounds = BaseFinderBounds(
                     minimum = BaseCoordinate(8, 68, -7),
                     maximum = BaseCoordinate(14, 72, -1),
@@ -272,10 +360,23 @@ class BaseFinderRendererTest {
 
         val request = BaseFinderRenderRequest.fromSnapshot(snapshot, Vec3.ZERO, settings, nowMillis = 789L)
         markers.clear()
+        labelContributions.clear()
 
         assertEquals(BaseFinderRenderScope("snapshot-server", "minecraft:the_end", 9L, 3L), request.scope)
         assertEquals(Vec3(12.0, 70.0, -4.0), request.markers.single().anchor)
         assertEquals(91, request.markers.single().confidence)
+        assertEquals(
+            listOf(
+                BaseFinderRenderEvidence(
+                    family = "Seed mismatch",
+                    score = 85,
+                    contributions = listOf(
+                        BaseFinderRenderContribution("Unexpected solid", 40, "143 blocks"),
+                    ),
+                ),
+            ),
+            request.markers.single().evidenceDetails,
+        )
         assertEquals(
             BaseFinderBounds(BaseCoordinate(8, 68, -7), BaseCoordinate(14, 72, -1)),
             request.markers.single().bounds,

@@ -74,20 +74,22 @@ class TargetGlowSourceRegistryTest {
     }
 
     @Test
-    fun `matched target style merges with the shared glow lane through the strongest values`() {
+    fun `matched target style remains independent from player ESP style`() {
         val target = entityIdentity()
         val targetStyle = EspGlowStyle.DEFAULT.copy(radius = 22f, intensity = 0.5f)
         val generalStyle = EspGlowStyle.DEFAULT.copy(radius = 8f, intensity = 1.7f)
         register { TargetGlowSelection(target, Color4b.RED, targetStyle) }
         TargetGlowSourceRegistry.selectionFor(target)
 
-        val resolved = EspShaderStyleResolver.resolveGlow(
-            generalStyle,
-            *TargetGlowSourceRegistry.consumeContributedStyles().toTypedArray(),
+        val sources = EspGlowFrameSources()
+        sources.contribute(
+            EspGlowSource.TARGET_GLOW,
+            TargetGlowSourceRegistry.consumeContributedStyles().single(),
         )
+        sources.contribute(EspGlowSource.PLAYER_ESP, generalStyle)
 
-        assertEquals(22f, resolved.radius)
-        assertEquals(1.7f, resolved.intensity)
+        assertEquals(targetStyle, sources.state(EspGlowSource.TARGET_GLOW).style)
+        assertEquals(generalStyle, sources.state(EspGlowSource.PLAYER_ESP).style)
     }
 
     private fun register(source: () -> TargetGlowSelection?) {

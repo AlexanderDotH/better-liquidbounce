@@ -11,6 +11,7 @@
 
 package net.ccbluex.liquidbounce.injection.mixins.minecraft.render;
 
+import net.ccbluex.liquidbounce.common.EspMaskLayer;
 import net.ccbluex.liquidbounce.interfaces.PreparedFrameAddition;
 import net.ccbluex.liquidbounce.interfaces.SubmitNodeCollectionAddition;
 import net.ccbluex.liquidbounce.render.engine.esp.EspPreparedPhaseLookup;
@@ -47,24 +48,11 @@ public abstract class MixinFeatureRenderDispatcherPreparedFrame implements Prepa
 
     @Unique
     @Override
-    public boolean liquid_bounce$hasEspGlow() {
-        return liquid_bounce$hasEspPhase(true);
-    }
-
-    @Unique
-    @Override
-    public boolean liquid_bounce$hasEspOutline() {
-        return liquid_bounce$hasEspPhase(false);
-    }
-
-    @Unique
-    private boolean liquid_bounce$hasEspPhase(boolean glow) {
+    public boolean liquid_bounce$hasEspMask(EspMaskLayer layer) {
         var storage = Objects.requireNonNull(submitNodeStorage, "Prepared frame has no submit storage");
         for (var collection : storage.getSubmitsPerOrder().values()) {
             var addition = (SubmitNodeCollectionAddition) collection;
-            var phase = glow
-                ? addition.liquid_bounce$getEspGlowPhase()
-                : addition.liquid_bounce$getEspOutlinePhase();
+            var phase = addition.liquid_bounce$getEspPhase(layer);
             if (EspPreparedPhaseLookup.hasPreparedGroups(groupsByPhase, phase)) {
                 return true;
             }
@@ -74,26 +62,12 @@ public abstract class MixinFeatureRenderDispatcherPreparedFrame implements Prepa
 
     @Unique
     @Override
-    public void liquid_bounce$executeEspGlow() {
-        liquid_bounce$executeEspPhase(true);
-    }
-
-    @Unique
-    @Override
-    public void liquid_bounce$executeEspOutline() {
-        liquid_bounce$executeEspPhase(false);
-    }
-
-    @Unique
-    private void liquid_bounce$executeEspPhase(boolean glow) {
+    public void liquid_bounce$executeEspMask(EspMaskLayer layer) {
         var frameContext = Objects.requireNonNull(context, "Prepared frame has no context");
         var storage = Objects.requireNonNull(submitNodeStorage, "Prepared frame has no submit storage");
         for (var collection : storage.getSubmitsPerOrder().values()) {
             var addition = (SubmitNodeCollectionAddition) collection;
-            executePhase(
-                glow ? addition.liquid_bounce$getEspGlowPhase() : addition.liquid_bounce$getEspOutlinePhase(),
-                frameContext
-            );
+            executePhase(addition.liquid_bounce$getEspPhase(layer), frameContext);
         }
     }
 }

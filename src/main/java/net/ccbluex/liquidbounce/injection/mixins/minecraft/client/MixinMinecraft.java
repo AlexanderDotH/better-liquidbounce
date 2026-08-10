@@ -36,6 +36,7 @@ import net.ccbluex.liquidbounce.features.module.modules.combat.ModuleNoMissCoold
 import net.ccbluex.liquidbounce.features.module.modules.combat.killaura.features.KillAuraAutoBlock;
 import net.ccbluex.liquidbounce.features.module.modules.exploit.ModuleMultiActions;
 import net.ccbluex.liquidbounce.features.module.modules.misc.ModuleMiddleClickAction;
+import net.ccbluex.liquidbounce.features.module.modules.movement.autododge.ModuleAutoDodge;
 import net.ccbluex.liquidbounce.features.module.modules.player.ModuleAutoBreak;
 import net.ccbluex.liquidbounce.features.module.modules.player.ModuleNoBlockInteract;
 import net.ccbluex.liquidbounce.features.module.modules.player.ModuleReach;
@@ -288,6 +289,13 @@ public abstract class MixinMinecraft {
     /**
      * Hook item use cooldown
      */
+    @Inject(method = "startUseItem", at = @At("HEAD"), cancellable = true)
+    private void suppressVanillaUseWhileAutoDodgeOwnsShieldSession(CallbackInfo callbackInfo) {
+        if (ModuleAutoDodge.suppressesVanillaSpearShieldUse()) {
+            callbackInfo.cancel();
+        }
+    }
+
     @Inject(method = "startUseItem", at = @At(value = "FIELD", target = "Lnet/minecraft/client/Minecraft;rightClickDelay:I", shift = At.Shift.AFTER, opcode = Opcodes.PUTFIELD))
     private void hookItemUseCooldown(CallbackInfo callbackInfo) {
         UseCooldownEvent useCooldownEvent = new UseCooldownEvent(rightClickDelay);
@@ -399,7 +407,10 @@ public abstract class MixinMinecraft {
     @ModifyExpressionValue(method = "handleKeybinds", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/player/LocalPlayer;isUsingItem()Z", ordinal = 0))
     private boolean injectMultiActionsAttackingWhileUsingAndEnforcedBlockingState(boolean isUsingItem) {
         if (isUsingItem) {
-            if (!this.options.keyUse.isDown() && !(KillAuraAutoBlock.INSTANCE.getRunning() && KillAuraAutoBlock.INSTANCE.getEnforcedBlockingHand() != null)) {
+            if (!this.options.keyUse.isDown()
+                && !(KillAuraAutoBlock.INSTANCE.getRunning()
+                && KillAuraAutoBlock.INSTANCE.getEnforcedBlockingHand() != null)
+                && !ModuleAutoDodge.ownsSpearShieldUse()) {
                 this.gameMode.releaseUsingItem(this.player);
             }
 

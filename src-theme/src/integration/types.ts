@@ -34,6 +34,7 @@ export interface GroupedModules {
 
 export type ModuleSetting =
     BlocksSetting
+    | ActionSetting
     | BooleanSetting
     | FloatSetting
     | FloatRangeSetting
@@ -125,6 +126,9 @@ export interface ColorSetting extends Setting<number> {
 }
 
 export interface BooleanSetting extends Setting<boolean> {
+}
+
+export interface ActionSetting extends Setting<boolean> {
 }
 
 export interface RangedSettingWarning {

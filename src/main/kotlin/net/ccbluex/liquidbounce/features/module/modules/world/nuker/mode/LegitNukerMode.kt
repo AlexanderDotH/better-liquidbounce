@@ -26,11 +26,13 @@ import net.ccbluex.liquidbounce.event.handler
 import net.ccbluex.liquidbounce.event.tickHandler
 import net.ccbluex.liquidbounce.event.waitTicks
 import net.ccbluex.liquidbounce.features.module.modules.player.ModuleBlink
+import net.ccbluex.liquidbounce.features.module.modules.world.ModuleFastBreak
 import net.ccbluex.liquidbounce.features.module.modules.world.nuker.ModuleNuker
 import net.ccbluex.liquidbounce.features.module.modules.world.nuker.ModuleNuker.areaMode
 import net.ccbluex.liquidbounce.features.module.modules.world.nuker.ModuleNuker.ignoreOpenInventory
 import net.ccbluex.liquidbounce.features.module.modules.world.nuker.ModuleNuker.mode
 import net.ccbluex.liquidbounce.features.module.modules.world.nuker.ModuleNuker.wasTarget
+import net.ccbluex.liquidbounce.features.module.modules.world.nuker.shouldNukerBreakImmediately
 import net.ccbluex.liquidbounce.features.module.modules.world.packetmine.ModulePacketMine
 import net.ccbluex.liquidbounce.utils.aiming.RotationManager
 import net.ccbluex.liquidbounce.utils.aiming.RotationsValueGroup
@@ -68,7 +70,7 @@ object LegitNukerMode : Mode("Legit") {
         }
 
         val target = currentTarget ?: return null
-        if (forceImmediateBreak) {
+        if (breaksImmediately()) {
             return wasTarget?.takeIf { it == target }?.let { BreakingProgress(it, 1f) }
         }
 
@@ -124,7 +126,7 @@ object LegitNukerMode : Mode("Legit") {
             return@tickHandler
         }
 
-        doBreak(rayTraceResult, forceImmediateBreak)
+        doBreak(rayTraceResult, breaksImmediately())
         wasTarget = currentTarget
     }
 
@@ -195,6 +197,10 @@ object LegitNukerMode : Mode("Legit") {
         }
 
         return null
+    }
+
+    private fun breaksImmediately(): Boolean {
+        return shouldNukerBreakImmediately(forceImmediateBreak, ModuleFastBreak.running)
     }
 
 }

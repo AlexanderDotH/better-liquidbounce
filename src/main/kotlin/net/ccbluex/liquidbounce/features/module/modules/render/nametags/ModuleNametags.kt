@@ -75,6 +75,19 @@ object ModuleNametags : ClientModule("Nametags", ModuleCategories.RENDER) {
             get() = frameModes
 
         internal val color by color("Color", MODERN_BLUE_ACCENT)
+        internal val backgroundOpacity by int(
+            "BackgroundOpacity",
+            MODERN_FRAME_BACKGROUND_OPACITY_PERCENT,
+            0..100,
+            "%",
+        )
+        internal val backgroundBlur by float(
+            "BackgroundBlur",
+            MODERN_FRAME_BACKGROUND_BLUR_RADIUS,
+            4f..24f,
+            "px",
+        )
+        internal val frameRadius by float("FrameRadius", MODERN_FRAME_RADIUS, 0f..16f, "px")
         private val styleConfig = EspGlowStyleConfig(this)
         internal val style get() = styleConfig.style
     }
@@ -87,11 +100,14 @@ object ModuleNametags : ClientModule("Nametags", ModuleCategories.RENDER) {
                 ClassicFrame.backgroundRadius,
             )
             GlowFrame -> resolveNametagFrameAppearance(
-                NametagFrameKind.GLOW,
-                ClassicFrame.borderWidth,
-                ClassicFrame.backgroundRadius,
-                GlowFrame.color,
-                GlowFrame.style,
+                kind = NametagFrameKind.GLOW,
+                classicBorderWidth = ClassicFrame.borderWidth,
+                classicRadius = ClassicFrame.backgroundRadius,
+                glowColor = GlowFrame.color,
+                glowStyle = GlowFrame.style,
+                glowBackgroundOpacityPercent = GlowFrame.backgroundOpacity,
+                glowBackgroundBlurRadius = GlowFrame.backgroundBlur,
+                glowFrameRadius = GlowFrame.frameRadius,
             )
             else -> resolveNametagFrameAppearance(
                 NametagFrameKind.MODERN,
@@ -99,6 +115,8 @@ object ModuleNametags : ClientModule("Nametags", ModuleCategories.RENDER) {
                 ClassicFrame.backgroundRadius,
             )
         }
+
+    internal val yOffset by float("YOffset", 0f, -1f..1f, "blocks")
 
     internal val scale = curve(
         "Scale",

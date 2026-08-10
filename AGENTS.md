@@ -4,6 +4,7 @@
 - Never copy `-sources.jar` or other non-mod build artifacts into the Performium mods folder.
 - When implementing from a plan file, do not edit the plan file itself; execute against it as specified.
 - Prefer plain ClickGUI text fields over searchable player dropdown UI for entering player names.
+- For SpearKill A* routes: keep the final approach lateral (not a top-down last step), stop within spear reach, and force instant path-follow rotations that override normal look while moving.
 
 ## Learned Workspace Facts
 
@@ -16,3 +17,5 @@
 - ClickGUI shift+hover extended descriptions for module modes/toggles need `description`, `extendedDescription`, and `key` in `ValueGroupSerializer` interop JSON.
 - ClickGUI shift detection uses global `shiftHeld` state in `shiftDescription.ts` (keydown/keyup plus window blur) for CEF reliability.
 - Player picker backend uses `ValueType.PLAYER` with the `world_players` REST registry (RemotePlayers, excluding self and AntiBot bots); ClickGUI renders `PLAYER` settings as plain `TextSetting`.
+- Performium in-game LiquidBounce configs live under `/home/alex/.local/share/PrismLauncher/instances/Performium 21.1/minecraft/LiquidBounce/` (`modules.json`, `backups/`); `.localconfig load` overwrites live module settings.
+- `ModuleSpearKill` Packet movement supports nested A* (`SpearKillAStarRoute` / path render); Wait ticks belong under Packet mode (shared by both Packet and A*).

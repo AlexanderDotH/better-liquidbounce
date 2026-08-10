@@ -12,7 +12,10 @@ package net.ccbluex.liquidbounce.features.module.modules.render
 
 import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertNotNull
+import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
+import java.nio.file.Files
+import java.nio.file.Path
 
 class ModuleStorageESPTest {
 
@@ -40,5 +43,20 @@ class ModuleStorageESPTest {
         }
 
         assertFalse(overridesRunning, "StorageESP must remain active independently of ChestStealer")
+    }
+
+    @Test
+    fun `changing a storage color invalidates cached mode geometry`() {
+        val source = Files.readString(
+            Path.of("src/main/kotlin/net/ccbluex/liquidbounce/features/module/modules/render/ModuleStorageESP.kt")
+        )
+        val colorSetting = Regex(
+            """val color by color\(\"Color\", defaultColor\)\.onChanged\s*\{\s*markDirtyForModes\(\)\s*}"""
+        )
+
+        assertTrue(
+            colorSetting.containsMatchIn(source),
+            "Storage color changes must invalidate Box, Outline, and Glow cached geometry",
+        )
     }
 }

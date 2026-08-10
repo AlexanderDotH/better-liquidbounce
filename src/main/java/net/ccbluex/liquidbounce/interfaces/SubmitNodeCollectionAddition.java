@@ -11,11 +11,10 @@
 
 package net.ccbluex.liquidbounce.interfaces;
 
+import net.ccbluex.liquidbounce.common.EspMaskLayer;
 import net.minecraft.client.renderer.feature.phase.SimpleFeatureRenderPhase;
 
 public interface SubmitNodeCollectionAddition {
 
-    SimpleFeatureRenderPhase liquid_bounce$getEspGlowPhase();
-
-    SimpleFeatureRenderPhase liquid_bounce$getEspOutlinePhase();
+    SimpleFeatureRenderPhase liquid_bounce$getEspPhase(EspMaskLayer layer);
 }

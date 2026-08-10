@@ -31,6 +31,7 @@ import net.minecraft.world.entity.EntityEquipment
 import net.minecraft.world.entity.EquipmentSlot
 import net.minecraft.world.entity.LivingEntity
 import net.minecraft.world.item.ItemStack
+import net.minecraft.world.phys.Vec3
 
 internal class NametagRenderState {
 
@@ -73,7 +74,8 @@ internal class NametagRenderState {
 
     fun calculateScreenPos(tickDelta: Float): Vec3f? {
         val entity = this.entity ?: return null
-        val nametagPos = PlayerModelNametagHook.getNametagAnchorPosition(entity, tickDelta)
+        val anchor = PlayerModelNametagHook.getNametagAnchorPosition(entity, tickDelta)
+        val nametagPos = offsetNametagAnchor(anchor, ModuleNametags.yOffset)
 
         screenPos = WorldToScreen.calculateScreenPos(nametagPos)
         return screenPos
@@ -149,3 +151,6 @@ internal class NametagRenderState {
         )
     }
 }
+
+internal fun offsetNametagAnchor(anchor: Vec3, yOffset: Float): Vec3 =
+    anchor.add(0.0, yOffset.toDouble(), 0.0)

@@ -12,11 +12,13 @@ package net.ccbluex.liquidbounce.features.module.modules.world.basefinder
 
 import net.ccbluex.liquidbounce.config.types.list.Tagged
 import net.minecraft.core.BlockPos
+import net.minecraft.world.level.ChunkPos
 import kotlin.math.max
 
 internal enum class BaseSignalFamily(
     val maximumScore: Int,
     val seedCapable: Boolean,
+    val showFamilyScore: Boolean = true,
 ) {
     STORAGE(30, true),
     UTILITIES(18, true),
@@ -24,9 +26,52 @@ internal enum class BaseSignalFamily(
     ENTITIES(12, true),
     STRUCTURAL(12, true),
     GEOMETRY(10, true),
+    SEED_MISMATCH(65, true, showFamilyScore = false),
     COMPACT_BASE(32, false),
     ACTIVITY(6, false),
     CHUNK_TRAILS(4, false),
+}
+
+/** Which generation stage produced a seed-mismatch signal. */
+internal enum class SeedComparePhase {
+    NONE,
+    SPARSE,
+    /** Dense compare of a limited local neighborhood (player overlay), not the whole chunk. */
+    OVERLAY,
+    FULL,
+}
+
+/** Classification of one seed-expected vs observed block cell. */
+internal enum class SeedMismatchKind {
+    MISSING_SOLID,
+    UNEXPECTED_SOLID,
+    UTILITY,
+
+    /**
+     * Both cells are solid, but they are different materials — cobblestone where the seed says stone.
+     * Overlay-only: material swaps never feed [SeedMismatchSignal.mismatchRatio] or base scoring.
+     */
+    MATERIAL_SWAP,
+}
+
+/** One mismatched block cell used for scoring anchors and the live mismatch overlay. */
+internal data class SeedMismatchCell(
+    val position: BaseCoordinate,
+    val kind: SeedMismatchKind,
+    /** Block in the loaded world. */
+    val observedBlockId: Int = UNKNOWN_BLOCK_ID,
+    /** Block rebuilt from the supplied seed. */
+    val expectedBlockId: Int = UNKNOWN_BLOCK_ID,
+) {
+    /** Compact diagnostic for the closest outlined cell in ModuleDebug. */
+    fun debugDescription(): String =
+        "${position.x} ${position.y} ${position.z} ${kind.name.lowercase().replace('_', ' ')}: " +
+            "actual=${BaseFinderBlockRegistry.nameOf(observedBlockId)} " +
+            "expected=${BaseFinderBlockRegistry.nameOf(expectedBlockId)}"
+
+    private companion object {
+        const val UNKNOWN_BLOCK_ID = -1
+    }
 }
 
 internal enum class BaseFalsePositive(val penalty: Int) {
@@ -55,6 +100,18 @@ internal enum class ConfidenceTier {
 internal enum class BaseFinderBoxMode(override val tag: String) : Tagged {
     FIXED("Fixed"),
     DYNAMIC("Dynamic box"),
+}
+
+/**
+ * Which vanilla worldgen path SeedMismatch uses to rebuild expected terrain.
+ *
+ * [FEATURES] regenerates noise→carvers→biome decoration from the typed seed via a background MinecraftServer
+ * host (singleplayer and multiplayer). [BASE_COLUMN] uses only the fast noise-column API.
+ * Neither backend falls back to the other on failure.
+ */
+internal enum class BaseFinderWorldBackend(override val tag: String) : Tagged {
+    FEATURES("Features"),
+    BASE_COLUMN("Base column"),
 }
 
 /** Integer world position which cannot retain a scanner-owned mutable [BlockPos]. */
@@ -126,6 +183,13 @@ internal data class BaseFinderBounds(
 
 internal data class ChunkCoordinate(val x: Int, val z: Int) {
     fun chebyshevDistance(other: ChunkCoordinate): Int = max(kotlin.math.abs(x - other.x), kotlin.math.abs(z - other.z))
+
+    fun pack(): Long = ChunkPos.pack(x, z)
+
+    companion object {
+        fun unpack(packed: Long): ChunkCoordinate =
+            ChunkCoordinate(ChunkPos.getX(packed), ChunkPos.getZ(packed))
+    }
 }
 
 internal data class EvidenceAnchor(
@@ -146,6 +210,8 @@ internal data class EvidenceAnchor(
 internal data class StorageSignal(
     val weightedPoints: Int = 0,
     val anchors: List<EvidenceAnchor> = emptyList(),
+    /** Complete raw occurrence counts; unlike [anchors], this map is never truncated for rendering. */
+    val observationsByKey: Map<String, Int> = emptyMap(),
 )
 
 internal data class UtilitiesSignal(
@@ -165,6 +231,8 @@ internal data class EntitiesSignal(
     val densityPoints: Int = 0,
     val hasContainerVehicleOrChestedMount: Boolean = false,
     val anchors: List<EvidenceAnchor> = emptyList(),
+    /** Chest/hopper/furnace minecarts only; boats and chested mounts are deliberately excluded. */
+    val stashMinecartCount: Int = 0,
 )
 
 internal data class StructuralSignal(
@@ -192,6 +260,33 @@ internal data class ChunkTrailsSignal(
     val anchors: List<EvidenceAnchor> = emptyList(),
 )
 
+/**
+ * Seed-backed mismatch evidence for one chunk.
+ *
+ * [seedConfirmedStructures] lists structure-shaped false-positive tags the configured seed actually predicts
+ * at this chunk. Heuristic false positives that are not confirmed are dropped so player builds mimicking
+ * villages/mineshafts keep their score.
+ */
+internal data class SeedMismatchSignal(
+    val unexpectedSolidCount: Int = 0,
+    val missingSolidCount: Int = 0,
+    val utilityMismatchCount: Int = 0,
+    /** Solid-but-different-material cells. Reported for the overlay only; never scored. */
+    val materialSwapCount: Int = 0,
+    val sampledColumns: Int = 0,
+    val mismatchRatio: Double = 0.0,
+    val phase: SeedComparePhase = SeedComparePhase.NONE,
+    val fidelity: ExpectedTerrainFidelity = ExpectedTerrainFidelity.BASE_COLUMN,
+    val seedConfirmedStructures: Set<BaseFalsePositive> = emptySet(),
+    val cells: List<SeedMismatchCell> = emptyList(),
+    val anchors: List<EvidenceAnchor> = emptyList(),
+    /** Strongest chunk-local scoring component; overlay [cells] remain the complete bounded render list. */
+    val clusterProfile: SeedMismatchClusterProfile = SeedMismatchClusterProfile(),
+) {
+    val hasEvidence: Boolean
+        get() = unexpectedSolidCount > 0 || missingSolidCount > 0 || utilityMismatchCount > 0
+}
+
 internal data class ChunkEvidenceSnapshot(
     val chunk: ChunkCoordinate,
     val storage: StorageSignal = StorageSignal(),
@@ -202,6 +297,7 @@ internal data class ChunkEvidenceSnapshot(
     val geometry: GeometrySignal = GeometrySignal(),
     val activity: ActivitySignal = ActivitySignal(),
     val chunkTrails: ChunkTrailsSignal = ChunkTrailsSignal(),
+    val seedMismatch: SeedMismatchSignal = SeedMismatchSignal(),
     val falsePositives: Set<BaseFalsePositive> = emptySet(),
     val dimensionKey: String = "minecraft:overworld",
 )
@@ -209,7 +305,10 @@ internal data class ChunkEvidenceSnapshot(
 internal interface BaseDetectionStrategy {
     val family: BaseSignalFamily
 
-    fun evaluate(snapshot: ChunkEvidenceSnapshot): FamilyEvidence?
+    fun evaluate(
+        snapshot: ChunkEvidenceSnapshot,
+        scoringWeights: BaseFinderScoringWeights = BaseFinderScoringWeights.DEFAULT,
+    ): FamilyEvidence?
 }
 
 internal data class FamilyEvidence(
@@ -217,13 +316,39 @@ internal data class FamilyEvidence(
     val score: Int,
     val anchors: List<EvidenceAnchor>,
     val keys: List<String>,
+    val contributions: List<ScoreContribution> = emptyList(),
 )
 
 internal data class EvidenceSummary(
     val family: BaseSignalFamily,
     val score: Int,
     val keys: List<String>,
+    /** Null means a legacy v1 finding whose detailed score inputs were never stored. */
+    val contributions: List<ScoreContribution>? = null,
 )
+
+/** Reconciled overall score retained with newly observed findings. */
+internal data class BaseScoreBreakdown(
+    val evidenceSubtotal: Int,
+    val diversityBonus: Int,
+    val falsePositivePenalty: Int,
+    val rawScore: Int,
+    val confidenceCap: Int,
+    val finalConfidence: Int,
+) {
+    init {
+        require(evidenceSubtotal >= 0) { "Evidence subtotal must be non-negative" }
+        require(diversityBonus >= 0) { "Diversity bonus must be non-negative" }
+        require(falsePositivePenalty >= 0) { "False-positive penalty must be non-negative" }
+        require(rawScore == evidenceSubtotal + diversityBonus - falsePositivePenalty) {
+            "Raw score must reconcile with evidence and modifiers"
+        }
+        require(confidenceCap in 0..100) { "Confidence cap must be between zero and one hundred" }
+        require(finalConfidence == rawScore.coerceIn(0, confidenceCap)) {
+            "Final confidence must equal the capped raw score"
+        }
+    }
+}
 
 internal data class ScoredBaseCandidate(
     val anchor: BaseCoordinate,
@@ -232,6 +357,7 @@ internal data class ScoredBaseCandidate(
     val evidence: List<EvidenceSummary>,
     val chunks: Set<ChunkCoordinate>,
     val accepted: Boolean,
+    val scoreBreakdown: BaseScoreBreakdown,
     val bounds: BaseFinderBounds? = null,
 )
 
@@ -247,13 +373,23 @@ internal data class BaseFinding(
     val lastSeenAtMillis: Long,
     val timesSeen: Int,
     val bounds: BaseFinderBounds? = null,
+    /** Null for existing v1 rows until the finding is observed and rescored again. */
+    val scoreBreakdown: BaseScoreBreakdown? = null,
 )
 
 /** Localized, render-only representation of one persisted evidence family. */
+internal data class BaseFinderLabelContribution(
+    val label: String,
+    val score: Int,
+    val observationText: String? = null,
+)
+
 internal data class BaseFinderLabelEvidence(
     val family: String,
     val score: Int,
     val detections: List<String>,
+    val contributions: List<BaseFinderLabelContribution> = emptyList(),
+    val showFamilyScore: Boolean = true,
 )
 
 internal data class BaseFinderMarker(

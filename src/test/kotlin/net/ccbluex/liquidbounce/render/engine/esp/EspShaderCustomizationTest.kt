@@ -35,7 +35,7 @@ class EspShaderCustomizationTest {
     }
 
     @Test
-    fun `shared masks resolve player storage and block overlay to the stronger style`() {
+    fun `repeated submissions from one source resolve to the stronger style`() {
         assertEquals(
             EspGlowStyle(radius = 22f, softness = 1.25f, intensity = 1.6f, coreSize = 2f, opacity = 0.9f),
             EspShaderStyleResolver.resolveGlow(

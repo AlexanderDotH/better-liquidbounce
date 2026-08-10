@@ -98,10 +98,20 @@ sealed class ClientShaders(val type: ShaderType) : ShaderSource {
         val EspDownsample = "esp_downsample"("shaders/esp/downsample.frag")
 
         @JvmField
+        val GuiBackdropDownsample = "gui_backdrop_downsample"("shaders/gui/backdrop_downsample.frag")
+
+        @JvmField
+        val GuiBackdropBlurComposite =
+            "gui_backdrop_blur_composite"("shaders/gui/backdrop_blur_composite.frag")
+
+        @JvmField
         val EspGaussianBlur = "esp_gaussian_blur"("shaders/esp/gaussian_blur.frag")
 
         @JvmField
         val EspGlowComposite = "esp_glow_composite"("shaders/esp/glow_composite.frag")
+
+        @JvmField
+        val EspMaskUnion = "esp_mask_union"("shaders/esp/mask_union.frag")
 
         @JvmField
         val EspOutlineComposite = "esp_outline_composite"("shaders/esp/outline_composite.frag")

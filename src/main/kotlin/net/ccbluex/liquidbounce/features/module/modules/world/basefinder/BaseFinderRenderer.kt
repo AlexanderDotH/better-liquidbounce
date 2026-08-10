@@ -19,6 +19,7 @@ import net.ccbluex.liquidbounce.event.events.OverlayRenderEvent
 import net.ccbluex.liquidbounce.event.events.WorldRenderEvent
 import net.ccbluex.liquidbounce.render.drawBox
 import net.ccbluex.liquidbounce.render.engine.esp.EspGlowStyle
+import net.ccbluex.liquidbounce.render.engine.esp.EspGlowSource
 import net.ccbluex.liquidbounce.render.engine.esp.EspShaderRenderer
 import net.ccbluex.liquidbounce.render.engine.type.Color4b
 import net.ccbluex.liquidbounce.render.renderEnvironment
@@ -27,9 +28,7 @@ import net.ccbluex.liquidbounce.utils.client.mc
 import net.ccbluex.liquidbounce.utils.render.WorldToScreen
 import net.minecraft.world.phys.AABB
 import net.minecraft.world.phys.Vec3
-import kotlin.math.PI
 import kotlin.math.roundToInt
-import kotlin.math.sin
 import kotlin.math.sqrt
 
 /** Identifies the world whose immutable findings are allowed to reach the renderer. */
@@ -38,6 +37,22 @@ internal data class BaseFinderRenderScope(
     val dimensionKey: String,
     val worldEpoch: Long,
     val revision: Long = 0L,
+)
+
+/** Localized render-only detail for one scored contribution. */
+internal data class BaseFinderRenderContribution(
+    val label: String,
+    val score: Int,
+    val observationText: String? = null,
+)
+
+/** Localized render-only detail for one evidence-family subtotal. */
+internal data class BaseFinderRenderEvidence(
+    val family: String,
+    val score: Int,
+    val detections: List<String> = emptyList(),
+    val contributions: List<BaseFinderRenderContribution> = emptyList(),
+    val showFamilyScore: Boolean = true,
 )
 
 /** Render-only projection of a persisted or newly accepted base finding. */
@@ -50,7 +65,7 @@ internal data class BaseFinderRenderMarker(
     val confidence: Int,
     val topEvidenceKeys: List<String>,
     val updatedAtMillis: Long,
-    val evidenceDetails: List<BaseFinderLabelEvidence> = emptyList(),
+    val evidenceDetails: List<BaseFinderRenderEvidence> = emptyList(),
     val bounds: BaseFinderBounds? = null,
     val revision: Long = 0L,
 )
@@ -66,9 +81,6 @@ internal data class BaseFinderRenderSettings(
     val highConfidenceColor: Color4b,
     val showLabels: Boolean,
     val maxLabels: Int,
-    val pulse: Boolean,
-    val pulseSpeedHz: Double,
-    val pulseAmount: Double,
     val baseLabel: String = "Base",
     val unknownEvidenceLabel: String = "Unknown",
     val distanceSuffix: String = "m",
@@ -114,7 +126,7 @@ internal data class BaseFinderRenderRequest(
                     confidence = marker.confidence,
                     topEvidenceKeys = java.util.List.copyOf(marker.topEvidenceKeys),
                     updatedAtMillis = marker.updatedAtMillis,
-                    evidenceDetails = marker.evidenceDetails.immutableCopy(),
+                    evidenceDetails = marker.evidenceDetails.toRenderEvidence(),
                     bounds = marker.bounds,
                     revision = snapshot.revision,
                 )
@@ -137,16 +149,15 @@ internal data class BaseFinderRenderEntry(
     val cameraRelativeBox: AABB,
     val labelPosition: Vec3,
     val color: Color4b,
-    val pulseMultiplier: Double,
 ) {
     val faceColor: Color4b
-        get() = color.with(a = (FACE_ALPHA * pulseMultiplier).roundToInt().coerceIn(0, 255))
+        get() = color.with(a = FACE_ALPHA)
 
     val outlineColor: Color4b
-        get() = color.with(a = (OUTLINE_ALPHA * pulseMultiplier).roundToInt().coerceIn(0, 255))
+        get() = color.with(a = OUTLINE_ALPHA)
 
     val glowMaskColor: Color4b
-        get() = color.with(a = (FULL_ALPHA * pulseMultiplier).roundToInt().coerceIn(0, 255))
+        get() = color.with(a = FULL_ALPHA)
 
     companion object {
         private const val FACE_ALPHA = 24
@@ -209,16 +220,6 @@ internal object BaseFinderRenderPlanner {
         return BaseFinderRenderBatch(java.util.List.copyOf(entries), java.util.List.copyOf(labels))
     }
 
-    internal fun pulseMultiplier(id: String, nowMillis: Long, speedHz: Double, amount: Double): Double {
-        val boundedAmount = amount.coerceIn(0.0, 1.0)
-        if (boundedAmount == 0.0) return 1.0
-
-        val cycle = nowMillis / 1_000.0 * speedHz.coerceAtLeast(0.0) * TWO_PI
-        val phase = (id.hashCode().toLong() and UNSIGNED_INT_MASK) / UNSIGNED_INT_MAX * TWO_PI
-        val wave = 0.5 + 0.5 * sin(cycle + phase)
-        return 1.0 - boundedAmount * wave
-    }
-
     private fun BaseFinderRenderMarker.belongsTo(scope: BaseFinderRenderScope): Boolean {
         return serverKey == scope.serverKey &&
             dimensionKey == scope.dimensionKey &&
@@ -233,11 +234,6 @@ internal object BaseFinderRenderPlanner {
     ): BaseFinderRenderEntry {
         val settings = request.settings
         val worldBox = createWorldBox(marker, settings)
-        val pulseMultiplier = if (settings.pulse) {
-            pulseMultiplier(marker.id, request.nowMillis, settings.pulseSpeedHz, settings.pulseAmount)
-        } else {
-            1.0
-        }
         return BaseFinderRenderEntry(
             marker = marker.copy(
                 topEvidenceKeys = java.util.List.copyOf(marker.topEvidenceKeys),
@@ -252,7 +248,6 @@ internal object BaseFinderRenderPlanner {
                 (worldBox.minZ + worldBox.maxZ) * 0.5,
             ),
             color = confidenceColor(marker.confidence, settings),
-            pulseMultiplier = pulseMultiplier,
         )
     }
 
@@ -309,9 +304,7 @@ internal object BaseFinderRenderPlanner {
         val details = "${marker.anchor.x.toInt()} ${marker.anchor.y.toInt()} " +
             "${marker.anchor.z.toInt()} • $evidence"
         val evidenceLines = if (settings.showEvidenceDetails) {
-            marker.evidenceDetails
-                .take(settings.maxEvidenceDetails.coerceAtLeast(0))
-                .map(::formatEvidenceLine)
+            BaseFinderLabelFormatter.format(marker.evidenceDetails, settings.maxEvidenceDetails)
         } else {
             emptyList()
         }
@@ -325,27 +318,159 @@ internal object BaseFinderRenderPlanner {
         )
     }
 
-    private fun formatEvidenceLine(evidence: BaseFinderLabelEvidence): String {
-        val detections = evidence.detections.joinToString(" + ")
-        return if (detections.isEmpty()) {
-            "${evidence.family} ${evidence.score}"
-        } else {
-            "${evidence.family} ${evidence.score}: $detections"
-        }
-    }
-
-    private const val TWO_PI = PI * 2.0
-    private const val UNSIGNED_INT_MASK = 0xffffffffL
-    private const val UNSIGNED_INT_MAX = 0xffffffffL.toDouble()
     private const val MINIMUM_LABEL_SCALE = 0.5f
     private const val MAXIMUM_LABEL_SCALE = 2.5f
     private const val LABEL_VERTICAL_OFFSET = 0.25
 }
 
+/** Formats already-localized evidence without coupling the pure planner to scoring or translations. */
+private object BaseFinderLabelFormatter {
+
+    fun format(evidence: List<BaseFinderRenderEvidence>, maximumLines: Int): List<String> = evidence
+        .asSequence()
+        .flatMap(::formatEvidenceLines)
+        .take(maximumLines.coerceAtLeast(0))
+        .toList()
+
+    private fun formatEvidenceLines(evidence: BaseFinderRenderEvidence): Sequence<String> {
+        if (evidence.contributions.isNotEmpty()) {
+            return sequenceOf(formatFamilySubtotal(evidence)) +
+                evidence.contributions.asSequence().map(::formatContribution)
+        }
+
+        val detections = evidence.detections.joinToString(" + ")
+        val familySubtotal = formatFamilySubtotal(evidence)
+        return sequenceOf(if (detections.isEmpty()) {
+            familySubtotal
+        } else {
+            "$familySubtotal: $detections"
+        })
+    }
+
+    private fun formatFamilySubtotal(evidence: BaseFinderRenderEvidence): String =
+        if (evidence.showFamilyScore) {
+            "${evidence.family} ${formatScore(evidence.score)}"
+        } else {
+            evidence.family
+        }
+
+    private fun formatContribution(contribution: BaseFinderRenderContribution): String {
+        val observations = contribution.observationText
+            ?.takeIf(String::isNotBlank)
+            ?.let { " · $it" }
+            .orEmpty()
+        return "${contribution.label} ${formatScore(contribution.score)}$observations"
+    }
+
+    private fun formatScore(score: Int): String = if (score > 0) "+$score" else score.toString()
+}
+
+/** Settings for the live seed-mismatch block overlay. */
+internal data class SeedMismatchRenderSettings(
+    val maximumDistance: Double,
+    val renderLimit: Int,
+    val missingSolidColor: Color4b,
+    val unexpectedSolidColor: Color4b,
+    val utilityMismatchColor: Color4b,
+    val materialSwapColor: Color4b,
+)
+
+internal data class SeedMismatchRenderEntry(
+    val cell: SeedMismatchCell,
+    val distance: Double,
+    val worldBox: AABB,
+    val cameraRelativeBox: AABB,
+    val color: Color4b,
+) {
+    val faceColor: Color4b
+        get() = color.with(a = MISMATCH_FACE_ALPHA)
+
+    val outlineColor: Color4b
+        get() = color.with(a = MISSING_OUTLINE_ALPHA)
+
+    val glowMaskColor: Color4b
+        get() = color.with(a = 255)
+
+    companion object {
+        private const val MISMATCH_FACE_ALPHA = 32
+        private const val MISSING_OUTLINE_ALPHA = 180
+    }
+}
+
+internal data class SeedMismatchRenderBatch(
+    val entries: List<SeedMismatchRenderEntry>,
+) {
+    companion object {
+        val EMPTY = SeedMismatchRenderBatch(emptyList())
+    }
+}
+
+/** Pure planner for seed-mismatch cell outlines. */
+internal object BaseFinderSeedMismatchRenderPlanner {
+
+    fun plan(
+        cells: Collection<SeedMismatchCell>,
+        cameraPosition: Vec3,
+        settings: SeedMismatchRenderSettings,
+    ): SeedMismatchRenderBatch {
+        if (cells.isEmpty() || settings.renderLimit <= 0 || settings.maximumDistance < 0.0) {
+            return SeedMismatchRenderBatch.EMPTY
+        }
+        val maximumDistanceSq = settings.maximumDistance * settings.maximumDistance
+        val entries = cells.asSequence()
+            .map { cell ->
+                val center = Vec3(
+                    cell.position.x + 0.5,
+                    cell.position.y + 0.5,
+                    cell.position.z + 0.5,
+                )
+                cell to center.distanceToSqr(cameraPosition)
+            }
+            .filter { (_, distanceSq) -> distanceSq <= maximumDistanceSq }
+            .sortedWith(
+                compareBy<Pair<SeedMismatchCell, Double>> { it.second }
+                    .thenBy { it.first.position.y }
+                    .thenBy { it.first.position.x }
+                    .thenBy { it.first.position.z },
+            )
+            .take(settings.renderLimit)
+            .map { (cell, distanceSq) ->
+                val worldBox = AABB(
+                    cell.position.x.toDouble(),
+                    cell.position.y.toDouble(),
+                    cell.position.z.toDouble(),
+                    cell.position.x + 1.0,
+                    cell.position.y + 1.0,
+                    cell.position.z + 1.0,
+                )
+                SeedMismatchRenderEntry(
+                    cell = cell,
+                    distance = sqrt(distanceSq),
+                    worldBox = worldBox,
+                    cameraRelativeBox = worldBox.move(cameraPosition.reverse()),
+                    color = colorFor(cell.kind, settings),
+                )
+            }
+            .toList()
+        return if (entries.isEmpty()) {
+            SeedMismatchRenderBatch.EMPTY
+        } else {
+            SeedMismatchRenderBatch(java.util.List.copyOf(entries))
+        }
+    }
+
+    private fun colorFor(kind: SeedMismatchKind, settings: SeedMismatchRenderSettings): Color4b = when (kind) {
+        SeedMismatchKind.MISSING_SOLID -> settings.missingSolidColor
+        SeedMismatchKind.UNEXPECTED_SOLID -> settings.unexpectedSolidColor
+        SeedMismatchKind.UTILITY -> settings.utilityMismatchColor
+        SeedMismatchKind.MATERIAL_SWAP -> settings.materialSwapColor
+    }
+}
+
 /** Thin adapter that submits one immutable batch to direct, glow, and overlay render APIs. */
 internal object BaseFinderRenderer {
 
-    fun renderWorld(event: WorldRenderEvent, batch: BaseFinderRenderBatch, glowStyle: EspGlowStyle) {
+    fun renderWorld(event: WorldRenderEvent, batch: BaseFinderRenderBatch, glowStyle: EspGlowStyle?) {
         if (batch.entries.isEmpty()) return
 
         event.renderEnvironment {
@@ -353,11 +478,23 @@ internal object BaseFinderRenderer {
                 drawBox(entry.cameraRelativeBox, entry.faceColor, entry.outlineColor)
             }
         }
+        if (glowStyle == null) return
         batch.contributeGlowIfPresent {
-            EspShaderRenderer.contributeGlow(event, glowStyle) {
+            EspShaderRenderer.contributeGlow(event, EspGlowSource.BASE_FINDER, glowStyle) {
                 for (entry in it.entries) {
                     drawBox(entry.cameraRelativeBox, entry.glowMaskColor, null)
                 }
+            }
+        }
+    }
+
+    /** Outline-only mismatch overlay (no ESP glow) to keep the render path cheap. */
+    fun renderMismatchWorld(event: WorldRenderEvent, batch: SeedMismatchRenderBatch) {
+        if (batch.entries.isEmpty()) return
+
+        event.renderEnvironment {
+            for (entry in batch.entries) {
+                drawBox(entry.cameraRelativeBox, entry.faceColor, entry.outlineColor)
             }
         }
     }
@@ -393,6 +530,29 @@ internal object BaseFinderRenderer {
     }
 }
 
-private fun List<BaseFinderLabelEvidence>.immutableCopy(): List<BaseFinderLabelEvidence> = java.util.List.copyOf(
-    map { evidence -> evidence.copy(detections = java.util.List.copyOf(evidence.detections)) },
+private fun List<BaseFinderLabelEvidence>.toRenderEvidence(): List<BaseFinderRenderEvidence> = java.util.List.copyOf(
+    map { evidence ->
+        BaseFinderRenderEvidence(
+            family = evidence.family,
+            score = evidence.score,
+            detections = java.util.List.copyOf(evidence.detections),
+            contributions = java.util.List.copyOf(evidence.contributions.map { contribution ->
+                BaseFinderRenderContribution(
+                    label = contribution.label,
+                    score = contribution.score,
+                    observationText = contribution.observationText,
+                )
+            }),
+            showFamilyScore = evidence.showFamilyScore,
+        )
+    },
+)
+
+private fun List<BaseFinderRenderEvidence>.immutableCopy(): List<BaseFinderRenderEvidence> = java.util.List.copyOf(
+    map { evidence ->
+        evidence.copy(
+            detections = java.util.List.copyOf(evidence.detections),
+            contributions = java.util.List.copyOf(evidence.contributions),
+        )
+    },
 )

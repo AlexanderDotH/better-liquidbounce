@@ -20,6 +20,7 @@
     import type {ThemeColorChangeEvent} from "./integration/events";
     import Menu from "./routes/menu/common/Menu.svelte";
     import MenuContent from "./routes/menu/common/MenuContent.svelte";
+    import {releaseDocumentFocus} from "./util/documentFocus";
 
     const menuRoutes = {
         "/title": Title,
@@ -115,6 +116,7 @@
 
             switch (action) {
                 case "close":
+                    releaseDocumentFocus();
                     await changeRoute("none");
                     break;
                 case "open":

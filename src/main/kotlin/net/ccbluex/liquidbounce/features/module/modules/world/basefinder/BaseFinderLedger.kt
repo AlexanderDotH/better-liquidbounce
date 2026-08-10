@@ -310,9 +310,37 @@ internal class BaseFinderLedger(
         finding.evidence.forEach { evidence ->
             require(evidence.score >= 0)
             require(evidence.keys.none(String::isBlank))
+            evidence.contributions?.let { contributions ->
+                require(contributions.sumOf { it.score.toLong() } == evidence.score.toLong())
+                contributions.forEach(::requireValidContribution)
+            }
         }
+        finding.scoreBreakdown?.let { breakdown -> requireValidBreakdown(finding, breakdown) }
         finding.copy(serverKeyHash = serverKeyHash, dimensionKey = dimensionKey)
     }.getOrNull()
+
+    private fun requireValidContribution(contribution: ScoreContribution) {
+        require(contribution.key.isNotBlank())
+        require(contribution.observations == null || contribution.observations >= 0)
+    }
+
+    private fun requireValidBreakdown(finding: BaseFinding, breakdown: BaseScoreBreakdown) {
+        require(finding.evidence.all { it.contributions != null })
+        require(breakdown.evidenceSubtotal >= 0)
+        require(breakdown.diversityBonus >= 0)
+        require(breakdown.falsePositivePenalty >= 0)
+        require(breakdown.confidenceCap in 0..100)
+        require(breakdown.finalConfidence in 0..100)
+        require(finding.evidence.sumOf { it.score.toLong() } == breakdown.evidenceSubtotal.toLong())
+
+        val calculatedRawScore = breakdown.evidenceSubtotal.toLong() +
+            breakdown.diversityBonus - breakdown.falsePositivePenalty
+        require(calculatedRawScore == breakdown.rawScore.toLong())
+        val cappedConfidence = breakdown.rawScore.coerceIn(0, 100)
+            .coerceAtMost(breakdown.confidenceCap)
+        require(cappedConfidence == breakdown.finalConfidence)
+        require(breakdown.finalConfidence == finding.confidence)
+    }
 
     private fun fileLock(scope: LedgerScope): Any = synchronized(stateLock) {
         fileLocks.getOrPut(scope) { Any() }
@@ -341,7 +369,8 @@ internal class BaseFinderLedger(
     private fun encodeCsv(findings: List<BaseFinding>): String = buildString {
         appendLine(
             "id,serverKeyHash,dimensionKey,x,y,z,confidence,tier,evidence," +
-                "firstSeenAtMillis,lastSeenAtMillis,timesSeen"
+                "firstSeenAtMillis,lastSeenAtMillis,timesSeen," +
+                "detailedEvidence,rawScore,modifiers,confidenceCap"
         )
         findings.forEach { finding ->
             val evidence = finding.evidence.joinToString("|") { summary ->
@@ -355,6 +384,7 @@ internal class BaseFinderLedger(
                     }
                 }
             }
+            val breakdown = finding.scoreBreakdown
             val values = listOf(
                 finding.id,
                 finding.serverKeyHash,
@@ -368,10 +398,40 @@ internal class BaseFinderLedger(
                 finding.firstSeenAtMillis,
                 finding.lastSeenAtMillis,
                 finding.timesSeen,
+                detailedEvidence(finding.evidence),
+                breakdown?.rawScore ?: "",
+                scoreModifiers(breakdown),
+                breakdown?.confidenceCap ?: "",
             )
             appendLine(values.joinToString(",") { value -> csvField(value.toString()) })
         }
     }
+
+    private fun detailedEvidence(evidence: List<EvidenceSummary>): String = evidence.asSequence()
+        .mapNotNull { summary ->
+            val contributions = summary.contributions ?: return@mapNotNull null
+            val details = contributions.joinToString("+") { contribution ->
+                buildString {
+                    append(contribution.key)
+                    append('=')
+                    append(signed(contribution.score))
+                    contribution.observations?.let {
+                        append('@')
+                        append(it)
+                    }
+                }
+            }
+            "${summary.family.name}:${summary.score}[$details]"
+        }
+        .joinToString("|")
+
+    private fun scoreModifiers(breakdown: BaseScoreBreakdown?): String {
+        if (breakdown == null) return ""
+        return "diversityBonus=${signed(breakdown.diversityBonus)}|" +
+            "falsePositivePenalty=-${breakdown.falsePositivePenalty}"
+    }
+
+    private fun signed(score: Int): String = if (score >= 0) "+$score" else score.toString()
 
     private fun csvField(value: String): String = "\"${value.replace("\"", "\"\"")}\""
 

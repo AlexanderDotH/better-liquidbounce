@@ -9,12 +9,19 @@
 
     export let setting: ModuleSetting;
 
-    const cSetting = setting as IntSetting;
+    let cSetting: IntSetting;
+    $: cSetting = setting as IntSetting;
 
     const dispatch = createEventDispatcher();
 
     let slider: HTMLElement;
     let apiSlider: API;
+
+    // A server-confirmed action such as BaseFinder's scoring reset replaces the setting object.
+    // Keep the imperative noUiSlider handle synchronized without emitting another save event.
+    $: if (apiSlider && parseInt(apiSlider.get().toString()) !== cSetting.value) {
+        apiSlider.set(cSetting.value, false);
+    }
 
     onMount(() => {
         apiSlider = noUiSlider.create(slider, {

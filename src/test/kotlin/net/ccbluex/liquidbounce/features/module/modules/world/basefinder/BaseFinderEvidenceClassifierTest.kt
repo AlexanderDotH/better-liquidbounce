@@ -11,6 +11,7 @@
 package net.ccbluex.liquidbounce.features.module.modules.world.basefinder
 
 import net.ccbluex.liquidbounce.test.MinecraftBootstrap
+import net.minecraft.world.entity.EntityTypes
 import net.minecraft.world.level.block.Blocks
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
@@ -76,7 +77,15 @@ class BaseFinderEvidenceClassifierTest {
         assertEquals("piston", BaseFinderEvidenceClassifier.automationCategory(Blocks.PISTON.defaultBlockState()))
         assertEquals("observer", BaseFinderEvidenceClassifier.automationCategory(Blocks.OBSERVER.defaultBlockState()))
         assertEquals("rail", BaseFinderEvidenceClassifier.automationCategory(Blocks.RAIL.defaultBlockState()))
-        assertEquals("crop", BaseFinderEvidenceClassifier.automationCategory(Blocks.WHEAT.defaultBlockState()))
+        assertEquals("crop", BaseFinderEvidenceClassifier.automationCategory(Blocks.FARMLAND.defaultBlockState()))
+        listOf(
+            Blocks.WHEAT,
+            Blocks.KELP,
+            Blocks.NETHER_WART,
+            Blocks.CHORUS_PLANT,
+        ).forEach { block ->
+            assertNull(BaseFinderEvidenceClassifier.automationCategory(block.defaultBlockState()))
+        }
         assertNull(BaseFinderEvidenceClassifier.automationCategory(Blocks.STONE.defaultBlockState()))
     }
 
@@ -104,6 +113,24 @@ class BaseFinderEvidenceClassifierTest {
         assertEquals("anvil", BaseFinderEvidenceClassifier.activityCategory("block.anvil.use"))
         assertEquals("portal", BaseFinderEvidenceClassifier.activityCategory("block.portal.ambient"))
         assertNull(BaseFinderEvidenceClassifier.activityCategory("ambient.cave"))
+    }
+
+    @Test
+    fun `chest hopper and furnace minecarts are classified as stash evidence`() {
+        assertEquals(
+            BaseFinderEntityCategory.CONTAINER_MINECART,
+            BaseFinderEvidenceClassifier.minecartCategory(EntityTypes.CHEST_MINECART),
+        )
+        assertEquals(
+            BaseFinderEntityCategory.CONTAINER_MINECART,
+            BaseFinderEvidenceClassifier.minecartCategory(EntityTypes.HOPPER_MINECART),
+        )
+        assertEquals(
+            BaseFinderEntityCategory.FURNACE_MINECART,
+            BaseFinderEvidenceClassifier.minecartCategory(EntityTypes.FURNACE_MINECART),
+        )
+        assertNull(BaseFinderEvidenceClassifier.minecartCategory(EntityTypes.MINECART))
+        assertNull(BaseFinderEvidenceClassifier.minecartCategory(EntityTypes.TNT_MINECART))
     }
 
     private fun storageAnchor(path: String) =

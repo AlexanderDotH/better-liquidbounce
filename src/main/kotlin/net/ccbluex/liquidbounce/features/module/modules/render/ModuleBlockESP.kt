@@ -23,7 +23,6 @@ import com.mojang.blaze3d.pipeline.RenderTarget
 import kotlinx.atomicfu.atomic
 import net.ccbluex.liquidbounce.config.types.group.ToggleableValueGroup
 import net.ccbluex.liquidbounce.event.EventListener
-import net.ccbluex.liquidbounce.event.events.DrawOutlinesEvent
 import net.ccbluex.liquidbounce.event.events.GameTickEvent
 import net.ccbluex.liquidbounce.event.events.WorldRenderEvent
 import net.ccbluex.liquidbounce.event.handler
@@ -38,7 +37,7 @@ import net.ccbluex.liquidbounce.render.addShapeFaces
 import net.ccbluex.liquidbounce.render.addShapeOutlines
 import net.ccbluex.liquidbounce.render.buildMesh
 import net.ccbluex.liquidbounce.render.drawGenericBlockESP
-import net.ccbluex.liquidbounce.render.engine.esp.EspGlowContributionRole
+import net.ccbluex.liquidbounce.render.engine.esp.EspGlowSource
 import net.ccbluex.liquidbounce.render.engine.esp.EspGlowStyle
 import net.ccbluex.liquidbounce.render.engine.esp.EspGlowStyleConfig
 import net.ccbluex.liquidbounce.render.engine.esp.EspHaloStyleConfig
@@ -166,7 +165,7 @@ object ModuleBlockESP : ClientModule("BlockESP", ModuleCategories.RENDER) {
                     distanceFade,
                 ) {
                     getDynamicTransformsUniform(
-                        modelView = event.poseStack.last().pose(),
+                        modelView = Matrix4f(event.modelViewMatrix),
                         colorModulatorAlpha = 150,
                     )
                 }
@@ -178,7 +177,7 @@ object ModuleBlockESP : ClientModule("BlockESP", ModuleCategories.RENDER) {
                 distanceFade,
             ) {
                 getDynamicTransformsUniform(
-                    modelView = event.poseStack.last().pose(),
+                    modelView = Matrix4f(event.modelViewMatrix),
                 )
             }
         }
@@ -231,6 +230,8 @@ object ModuleBlockESP : ClientModule("BlockESP", ModuleCategories.RENDER) {
     sealed class CachedMaskMode(name: String) : Mode(name) {
         private val renderState by lazy { CachedMeshStorage("${ModuleBlockESP.name} $name") }
 
+        abstract val style: EspGlowStyle
+
         override fun disable() {
             renderState.clearStates()
             renderState.clearBuffers()
@@ -278,20 +279,24 @@ object ModuleBlockESP : ClientModule("BlockESP", ModuleCategories.RENDER) {
     }
 
     object GlowMode : CachedMaskMode("Glow") {
-        @Suppress("unused")
-        private val renderHandler = handler<DrawOutlinesEvent> { event ->
-            if (drawMask(event.renderTarget)) {
-                event.markDirty()
-            }
-        }
+        override val style = EspGlowStyle(
+            radius = 4f,
+            softness = 0.5f,
+            intensity = 0f,
+            coreSize = 2f,
+            opacity = 1f,
+        )
     }
 
     object ShaderEspMode : CachedMaskMode("ShaderESP") {
         private val styleConfig = EspGlowStyleConfig(this)
 
-        internal val style: EspGlowStyle
+        override val style: EspGlowStyle
             get() = styleConfig.style
     }
+
+    internal val activeShaderMode: CachedMaskMode?
+        get() = (modes.activeMode as? CachedMaskMode)?.takeIf { it.running }
 
     override fun prepareDeserialize(jsonObject: JsonObject) {
         super.prepareDeserialize(jsonObject)
@@ -344,7 +349,7 @@ object ModuleBlockESP : ClientModule("BlockESP", ModuleCategories.RENDER) {
             drawTracerBatch(batch, glowMask = false)
         }
         batch.contributeGlowIfPresent {
-            EspShaderRenderer.contributeGlow(event, tracers.style, EspGlowContributionRole.HALO_ONLY) {
+            EspShaderRenderer.contributeGlow(event, EspGlowSource.BLOCK_ESP_TRACERS, tracers.style) {
                 drawTracerBatch(it, glowMask = true)
             }
         }

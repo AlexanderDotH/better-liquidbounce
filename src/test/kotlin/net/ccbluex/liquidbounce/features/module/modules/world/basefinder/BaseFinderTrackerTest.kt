@@ -49,6 +49,38 @@ class BaseFinderTrackerTest {
             (-1..1).flatMap { dx -> (-1..1).map { dz -> ChunkCoordinate(1 + dx, 2 + dz) } }.toSet(),
             BaseFinderTracker.dirtyChunksForTest().toSet(),
         )
+        assertEquals(
+            setOf(BlockPos.asLong(17, 64, 33)),
+            BaseFinderTracker.seedMismatchUpdatePositionsFor(ChunkCoordinate(1, 2)),
+        )
+    }
+
+    @Test
+    fun `block updates invalidate an active seed comparison ticket`() {
+        val chunk = ChunkCoordinate(1, 2)
+        val ticket = BaseFinderTracker.ticketFor(chunk)
+
+        BaseFinderTracker.recordBlock(BlockPos(17, 64, 33), Blocks.CHEST.defaultBlockState(), cleared = false)
+
+        assertFalse(BaseFinderTracker.isTicketCurrent(ticket))
+    }
+
+    @Test
+    fun `ignored natural updates do not invalidate seed comparisons or enqueue rescans`() {
+        val chunk = ChunkCoordinate(1, 2)
+        val ticket = BaseFinderTracker.ticketFor(chunk)
+
+        listOf(Blocks.KELP, Blocks.CRIMSON_STEM, Blocks.CHORUS_PLANT).forEachIndexed { index, block ->
+            BaseFinderTracker.recordBlock(
+                BlockPos(17 + index, 64, 33),
+                block.defaultBlockState(),
+                cleared = false,
+            )
+        }
+
+        assertTrue(BaseFinderTracker.isTicketCurrent(ticket))
+        assertTrue(BaseFinderTracker.dirtyChunksForTest().isEmpty())
+        assertTrue(BaseFinderTracker.seedMismatchUpdatePositionsFor(chunk).isEmpty())
     }
 
     @Test
@@ -132,6 +164,40 @@ class BaseFinderTrackerTest {
     }
 
     @Test
+    fun `generated mineshaft context removes rail automation and geometry`() {
+        val snapshot = BaseFinderTracker.scanBlocksForTest(
+            buildList {
+                repeat(8) { x -> add(BlockPos(x, 12, 0) to Blocks.RAIL.defaultBlockState()) }
+                repeat(3) { x -> add(BlockPos(x, 13, 1) to Blocks.COBWEB.defaultBlockState()) }
+                repeat(30) { index ->
+                    add(BlockPos(index % 10, 10 + index / 10, 2) to Blocks.CAVE_AIR.defaultBlockState())
+                }
+            },
+        )
+
+        assertTrue(BaseFalsePositive.MINESHAFT_OR_DUNGEON in snapshot.falsePositives)
+        assertEquals(0, snapshot.automation.diversityPoints)
+        assertEquals(0, snapshot.automation.densityPoints)
+        assertFalse(snapshot.automation.organizedPattern)
+        assertTrue(snapshot.automation.anchors.isEmpty())
+        assertFalse(snapshot.geometry.artificialPattern)
+        assertFalse(snapshot.geometry.caveDisturbance)
+    }
+
+    @Test
+    fun `player rail without generated mineshaft context remains evidence`() {
+        val snapshot = BaseFinderTracker.scanBlocksForTest(
+            List(8) { x -> BlockPos(x, 64, 0) to Blocks.POWERED_RAIL.defaultBlockState() },
+        )
+
+        assertFalse(BaseFalsePositive.MINESHAFT_OR_DUNGEON in snapshot.falsePositives)
+        assertTrue(snapshot.automation.diversityPoints > 0)
+        assertTrue(snapshot.automation.densityPoints > 0)
+        assertTrue(snapshot.automation.organizedPattern)
+        assertTrue(snapshot.geometry.artificialPattern)
+    }
+
+    @Test
     fun `container entities add storage evidence at weight three`() {
         val evidence = BaseFinderTracker.entityEvidenceForTest(
             listOf(
@@ -144,6 +210,44 @@ class BaseFinderTrackerTest {
         assertEquals(6, evidence.storage.weightedPoints)
         assertEquals(2, evidence.storage.anchors.size)
         assertTrue(evidence.entities.hasContainerVehicleOrChestedMount)
+    }
+
+    @Test
+    fun `container and furnace minecarts form weighted stash evidence`() {
+        val evidence = BaseFinderTracker.entityEvidenceForTest(
+            listOf(
+                BaseFinderEntityCategory.CONTAINER_MINECART to BaseCoordinate(2, 32, 3),
+                BaseFinderEntityCategory.FURNACE_MINECART to BaseCoordinate(5, 32, 3),
+            ),
+        )
+
+        assertEquals(4, evidence.storage.weightedPoints)
+        assertEquals(
+            setOf("storage.minecart_container", "storage.minecart_furnace"),
+            evidence.storage.anchors.mapTo(linkedSetOf(), EvidenceAnchor::key),
+        )
+        assertEquals(2, evidence.entities.stashMinecartCount)
+        assertTrue(evidence.entities.hasContainerVehicleOrChestedMount)
+        assertEquals(
+            mapOf("storage.minecart_container" to 1, "storage.minecart_furnace" to 1),
+            evidence.storage.observationsByKey,
+        )
+    }
+
+    @Test
+    fun `storage retains raw grouped observations independently of bounded anchors`() {
+        val snapshot = BaseFinderTracker.scanBlocksForTest(
+            buildList {
+                repeat(40) { x -> add(BlockPos(x, 64, 0) to Blocks.CHEST.defaultBlockState()) }
+                repeat(3) { x -> add(BlockPos(x, 65, 0) to Blocks.FURNACE.defaultBlockState()) }
+            },
+        )
+
+        assertEquals(32, snapshot.storage.anchors.size)
+        assertEquals(
+            mapOf("storage.chest" to 40, "storage.furnace" to 3),
+            snapshot.storage.observationsByKey,
+        )
     }
 
     @Test

@@ -19,6 +19,7 @@
 package net.ccbluex.liquidbounce.render.engine.esp
 
 import net.ccbluex.liquidbounce.config.types.group.ValueGroup
+import java.util.EnumMap
 
 data class EspGlowStyle(
     val radius: Float,
@@ -78,9 +79,8 @@ class EspOutlineStyleConfig(owner: ValueGroup) {
 }
 
 /**
- * Full world Glow and Outline sources share one mask per effect. Combining the strongest active values
- * keeps those shared sources visible and makes the result independent of module evaluation order.
- * Halo-only effects use a separate frame lane so their module-local controls remain authoritative.
+ * Resolves repeated submissions from one logical source. Different module sources own different masks
+ * and are never passed through this resolver together.
  */
 object EspShaderStyleResolver {
 
@@ -138,6 +138,9 @@ internal class EspGlowFrameState {
     var style = EspGlowStyle.DEFAULT
         private set
 
+    val hasMask: Boolean
+        get() = maskPrepared
+
     fun prepareMask(): Boolean {
         val shouldClear = !maskPrepared
         maskPrepared = true
@@ -160,26 +163,27 @@ internal class EspGlowFrameState {
     }
 }
 
-/** Keeps full world glows and halo-only effects independently configurable. */
-internal class EspGlowFrameLanes {
+/** Keeps every module source's mask lifecycle and style independently configurable. */
+internal class EspGlowFrameSources {
 
-    val full = EspGlowFrameState()
-    val haloOnly = EspGlowFrameState()
+    private val states = EnumMap<EspGlowSource, EspGlowFrameState>(EspGlowSource::class.java)
 
     val hasAnyContribution: Boolean
-        get() = full.hasContribution || haloOnly.hasContribution
+        get() = states.values.any(EspGlowFrameState::hasContribution)
 
-    fun lane(role: EspGlowContributionRole): EspGlowFrameState = when (role) {
-        EspGlowContributionRole.FULL -> full
-        EspGlowContributionRole.HALO_ONLY -> haloOnly
-    }
+    val activeSources: List<EspGlowSource>
+        get() = EspGlowSource.entries.filter { state(it).hasContribution }
 
-    fun contribute(role: EspGlowContributionRole, style: EspGlowStyle) {
-        lane(role).contribute(style)
-    }
+    val maskSources: List<EspGlowSource>
+        get() = EspGlowSource.entries.filter { state(it).hasMask }
+
+    fun state(source: EspGlowSource): EspGlowFrameState = states.getOrPut(source, ::EspGlowFrameState)
+
+    fun prepareMask(source: EspGlowSource): Boolean = state(source).prepareMask()
+
+    fun contribute(source: EspGlowSource, style: EspGlowStyle) = state(source).contribute(style)
 
     fun reset() {
-        full.reset()
-        haloOnly.reset()
+        states.values.forEach(EspGlowFrameState::reset)
     }
 }

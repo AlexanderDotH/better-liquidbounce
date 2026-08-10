@@ -12,6 +12,7 @@ package net.ccbluex.liquidbounce.features.module.modules.render.nametags
 
 import com.google.gson.JsonArray
 import com.google.gson.JsonObject
+import net.ccbluex.liquidbounce.config.types.RangedValue
 import net.ccbluex.liquidbounce.render.engine.esp.EspGlowStyle
 import net.ccbluex.liquidbounce.render.engine.type.Color4b
 import net.ccbluex.liquidbounce.test.MinecraftBootstrap
@@ -33,10 +34,26 @@ class ModuleNametagsFrameTest {
         assertEquals(listOf("BorderWidth", "BackgroundRadius"), ModuleNametags.ClassicFrame.inner.map { it.name })
         assertTrue(ModuleNametags.ModernFrame.inner.isEmpty())
         assertEquals(
-            listOf("Color", "Radius", "Softness", "Intensity", "CoreSize", "Opacity"),
+            listOf(
+                "Color",
+                "BackgroundOpacity",
+                "BackgroundBlur",
+                "FrameRadius",
+                "Radius",
+                "Softness",
+                "Intensity",
+                "CoreSize",
+                "Opacity",
+            ),
             ModuleNametags.GlowFrame.inner.map { it.name },
         )
         assertEquals(Color4b(70, 119, 255, 255), ModuleNametags.GlowFrame.color)
+        assertEquals(84, ModuleNametags.GlowFrame.backgroundOpacity)
+        assertEquals(12f, ModuleNametags.GlowFrame.backgroundBlur)
+        assertEquals(6f, ModuleNametags.GlowFrame.frameRadius)
+        assertGlowRange("BackgroundOpacity", 0, 100, "%")
+        assertGlowRange("BackgroundBlur", 4f, 24f, "px")
+        assertGlowRange("FrameRadius", 0f, 16f, "px")
     }
 
     @Test
@@ -64,11 +81,20 @@ class ModuleNametagsFrameTest {
         val glowStyle = EspGlowStyle(18f, 1.2f, 1.4f, 2f, 0.8f)
         val glowColor = Color4b(0, 128, 255, 255)
         assertEquals(
-            modern.copy(glow = NametagFrameGlow(glowColor, glowStyle)),
+            modern.copy(
+                fill = Color4b(15, 18, 23, 128),
+                border = Color4b.TRANSPARENT,
+                borderWidth = 0f,
+                radius = 12f,
+                glow = NametagFrameGlow(glowColor, glowStyle, backgroundBlurRadius = 18f),
+            ),
             resolveNametagFrameAppearance(
                 NametagFrameKind.GLOW,
                 classicBorderWidth = 8f,
                 classicRadius = 16f,
+                glowBackgroundOpacityPercent = 50,
+                glowBackgroundBlurRadius = 18f,
+                glowFrameRadius = 12f,
                 glowColor = glowColor,
                 glowStyle = glowStyle,
             ),
@@ -125,5 +151,12 @@ class ModuleNametagsFrameTest {
     private fun storedValue(name: String, value: Number) = JsonObject().apply {
         addProperty("name", name)
         addProperty("value", value)
+    }
+
+    private fun assertGlowRange(name: String, from: Any, to: Any, suffix: String) {
+        val value = ModuleNametags.GlowFrame.inner.single { it.name == name } as RangedValue<*>
+        assertEquals(from, value.range.start)
+        assertEquals(to, value.range.endInclusive)
+        assertEquals(suffix, value.suffix)
     }
 }

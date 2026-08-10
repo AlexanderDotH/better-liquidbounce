@@ -131,11 +131,38 @@ class ModuleTracersGlowTest {
         val coreDraws = mutableListOf<TracerLineDraw>()
         val haloDraws = mutableListOf<TracerLineDraw>()
 
-        batch.forEachLine(glowMask = false, coreDraws::add)
-        batch.forEachLine(glowMask = true, haloDraws::add)
+        batch.forEachLine(glowMask = false, draw = coreDraws::add)
+        batch.forEachLine(glowMask = true, draw = haloDraws::add)
 
         assertEquals(listOf(TracerLineDraw(Color4b(12, 34, 56, 78), 1f, eye, target)), coreDraws)
-        assertEquals(listOf(TracerLineDraw(Color4b(12, 34, 56, 255), 2f, eye, target)), haloDraws)
+        assertEquals(
+            listOf(TracerLineDraw(Color4b(12, 34, 56, 255), 2f, eye, target, depthTested = true)),
+            haloDraws,
+        )
+    }
+
+    @Test
+    fun `Glow tracer core is depth tested so it cannot paint over player skin`() {
+        val batch = TracerRenderBatch(
+            listOf(TracerSegment(Color4b.WHITE, Vec3f.ZERO, Vec3f.Z_AXIS)),
+            lineWidth = 1f,
+        )
+        val draws = mutableListOf<TracerLineDraw>()
+
+        batch.forEachLine(glowMask = false, depthTested = true, draw = draws::add)
+
+        assertTrue(draws.single().depthTested)
+    }
+
+    @Test
+    fun `Glow mode requests a depth tested direct tracer core`() {
+        val source = java.nio.file.Files.readString(
+            java.nio.file.Path.of(
+                "src/main/kotlin/net/ccbluex/liquidbounce/features/module/modules/render/ModuleTracers.kt"
+            )
+        )
+
+        assertTrue(source.contains("depthTested = glowMode"))
     }
 
     @Suppress("UNCHECKED_CAST")

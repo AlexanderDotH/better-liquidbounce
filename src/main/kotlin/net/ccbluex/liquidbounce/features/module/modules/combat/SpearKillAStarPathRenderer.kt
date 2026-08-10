@@ -22,7 +22,7 @@ package net.ccbluex.liquidbounce.features.module.modules.combat
 import net.ccbluex.liquidbounce.event.events.WorldRenderEvent
 import net.ccbluex.liquidbounce.render.drawLines
 import net.ccbluex.liquidbounce.render.drawLinesWithWidth
-import net.ccbluex.liquidbounce.render.engine.esp.EspGlowContributionRole
+import net.ccbluex.liquidbounce.render.engine.esp.EspGlowSource
 import net.ccbluex.liquidbounce.render.engine.esp.EspGlowStyle
 import net.ccbluex.liquidbounce.render.engine.esp.EspShaderRenderer
 import net.ccbluex.liquidbounce.render.engine.type.Color4b
@@ -77,7 +77,7 @@ internal fun renderSpearKillAStarPath(
     event.renderEnvironment {
         drawLines(appearance.color.argb, vertices)
     }
-    EspShaderRenderer.contributeGlow(event, appearance.style, EspGlowContributionRole.HALO_ONLY) {
+    EspShaderRenderer.contributeGlow(event, EspGlowSource.SPEAR_KILL_PATH, appearance.style) {
         drawLinesWithWidth(
             appearance.glowMaskColor.argb,
             SPEAR_KILL_A_STAR_PATH_GLOW_MASK_LINE_WIDTH,

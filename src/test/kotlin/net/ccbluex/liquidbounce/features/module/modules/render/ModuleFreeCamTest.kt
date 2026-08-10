@@ -28,6 +28,45 @@ import org.junit.jupiter.api.Test
 class ModuleFreeCamTest {
 
     @Test
+    fun `freecam uses sprint speed while the physical sprint binding is held`() {
+        val sprintSpeed = FreeCamMovementSpeed(horizontalSpeed = 2.5, verticalSpeed = 2.0)
+        val movementSpeed = resolveFreeCamMovementSpeed(
+            baseSpeed = FreeCamMovementSpeed(horizontalSpeed = 1.0, verticalSpeed = 0.75),
+            sprintSpeed = sprintSpeed,
+            sprintSpeedEnabled = true,
+            sprintBindingPressed = true,
+        )
+
+        assertEquals(sprintSpeed, movementSpeed)
+    }
+
+    @Test
+    fun `freecam keeps base speed when sprint speed is not used`() {
+        val baseSpeed = FreeCamMovementSpeed(horizontalSpeed = 1.0, verticalSpeed = 0.75)
+        val movementSpeed = resolveFreeCamMovementSpeed(
+            baseSpeed = baseSpeed,
+            sprintSpeed = FreeCamMovementSpeed(horizontalSpeed = 2.5, verticalSpeed = 2.0),
+            sprintSpeedEnabled = true,
+            sprintBindingPressed = false,
+        )
+
+        assertEquals(baseSpeed, movementSpeed)
+    }
+
+    @Test
+    fun `freecam keeps base speed when sprint speed is disabled`() {
+        val baseSpeed = FreeCamMovementSpeed(horizontalSpeed = 1.0, verticalSpeed = 0.75)
+        val movementSpeed = resolveFreeCamMovementSpeed(
+            baseSpeed = baseSpeed,
+            sprintSpeed = FreeCamMovementSpeed(horizontalSpeed = 2.5, verticalSpeed = 2.0),
+            sprintSpeedEnabled = false,
+            sprintBindingPressed = true,
+        )
+
+        assertEquals(baseSpeed, movementSpeed)
+    }
+
+    @Test
     fun `freecam stops the player on every movement axis`() {
         val event = PlayerMoveEvent(MoverType.SELF, Vec3(1.25, -0.44, -2.5))
         var retainedVelocity = event.movement

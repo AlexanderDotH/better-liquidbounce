@@ -23,6 +23,7 @@ package net.ccbluex.liquidbounce.features.module.modules.render
 import com.mojang.blaze3d.platform.InputConstants
 import net.ccbluex.fastutil.enumSetOf
 import net.ccbluex.liquidbounce.config.types.group.ToggleableValueGroup
+import net.ccbluex.liquidbounce.config.types.group.ValueGroup
 import net.ccbluex.liquidbounce.config.types.list.Tagged
 import net.ccbluex.liquidbounce.event.Event
 import net.ccbluex.liquidbounce.event.EventManager
@@ -76,9 +77,29 @@ internal inline fun suppressFreeCamPlayerMovement(event: PlayerMoveEvent, setVel
     setVelocity(Vec3.ZERO)
 }
 
+internal data class FreeCamMovementSpeed(
+    val horizontalSpeed: Double,
+    val verticalSpeed: Double,
+)
+
+internal fun resolveFreeCamMovementSpeed(
+    baseSpeed: FreeCamMovementSpeed,
+    sprintSpeed: FreeCamMovementSpeed,
+    sprintSpeedEnabled: Boolean,
+    sprintBindingPressed: Boolean,
+) = if (sprintSpeedEnabled && sprintBindingPressed) sprintSpeed else baseSpeed
+
 object ModuleFreeCam : ClientModule("FreeCam", ModuleCategories.RENDER, disableOnQuit = true) {
 
-    private val speed by float("Speed", 1f, 0.1f..2f)
+    object BaseSpeed : ValueGroup("BaseSpeed") {
+        val horizontalSpeed by float("Horizontal", 1f, 0.1f..10f)
+        val verticalSpeed by float("Vertical", 1f, 0.1f..10f)
+    }
+
+    object SprintSpeed : ToggleableValueGroup(this, "SprintSpeed", true) {
+        val horizontalSpeed by float("Horizontal", 2f, 0.1f..10f)
+        val verticalSpeed by float("Vertical", 2f, 0.1f..10f)
+    }
 
     /**
      * Allows to interact from the camera perspective. This is very useful to interact with blocks that
@@ -169,6 +190,8 @@ object ModuleFreeCam : ClientModule("FreeCam", ModuleCategories.RENDER, disableO
     private val rotations = tree(RotationsValueGroup(this))
 
     init {
+        tree(BaseSpeed)
+        tree(SprintSpeed)
         tree(CameraInteract)
         tree(Navigation)
     }
@@ -258,16 +281,29 @@ object ModuleFreeCam : ClientModule("FreeCam", ModuleCategories.RENDER, disableO
         if (shouldHandleInputs(mc.options.keyJump) && mc.options.keyJump.isPressedOnAny) yAxisMovement += 1.0f
         if (shouldHandleInputs(mc.options.keyShift) && mc.options.keyShift.isPressedOnAny) yAxisMovement -= 1.0f
 
-        val speed = this.speed.toDouble()
+        val movementSpeed = resolveFreeCamMovementSpeed(
+            baseSpeed = FreeCamMovementSpeed(
+                BaseSpeed.horizontalSpeed.toDouble(),
+                BaseSpeed.verticalSpeed.toDouble(),
+            ),
+            sprintSpeed = FreeCamMovementSpeed(
+                SprintSpeed.horizontalSpeed.toDouble(),
+                SprintSpeed.verticalSpeed.toDouble(),
+            ),
+            sprintSpeedEnabled = SprintSpeed.enabled,
+            sprintBindingPressed = shouldHandleInputs(mc.options.keySprint) && mc.options.keySprint.isPressedOnAny,
+        )
+        val hSpeed = movementSpeed.horizontalSpeed
+        val vSpeed = movementSpeed.verticalSpeed
 
         ModuleDebug.debugParameter(this, "DirectionalInput", directionalInput)
         val velocity = Vec3.ZERO
             .withStrafe(
-                speed = speed,
+                speed = hSpeed,
                 input = directionalInput,
                 yaw = getMovementDirectionOfInput(PositionState.rot.yaw, directionalInput)
             )
-            .with(Direction.Axis.Y, yAxisMovement * speed)
+            .with(Direction.Axis.Y, yAxisMovement * vSpeed)
         ModuleDebug.debugParameter(this, "Velocity", velocity)
         PositionState.update(velocity)
 

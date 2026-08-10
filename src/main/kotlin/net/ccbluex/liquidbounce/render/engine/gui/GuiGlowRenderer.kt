@@ -35,14 +35,16 @@ import org.joml.Matrix3x2fc
 import org.joml.Matrix4f
 import kotlin.math.roundToInt
 
-/** Screen-space Gaussian compositor used by GUI elements that render after the world ESP pass. */
+/** Rounded backdrop-blur and Gaussian-halo compositor for deferred GUI elements. */
 object GuiGlowRenderer : EventListener {
 
-    private val mask = EspRenderTargetHolder("LiquidBounce GUI Glow Mask", false, GpuFormat.RGBA8_UNORM)
-    private val blurPing = EspRenderTargetHolder("LiquidBounce GUI Glow Blur Ping", false, GpuFormat.RGBA16_FLOAT)
-    private val blurPong = EspRenderTargetHolder("LiquidBounce GUI Glow Blur Pong", false, GpuFormat.RGBA16_FLOAT)
+    private val mask = EspRenderTargetHolder("LiquidBounce GUI Frame Mask", false, GpuFormat.RGBA8_UNORM)
+    private val blurPing = EspRenderTargetHolder("LiquidBounce GUI Frame Blur Ping", false, GpuFormat.RGBA16_FLOAT)
+    private val blurPong = EspRenderTargetHolder("LiquidBounce GUI Frame Blur Pong", false, GpuFormat.RGBA16_FLOAT)
 
     private val linearSampler = RenderSystem.getSamplerCache().getClampToEdge(FilterMode.LINEAR)
+    private val backdropHorizontalBlurData = ClientUniformDefine.ESP_BLUR.createSingleBuffer()
+    private val backdropVerticalBlurData = ClientUniformDefine.ESP_BLUR.createSingleBuffer()
     private val horizontalBlurData = ClientUniformDefine.ESP_BLUR.createSingleBuffer()
     private val verticalBlurData = ClientUniformDefine.ESP_BLUR.createSingleBuffer()
     private val styleData = ClientUniformDefine.ESP_STYLE.createSingleBuffer()
@@ -62,25 +64,37 @@ object GuiGlowRenderer : EventListener {
         radius: Float,
         color: Color4b,
         style: EspGlowStyle,
+        backgroundBlurRadius: Float,
     ) {
         frameState.append(
-            GuiGlowFrameRequest.transformed(pose, x1, y1, x2, y2, radius, color, style)
+            GuiGlowFrameRequest.transformed(
+                pose = pose,
+                x1 = x1,
+                y1 = y1,
+                x2 = x2,
+                y2 = y2,
+                radius = radius,
+                color = color,
+                style = style,
+                backgroundBlurRadius = backgroundBlurRadius,
+            )
         )
     }
 
     @JvmStatic
-    fun composite(destination: RenderTarget) {
+    fun composite(mainTarget: RenderTarget, destination: RenderTarget) {
         if (frameState.pendingCount == 0) return
 
-        val shouldClear = frameState.prepareMask(destination.width, destination.height)
+        val shouldClear = frameState.prepareMask(mainTarget.width, mainTarget.height)
         val maskTarget = if (shouldClear) {
-            mask.initAndClear(destination.width, destination.height)
+            mask.initAndClear(mainTarget.width, mainTarget.height)
         } else {
             requireNotNull(mask.raw)
         }
         val batch = frameState.consume() ?: return
 
         drawMask(maskTarget, batch.requests)
+        compositeBackdropBlur(mainTarget, maskTarget, batch.backgroundBlurRadius)
         val blurredMask = downsampleAndBlur(maskTarget, batch.style)
         writeStyleData(batch.style)
 
@@ -90,6 +104,45 @@ object GuiGlowRenderer : EventListener {
             pass.bindTexture("BlurSampler", blurredMask.colorTextureView, linearSampler)
             pass.bindTexture("CoreExclusionSampler", maskTarget.colorTextureView, linearSampler)
             pass.setUniform(ClientUniformDefine.ESP_STYLE.uboName, styleData)
+            pass.draw(3, 1, 0, 0)
+        }
+    }
+
+    private fun compositeBackdropBlur(
+        mainTarget: RenderTarget,
+        maskTarget: RenderTarget,
+        radius: Float,
+    ) {
+        val size = EspTargetSize.halfOf(mainTarget.width, mainTarget.height)
+        val ping = blurPing.initAndClear(size.width, size.height)
+        val pong = blurPong.initAndClear(size.width, size.height)
+
+        ping.createRenderPass({ "LiquidBounce GUI backdrop downsample" }).use { pass ->
+            pass.setPipeline(ClientRenderPipelines.GuiBackdropDownsample)
+            pass.bindTexture("SceneSampler", mainTarget.colorTextureView, linearSampler)
+            pass.draw(3, 1, 0, 0)
+        }
+
+        writeBlurData(backdropHorizontalBlurData, size, horizontal = true, radius = radius, softness = 1f)
+        pong.createRenderPass({ "LiquidBounce GUI backdrop horizontal blur" }).use { pass ->
+            pass.setPipeline(ClientRenderPipelines.EspGaussianBlur)
+            pass.bindTexture("InputSampler", ping.colorTextureView, linearSampler)
+            pass.setUniform(ClientUniformDefine.ESP_BLUR.uboName, backdropHorizontalBlurData)
+            pass.draw(3, 1, 0, 0)
+        }
+
+        writeBlurData(backdropVerticalBlurData, size, horizontal = false, radius = radius, softness = 1f)
+        ping.createRenderPass({ "LiquidBounce GUI backdrop vertical blur" }).use { pass ->
+            pass.setPipeline(ClientRenderPipelines.EspGaussianBlur)
+            pass.bindTexture("InputSampler", pong.colorTextureView, linearSampler)
+            pass.setUniform(ClientUniformDefine.ESP_BLUR.uboName, backdropVerticalBlurData)
+            pass.draw(3, 1, 0, 0)
+        }
+
+        mainTarget.createRenderPass({ "LiquidBounce GUI backdrop composite" }).use { pass ->
+            pass.setPipeline(ClientRenderPipelines.GuiBackdropBlurComposite)
+            pass.bindTexture("BlurSampler", ping.colorTextureView, linearSampler)
+            pass.bindTexture("MaskSampler", maskTarget.colorTextureView, linearSampler)
             pass.draw(3, 1, 0, 0)
         }
     }
@@ -138,7 +191,13 @@ object GuiGlowRenderer : EventListener {
             pass.draw(3, 1, 0, 0)
         }
 
-        writeBlurData(horizontalBlurData, size, horizontal = true, style)
+        writeBlurData(
+            horizontalBlurData,
+            size,
+            horizontal = true,
+            radius = style.radius,
+            softness = style.softness,
+        )
         pong.createRenderPass({ "LiquidBounce GUI glow horizontal blur" }).use { pass ->
             pass.setPipeline(ClientRenderPipelines.EspGaussianBlur)
             pass.bindTexture("InputSampler", ping.colorTextureView, linearSampler)
@@ -146,7 +205,13 @@ object GuiGlowRenderer : EventListener {
             pass.draw(3, 1, 0, 0)
         }
 
-        writeBlurData(verticalBlurData, size, horizontal = false, style)
+        writeBlurData(
+            verticalBlurData,
+            size,
+            horizontal = false,
+            radius = style.radius,
+            softness = style.softness,
+        )
         ping.createRenderPass({ "LiquidBounce GUI glow vertical blur" }).use { pass ->
             pass.setPipeline(ClientRenderPipelines.EspGaussianBlur)
             pass.bindTexture("InputSampler", pong.colorTextureView, linearSampler)
@@ -161,12 +226,10 @@ object GuiGlowRenderer : EventListener {
         buffer: GpuBufferSlice,
         size: EspTargetSize,
         horizontal: Boolean,
-        style: EspGlowStyle,
+        radius: Float,
+        softness: Float,
     ) {
-        val kernel = GaussianKernel.forScreenRadius(
-            style.radius,
-            style.softness,
-        )
+        val kernel = GaussianKernel.forScreenRadius(radius, softness)
         buffer.writeStd140 {
             putVec4(
                 if (horizontal) 1f / size.width else 0f,
@@ -192,6 +255,8 @@ object GuiGlowRenderer : EventListener {
         mask.close()
         blurPing.close()
         blurPong.close()
+        backdropHorizontalBlurData.buffer().close()
+        backdropVerticalBlurData.buffer().close()
         horizontalBlurData.buffer().close()
         verticalBlurData.buffer().close()
         styleData.buffer().close()

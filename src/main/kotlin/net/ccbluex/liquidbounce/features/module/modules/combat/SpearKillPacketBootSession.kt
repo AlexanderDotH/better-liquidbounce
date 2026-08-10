@@ -28,6 +28,8 @@ import net.minecraft.world.phys.Vec3
 import java.util.Collections
 import java.util.IdentityHashMap
 
+internal const val SPEAR_KILL_PACKET_STRIKE_HOLD_TICKS = 2
+
 internal fun buildSpearKillAttackMovements(
     direction: Vec3,
     distance: Double,
@@ -117,10 +119,7 @@ internal fun isSpearKillGrounded(wasOnGround: Boolean, virtualOffset: Vec3): Boo
     wasOnGround && virtualOffset.y == 0.0
 
 /** Keeps the final kinetic lunge intact instead of letting a camera packet reset its server-side speed. */
-internal fun shouldSuppressSpearKillAStarStrikeHoldPacket(
-    packetAStarAttackActive: Boolean,
-    holdingStrike: Boolean,
-): Boolean = packetAStarAttackActive && holdingStrike
+internal fun shouldSuppressSpearKillStrikeHoldPacket(holdingStrike: Boolean): Boolean = holdingStrike
 
 /** Only the selected movement packet may carry a pending virtual step. */
 internal fun spearKillPacketVirtualOffset(
@@ -163,7 +162,7 @@ internal class SpearKillFallDamagePacketTracker {
  * Tracks SpearKill's packet displacement and confirmed physical return positions.
  * A movement is removed only after the corresponding packet passed the packet pipeline.
  */
-@Suppress("TooManyFunctions")
+@Suppress("TooManyFunctions", "LongParameterList")
 internal class SpearKillPacketBootSession {
 
     private val movements = ArrayDeque<Vec3>()
@@ -181,10 +180,16 @@ internal class SpearKillPacketBootSession {
     private var preStrikeHoldPending = false
     private var configuredStrikeHoldTicks = 0
     private var configuredPreStrikeHoldTicks = 0
+    private var configuredTerminalSuffixSteps = 1
+    private var configuredTerminalAuthorizationRequired = false
     private var configuredStepWaitTicks = 0
     private var physicalReturnEnabled = false
     private var physicalReturnStarted = false
     private var lastDeliveredMovement: Vec3? = null
+    private var terminalCommitAuthorized = true
+
+    var terminalAimLockComplete: Boolean = false
+        private set
 
     var committedOffset: Vec3 = Vec3.ZERO
         private set
@@ -209,20 +214,70 @@ internal class SpearKillPacketBootSession {
     val pendingMovement: Vec3?
         get() = pendingOffset?.subtract(committedOffset)
 
-    /** Pending movement wins; between steps the last delivered direction remains authoritative. */
+    /**
+     * Rotation enforced for the current route phase.
+     *
+     * The next edge is exposed before packet preparation so RotationManager and item-use packets
+     * cannot lag one edge behind movement. Cadence waits retain the delivered edge, while the
+     * pre-strike hold deliberately pre-locks the first terminal edge.
+     */
     val pathHeading: Rotation?
-        get() = (pendingMovement ?: lastDeliveredMovement)?.let(::spearKillKineticHeading)
+        get() = pathHeadingMovement()?.let(::spearKillKineticHeading)
+
+    private fun pathHeadingMovement(): Vec3? {
+        pendingMovement?.let { return it }
+
+        val nextMovement = movements.firstOrNull()?.takeIf { it.lengthSqr() >= EPSILON }
+        val lockingTerminal = remainingPreStrikeHoldTicks > 0 ||
+            holdingPreStrikeThisTick ||
+            preStrikeHoldPending && remainingOutboundSteps == configuredTerminalSuffixSteps
+
+        return when {
+            holdingStrike -> lastDeliveredMovement
+            lockingTerminal -> nextMovement ?: lastDeliveredMovement
+            remainingStepWaitTicks == 0 -> nextMovement ?: lastDeliveredMovement
+            else -> lastDeliveredMovement
+        }
+    }
 
     /** True from the final outbound confirmation until both strike-hold ticks have been consumed. */
     val holdingStrike: Boolean
         get() = remainingStrikeHoldTicks > 0 || holdingStrikeThisTick
 
+    val holdingPreStrike: Boolean
+        get() = remainingPreStrikeHoldTicks > 0 || holdingPreStrikeThisTick
+
     /** True while ambient movement packets must not collapse into the terminal kinetic lunge. */
     val holdingKineticBarrier: Boolean
         get() = holdingStrike || remainingPreStrikeHoldTicks > 0 || holdingPreStrikeThisTick
 
+    val terminalSuffixSteps: Int
+        get() = configuredTerminalSuffixSteps
+
+    val awaitingTerminalCommitAuthorization: Boolean
+        get() = configuredTerminalAuthorizationRequired &&
+            !recovering &&
+            pendingOffset == null &&
+            remainingOutboundSteps == configuredTerminalSuffixSteps &&
+            !terminalCommitAuthorized
+
+    fun authorizeTerminalCommit(): Boolean {
+        if (!awaitingTerminalCommitAuthorization || !terminalAimLockComplete) return false
+        terminalCommitAuthorized = true
+        return true
+    }
+
     val canReplaceRemainingOutbound: Boolean
         get() = !recovering && remainingOutboundSteps > 0 && pendingOffset == null
+
+    /**
+     * Replanning is safe only between cadence waits and before the kinetic suffix is committed.
+     * Once the suffix starts, changing its route would destroy the continuous MaxSpeed run-up.
+     */
+    val canReplaceRemainingApproach: Boolean
+        get() = canReplaceRemainingOutbound &&
+            remainingStepWaitTicks == 0 &&
+            remainingOutboundSteps > configuredTerminalSuffixSteps
 
     val physicalReturnConfigured: Boolean
         get() = physicalReturnEnabled
@@ -233,7 +288,18 @@ internal class SpearKillPacketBootSession {
         strikeHoldTicks: Int = 0,
         stepWaitTicks: Int = 0,
         preStrikeHoldTicks: Int = 0,
-    ) = startInternal(path, outboundSteps, strikeHoldTicks, stepWaitTicks, preStrikeHoldTicks, physicalReturn = false)
+        terminalSuffixSteps: Int = 1,
+        requireTerminalAuthorization: Boolean = false,
+    ) = startInternal(
+        path = path,
+        outboundSteps = outboundSteps,
+        strikeHoldTicks = strikeHoldTicks,
+        stepWaitTicks = stepWaitTicks,
+        preStrikeHoldTicks = preStrikeHoldTicks,
+        terminalSuffixSteps = terminalSuffixSteps,
+        requireTerminalAuthorization = requireTerminalAuthorization,
+        physicalReturn = false,
+    )
 
     fun startPhysicalReturn(
         path: List<Vec3>,
@@ -241,7 +307,18 @@ internal class SpearKillPacketBootSession {
         strikeHoldTicks: Int = 0,
         stepWaitTicks: Int = 0,
         preStrikeHoldTicks: Int = 0,
-    ) = startInternal(path, outboundSteps, strikeHoldTicks, stepWaitTicks, preStrikeHoldTicks, physicalReturn = true)
+        terminalSuffixSteps: Int = 1,
+        requireTerminalAuthorization: Boolean = false,
+    ) = startInternal(
+        path = path,
+        outboundSteps = outboundSteps,
+        strikeHoldTicks = strikeHoldTicks,
+        stepWaitTicks = stepWaitTicks,
+        preStrikeHoldTicks = preStrikeHoldTicks,
+        terminalSuffixSteps = terminalSuffixSteps,
+        requireTerminalAuthorization = requireTerminalAuthorization,
+        physicalReturn = true,
+    )
 
     /**
      * Atomically replaces only movement that has not entered the packet pipeline yet.
@@ -250,9 +327,16 @@ internal class SpearKillPacketBootSession {
     fun replaceRemainingOutbound(
         outboundMovements: List<Vec3>,
         strikeHoldTicks: Int,
+        preStrikeHoldTicks: Int = 0,
+        terminalSuffixSteps: Int = 1,
+        requireTerminalAuthorization: Boolean = false,
     ): Boolean {
-        if (!canReplaceRemainingOutbound || strikeHoldTicks < 0 ||
-            outboundMovements.isEmpty() || outboundMovements.any { !it.isFinite() || it.lengthSqr() < EPSILON }
+        if (!canReplaceRemainingOutbound) return false
+        if (strikeHoldTicks < 0 || preStrikeHoldTicks < 0) return false
+        if (terminalSuffixSteps < 1 || terminalSuffixSteps > outboundMovements.size) return false
+        if (requireTerminalAuthorization && preStrikeHoldTicks < 1) return false
+        if (outboundMovements.isEmpty() ||
+            outboundMovements.any { !it.isFinite() || it.lengthSqr() < EPSILON }
         ) {
             return false
         }
@@ -264,8 +348,16 @@ internal class SpearKillPacketBootSession {
         movements += Vec3.ZERO
         remainingOutboundSteps = outboundMovements.size
         remainingStrikeHoldTicks = 0
+        remainingPreStrikeHoldTicks = 0
         holdingStrikeThisTick = false
+        holdingPreStrikeThisTick = false
         configuredStrikeHoldTicks = strikeHoldTicks
+        configuredPreStrikeHoldTicks = preStrikeHoldTicks
+        configuredTerminalSuffixSteps = terminalSuffixSteps
+        configuredTerminalAuthorizationRequired = requireTerminalAuthorization
+        preStrikeHoldPending = preStrikeHoldTicks > 0
+        terminalAimLockComplete = !requireTerminalAuthorization
+        terminalCommitAuthorized = !requireTerminalAuthorization
         physicalReturnStarted = false
         pendingPhysicalPositionOffset = null
         return true
@@ -277,12 +369,21 @@ internal class SpearKillPacketBootSession {
         strikeHoldTicks: Int,
         stepWaitTicks: Int,
         preStrikeHoldTicks: Int,
+        terminalSuffixSteps: Int,
+        requireTerminalAuthorization: Boolean,
         physicalReturn: Boolean,
     ) {
         check(!active && committedOffset.lengthSqr() < EPSILON) { "A PacketBoot session is already active" }
         require(outboundSteps >= 0) { "Outbound step count must not be negative" }
         require(strikeHoldTicks >= 0) { "Strike hold duration must not be negative" }
         require(preStrikeHoldTicks >= 0) { "Pre-strike hold duration must not be negative" }
+        require(terminalSuffixSteps >= 1) { "Terminal suffix step count must be positive" }
+        require(!requireTerminalAuthorization || preStrikeHoldTicks >= 1) {
+            "Terminal authorization requires at least one pre-strike aim-lock tick"
+        }
+        require(outboundSteps == 0 || terminalSuffixSteps <= outboundSteps) {
+            "Terminal suffix must not exceed outbound steps"
+        }
         require(stepWaitTicks in 0..SPEAR_KILL_MAX_WAIT_TICKS) { "Step wait duration is outside the configured range" }
         require(outboundSteps <= path.count { it.lengthSqr() >= EPSILON }) {
             "Outbound step count must not exceed movement count"
@@ -295,9 +396,13 @@ internal class SpearKillPacketBootSession {
         remainingStepWaitTicks = 0
         holdingStrikeThisTick = false
         holdingPreStrikeThisTick = false
-        preStrikeHoldPending = outboundSteps > 0 && preStrikeHoldTicks > 0
         configuredStrikeHoldTicks = strikeHoldTicks
         configuredPreStrikeHoldTicks = preStrikeHoldTicks
+        configuredTerminalSuffixSteps = terminalSuffixSteps
+        configuredTerminalAuthorizationRequired = requireTerminalAuthorization
+        preStrikeHoldPending = outboundSteps > 0 && preStrikeHoldTicks > 0
+        terminalAimLockComplete = !requireTerminalAuthorization
+        terminalCommitAuthorized = !requireTerminalAuthorization
         configuredStepWaitTicks = stepWaitTicks
         physicalReturnEnabled = physicalReturn
         physicalReturnStarted = false
@@ -322,14 +427,21 @@ internal class SpearKillPacketBootSession {
             remainingPreStrikeHoldTicks > 0 -> {
                 remainingPreStrikeHoldTicks--
                 holdingPreStrikeThisTick = true
+                if (remainingPreStrikeHoldTicks == 0) {
+                    terminalAimLockComplete = true
+                }
                 null
             }
-            preStrikeHoldPending && remainingOutboundSteps == 1 -> {
+            preStrikeHoldPending && remainingOutboundSteps == configuredTerminalSuffixSteps -> {
                 preStrikeHoldPending = false
                 remainingPreStrikeHoldTicks = configuredPreStrikeHoldTicks - 1
                 holdingPreStrikeThisTick = true
+                if (remainingPreStrikeHoldTicks == 0) {
+                    terminalAimLockComplete = true
+                }
                 null
             }
+            awaitingTerminalCommitAuthorization -> null
             else -> {
                 val movement = movements.firstOrNull()
                 if (movement == null || movement.lengthSqr() < EPSILON) {
@@ -412,7 +524,11 @@ internal class SpearKillPacketBootSession {
         preStrikeHoldPending = false
         configuredStrikeHoldTicks = 0
         configuredPreStrikeHoldTicks = 0
+        configuredTerminalSuffixSteps = 1
+        configuredTerminalAuthorizationRequired = false
         configuredStepWaitTicks = 0
+        terminalAimLockComplete = false
+        terminalCommitAuthorized = true
         movements.clear()
 
         if (committedOffset.lengthSqr() < EPSILON) {
@@ -447,7 +563,11 @@ internal class SpearKillPacketBootSession {
         preStrikeHoldPending = false
         configuredStrikeHoldTicks = 0
         configuredPreStrikeHoldTicks = 0
+        configuredTerminalSuffixSteps = 1
+        configuredTerminalAuthorizationRequired = false
         configuredStepWaitTicks = 0
+        terminalAimLockComplete = false
+        terminalCommitAuthorized = true
         movements.clear()
 
         if (committedOffset.lengthSqr() < EPSILON) {
@@ -536,10 +656,14 @@ internal class SpearKillPacketBootSession {
         preStrikeHoldPending = false
         configuredStrikeHoldTicks = 0
         configuredPreStrikeHoldTicks = 0
+        configuredTerminalSuffixSteps = 1
+        configuredTerminalAuthorizationRequired = false
         configuredStepWaitTicks = 0
         physicalReturnEnabled = false
         physicalReturnStarted = false
         lastDeliveredMovement = null
+        terminalAimLockComplete = false
+        terminalCommitAuthorized = true
         committedOffset = Vec3.ZERO
         recovering = false
     }

@@ -260,57 +260,72 @@ object AutoConfig {
         autoSettingsType: AutoSettingsType = AutoSettingsType.RAGE,
         statusType: AutoSettingsStatusType = AutoSettingsStatusType.BYPASSING
     ) {
-        this.includeConfiguration = includeConfiguration
-
-        // Store the config
-        val moduleTree = ConfigSystem.serializeValueGroup(ModuleManager.modulesConfig, publicGson)
-        val spooferTree = ConfigSystem.serializeValueGroup(SpooferManager, publicGson)
-
-        if (!moduleTree.isJsonObject || !spooferTree.isJsonObject) {
-            error("Root element is not a json object")
-        }
-
-        val jsonObject = JsonObject()
-        jsonObject.addProperty("name", "autoconfig")
-
-        jsonObject.add("modules", moduleTree.asJsonObject)
-        jsonObject.add("spoofers", spooferTree.asJsonObject)
-
-        val author = mc.user.name
-
-        val now = Date()
-        val dateFormatter = SimpleDateFormat("dd/MM/yyyy")
-        val timeFormatter = SimpleDateFormat("HH:mm:ss")
-        val date = dateFormatter.format(now)
-        val time = timeFormatter.format(now)
-
-        val (protocolName, protocolVersion) = protocolVersion
-
-        jsonObject.addProperty("author", author)
-        jsonObject.addProperty("date", date)
-        jsonObject.addProperty("time", time)
-        jsonObject.addProperty("clientVersion", LiquidBounce.clientVersion)
-        jsonObject.addProperty("clientCommit", LiquidBounce.clientCommit)
-        mc.currentServer?.let {
-            jsonObject.addProperty("serverAddress", it.ip.dropPort().rootDomain())
-        }
-        jsonObject.addProperty("protocolName", protocolName)
-        jsonObject.addProperty("protocolVersion", protocolVersion)
-
-        jsonObject.add("type", publicGson.toJsonTree(autoSettingsType))
-        jsonObject.add("status", publicGson.toJsonTree(statusType))
+        val jsonObject = createAutoConfigJson(includeConfiguration, autoSettingsType, statusType)
 
         publicGson.newJsonWriter(writer).use {
             publicGson.toJson(jsonObject, it)
         }
+    }
 
-        this.includeConfiguration = IncludeConfiguration.DEFAULT
+    /**
+     * Creates the JSON tree shared by public auto config serialization and local config extensions.
+     */
+    internal fun createAutoConfigJson(
+        includeConfiguration: IncludeConfiguration = IncludeConfiguration.DEFAULT,
+        autoSettingsType: AutoSettingsType = AutoSettingsType.RAGE,
+        statusType: AutoSettingsStatusType = AutoSettingsStatusType.BYPASSING
+    ): JsonObject {
+        this.includeConfiguration = includeConfiguration
+
+        try {
+            // Store the config
+            val moduleTree = ConfigSystem.serializeValueGroup(ModuleManager.modulesConfig, publicGson)
+            val spooferTree = ConfigSystem.serializeValueGroup(SpooferManager, publicGson)
+
+            if (!moduleTree.isJsonObject || !spooferTree.isJsonObject) {
+                error("Root element is not a json object")
+            }
+
+            val jsonObject = JsonObject()
+            jsonObject.addProperty("name", "autoconfig")
+
+            jsonObject.add("modules", moduleTree.asJsonObject)
+            jsonObject.add("spoofers", spooferTree.asJsonObject)
+
+            val author = mc.user.name
+
+            val now = Date()
+            val dateFormatter = SimpleDateFormat("dd/MM/yyyy")
+            val timeFormatter = SimpleDateFormat("HH:mm:ss")
+            val date = dateFormatter.format(now)
+            val time = timeFormatter.format(now)
+
+            val (protocolName, protocolVersion) = protocolVersion
+
+            jsonObject.addProperty("author", author)
+            jsonObject.addProperty("date", date)
+            jsonObject.addProperty("time", time)
+            jsonObject.addProperty("clientVersion", LiquidBounce.clientVersion)
+            jsonObject.addProperty("clientCommit", LiquidBounce.clientCommit)
+            mc.currentServer?.let {
+                jsonObject.addProperty("serverAddress", it.ip.dropPort().rootDomain())
+            }
+            jsonObject.addProperty("protocolName", protocolName)
+            jsonObject.addProperty("protocolVersion", protocolVersion)
+
+            jsonObject.add("type", publicGson.toJsonTree(autoSettingsType))
+            jsonObject.add("status", publicGson.toJsonTree(statusType))
+
+            return jsonObject
+        } finally {
+            this.includeConfiguration = IncludeConfiguration.DEFAULT
+        }
     }
 
     /**
      * Deserialize module configurable from a JSON object
      */
-    private fun deserializeModuleValueGroup(
+    internal fun deserializeModuleValueGroup(
         jsonObject: JsonObject,
         modules: Collection<ValueGroup> = emptyList()
     ) {

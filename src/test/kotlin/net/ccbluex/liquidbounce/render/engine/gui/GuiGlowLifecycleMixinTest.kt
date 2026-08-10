@@ -35,4 +35,16 @@ class GuiGlowLifecycleMixinTest {
         assertTrue(extractHook.containsMatchIn(source))
         assertFalse(renderHook.contains("GuiGlowRenderer.beginFrame()"))
     }
+
+    @Test
+    fun `GUI frame effects receive the world target before deferred elements draw`() {
+        val source = Files.readString(
+            Path.of(
+                "src/main/java/net/ccbluex/liquidbounce/injection/mixins/minecraft/gui/MixinGuiRenderer.java"
+            )
+        )
+
+        assertTrue(source.contains("RenderTarget mainTarget = original.call(instance);"))
+        assertTrue(source.contains("GuiGlowRenderer.composite(mainTarget, destination);"))
+    }
 }

@@ -30,7 +30,16 @@ import net.ccbluex.liquidbounce.features.module.ClientModule
 import net.ccbluex.liquidbounce.features.module.ModuleCategories
 import net.ccbluex.liquidbounce.features.module.modules.combat.ModuleSwordBlock
 import net.minecraft.util.Mth
+import net.minecraft.world.InteractionHand
 import net.minecraft.world.entity.HumanoidArm
+
+fun shouldApplyOffHandTransform(
+    hand: InteractionHand,
+    isInBothHands: Boolean,
+    offHandRunning: Boolean,
+): Boolean {
+    return offHandRunning && (hand == InteractionHand.OFF_HAND || isInBothHands)
+}
 
 /**
  * Animations module

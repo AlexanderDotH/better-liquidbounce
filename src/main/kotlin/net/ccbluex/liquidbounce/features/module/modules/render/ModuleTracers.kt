@@ -32,7 +32,7 @@ import net.ccbluex.liquidbounce.render.GenericStaticColorMode
 import net.ccbluex.liquidbounce.render.WorldRenderEnvironment
 import net.ccbluex.liquidbounce.render.drawLines
 import net.ccbluex.liquidbounce.render.drawLinesWithWidth
-import net.ccbluex.liquidbounce.render.engine.esp.EspGlowContributionRole
+import net.ccbluex.liquidbounce.render.engine.esp.EspGlowSource
 import net.ccbluex.liquidbounce.render.engine.esp.EspHaloStyleConfig
 import net.ccbluex.liquidbounce.render.engine.esp.EspShaderRenderer
 import net.ccbluex.liquidbounce.render.engine.type.Color4b
@@ -123,15 +123,16 @@ object ModuleTracers : ClientModule("Tracers", ModuleCategories.RENDER) {
             }
         }
         val batch = TracerRenderBatch(segments, lineWidth)
+        val glowMode = renderModes.activeMode === GlowMode
 
         event.renderEnvironment {
-            drawTracerBatch(batch, glowMask = false)
+            drawTracerBatch(batch, glowMask = false, depthTested = glowMode)
         }
 
-        if (renderModes.activeMode !== GlowMode) return@handler
+        if (!glowMode) return@handler
 
         batch.contributeGlowIfPresent {
-            EspShaderRenderer.contributeGlow(event, GlowMode.style, EspGlowContributionRole.HALO_ONLY) {
+            EspShaderRenderer.contributeGlow(event, EspGlowSource.TRACERS, GlowMode.style) {
                 drawTracerBatch(it, glowMask = true)
             }
         }
@@ -167,10 +168,12 @@ internal data class TracerLineDraw(
     val width: Float,
     val start: Vec3f,
     val end: Vec3f,
+    val depthTested: Boolean = false,
 )
 
 internal inline fun TracerRenderBatch.forEachLine(
     glowMask: Boolean,
+    depthTested: Boolean = glowMask,
     draw: (TracerLineDraw) -> Unit,
 ) {
     val renderLineWidth = if (glowMask) glowMaskLineWidth else lineWidth
@@ -181,14 +184,19 @@ internal inline fun TracerRenderBatch.forEachLine(
                 width = renderLineWidth,
                 start = segment.eyePosition,
                 end = segment.targetPosition,
+                depthTested = depthTested,
             )
         )
     }
 }
 
-internal fun WorldRenderEnvironment.drawTracerBatch(batch: TracerRenderBatch, glowMask: Boolean) {
-    batch.forEachLine(glowMask) { line ->
-        if (line.width == 1f) {
+internal fun WorldRenderEnvironment.drawTracerBatch(
+    batch: TracerRenderBatch,
+    glowMask: Boolean,
+    depthTested: Boolean = glowMask,
+) {
+    batch.forEachLine(glowMask, depthTested) { line ->
+        if (line.width == 1f && !line.depthTested) {
             drawLines(
                 line.color.argb,
                 line.start,

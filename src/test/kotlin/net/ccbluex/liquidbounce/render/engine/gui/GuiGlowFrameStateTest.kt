@@ -39,6 +39,7 @@ class GuiGlowFrameStateTest {
         val batch = state.consume()
         assertEquals(listOf(first, second), batch?.requests)
         assertEquals(style, batch?.style)
+        assertEquals(18f, batch?.backgroundBlurRadius)
         assertEquals(0, state.pendingCount)
         assertNull(state.consume())
         assertTrue(state.prepareMask(1920, 1080))
@@ -74,5 +75,6 @@ class GuiGlowFrameStateTest {
         radius = 6f,
         color = Color4b.LIQUID_BOUNCE,
         style = style,
+        backgroundBlurRadius = if (x < 20f) 12f else 18f,
     )
 }
