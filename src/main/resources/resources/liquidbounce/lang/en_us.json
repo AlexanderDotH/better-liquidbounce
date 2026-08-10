@@ -2090,5 +2090,8 @@
   "liquidbounce.command.seedcracker.subcommand.reject.parameter.id.description": "Optional evidence id to reject; omit it to select the sole currently needed observation.",
   "liquidbounce.command.seedcracker.subcommand.undo.parameter.id.description": "Optional evidence id to remove; omit it to show status.",
   "liquidbounce.command.seedcracker.subcommand.reset.subcommand.current.parameter.confirm.description": "Type --confirm exactly to clear this scope.",
-  "liquidbounce.command.seedcracker.subcommand.reset.subcommand.all.parameter.confirm.description": "Type --confirm exactly to clear all local SeedCracker v2 data."
+  "liquidbounce.command.seedcracker.subcommand.reset.subcommand.all.parameter.confirm.description": "Type --confirm exactly to clear all local SeedCracker v2 data.",
+  "liquidbounce.module.middleClickAction.messages.nukerBlockSet": "Nuker now targets %s blocks.",
+  "liquidbounce.module.nuker.messages.blockSelected": "Nuker now targets %s blocks.",
+  "liquidbounce.module.middleClickAction.mode.nukerBlock.extendedDescription": "Middle click a block to select its type for Nuker's SameBlock rule.\nCancels vanilla pick-block while this action is active.\nWorks even before Nuker is enabled.\nPhysical mouse movement temporarily overrides Nuker's rotations so you can aim at a different block."
 }

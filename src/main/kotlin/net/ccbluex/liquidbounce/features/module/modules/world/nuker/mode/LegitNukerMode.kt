@@ -79,6 +79,11 @@ object LegitNukerMode : Mode("Legit") {
 
     @Suppress("unused")
     private val simulatedTickHandler = handler<RotationUpdateEvent> {
+        if (ModuleNuker.playerInputOverridesRotation) {
+            releaseTargetForPlayerInput()
+            return@handler
+        }
+
         if (!ignoreOpenInventory && mc.gui.screen() is AbstractContainerScreen<*>) {
             this.currentTarget = null
             return@handler
@@ -201,6 +206,11 @@ object LegitNukerMode : Mode("Legit") {
 
     private fun breaksImmediately(): Boolean {
         return shouldNukerBreakImmediately(forceImmediateBreak, ModuleFastBreak.running)
+    }
+
+    internal fun releaseTargetForPlayerInput() {
+        currentTarget = null
+        wasTarget = null
     }
 
 }

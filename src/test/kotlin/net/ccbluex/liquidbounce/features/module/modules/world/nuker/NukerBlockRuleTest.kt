@@ -69,6 +69,25 @@ class NukerBlockRuleTest {
     }
 
     @Test
+    fun `player input override stays active for its full grace period and can be refreshed`() {
+        val override = NukerPlayerInputOverride(durationTicks = 3)
+
+        assertFalse(override.active)
+        override.activate()
+        assertTrue(override.active)
+
+        override.tick()
+        override.tick()
+        override.activate()
+        override.tick()
+        override.tick()
+        assertTrue(override.active)
+
+        override.tick()
+        assertFalse(override.active)
+    }
+
+    @Test
     fun `nuker exposes block rule instead of filter and block list`() {
         bootstrap()
 

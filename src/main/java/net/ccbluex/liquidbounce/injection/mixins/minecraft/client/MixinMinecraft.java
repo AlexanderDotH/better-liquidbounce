@@ -305,7 +305,7 @@ public abstract class MixinMinecraft {
 
     @Inject(method = "pickBlockOrEntity", at = @At("HEAD"), cancellable = true)
     private void hookItemPick(CallbackInfo ci) {
-        if (ModuleMiddleClickAction.Pearl.INSTANCE.cancelPick()) {
+        if (ModuleMiddleClickAction.cancelPick()) {
             ci.cancel();
         }
     }

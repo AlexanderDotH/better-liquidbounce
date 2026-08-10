@@ -29,6 +29,7 @@ import net.ccbluex.liquidbounce.features.misc.FriendManager
 import net.ccbluex.liquidbounce.features.module.ClientModule
 import net.ccbluex.liquidbounce.features.module.ModuleCategories
 import net.ccbluex.liquidbounce.features.module.modules.`fun`.ModuleAmnesia
+import net.ccbluex.liquidbounce.features.module.modules.world.nuker.ModuleNuker
 import net.ccbluex.liquidbounce.utils.client.SilentHotbar
 import net.ccbluex.liquidbounce.utils.client.notification
 import net.ccbluex.liquidbounce.utils.entity.rotation
@@ -38,6 +39,8 @@ import net.ccbluex.liquidbounce.utils.raytracing.findEntityInCrosshair
 import net.ccbluex.liquidbounce.utils.raytracing.isLookingAtEntity
 import net.minecraft.world.entity.player.Player
 import net.minecraft.world.item.Items
+import net.minecraft.world.phys.BlockHitResult
+import net.minecraft.world.phys.HitResult
 import org.lwjgl.glfw.GLFW
 
 /**
@@ -55,7 +58,15 @@ object ModuleMiddleClickAction : ClientModule(
         doNotIncludeAlways()
     }
 
-    private val mode = modes(this, "Mode", FriendClicker, arrayOf(FriendClicker, Pearl, AmnesiaTarget))
+    private val mode = modes(
+        this,
+        "Mode",
+        FriendClicker,
+        arrayOf(FriendClicker, Pearl, AmnesiaTarget, NukerBlock),
+    )
+
+    @JvmStatic
+    fun cancelPick(): Boolean = Pearl.cancelPick() || NukerBlock.cancelPick()
 
     override fun onDisabled() {
         SilentHotbar.resetSlot(Pearl)
@@ -195,6 +206,39 @@ object ModuleMiddleClickAction : ClientModule(
                 message("amnesiaTargetSet", name),
                 NotificationEvent.Severity.INFO,
             )
+        }
+
+        override val parent: ModeValueGroup<*>
+            get() = mode
+
+    }
+
+    object NukerBlock : Mode("NukerBlock", aliases = listOf("Nuker Block")) {
+
+        @Suppress("unused")
+        private val middleClickHandler = handler<MouseButtonEvent> { event ->
+            if (event.screen != null ||
+                event.action != GLFW.GLFW_PRESS ||
+                event.button != GLFW.GLFW_MOUSE_BUTTON_MIDDLE
+            ) {
+                return@handler
+            }
+
+            val hitResult = mc.hitResult as? BlockHitResult ?: return@handler
+            if (hitResult.type != HitResult.Type.BLOCK) {
+                return@handler
+            }
+
+            val block = ModuleNuker.selectBlock(hitResult.blockPos) ?: return@handler
+            notification(
+                "MiddleClickAction",
+                message("nukerBlockSet", block.name.string),
+                NotificationEvent.Severity.INFO,
+            )
+        }
+
+        fun cancelPick(): Boolean {
+            return ModuleMiddleClickAction.running && mode.activeMode == this
         }
 
         override val parent: ModeValueGroup<*>

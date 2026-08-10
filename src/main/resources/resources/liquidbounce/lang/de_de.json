@@ -1765,5 +1765,8 @@
   "liquidbounce.command.seedcracker.subcommand.reject.parameter.id.description": "Optionale abzulehnende Beweis-ID; ohne ID wird die einzige aktuell benötigte Beobachtung gewählt.",
   "liquidbounce.command.seedcracker.subcommand.undo.parameter.id.description": "Optionale zu entfernende Beweis-ID; ohne ID wird der Status angezeigt.",
   "liquidbounce.command.seedcracker.subcommand.reset.subcommand.current.parameter.confirm.description": "Tippe exakt --confirm, um diesen Scope zu löschen.",
-  "liquidbounce.command.seedcracker.subcommand.reset.subcommand.all.parameter.confirm.description": "Tippe exakt --confirm, um alle lokalen SeedCracker-v2-Daten zu löschen."
+  "liquidbounce.command.seedcracker.subcommand.reset.subcommand.all.parameter.confirm.description": "Tippe exakt --confirm, um alle lokalen SeedCracker-v2-Daten zu löschen.",
+  "liquidbounce.module.middleClickAction.messages.nukerBlockSet": "Nuker zielt jetzt auf %s-Blöcke.",
+  "liquidbounce.module.nuker.messages.blockSelected": "Nuker zielt jetzt auf %s-Blöcke.",
+  "liquidbounce.module.middleClickAction.mode.nukerBlock.extendedDescription": "Mittelklick auf einen Block wählt dessen Typ für Nukers SameBlock-Regel.\nUnterdrückt die normale Pick-Block-Aktion, solange diese Aktion aktiv ist.\nFunktioniert auch bevor Nuker aktiviert wird.\nEchte Mausbewegung überstimmt Nukers Rotation kurzzeitig, damit du einen anderen Block anvisieren kannst."
 }
