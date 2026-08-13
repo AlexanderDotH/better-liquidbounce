@@ -603,6 +603,19 @@ internal class SpearKillPacketBootSession {
 
     /** Starts a physical recovery using an already collision-validated route back to zero. */
     fun beginPhysicalExactRecoveryFrom(authoritativeOffset: Vec3, recoveryMovements: List<Vec3>) {
+        beginExactRecoveryFrom(authoritativeOffset, recoveryMovements, physicalReturn = true)
+    }
+
+    /** Starts a packet-only recovery before any physical-position fallback is allowed. */
+    fun beginPacketExactRecoveryFrom(authoritativeOffset: Vec3, recoveryMovements: List<Vec3>) {
+        beginExactRecoveryFrom(authoritativeOffset, recoveryMovements, physicalReturn = false)
+    }
+
+    private fun beginExactRecoveryFrom(
+        authoritativeOffset: Vec3,
+        recoveryMovements: List<Vec3>,
+        physicalReturn: Boolean,
+    ) {
         require(authoritativeOffset.isFinite()) { "Authoritative offset must be finite" }
         require(
             recoveryMovements.isNotEmpty() &&
@@ -617,9 +630,9 @@ internal class SpearKillPacketBootSession {
         committedOffset = authoritativeOffset
         movements.addAll(recoveryMovements)
         movements += Vec3.ZERO
-        physicalReturnEnabled = true
-        physicalReturnStarted = true
-        pendingPhysicalPositionOffset = authoritativeOffset
+        physicalReturnEnabled = physicalReturn
+        physicalReturnStarted = physicalReturn
+        pendingPhysicalPositionOffset = authoritativeOffset.takeIf { physicalReturn }
         recovering = true
     }
 
@@ -681,28 +694,33 @@ internal class SpearKillPacketBootSession {
 }
 
 private const val SPEAR_KILL_PACKET_EPSILON = 1.0E-12
-private const val SPEAR_KILL_PHYSICAL_RETURN_DISTANCE_SQUARED = 4.0
+private const val SPEAR_KILL_PHYSICAL_RETURN_MATCH_EPSILON_SQUARED = 1.0E-6
 
 private fun Vec3.isFinite(): Boolean = x.isFinite() && y.isFinite() && z.isFinite()
 
 /** Applies confirmed return positions once the client is observed away from the session origin. */
 internal class SpearKillPhysicalReturnPositioner(
-    private val physicalReturnDistanceSquared: Double = SPEAR_KILL_PHYSICAL_RETURN_DISTANCE_SQUARED,
+    private val matchEpsilonSquared: Double = SPEAR_KILL_PHYSICAL_RETURN_MATCH_EPSILON_SQUARED,
 ) {
 
     private var applyPositionUpdates: Boolean? = null
 
+    val followingReturn: Boolean
+        get() = applyPositionUpdates == true
+
     init {
-        require(physicalReturnDistanceSquared.isFinite() && physicalReturnDistanceSquared >= 0.0) {
-            "Physical return distance must be finite and non-negative"
+        require(matchEpsilonSquared.isFinite() && matchEpsilonSquared >= 0.0) {
+            "Physical return match epsilon must be finite and non-negative"
         }
     }
 
     fun resolve(origin: Vec3, currentPosition: Vec3, confirmedOffset: Vec3): Vec3? {
-        val isDisplaced = currentPosition.distanceToSqr(origin) > physicalReturnDistanceSquared
-        val shouldApply = applyPositionUpdates == true || isDisplaced
+        val confirmedPosition = origin.add(confirmedOffset)
+        val matchesConfirmedRoutePosition = confirmedOffset.lengthSqr() > matchEpsilonSquared &&
+            currentPosition.distanceToSqr(confirmedPosition) <= matchEpsilonSquared
+        val shouldApply = applyPositionUpdates == true || matchesConfirmedRoutePosition
         applyPositionUpdates = shouldApply
-        return origin.add(confirmedOffset).takeIf { shouldApply }
+        return confirmedPosition.takeIf { shouldApply }
     }
 
     fun clear() {
@@ -728,13 +746,15 @@ internal class SpearKillSetbackGuard(
     fun record(serverPosition: Vec3, localPosition: Vec3) {
         if (serverPosition.distanceToSqr(localPosition) <= POSITION_EPSILON_SQUARED) return
 
-        if (recentVirtualPositions.none { it.distanceToSqr(serverPosition) <= POSITION_EPSILON_SQUARED }) {
-            if (recentVirtualPositions.size == MAX_RECENT_POSITIONS) {
-                recentVirtualPositions.removeFirst()
-            }
-            recentVirtualPositions += serverPosition
-        }
+        recordRecognizedPosition(localPosition)
+        recordRecognizedPosition(serverPosition)
         remainingTicks = guardTicks
+    }
+
+    private fun recordRecognizedPosition(position: Vec3) {
+        if (recentVirtualPositions.any { it.distanceToSqr(position) <= POSITION_EPSILON_SQUARED }) return
+        if (recentVirtualPositions.size == MAX_RECENT_POSITIONS) recentVirtualPositions.removeFirst()
+        recentVirtualPositions += position
     }
 
     fun tick(pathActive: Boolean) {

@@ -36,17 +36,47 @@ import net.ccbluex.liquidbounce.features.module.modules.world.nuker.shouldNukerB
 import net.ccbluex.liquidbounce.features.module.modules.world.packetmine.ModulePacketMine
 import net.ccbluex.liquidbounce.utils.aiming.RotationManager
 import net.ccbluex.liquidbounce.utils.aiming.RotationsValueGroup
+import net.ccbluex.liquidbounce.utils.aiming.data.Rotation
 import net.ccbluex.liquidbounce.utils.aiming.utils.raytraceBlockRotation
 import net.ccbluex.liquidbounce.utils.block.doBreak
 import net.ccbluex.liquidbounce.utils.block.getState
 import net.ccbluex.liquidbounce.utils.block.isNotBreakable
+import net.ccbluex.liquidbounce.utils.client.network
 import net.ccbluex.liquidbounce.utils.kotlin.Priority
 import net.ccbluex.liquidbounce.utils.raytracing.raytraceBlock
 import net.ccbluex.liquidbounce.utils.render.BreakingProgress
 import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen
 import net.minecraft.core.BlockPos
+import net.minecraft.network.protocol.game.ServerboundMovePlayerPacket
+import net.minecraft.world.phys.BlockHitResult
 import net.minecraft.world.phys.HitResult
 import kotlin.math.max
+
+internal fun isServerRotationReadyForNukerBreak(
+    expectedTarget: BlockPos,
+    hitResult: BlockHitResult?
+) = hitResult?.type == HitResult.Type.BLOCK && hitResult.blockPos == expectedTarget
+
+internal fun executeServerRotatedNukerBreak(
+    expectedTarget: BlockPos,
+    hitResult: BlockHitResult,
+    sendRotation: () -> Unit,
+    breakBlock: (BlockHitResult) -> Unit,
+): Boolean {
+    if (!isServerRotationReadyForNukerBreak(expectedTarget, hitResult)) {
+        return false
+    }
+
+    sendRotation()
+    breakBlock(hitResult)
+    return true
+}
+
+/**
+ * An active Legit Nuker break must win over ordinary combat aiming. Otherwise KillAura can keep
+ * the server rotation on a nearby entity while Nuker waits forever for its block raytrace.
+ */
+internal val LEGIT_NUKER_ROTATION_PRIORITY = Priority.IMPORTANT_FOR_USAGE_3
 
 object LegitNukerMode : Mode("Legit") {
 
@@ -79,11 +109,6 @@ object LegitNukerMode : Mode("Legit") {
 
     @Suppress("unused")
     private val simulatedTickHandler = handler<RotationUpdateEvent> {
-        if (ModuleNuker.playerInputOverridesRotation) {
-            releaseTargetForPlayerInput()
-            return@handler
-        }
-
         if (!ignoreOpenInventory && mc.gui.screen() is AbstractContainerScreen<*>) {
             this.currentTarget = null
             return@handler
@@ -121,17 +146,24 @@ object LegitNukerMode : Mode("Legit") {
             waitTicks(switchDelay)
         }
 
+        val rotation = RotationManager.currentRotation ?: return@tickHandler
         val rayTraceResult = raytraceBlock(
             max(range, wallRange).toDouble() + 1.0,
+            rotation = rotation,
             pos = currentTarget,
             state = state
         ) ?: return@tickHandler
 
-        if (rayTraceResult.type != HitResult.Type.BLOCK || rayTraceResult.blockPos != currentTarget) {
+        val brokeBlock = executeServerRotatedNukerBreak(
+            expectedTarget = currentTarget,
+            hitResult = rayTraceResult,
+            sendRotation = { sendServerRotation(rotation) },
+            breakBlock = { doBreak(it, breaksImmediately()) },
+        )
+        if (!brokeBlock) {
             return@tickHandler
         }
 
-        doBreak(rayTraceResult, breaksImmediately())
         wasTarget = currentTarget
     }
 
@@ -166,13 +198,7 @@ object LegitNukerMode : Mode("Legit") {
             ) ?: return@let
 
             if (!packetMine) {
-                RotationManager.setRotationTarget(
-                    raytraceResult.rotation,
-                    considerInventory = !ignoreOpenInventory,
-                    valueGroup = rotations,
-                    priority = Priority.IMPORTANT_FOR_USAGE_1,
-                    ModuleNuker
-                )
+                aimAt(raytraceResult.rotation)
             }
 
             // We don't need to update the target if it's still valid
@@ -189,13 +215,7 @@ object LegitNukerMode : Mode("Legit") {
             ) ?: continue
 
             if (!packetMine) {
-                RotationManager.setRotationTarget(
-                    raytraceResult.rotation,
-                    considerInventory = !ignoreOpenInventory,
-                    valueGroup = rotations,
-                    priority = Priority.IMPORTANT_FOR_USAGE_1,
-                    ModuleNuker
-                )
+                aimAt(raytraceResult.rotation)
             }
 
             return pos
@@ -204,13 +224,34 @@ object LegitNukerMode : Mode("Legit") {
         return null
     }
 
-    private fun breaksImmediately(): Boolean {
-        return shouldNukerBreakImmediately(forceImmediateBreak, ModuleFastBreak.running)
+    private fun aimAt(rotation: Rotation) {
+        RotationManager.setRotationTarget(
+            rotations.toRotationTarget(rotation, considerInventory = !ignoreOpenInventory),
+            priority = LEGIT_NUKER_ROTATION_PRIORITY,
+            provider = ModuleNuker
+        )
     }
 
-    internal fun releaseTargetForPlayerInput() {
-        currentTarget = null
-        wasTarget = null
+    /**
+     * Keep the normal RotationManager smoothing, but guarantee packet ordering for the block action.
+     * This mirrors KillAura's on-tick rotation path: rotation first, action second.
+     */
+    private fun sendServerRotation(rotation: Rotation) {
+        network.send(
+            ServerboundMovePlayerPacket.PosRot(
+                player.x,
+                player.y,
+                player.z,
+                rotation.yaw,
+                rotation.pitch,
+                player.onGround(),
+                player.horizontalCollision,
+            )
+        )
+    }
+
+    private fun breaksImmediately(): Boolean {
+        return shouldNukerBreakImmediately(forceImmediateBreak, ModuleFastBreak.running)
     }
 
 }

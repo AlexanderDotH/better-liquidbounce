@@ -1,0 +1,305 @@
+/*
+ * This file is part of LiquidBounce (https://github.com/CCBlueX/LiquidBounce)
+ *
+ * Copyright (c) 2015 - 2026 CCBlueX
+ *
+ * LiquidBounce is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * LiquidBounce is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with LiquidBounce. If not, see <https://www.gnu.org/licenses/>.
+ */
+
+package net.ccbluex.liquidbounce.features.module.modules.combat
+
+import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertFalse
+import org.junit.jupiter.api.Assertions.assertTrue
+import org.junit.jupiter.api.Test
+
+class SpearKillTargetConfigurationTest {
+
+    @Test
+    fun `defaults require a manual attack request and use crosshair targeting`() {
+        assertEquals(SpearKillActivationMode.Manual, DEFAULT_SPEAR_KILL_ACTIVATION_MODE)
+        assertEquals(SpearKillTargetSource.Crosshair, DEFAULT_SPEAR_KILL_TARGET_SOURCE)
+        assertFalse(
+            isSpearKillActivationSatisfied(
+                activationMode = DEFAULT_SPEAR_KILL_ACTIVATION_MODE,
+                attackRequested = false,
+                useKeyDown = true,
+            ),
+        )
+    }
+
+    @Test
+    fun `Manual activation requires an attack request while HoldUse does not`() {
+        assertTrue(requiresSpearKillAttackRequest(SpearKillActivationMode.Manual))
+        assertFalse(requiresSpearKillAttackRequest(SpearKillActivationMode.HoldUse))
+        assertFalse(isSpearKillActivationSatisfied(SpearKillActivationMode.Manual, false, true))
+        assertTrue(isSpearKillActivationSatisfied(SpearKillActivationMode.Manual, true, true))
+        assertFalse(isSpearKillActivationSatisfied(SpearKillActivationMode.HoldUse, true, false))
+        assertTrue(isSpearKillActivationSatisfied(SpearKillActivationMode.HoldUse, false, true))
+    }
+
+    @Test
+    fun `KillAura inheritance overrides every configured SpearKill activation mode`() {
+        SpearKillActivationMode.entries.forEach { activationMode ->
+            assertTrue(
+                isSpearKillActivationSatisfied(
+                    activationMode = activationMode,
+                    attackRequested = false,
+                    useKeyDown = false,
+                    inheritedKillAuraRequest = true,
+                ),
+                activationMode.name,
+            )
+        }
+    }
+
+    @Test
+    fun `KillAura inheritance starts an idle held spear and preserves an existing spear use`() {
+        assertEquals(
+            SpearKillInheritedUseAction.START_MAIN_HAND,
+            resolveSpearKillInheritedUseAction(true, true, true, false, false),
+        )
+        assertEquals(
+            SpearKillInheritedUseAction.START_OFF_HAND,
+            resolveSpearKillInheritedUseAction(true, false, true, false, false),
+        )
+        assertEquals(
+            SpearKillInheritedUseAction.KEEP_CURRENT_USE,
+            resolveSpearKillInheritedUseAction(true, true, false, true, true),
+        )
+    }
+
+    @Test
+    fun `KillAura inheritance never steals unrelated item use or releases borrowed spear use`() {
+        assertEquals(
+            SpearKillInheritedUseAction.NONE,
+            resolveSpearKillInheritedUseAction(true, true, false, true, false),
+        )
+        assertFalse(shouldStopSpearKillInheritedUse(false, true, true, true))
+        assertFalse(shouldStopSpearKillInheritedUse(true, true, false, true))
+        assertFalse(shouldStopSpearKillInheritedUse(true, true, true, false))
+        assertTrue(shouldStopSpearKillInheritedUse(true, true, true, true))
+    }
+
+    @Test
+    fun `KillAura owned spear use remains held without a physical use key`() {
+        assertTrue(shouldPreserveSpearKillInheritedUse(true, true, true, true))
+        assertFalse(shouldPreserveSpearKillInheritedUse(false, true, true, true))
+        assertFalse(shouldPreserveSpearKillInheritedUse(true, false, true, true))
+        assertFalse(shouldPreserveSpearKillInheritedUse(true, true, false, true))
+        assertFalse(shouldPreserveSpearKillInheritedUse(true, true, true, false))
+    }
+
+    @Test
+    fun `Manual activation keeps one click armed until launch or spear-use release`() {
+        val latched = nextSpearKillManualAttackRequestLatch(
+            activationMode = SpearKillActivationMode.Manual,
+            holdingSpear = true,
+            isUsingSpear = true,
+            useInputHeld = true,
+            wasLatched = false,
+            attackPressed = true,
+        )
+
+        assertTrue(latched)
+        assertTrue(
+            nextSpearKillManualAttackRequestLatch(
+                activationMode = SpearKillActivationMode.Manual,
+                holdingSpear = true,
+                isUsingSpear = true,
+                useInputHeld = true,
+                wasLatched = latched,
+                attackPressed = false,
+            ),
+        )
+        assertFalse(
+            nextSpearKillManualAttackRequestLatch(
+                activationMode = SpearKillActivationMode.Manual,
+                holdingSpear = true,
+                isUsingSpear = true,
+                useInputHeld = false,
+                wasLatched = latched,
+                attackPressed = false,
+            ),
+        )
+        assertFalse(
+            nextSpearKillManualAttackRequestLatch(
+                activationMode = SpearKillActivationMode.HoldUse,
+                holdingSpear = true,
+                isUsingSpear = true,
+                useInputHeld = true,
+                wasLatched = false,
+                attackPressed = true,
+            ),
+        )
+    }
+
+    @Test
+    fun `HoldUse launches on the first safe charged tick without an attack request`() {
+        val holdUseSatisfied = isSpearKillActivationSatisfied(
+            activationMode = SpearKillActivationMode.HoldUse,
+            attackRequested = false,
+            useKeyDown = true,
+        )
+
+        assertFalse(shouldStartSpearKillAttempt(false, holdUseSatisfied, true, 3, 3, 20))
+        assertTrue(shouldStartSpearKillAttempt(false, holdUseSatisfied, true, 4, 3, 20))
+        assertFalse(shouldStartSpearKillAttempt(false, holdUseSatisfied, true, 20, 3, 20))
+        assertFalse(shouldStartSpearKillAttempt(true, holdUseSatisfied, true, 4, 3, 20))
+    }
+
+    @Test
+    fun `KillAura can acquire SpearKill range before the spear is charged`() {
+        val acquisitionAvailable = isSpearKillKillAuraAcquisitionAvailable(
+            moduleEnabled = true,
+            moduleRunning = true,
+            delegationEnabled = true,
+            holdingSpear = true,
+            routeBlocked = false,
+        )
+
+        assertTrue(acquisitionAvailable)
+        assertFalse(
+            isSpearKillKillAuraAttackArmed(
+                acquisitionAvailable = acquisitionAvailable,
+                usingSpear = false,
+                activationRequested = false,
+                hasKineticWeapon = false,
+            ),
+        )
+        assertTrue(
+            isSpearKillKillAuraAttackArmed(
+                acquisitionAvailable = acquisitionAvailable,
+                usingSpear = true,
+                activationRequested = true,
+                hasKineticWeapon = true,
+            ),
+        )
+    }
+
+    @Test
+    fun `KillAura cannot acquire SpearKill range without every availability gate`() {
+        listOf(
+            isSpearKillKillAuraAcquisitionAvailable(false, true, true, true, false),
+            isSpearKillKillAuraAcquisitionAvailable(true, false, true, true, false),
+            isSpearKillKillAuraAcquisitionAvailable(true, true, false, true, false),
+            isSpearKillKillAuraAcquisitionAvailable(true, true, true, false, false),
+            isSpearKillKillAuraAcquisitionAvailable(true, true, true, true, true),
+        ).forEach { available -> assertFalse(available) }
+    }
+
+    @Test
+    fun `Combat is automatic while Crosshair is manual`() {
+        assertFalse(isSpearKillTargetSourceAutomatic(SpearKillTargetSource.Crosshair))
+        assertTrue(isSpearKillTargetSourceAutomatic(SpearKillTargetSource.Combat))
+        assertEquals(setOf("Crosshair", "Combat"), SpearKillTargetSource.entries.map { it.tag }.toSet())
+    }
+
+    @Test
+    fun `candidate eligibility fails closed for every target safety gate`() {
+        assertTrue(
+            isSpearKillTargetCandidateEligible(
+                isCombatSafe = true,
+                isAlive = true,
+                isInCurrentWorld = true,
+                isWithinRange = true,
+                isRejected = false,
+            ),
+        )
+
+        listOf(
+            isSpearKillTargetCandidateEligible(
+                isCombatSafe = false,
+                isAlive = true,
+                isInCurrentWorld = true,
+                isWithinRange = true,
+                isRejected = false,
+            ),
+            isSpearKillTargetCandidateEligible(
+                isCombatSafe = true,
+                isAlive = false,
+                isInCurrentWorld = true,
+                isWithinRange = true,
+                isRejected = false,
+            ),
+            isSpearKillTargetCandidateEligible(
+                isCombatSafe = true,
+                isAlive = true,
+                isInCurrentWorld = false,
+                isWithinRange = true,
+                isRejected = false,
+            ),
+            isSpearKillTargetCandidateEligible(
+                isCombatSafe = true,
+                isAlive = true,
+                isInCurrentWorld = true,
+                isWithinRange = false,
+                isRejected = false,
+            ),
+            isSpearKillTargetCandidateEligible(
+                isCombatSafe = true,
+                isAlive = true,
+                isInCurrentWorld = true,
+                isWithinRange = true,
+                isRejected = true,
+            ),
+        ).forEach { eligible -> assertFalse(eligible) }
+    }
+
+    @Test
+    fun `automatic sources reject self friend teammate and AntiBot candidates through combat safety`() {
+        listOf("self", "friend", "teammate", "antibot").forEach { rejectedKind ->
+            assertFalse(
+                isSpearKillTargetCandidateEligible(
+                    isCombatSafe = false,
+                    isAlive = true,
+                    isInCurrentWorld = true,
+                    isWithinRange = true,
+                    isRejected = false,
+                ),
+                rejectedKind,
+            )
+        }
+    }
+
+    @Test
+    fun `configured source remains authoritative and an active route keeps its lock`() {
+        assertEquals(
+            "combat",
+            selectSpearKillTargetForSource(
+                targetSource = SpearKillTargetSource.Combat,
+                lookRayTarget = { "look" },
+                combatTarget = { "combat" },
+            ),
+        )
+        assertEquals("locked", preferLockedSpearKillTarget("locked", "retargeted"))
+        assertEquals("selected", preferLockedSpearKillTarget(null, "selected"))
+    }
+
+    @Test
+    fun `a rejected target is skipped in favor of the next eligible candidate`() {
+        val rejected = setOf("blocked")
+        val selected = listOf("blocked", "reachable").firstOrNull { candidate ->
+            isSpearKillTargetCandidateEligible(
+                isCombatSafe = true,
+                isAlive = true,
+                isInCurrentWorld = true,
+                isWithinRange = true,
+                isRejected = candidate in rejected,
+            )
+        }
+
+        assertEquals("reachable", selected)
+    }
+}

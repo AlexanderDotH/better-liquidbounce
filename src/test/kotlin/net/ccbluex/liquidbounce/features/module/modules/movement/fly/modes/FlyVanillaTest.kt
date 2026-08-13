@@ -19,7 +19,10 @@
 
 package net.ccbluex.liquidbounce.features.module.modules.movement.fly.modes
 
+import net.ccbluex.liquidbounce.event.events.PlayerMoveEvent
 import net.minecraft.network.protocol.game.ServerboundMovePlayerPacket
+import net.minecraft.world.entity.MoverType
+import net.minecraft.world.phys.Vec3
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertTrue
@@ -45,5 +48,94 @@ class FlyVanillaTest {
         assertEquals(-4.25, packet.z)
         assertTrue(packet.isOnGround)
         assertTrue(packet.horizontalCollision())
+    }
+
+    @Test
+    fun `packet bypass mode remains packet mode during normal flight`() {
+        val resolvedMode = resolveVanillaFlyCheckBypassMode(
+            configuredMode = VanillaFlyCheckBypassMode.PACKET,
+            isFallFlying = false,
+        )
+
+        assertEquals(VanillaFlyCheckBypassMode.PACKET, resolvedMode)
+    }
+
+    @Test
+    fun `motion bypass mode remains motion mode during normal flight`() {
+        val resolvedMode = resolveVanillaFlyCheckBypassMode(
+            configuredMode = VanillaFlyCheckBypassMode.MOTION,
+            isFallFlying = false,
+        )
+
+        assertEquals(VanillaFlyCheckBypassMode.MOTION, resolvedMode)
+    }
+
+    @Test
+    fun `elytra flight forces the bypass to use packets`() {
+        val resolvedMode = resolveVanillaFlyCheckBypassMode(
+            configuredMode = VanillaFlyCheckBypassMode.MOTION,
+            isFallFlying = true,
+        )
+
+        assertEquals(VanillaFlyCheckBypassMode.PACKET, resolvedMode)
+    }
+
+    @Test
+    fun `elytra gravity is replaced with neutral vanilla fly motion`() {
+        val resolvedMotion = resolveVanillaFlyElytraVerticalMotion(
+            isFallFlying = true,
+            movementY = -0.08,
+            requestedVerticalMotion = 0.0,
+        )
+
+        assertEquals(0.0, resolvedMotion)
+    }
+
+    @Test
+    fun `elytra downward correction updates movement and retained velocity`() {
+        val event = PlayerMoveEvent(MoverType.SELF, Vec3(1.25, -0.08, -2.5))
+        var retainedVelocityY = event.movement.y
+
+        applyVanillaFlyElytraVerticalMotion(
+            event = event,
+            isFallFlying = true,
+            requestedVerticalMotion = 0.0,
+        ) { retainedVelocityY = it }
+
+        assertEquals(Vec3(1.25, 0.0, -2.5), event.movement)
+        assertEquals(0.0, retainedVelocityY)
+    }
+
+    @Test
+    fun `elytra flight preserves intentional vanilla fly descent`() {
+        val resolvedMotion = resolveVanillaFlyElytraVerticalMotion(
+            isFallFlying = true,
+            movementY = -0.08,
+            requestedVerticalMotion = -0.44,
+        )
+
+        assertEquals(-0.44, resolvedMotion)
+    }
+
+    @Test
+    fun `elytra flight preserves upward motion`() {
+        val resolvedMotion = resolveVanillaFlyElytraVerticalMotion(
+            isFallFlying = true,
+            movementY = 0.25,
+            requestedVerticalMotion = 0.0,
+        )
+
+        assertEquals(0.25, resolvedMotion)
+    }
+
+    @Test
+    fun `normal flight does not rewrite downward motion`() {
+        val resolvedMotion = resolveVanillaFlyElytraVerticalMotion(
+            isFallFlying = false,
+            movementY = -0.08,
+            requestedVerticalMotion = 0.0,
+        )
+
+        assertEquals(-0.08, resolvedMotion)
     }
 }

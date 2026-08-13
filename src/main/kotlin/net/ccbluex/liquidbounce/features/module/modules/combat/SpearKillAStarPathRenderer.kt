@@ -47,10 +47,11 @@ internal fun buildSpearKillAStarRenderPath(origin: Vec3, outboundWaypoints: List
 
 /** Keeps the visual opt-in independent from Packet transport and path planning. */
 internal fun shouldRenderSpearKillAStarPath(
+    previewEnabled: Boolean = true,
     packetAStarEnabled: Boolean,
     renderPathEnabled: Boolean,
     renderPath: List<Vec3>,
-): Boolean = packetAStarEnabled && renderPathEnabled && renderPath.size >= 2
+): Boolean = previewEnabled && packetAStarEnabled && renderPathEnabled && renderPath.size >= 2
 
 /** Visuals shared by the A* route and SpearKill's target Glow preview. */
 internal data class SpearKillAStarPathAppearance(

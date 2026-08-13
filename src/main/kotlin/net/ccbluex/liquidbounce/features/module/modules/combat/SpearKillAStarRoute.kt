@@ -344,6 +344,6 @@ private fun isSpearKillAStarSameDirection(first: Vec3, second: Vec3): Boolean {
 private fun Vec3.isFinite(): Boolean = x.isFinite() && y.isFinite() && z.isFinite()
 
 private const val SPEAR_KILL_A_STAR_POSITION_EPSILON = 1.0E-9
-private const val SPEAR_KILL_A_STAR_POSITION_EPSILON_SQUARED = 1.0E-18
+internal const val SPEAR_KILL_A_STAR_POSITION_EPSILON_SQUARED = 1.0E-18
 private const val SPEAR_KILL_A_STAR_REPLAN_INTERVAL_TICKS = 3
 private const val SPEAR_KILL_A_STAR_REPLAN_DISTANCE_SQUARED = 0.5 * 0.5

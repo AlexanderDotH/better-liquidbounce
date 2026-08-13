@@ -20,7 +20,6 @@ package net.ccbluex.liquidbounce.features.module.modules.world.nuker
 
 import net.ccbluex.liquidbounce.config.types.list.ChoiceListValue
 import net.ccbluex.liquidbounce.test.MinecraftBootstrap
-import net.minecraft.core.BlockPos
 import net.minecraft.world.level.block.Blocks
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -56,35 +55,6 @@ class NukerBlockRuleTest {
         assertFalse(shouldNukerBreakImmediately(forceImmediateBreak = true, fastBreakRunning = true))
         assertTrue(shouldNukerBreakImmediately(forceImmediateBreak = true, fastBreakRunning = false))
         assertFalse(shouldNukerBreakImmediately(forceImmediateBreak = false, fastBreakRunning = false))
-    }
-
-    @Test
-    fun `only a player mining the crosshair block updates same block`() {
-        val minedPos = BlockPos(1, 2, 3)
-
-        assertTrue(isManualNukerSelection(true, minedPos, minedPos))
-        assertFalse(isManualNukerSelection(false, minedPos, minedPos))
-        assertFalse(isManualNukerSelection(true, BlockPos.ZERO, minedPos))
-        assertFalse(isManualNukerSelection(true, null, minedPos))
-    }
-
-    @Test
-    fun `player input override stays active for its full grace period and can be refreshed`() {
-        val override = NukerPlayerInputOverride(durationTicks = 3)
-
-        assertFalse(override.active)
-        override.activate()
-        assertTrue(override.active)
-
-        override.tick()
-        override.tick()
-        override.activate()
-        override.tick()
-        override.tick()
-        assertTrue(override.active)
-
-        override.tick()
-        assertFalse(override.active)
     }
 
     @Test

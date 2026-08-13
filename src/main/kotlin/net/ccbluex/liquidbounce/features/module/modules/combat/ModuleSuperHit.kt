@@ -94,6 +94,7 @@ object ModuleSuperHit : ClientModule("SuperHit", ModuleCategories.COMBAT, disabl
     private var setbackDetected = false
     private var executionGeneration = 0L
     private val executionMode = SuperHitExecutionMode()
+    private val automaticRetryGate = SuperHitAutomaticRetryGate(SUPER_HIT_AUTOMATIC_RETRY_DELAY_TICKS)
 
     private val aStarPathContext = Dispatchers.Default + CoroutineName("$name-AStar")
 
@@ -192,6 +193,7 @@ object ModuleSuperHit : ClientModule("SuperHit", ModuleCategories.COMBAT, disabl
         desyncPlayerPosition = null
         hoverTarget = null
         setbackDetected = isExecuting
+        automaticRetryGate.clear()
         super.onDisabled()
     }
 
@@ -215,7 +217,12 @@ object ModuleSuperHit : ClientModule("SuperHit", ModuleCategories.COMBAT, disabl
         target: LivingEntity,
         rotation: Rotation,
         keepSprint: Boolean,
+        automatedByKillAura: Boolean = false,
     ): Boolean {
+        val attemptTick = player.tickCount
+        if (automatedByKillAura && !automaticRetryGate.canAttempt(target.id, attemptTick)) {
+            return false
+        }
         if (!canStartAttack(target, rotation)) {
             return false
         }
@@ -227,8 +234,9 @@ object ModuleSuperHit : ClientModule("SuperHit", ModuleCategories.COMBAT, disabl
         val origin = player.position()
         val targetPos = target.position()
 
-        return try {
-            when (travelMode) {
+        var success = false
+        try {
+            success = when (travelMode) {
                 SuperHitMode.PACKET -> executePacketHit(
                     target, origin, targetPos, rotation, keepSprint, operationGeneration, travelMode
                 )
@@ -263,10 +271,27 @@ object ModuleSuperHit : ClientModule("SuperHit", ModuleCategories.COMBAT, disabl
                 )
             }
         } finally {
-            desyncPlayerPosition = null
-            isExecuting = false
-            setbackDetected = false
-            executionMode.clear()
+            finishAttack(target.id, attemptTick, automatedByKillAura, success)
+        }
+        return success
+    }
+
+    private fun finishAttack(
+        targetId: Int,
+        attemptTick: Int,
+        automatedByKillAura: Boolean,
+        success: Boolean,
+    ) {
+        desyncPlayerPosition = null
+        isExecuting = false
+        setbackDetected = false
+        executionMode.clear()
+        if (automatedByKillAura) {
+            if (success) {
+                automaticRetryGate.recordSuccess()
+            } else {
+                automaticRetryGate.recordFailure(targetId, attemptTick)
+            }
         }
     }
 
@@ -635,6 +660,31 @@ internal class SuperHitExecutionMode {
     }
 }
 
+/** Prevents automatic failed routes from being recomputed on every KillAura click. */
+internal class SuperHitAutomaticRetryGate(private val retryDelayTicks: Int) {
+    private var failedTargetId: Int? = null
+    private var retryAtTick = 0
+
+    init {
+        require(retryDelayTicks > 0) { "retryDelayTicks must be positive" }
+    }
+
+    fun canAttempt(targetId: Int, currentTick: Int): Boolean =
+        failedTargetId != targetId || currentTick >= retryAtTick
+
+    fun recordFailure(targetId: Int, currentTick: Int) {
+        failedTargetId = targetId
+        retryAtTick = currentTick + retryDelayTicks
+    }
+
+    fun recordSuccess() = clear()
+
+    fun clear() {
+        failedTargetId = null
+        retryAtTick = 0
+    }
+}
+
 internal enum class SuperHitMode(
     override val tag: String,
     override val tagAliases: List<String> = emptyList(),
@@ -778,6 +828,7 @@ internal data class SentinelSuperHitOutcome(val attacked: Boolean, val returned:
 }
 
 private const val SUPER_HIT_MIN_ATTACK_STRENGTH = 0.9f
+private const val SUPER_HIT_AUTOMATIC_RETRY_DELAY_TICKS = 10
 private const val SUPER_HIT_COLLISION_PADDING = 0.1
 private const val SUPER_HIT_DIRECTION_EPSILON = 1.0E-9
 private const val SENTINEL_HOME_DISTANCE_SQUARED = 4.0

@@ -22,14 +22,40 @@ import net.minecraft.world.phys.AABB
 import net.minecraft.world.phys.Vec3
 
 /**
- * Validates one direct Packet edge using the same acceptance boundary as the vanilla server.
+ * Validates one direct Packet edge with the same swept player-hitbox raycast used by A*.
  *
- * Unlike A* clearance, this deliberately does not reject every touched shape in the full swept
- * corridor. Vanilla first resolves the complete packet movement (including step-up), tolerates up
- * to 0.25 blocks of horizontal residual, ignores vertical residual for moved-wrongly detection,
- * and separately rejects a newly occupied destination.
+ * Direct routes intentionally reject any obstacle intersected by the actual body corridor. This
+ * avoids accepting a packet merely because an old movement simulation could step over or clip
+ * around a shape before the server evaluates the kinetic route.
  */
 internal fun createSpearKillDirectPacketSegmentValidator(
+    origin: Vec3,
+    playerBoundingBox: AABB,
+    hasHitboxRaycastCollision: (AABB, Vec3) -> Boolean,
+): SpearKillAStarSegmentValidator {
+    val results = HashMap<SpearKillDirectPacketSegment, Boolean>()
+    return SpearKillAStarSegmentValidator { from, to ->
+        if (!from.hasFiniteSpearKillDirectPacketCoordinates() ||
+            !to.hasFiniteSpearKillDirectPacketCoordinates()
+        ) {
+            false
+        } else {
+            val segment = SpearKillDirectPacketSegment(from, to)
+            results[segment] ?: (!hasHitboxRaycastCollision(
+                playerBoundingBox.move(from.subtract(origin)),
+                to.subtract(from),
+            )).also { results[segment] = it }
+        }
+    }
+}
+
+/**
+ * Final server-faithful preflight for a selected Packet edge.
+ *
+ * Search continues to use the cheaper swept-hitbox validator. Only the bounded route that may be
+ * emitted pays for vanilla collision resolution and the moved-wrongly residual check.
+ */
+internal fun createSpearKillServerPacketSegmentValidator(
     origin: Vec3,
     playerBoundingBox: AABB,
     hasDestinationCollision: (AABB) -> Boolean,
@@ -43,7 +69,7 @@ internal fun createSpearKillDirectPacketSegmentValidator(
             false
         } else {
             val segment = SpearKillDirectPacketSegment(from, to)
-            results[segment] ?: isSpearKillDirectPacketSegmentAccepted(
+            results[segment] ?: isSpearKillServerPacketSegmentAccepted(
                 origin = origin,
                 playerBoundingBox = playerBoundingBox,
                 from = from,
@@ -55,7 +81,8 @@ internal fun createSpearKillDirectPacketSegmentValidator(
     }
 }
 
-internal fun isSpearKillDirectPacketMovementAccepted(
+/** Mirrors the horizontal residual threshold used by the server's moved-wrongly check. */
+internal fun isSpearKillServerPacketMovementAccepted(
     requestedMovement: Vec3,
     resolvedMovement: Vec3,
 ): Boolean {
@@ -70,7 +97,7 @@ internal fun isSpearKillDirectPacketMovementAccepted(
     return residualX * residualX + residualZ * residualZ <= SPEAR_KILL_SERVER_MOVED_WRONGLY_THRESHOLD_SQUARED
 }
 
-private fun isSpearKillDirectPacketSegmentAccepted(
+private fun isSpearKillServerPacketSegmentAccepted(
     origin: Vec3,
     playerBoundingBox: AABB,
     from: Vec3,
@@ -95,8 +122,7 @@ private fun isSpearKillDirectPacketSegmentAccepted(
         rawMovementBox.maxY,
         rawMovementBox.maxZ,
     )
-    val resolvedMovement = resolveMovement(movementBox, requestedMovement)
-    return isSpearKillDirectPacketMovementAccepted(requestedMovement, resolvedMovement)
+    return isSpearKillServerPacketMovementAccepted(requestedMovement, resolveMovement(movementBox, requestedMovement))
 }
 
 private fun Vec3.hasFiniteSpearKillDirectPacketCoordinates(): Boolean =

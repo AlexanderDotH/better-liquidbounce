@@ -20,6 +20,8 @@
 package net.ccbluex.liquidbounce.features.module.modules.combat.killaura
 
 import kotlinx.coroutines.test.runTest
+import net.minecraft.world.phys.AABB
+import net.minecraft.world.phys.Vec3
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertTrue
@@ -32,46 +34,130 @@ class ModuleKillAuraSuperHitTest {
         assertEquals(
             KillAuraAttackRoute.NORMAL,
             selectKillAuraAttackRoute(
+                delegateKillAuraAttacks = true,
                 normalAttackPossible = true,
-                superHitRunning = true,
+                spearKillRunning = true,
+                spearKillTargetPossible = true,
+                superHitAvailable = true,
                 superHitTargetPossible = true,
             ),
         )
     }
 
     @Test
-    fun `distant target uses SuperHit only while both modules can handle it`() {
+    fun `SpearKill owns a distant target before SuperHit`() {
+        assertEquals(
+            KillAuraAttackRoute.SPEAR_KILL,
+            selectKillAuraAttackRoute(
+                delegateKillAuraAttacks = true,
+                normalAttackPossible = false,
+                spearKillRunning = true,
+                spearKillTargetPossible = true,
+                superHitAvailable = true,
+                superHitTargetPossible = true,
+            ),
+        )
         assertEquals(
             KillAuraAttackRoute.SUPER_HIT,
             selectKillAuraAttackRoute(
+                delegateKillAuraAttacks = true,
                 normalAttackPossible = false,
-                superHitRunning = true,
+                spearKillRunning = false,
+                spearKillTargetPossible = true,
+                superHitAvailable = true,
+                superHitTargetPossible = true,
+            ),
+        )
+    }
+
+    @Test
+    fun `global opt in gates every inherited KillAura attack route`() {
+        assertEquals(
+            KillAuraAttackRoute.NONE,
+            selectKillAuraAttackRoute(
+                delegateKillAuraAttacks = false,
+                normalAttackPossible = false,
+                spearKillRunning = true,
+                spearKillTargetPossible = true,
+                superHitAvailable = true,
+                superHitTargetPossible = true,
+            ),
+        )
+    }
+
+    @Test
+    fun `distant target uses SuperHit only while its integration is available`() {
+        assertEquals(
+            KillAuraAttackRoute.SUPER_HIT,
+            selectKillAuraAttackRoute(
+                delegateKillAuraAttacks = true,
+                normalAttackPossible = false,
+                superHitAvailable = true,
                 superHitTargetPossible = true,
             ),
         )
         assertEquals(
             KillAuraAttackRoute.NONE,
             selectKillAuraAttackRoute(
+                delegateKillAuraAttacks = true,
                 normalAttackPossible = false,
-                superHitRunning = false,
+                superHitAvailable = false,
                 superHitTargetPossible = true,
             ),
         )
         assertEquals(
             KillAuraAttackRoute.NONE,
             selectKillAuraAttackRoute(
+                delegateKillAuraAttacks = true,
                 normalAttackPossible = false,
-                superHitRunning = true,
+                superHitAvailable = true,
                 superHitTargetPossible = false,
             ),
         )
     }
 
     @Test
-    fun `SuperHit expands acquisition range only while it is running`() {
-        assertEquals(7f, calculateKillAuraTargetingRange(7f, false, 100f))
-        assertEquals(100f, calculateKillAuraTargetingRange(7f, true, 100f))
-        assertEquals(7f, calculateKillAuraTargetingRange(7f, true, 5f))
+    fun `SuperHit expands acquisition range only while its integration is available`() {
+        assertEquals(7f, calculateKillAuraTargetingRange(false, 7f, true, 100f, true, 500f))
+        assertEquals(7f, calculateKillAuraTargetingRange(true, 7f, false, 100f))
+        assertEquals(100f, calculateKillAuraTargetingRange(true, 7f, true, 100f))
+        assertEquals(7f, calculateKillAuraTargetingRange(true, 7f, true, 5f))
+        assertEquals(500f, calculateKillAuraTargetingRange(true, 7f, true, 100f, true, 500f))
+    }
+
+    @Test
+    fun `delegated attacks bypass KillAura continuous aiming and range-exit prediction`() {
+        assertTrue(shouldUseKillAuraAimPipeline(false, false))
+        assertFalse(shouldUseKillAuraAimPipeline(true, false))
+        assertFalse(shouldUseKillAuraAimPipeline(false, true))
+        assertTrue(shouldPredictKillAuraRangeExit(delegatedSuperHit = false))
+        assertFalse(shouldPredictKillAuraRangeExit(delegatedSuperHit = true))
+    }
+
+    @Test
+    fun `SuperHit dispatch uses a stable center rotation without pitching vertically`() {
+        val rotation = calculateKillAuraDelegatedAttackRotation(
+            eyes = Vec3(0.0, 65.62, 0.0),
+            targetBox = AABB(9.7, 64.0, -0.3, 10.3, 65.8, 0.3),
+        )
+
+        assertEquals(-90f, rotation.yaw, 0.001f)
+        assertTrue(rotation.pitch in 0f..10f, "pitch=${rotation.pitch}")
+    }
+
+    @Test
+    fun `SpearKill route never invokes KillAura attacks or success bookkeeping`() = runTest {
+        var successfulAttacks = 0
+
+        val success = executeKillAuraAttack(
+            route = KillAuraAttackRoute.SPEAR_KILL,
+            normalAttack = { error("normal attack must remain suppressed") },
+            superHitAttack = { error("SuperHit must remain suppressed") },
+            onSuccess = { successfulAttacks++ },
+        )
+
+        assertFalse(success)
+        assertEquals(0, successfulAttacks)
     }
 
     @Test

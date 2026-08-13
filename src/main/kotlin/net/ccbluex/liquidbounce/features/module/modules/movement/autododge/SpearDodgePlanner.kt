@@ -292,4 +292,21 @@ object AutoDodgeMovementArbitrator {
     fun choose(projectilePlan: DodgePlan?, spearPlan: SpearDodgePlan?): DodgePlan? {
         return projectilePlan ?: spearPlan?.asDodgePlan()
     }
+
+    fun chooseAction(
+        projectilePlan: DodgePlan?,
+        spearTeleportPlan: SpearTeleportPlan?,
+        spearPlan: SpearDodgePlan?,
+    ): AutoDodgeMovementAction = when {
+        projectilePlan != null -> AutoDodgeMovementAction.Dodge(projectilePlan)
+        spearTeleportPlan != null -> AutoDodgeMovementAction.Teleport(spearTeleportPlan)
+        spearPlan != null -> AutoDodgeMovementAction.Dodge(spearPlan.asDodgePlan())
+        else -> AutoDodgeMovementAction.None
+    }
+}
+
+sealed interface AutoDodgeMovementAction {
+    data class Dodge(val plan: DodgePlan) : AutoDodgeMovementAction
+    data class Teleport(val plan: SpearTeleportPlan) : AutoDodgeMovementAction
+    data object None : AutoDodgeMovementAction
 }

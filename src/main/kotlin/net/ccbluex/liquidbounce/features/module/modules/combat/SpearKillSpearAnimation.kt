@@ -102,3 +102,19 @@ internal fun shouldAccelerateSpearKillCharge(
     isUsingSpear &&
     delayTicks >= 0 &&
     ticksUsingItem <= delayTicks
+
+/** FightBot charges at the normal rate and never owns the manual movement-packet acceleration burst. */
+internal fun shouldAccelerateSpearKillChargeForRequest(
+    attackPathActive: Boolean,
+    fightBotRequestActive: Boolean,
+    physicalUseInputHeld: Boolean,
+    isUsingSpear: Boolean,
+    ticksUsingItem: Int,
+    delayTicks: Int,
+): Boolean = !fightBotRequestActive && shouldAccelerateSpearKillCharge(
+    attackPathActive = attackPathActive,
+    isUseKeyDown = physicalUseInputHeld,
+    isUsingSpear = isUsingSpear,
+    ticksUsingItem = ticksUsingItem,
+    delayTicks = delayTicks,
+)

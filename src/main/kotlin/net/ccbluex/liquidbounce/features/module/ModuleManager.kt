@@ -40,6 +40,7 @@ import net.ccbluex.liquidbounce.features.module.modules.combat.ModuleAutoRod
 import net.ccbluex.liquidbounce.features.module.modules.combat.ModuleAutoShoot
 import net.ccbluex.liquidbounce.features.module.modules.combat.ModuleAutoWeapon
 import net.ccbluex.liquidbounce.features.module.modules.combat.ModuleFakeLag
+import net.ccbluex.liquidbounce.features.module.modules.combat.ModuleFightBot
 import net.ccbluex.liquidbounce.features.module.modules.combat.ModuleHitbox
 import net.ccbluex.liquidbounce.features.module.modules.combat.ModuleKeepSprint
 import net.ccbluex.liquidbounce.features.module.modules.combat.ModuleMaceKill
@@ -253,6 +254,7 @@ import net.ccbluex.liquidbounce.features.module.modules.world.ModuleBlockTrap
 import net.ccbluex.liquidbounce.features.module.modules.world.ModuleExtinguish
 import net.ccbluex.liquidbounce.features.module.modules.world.ModuleFastBreak
 import net.ccbluex.liquidbounce.features.module.modules.world.ModuleFastPlace
+import net.ccbluex.liquidbounce.features.module.modules.world.ModuleGroundSpoof
 import net.ccbluex.liquidbounce.features.module.modules.world.ModuleHoleFiller
 import net.ccbluex.liquidbounce.features.module.modules.world.ModuleLiquidFiller
 import net.ccbluex.liquidbounce.features.module.modules.world.ModuleLiquidPlace
@@ -477,6 +479,7 @@ object ModuleManager : EventListener, Collection<ClientModule> by modules {
             ModuleFakeLag,
             ModuleCriticals,
             ModuleHitbox,
+            ModuleFightBot,
             ModuleKillAura,
             ModuleTpAura,
             ModuleSuperHit,
@@ -699,6 +702,7 @@ object ModuleManager : EventListener, Collection<ClientModule> by modules {
             ModuleCrystalAura,
             ModuleFastBreak,
             ModuleFastPlace,
+            ModuleGroundSpoof,
             ModuleFucker,
             ModuleAutoTrap,
             ModuleBlockTrap,

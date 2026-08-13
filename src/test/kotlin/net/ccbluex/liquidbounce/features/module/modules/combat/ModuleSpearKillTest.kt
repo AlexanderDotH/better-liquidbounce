@@ -24,6 +24,7 @@ import com.google.gson.JsonParser
 import net.ccbluex.liquidbounce.config.gson.fileGson
 import net.ccbluex.liquidbounce.config.gson.interopGson
 import net.ccbluex.liquidbounce.config.types.RangedValue
+import net.ccbluex.liquidbounce.config.types.list.ChoiceListValue
 import net.ccbluex.liquidbounce.config.types.group.ModeValueGroup
 import net.ccbluex.liquidbounce.config.types.group.ToggleableValueGroup
 import net.ccbluex.liquidbounce.common.ShapeFlag
@@ -62,67 +63,113 @@ class ModuleSpearKillTest {
     }
 
     @Test
+    fun `SpearKill exposes the requested setting order and fresh defaults`() {
+        assertEquals(
+            listOf(
+                "Hidden",
+                "TargetDistance",
+                "Speed",
+                "Activation",
+                "TargetSource",
+                "Movement",
+                "SneakWhileMoving",
+                "ElytraWhileMoving",
+                "Preview",
+            ),
+            ModuleSpearKill.inner.dropWhile { it.name != "Hidden" }.map { it.name },
+        )
+        assertEquals(
+            SpearKillActivationMode.Manual,
+            ModuleSpearKill.inner.single { it.name == "Activation" }.get(),
+        )
+        assertEquals(
+            SpearKillTargetSource.Crosshair,
+            ModuleSpearKill.inner.single { it.name == "TargetSource" }.get(),
+        )
+        @Suppress("UNCHECKED_CAST")
+        val targetSource = ModuleSpearKill.inner.single { it.name == "TargetSource" }
+            as ChoiceListValue<SpearKillTargetSource>
+        assertEquals(setOf("Crosshair", "Combat"), targetSource.choices.map { it.tag }.toSet())
+
+        assertEquals(
+            SpearKillMovementAssistMode.NONE,
+            ModuleSpearKill.inner.single { it.name == "SneakWhileMoving" }.get(),
+        )
+        assertEquals(
+            SpearKillMovementAssistMode.NONE,
+            ModuleSpearKill.inner.single { it.name == "ElytraWhileMoving" }.get(),
+        )
+    }
+
+    @Test
     @Suppress("UNCHECKED_CAST", "LongMethod")
-    fun `Movement nests AStar packet controls with safe defaults`() {
+    fun `Movement nests AStar controls under the Routing choice`() {
         val configuration = SpearKillMovementConfiguration(null)
         val movement = configuration.choice
 
-        assertEquals("Motion", movement.activeMode.name)
+        assertEquals("Packet", movement.activeMode.name)
         assertEquals(
             mapOf(
-                "Motion" to listOf("StepLimit"),
-                "Packet" to listOf("StepLimit", "WaitTicks", "Elytra", "AStar"),
+                "Motion" to listOf("StepDistance"),
+                "Packet" to listOf("StepDistance", "StepDelay", "Routing"),
             ),
             movement.modes.associate { it.name to it.inner.map { value -> value.name } },
         )
+        val routing = configuration.packet.routing
+        assertEquals("Direct", routing.activeMode.name)
         assertEquals(
-            listOf("Enabled", "MaxSpeed"),
-            configuration.packet.elytra.inner.map { it.name },
-        )
-        assertEquals(
-            listOf(
-                "Enabled",
-                "MaxCost",
-                "Diagonal",
-                "LineOfSightShortcuts",
-                "RenderPath",
+            mapOf(
+                "Direct" to emptyList(),
+                "AStar" to listOf("MaxCost", "Diagonal", "LineOfSightShortcuts"),
             ),
-            configuration.packet.aStar.inner.map { it.name },
+            routing.modes.associate { it.name to it.inner.map { value -> value.name } },
         )
-        val motionStepLimit = configuration.motion.inner.single { it.name == "StepLimit" } as RangedValue<Float>
-        val packetStepLimit = configuration.packet.inner.single { it.name == "StepLimit" } as RangedValue<Float>
-        val packetWaitTicks = configuration.packet.inner.single { it.name == "WaitTicks" } as RangedValue<Int>
-        assertEquals(10f, motionStepLimit.get())
-        assertEquals(17.32f, packetStepLimit.get())
-        assertEquals(2f..10f, motionStepLimit.range)
-        assertEquals(2f..17.32f, packetStepLimit.range)
-        assertEquals(0, packetWaitTicks.get())
-        assertEquals(0..4, packetWaitTicks.range)
+        val motionStepDistance = configuration.motion.inner.single {
+            it.name == "StepDistance"
+        } as RangedValue<Float>
+        val packetStepDistance = configuration.packet.inner.single {
+            it.name == "StepDistance"
+        } as RangedValue<Float>
+        val packetStepDelay = configuration.packet.inner.single {
+            it.name == "StepDelay"
+        } as RangedValue<Int>
+        assertEquals(10f, motionStepDistance.get())
+        assertEquals(17.32f, packetStepDistance.get())
+        assertEquals(2f..17.32f, motionStepDistance.range)
+        assertEquals(2f..17.32f, packetStepDistance.range)
+        assertEquals(listOf("StepsPerTeleport", "StepLimit"), motionStepDistance.aliases)
+        assertEquals(listOf("StepsPerTeleport", "StepLimit"), packetStepDistance.aliases)
+        assertEquals(0, packetStepDelay.get())
+        assertEquals(0..4, packetStepDelay.range)
+        assertEquals(listOf("WaitBeforeTeleport", "WaitTicks"), packetStepDelay.aliases)
 
         val serializedMovement = fileGson.toJsonTree(movement, ModeValueGroup::class.java).asJsonObject
-        val serializedElytra = serializedMovement.getAsJsonObject("choices")
-            .choiceValue("Packet", "Elytra")
-        val serializedAStar = serializedMovement.getAsJsonObject("choices")
-            .choiceValue("Packet", "AStar")
+        val serializedRouting = serializedMovement.getAsJsonObject("choices")
+            .choiceValue("Packet", "Routing")
+        val serializedAStar = serializedRouting.getAsJsonObject("choices").getAsJsonObject("AStar")
 
-        assertFalse(serializedElytra.settingValue("Enabled").asBoolean)
-        assertEquals(17.32f, serializedElytra.settingValue("MaxSpeed").asFloat)
-        assertFalse(serializedAStar.settingValue("Enabled").asBoolean)
+        assertEquals(
+            "Direct",
+            serializedRouting["active"].asString,
+        )
+        assertEquals(setOf("Direct", "AStar"), serializedRouting.getAsJsonObject("choices").keySet())
         assertEquals(250, serializedAStar.settingValue("MaxCost").asInt)
         assertFalse(serializedAStar.settingValue("Diagonal").asBoolean)
         assertFalse(serializedAStar.settingValue("LineOfSightShortcuts").asBoolean)
-        assertFalse(serializedAStar.settingValue("RenderPath").asBoolean)
         assertEquals(
             10f,
-            serializedMovement.getAsJsonObject("choices").choiceValue("Motion", "StepLimit")["value"].asFloat,
+            serializedMovement.getAsJsonObject("choices")
+                .choiceValue("Motion", "StepDistance")["value"].asFloat,
         )
         assertEquals(
             17.32f,
-            serializedMovement.getAsJsonObject("choices").choiceValue("Packet", "StepLimit")["value"].asFloat,
+            serializedMovement.getAsJsonObject("choices")
+                .choiceValue("Packet", "StepDistance")["value"].asFloat,
         )
         assertEquals(
             0,
-            serializedMovement.getAsJsonObject("choices").choiceValue("Packet", "WaitTicks")["value"].asInt,
+            serializedMovement.getAsJsonObject("choices")
+                .choiceValue("Packet", "StepDelay")["value"].asInt,
         )
 
         try {
@@ -137,133 +184,18 @@ class ModuleSpearKillTest {
 
     @Test
     @Suppress("UNCHECKED_CAST")
-    fun `normal and Elytra speed sliders expose their server-safe caps`() {
-        val maxSpeed = ModuleSpearKill.inner.single { it.name == "MaxSpeed" } as RangedValue<Float>
-        val configuration = SpearKillMovementConfiguration(null)
-        val elytraMaxSpeed = configuration.packet.elytra.inner.single { it.name == "MaxSpeed" } as RangedValue<Float>
+    fun `one Speed slider exposes the merged movement range`() {
+        val maxSpeed = ModuleSpearKill.inner.single { it.name == "Speed" } as RangedValue<Float>
 
         assertEquals(10f, maxSpeed.get())
-        assertEquals(2f..10f, maxSpeed.range)
-        assertEquals(17.32f, elytraMaxSpeed.get())
-        assertEquals(2f..17.32f, elytraMaxSpeed.range)
+        assertEquals(2f..17.32f, maxSpeed.range)
         try {
-            maxSpeed.set(11f)
-            elytraMaxSpeed.set(18f)
+            maxSpeed.set(18f)
 
-            assertEquals(10f, maxSpeed.get())
-            assertEquals(17.32f, elytraMaxSpeed.get())
+            assertEquals(17.32f, maxSpeed.get())
         } finally {
             maxSpeed.restore()
-            elytraMaxSpeed.restore()
         }
-    }
-
-    @Test
-    fun `flat Movement values migrate to canonical nested choices`() {
-        mapOf(
-            "Motion" to "Motion",
-            "Packet" to "Packet",
-            "PacketBoot" to "Packet",
-            "Packet-Boot" to "Packet",
-        ).forEach { (savedName, expectedActive) ->
-            val legacy = legacySpearKillMovementConfig(savedName)
-
-            migrateLegacySpearKillMovementConfig(legacy)
-
-            val movement = legacy.spearKillMovement()
-            val choices = movement.getAsJsonObject("choices")
-            assertEquals(expectedActive, movement["active"].asString)
-            assertEquals(setOf("Motion", "Packet"), choices.keySet())
-            assertEquals(emptyList<String>(), choices.choiceValues("Motion"))
-            assertEquals(emptyList<String>(), choices.choiceValues("Packet"))
-            assertEquals(listOf("Movement"), legacy.getAsJsonArray("value").map { it.asJsonObject["name"].asString })
-        }
-    }
-
-    @Test
-    fun `nested Movement config remains unchanged during migration`() {
-        val nested = JsonParser.parseString(
-            """
-            {
-              "name": "SpearKill",
-              "value": [
-                {
-                  "name": "Movement",
-                  "active": "Packet",
-                  "value": [],
-                  "choices": {
-                    "Motion": { "name": "Motion", "value": [] },
-                    "Packet": {
-                      "name": "Packet",
-                      "value": [
-                        {
-                          "name": "AStar",
-                          "value": [
-                            { "name": "Enabled", "value": true },
-                            { "name": "MaxCost", "value": 321 },
-                            { "name": "Diagonal", "value": true }
-                          ]
-                        }
-                      ]
-                    }
-                  }
-                }
-              ]
-            }
-            """.trimIndent(),
-        ).asJsonObject
-        val original = nested.deepCopy()
-
-        migrateLegacySpearKillMovementConfig(nested)
-
-        assertEquals(original, nested)
-    }
-
-    @Test
-    fun `legacy AStar wait moves to the shared Packet wait idempotently`() {
-        val nested = JsonParser.parseString(
-            """
-            {
-              "name": "SpearKill",
-              "value": [
-                {
-                  "name": "Movement",
-                  "active": "Packet",
-                  "value": [],
-                  "choices": {
-                    "Motion": { "name": "Motion", "value": [] },
-                    "Packet": {
-                      "name": "Packet",
-                      "value": [
-                        { "name": "WaitTicks", "value": 1 },
-                        {
-                          "name": "AStar",
-                          "value": [
-                            { "name": "Enabled", "value": true },
-                            { "name": "WaitTicks", "value": 3 },
-                            { "name": "MaxCost", "value": 321 }
-                          ]
-                        }
-                      ]
-                    }
-                  }
-                }
-              ]
-            }
-            """.trimIndent(),
-        ).asJsonObject
-
-        migrateLegacySpearKillMovementConfig(nested)
-
-        val packetValues = nested.spearKillMovement().getAsJsonObject("choices")
-            .getAsJsonObject("Packet").getAsJsonArray("value").map { it.asJsonObject }
-        val aStar = packetValues.single { it["name"].asString == "AStar" }
-        assertEquals(3, packetValues.single { it["name"].asString == "WaitTicks" }["value"].asInt)
-        assertTrue(aStar.getAsJsonArray("value").none { it.asJsonObject["name"].asString == "WaitTicks" })
-
-        val once = nested.deepCopy()
-        migrateLegacySpearKillMovementConfig(nested)
-        assertEquals(once, nested)
     }
 
     @Test
@@ -422,6 +354,34 @@ class ModuleSpearKillTest {
                 isUseKeyDown = false,
                 isUsingSpear = true,
                 ticksUsingItem = 2,
+                delayTicks = 3,
+            ),
+        )
+    }
+
+    @Test
+    fun `FightBot charging never emits the manual packet acceleration burst`() {
+        assertFalse(
+            shouldAccelerateSpearKillChargeForRequest(
+                attackPathActive = false,
+                fightBotRequestActive = true,
+                physicalUseInputHeld = false,
+                isUsingSpear = true,
+                ticksUsingItem = 1,
+                delayTicks = 3,
+            ),
+        )
+    }
+
+    @Test
+    fun `physical spear charging preserves acceleration outside FightBot ownership`() {
+        assertTrue(
+            shouldAccelerateSpearKillChargeForRequest(
+                attackPathActive = false,
+                fightBotRequestActive = false,
+                physicalUseInputHeld = true,
+                isUsingSpear = true,
+                ticksUsingItem = 1,
                 delayTicks = 3,
             ),
         )
@@ -764,7 +724,7 @@ class ModuleSpearKillTest {
     }
 
     @Test
-    fun `swept segment validator follows the corridor instead of its full bounding rectangle`() {
+    fun `swept segment validator follows the hitbox corridor instead of its full bounding rectangle`() {
         val playerBox = AABB(-0.3, 0.0, -0.3, 0.3, 1.8, 0.3)
         val offCorridorObstacle = AABB(0.0, 0.0, 9.0, 1.0, 2.0, 10.0)
         val onCorridorObstacle = AABB(4.5, 0.0, 4.5, 5.5, 2.0, 5.5)
@@ -774,14 +734,16 @@ class ModuleSpearKillTest {
         val offCorridorValidator = createSpearKillAStarSegmentValidator(
             origin = from,
             playerBoundingBox = playerBox,
-            hasCollision = { it.intersects(offCorridorObstacle) },
-            resolveMovement = { _, movement -> movement },
+            hasHitboxRaycastCollision = { box, movement ->
+                hasSpearKillHitboxRaycastCollision(box, movement, listOf(offCorridorObstacle))
+            },
         )
         val onCorridorValidator = createSpearKillAStarSegmentValidator(
             origin = from,
             playerBoundingBox = playerBox,
-            hasCollision = { it.intersects(onCorridorObstacle) },
-            resolveMovement = { _, movement -> movement },
+            hasHitboxRaycastCollision = { box, movement ->
+                hasSpearKillHitboxRaycastCollision(box, movement, listOf(onCorridorObstacle))
+            },
         )
 
         assertTrue(offCorridorValidator.isClear(from, to))
@@ -789,41 +751,23 @@ class ModuleSpearKillTest {
     }
 
     @Test
-    fun `long diagonal validation never submits one huge rectangle to the world`() {
-        var largestHorizontalArea = 0.0
+    fun `long diagonal validation performs one cached hitbox raycast`() {
+        var raycasts = 0
+        var castMovement: Vec3? = null
         val validator = createSpearKillAStarSegmentValidator(
             origin = Vec3.ZERO,
             playerBoundingBox = AABB(-0.3, 0.0, -0.3, 0.3, 1.8, 0.3),
-            hasCollision = { box ->
-                largestHorizontalArea = maxOf(
-                    largestHorizontalArea,
-                    (box.maxX - box.minX) * (box.maxZ - box.minZ),
-                )
+            hasHitboxRaycastCollision = { _, movement ->
+                raycasts++
+                castMovement = movement
                 false
             },
-            resolveMovement = { _, movement -> movement },
         )
 
         assertTrue(validator.isClear(Vec3.ZERO, Vec3(100.0, 0.0, 100.0)))
-        assertTrue(largestHorizontalArea < 16.0, "Submitted area was $largestHorizontalArea")
-    }
-
-    @Test
-    fun `segment validator rejects movement clipped by server collision resolution`() {
-        var resolvedBox: AABB? = null
-        val validator = createSpearKillAStarSegmentValidator(
-            origin = Vec3.ZERO,
-            playerBoundingBox = AABB(-0.3, 0.0, -0.3, 0.3, 1.8, 0.3),
-            hasCollision = { false },
-            resolveMovement = { box, movement ->
-                resolvedBox = box
-                movement.multiply(0.5, 1.0, 1.0)
-            },
-        )
-
-        assertFalse(validator.isClear(Vec3.ZERO, Vec3(4.0, 0.0, 0.0)))
-        assertTrue(resolvedBox!!.xsize > 0.6)
-        assertEquals(1.8, resolvedBox!!.ysize, 1e-9)
+        assertTrue(validator.isClear(Vec3.ZERO, Vec3(100.0, 0.0, 100.0)))
+        assertEquals(1, raycasts)
+        assertVec3Equals(Vec3(100.0, 0.0, 100.0), castMovement!!, 1e-9)
     }
 
     @Test
@@ -843,80 +787,79 @@ class ModuleSpearKillTest {
     }
 
     @Test
-    fun `server collision margin grows for diagonal elevation edges`() {
-        val axisAligned = spearKillAStarServerCollisionMargin(Vec3(1.0, 0.0, 0.0))
-        val diagonal = spearKillAStarServerCollisionMargin(Vec3(1.0, 0.0, 1.0))
-        val diagonalElevation = spearKillAStarServerCollisionMargin(Vec3(1.0, 1.0, 1.0))
-
-        assertTrue(axisAligned.horizontal < diagonal.horizontal)
-        assertTrue(diagonal.horizontal < diagonalElevation.horizontal)
-        assertEquals(0.0, axisAligned.vertical, 1e-9)
-        assertTrue(diagonalElevation.vertical > 0.0)
-    }
-
-    @Test
-    fun `direct Packet mirrors vanilla horizontal residual tolerance and ignores vertical clipping`() {
-        val requested = Vec3(4.0, 0.4, 0.0)
-
-        assertTrue(
-            isSpearKillDirectPacketMovementAccepted(
-                requestedMovement = requested,
-                resolvedMovement = Vec3(3.75, 0.0, 0.0),
-            ),
-        )
-        assertFalse(
-            isSpearKillDirectPacketMovementAccepted(
-                requestedMovement = requested,
-                resolvedMovement = Vec3(3.749, 0.4, 0.0),
-            ),
-        )
-    }
-
-    @Test
-    fun `direct Packet validates one complete edge without rejecting a traversable terrain lip`() {
+    fun `direct Packet hitbox raycast rejects a terrain lip across the route`() {
         val origin = Vec3.ZERO
         val destination = Vec3(4.0, 0.0, 0.0)
         val terrainLip = AABB(1.0, 0.0, -0.3, 1.5, 0.4, 0.3)
-        var destinationChecks = 0
-        var resolveCalls = 0
-        var resolvedRequest: Vec3? = null
 
         val validator = createSpearKillDirectPacketSegmentValidator(
             origin = origin,
             playerBoundingBox = AABB(-0.3, 0.0, -0.3, 0.3, 1.8, 0.3),
-            hasDestinationCollision = { box ->
-                destinationChecks++
-                box.intersects(terrainLip)
-            },
-            resolveMovement = { _, movement ->
-                resolveCalls++
-                resolvedRequest = movement
-                movement
+            hasHitboxRaycastCollision = { box, movement ->
+                hasSpearKillHitboxRaycastCollision(box, movement, listOf(terrainLip))
             },
         )
 
-        assertTrue(validator.isClear(origin, destination))
-        assertEquals(1, destinationChecks)
-        assertEquals(1, resolveCalls)
-        assertVec3Equals(destination, resolvedRequest!!, 1e-9)
+        assertFalse(validator.isClear(origin, destination))
     }
 
     @Test
-    fun `direct Packet rejects an occupied endpoint and wall-sized horizontal clipping`() {
+    fun `server preflight rejects movement that would trigger moved wrongly`() {
+        val requested = Vec3(17.32, 0.0, 0.0)
+
+        assertTrue(
+            isSpearKillServerPacketMovementAccepted(
+                requestedMovement = requested,
+                resolvedMovement = Vec3(17.1, 0.0, 0.0),
+            ),
+        )
+        assertFalse(
+            isSpearKillServerPacketMovementAccepted(
+                requestedMovement = requested,
+                resolvedMovement = Vec3(17.0, 0.0, 0.0),
+            ),
+        )
+    }
+
+    @Test
+    fun `server packet validator rejects a terrain-clipped Elytra step`() {
+        val origin = Vec3.ZERO
+        val validator = createSpearKillServerPacketSegmentValidator(
+            origin = origin,
+            playerBoundingBox = AABB(-0.3, 0.0, -0.3, 0.3, 1.8, 0.3),
+            hasDestinationCollision = { false },
+            resolveMovement = { _, movement -> movement.subtract(0.32, 0.0, 0.0) },
+        )
+
+        assertFalse(validator.isClear(origin, origin.add(17.32, 0.0, 0.0)))
+    }
+
+    @Test
+    fun `direct Packet hitbox raycast rejects an occupied endpoint and wall`() {
         val origin = Vec3.ZERO
         val destination = Vec3(4.0, 0.0, 0.0)
         val playerBox = AABB(-0.3, 0.0, -0.3, 0.3, 1.8, 0.3)
         val occupiedDestination = createSpearKillDirectPacketSegmentValidator(
             origin = origin,
             playerBoundingBox = playerBox,
-            hasDestinationCollision = { true },
-            resolveMovement = { _, movement -> movement },
+            hasHitboxRaycastCollision = { box, movement ->
+                hasSpearKillHitboxRaycastCollision(
+                    box,
+                    movement,
+                    listOf(AABB(3.8, 0.0, -0.3, 4.5, 1.8, 0.3)),
+                )
+            },
         )
         val clippedByWall = createSpearKillDirectPacketSegmentValidator(
             origin = origin,
             playerBoundingBox = playerBox,
-            hasDestinationCollision = { false },
-            resolveMovement = { _, movement -> movement.multiply(0.5, 1.0, 1.0) },
+            hasHitboxRaycastCollision = { box, movement ->
+                hasSpearKillHitboxRaycastCollision(
+                    box,
+                    movement,
+                    listOf(AABB(1.5, 0.0, -0.3, 2.0, 1.8, 0.3)),
+                )
+            },
         )
 
         assertFalse(occupiedDestination.isClear(origin, destination))
@@ -924,28 +867,19 @@ class ModuleSpearKillTest {
     }
 
     @Test
-    fun `elevation plus horizontal movement requires both axis order resolves`() {
+    fun `AStar hitbox raycast rejects an elevated diagonal obstacle`() {
         val from = Vec3.ZERO
-        val to = Vec3(1.0, 1.0, 0.0)
-        var resolveCalls = 0
+        val to = Vec3(2.0, 1.0, 0.0)
+        val obstacle = AABB(0.9, 2.0, -0.2, 1.3, 2.5, 0.2)
         val validator = createSpearKillAStarSegmentValidator(
             origin = from,
             playerBoundingBox = AABB(-0.3, 0.0, -0.3, 0.3, 1.8, 0.3),
-            hasCollision = { false },
-            resolveMovement = { _, movement ->
-                resolveCalls++
-                // Clip only the pure horizontal leg that starts after climbing — Y-then-XZ fails,
-                // matching stepped sand lips that reject a single 3D packet.
-                if (abs(movement.y) <= 1e-9 && abs(movement.x) > 0.0) {
-                    movement.multiply(0.5, 1.0, 1.0)
-                } else {
-                    movement
-                }
+            hasHitboxRaycastCollision = { box, movement ->
+                hasSpearKillHitboxRaycastCollision(box, movement, listOf(obstacle))
             },
         )
 
         assertFalse(validator.isClear(from, to))
-        assertTrue(resolveCalls > 1)
     }
 
     @Test
@@ -1045,7 +979,7 @@ class ModuleSpearKillTest {
         val outbound = buildSpearKillAStarOutboundMovements(
             origin = approach.plannerGoal,
             waypoints = listOf(approach.terminalWaypoint),
-            maxSpeed = effectiveSpearKillPacketSpeed(7.0),
+            maxSpeed = resolveSpearKillMovementTransport(7.0, 17.32, elytraActive = false).maxSpeed,
             segmentValidator = SpearKillAStarSegmentValidator { _, _ -> true },
         )!!
 
@@ -1249,50 +1183,6 @@ class ModuleSpearKillTest {
 
         assertTrue(usable.isNotEmpty())
         assertTrue(usable.all { approach -> approach.terminalWaypoint.subtract(approach.plannerGoal).x == 0.0 })
-    }
-
-    @Test
-    fun `Packet speed uses the normal or Elytra server-safe cap`() {
-        assertEquals(7.0, effectiveSpearKillPacketSpeed(7.0), 1e-9)
-        assertEquals(10.0, effectiveSpearKillPacketSpeed(10.0), 1e-9)
-        assertEquals(10.0, effectiveSpearKillPacketSpeed(20.0), 1e-9)
-        assertEquals(17.32, effectiveSpearKillPacketSpeed(20.0, elytra = true), 1e-9)
-    }
-
-    @Test
-    fun `StepLimit caps normal and Elytra Packet movement independently`() {
-        assertEquals(3.0, effectiveSpearKillStepLimit(30.0, 3.0, packetMode = false), 1e-9)
-        assertEquals(3.0, effectiveSpearKillStepLimit(30.0, 3.0, packetMode = true), 1e-9)
-        assertEquals(3.0, effectiveSpearKillStepLimit(3.0, 30.0, packetMode = false), 1e-9)
-        assertEquals(10.0, effectiveSpearKillStepLimit(30.0, 30.0, packetMode = true), 1e-9)
-        assertEquals(
-            17.32,
-            effectiveSpearKillStepLimit(30.0, 30.0, packetMode = true, packetElytra = true),
-            1e-9,
-        )
-    }
-
-    @Test
-    fun `Packet transport uses Elytra speed only when safe flight is available`() {
-        val normal = resolveSpearKillPacketTransport(
-            elytraEnabled = true,
-            elytraReady = false,
-            normalMaxSpeed = 10.0,
-            elytraMaxSpeed = 17.32,
-            configuredStepLimit = 17.32,
-        )
-        val elytra = resolveSpearKillPacketTransport(
-            elytraEnabled = true,
-            elytraReady = true,
-            normalMaxSpeed = 10.0,
-            elytraMaxSpeed = 17.32,
-            configuredStepLimit = 17.32,
-        )
-
-        assertFalse(normal.elytra)
-        assertEquals(10.0, normal.stepLimit, 1e-9)
-        assertTrue(elytra.elytra)
-        assertEquals(17.32, elytra.stepLimit, 1e-9)
     }
 
     @Test
@@ -1716,6 +1606,13 @@ class ModuleSpearKillTest {
 
         assertEquals(listOf(origin, firstWaypoint, secondWaypoint), renderPath)
         assertFalse(shouldRenderSpearKillAStarPath(
+            previewEnabled = false,
+            packetAStarEnabled = true,
+            renderPathEnabled = true,
+            renderPath = renderPath,
+        ))
+        assertFalse(shouldRenderSpearKillAStarPath(
+            previewEnabled = true,
             packetAStarEnabled = false,
             renderPathEnabled = true,
             renderPath = renderPath,
@@ -1731,6 +1628,7 @@ class ModuleSpearKillTest {
             renderPath = listOf(origin),
         ))
         assertTrue(shouldRenderSpearKillAStarPath(
+            previewEnabled = true,
             packetAStarEnabled = true,
             renderPathEnabled = true,
             renderPath = renderPath,
@@ -1764,7 +1662,8 @@ class ModuleSpearKillTest {
             .filterIsInstance<ModeValueGroup<*>>()
             .single { it.name == "Mode" }
 
-        assertEquals(listOf("Enabled", "Mode"), preview.inner.map { it.name })
+        assertEquals(listOf("Enabled", "RenderPath", "Mode"), preview.inner.map { it.name })
+        assertFalse(preview.inner.single { it.name == "RenderPath" }.get() as Boolean)
         assertEquals("Box", mode.activeMode.name)
         assertEquals(
             mapOf(
@@ -2556,6 +2455,24 @@ class ModuleSpearKillTest {
     }
 
     @Test
+    fun `selected round trip is rejected before emission when one server step clips`() {
+        val origin = Vec3(10.0, 64.0, 2.0)
+        val route = SpearKillAStarPacketRoute(
+            outboundMovements = listOf(Vec3(17.32, 0.0, 0.0)),
+            roundTripMovements = listOf(
+                Vec3(17.32, 0.0, 0.0),
+                Vec3(-17.32, 0.0, 0.0),
+                Vec3.ZERO,
+            ),
+        )
+        val validator = SpearKillAStarSegmentValidator { from, to ->
+            to.subtract(from).x <= 17.0
+        }
+
+        assertFalse(isSpearKillPacketRouteServerAccepted(origin, route, validator))
+    }
+
+    @Test
     fun `unsafe pending outbound step returns along only confirmed movement`() {
         val firstMovement = Vec3(2.0, 1.0, 0.0)
         val unsafeMovement = Vec3(4.0, 0.0, 0.0)
@@ -3031,13 +2948,13 @@ class ModuleSpearKillTest {
     }
 
     @Test
-    fun `physical packet return begins only when truly far from its origin`() {
+    fun `physical packet return begins only at a confirmed route position`() {
         val positioner = SpearKillPhysicalReturnPositioner()
         val origin = Vec3(10.0, 64.0, -3.0)
 
         assertVec3Equals(
             origin.add(4.0, 2.0, 0.0),
-            positioner.resolve(origin, origin.add(2.01, 0.0, 0.0), Vec3(4.0, 2.0, 0.0))!!,
+            positioner.resolve(origin, origin.add(4.0, 2.0, 0.0), Vec3(4.0, 2.0, 0.0))!!,
             1e-9,
         )
     }
@@ -3083,10 +3000,25 @@ class ModuleSpearKillTest {
         assertEquals(null, positioner.resolve(origin, origin, Vec3(8.0, 4.0, 0.0)))
         assertVec3Equals(
             origin.add(4.0, 2.0, 0.0),
-            positioner.resolve(origin, origin.add(8.0, 4.0, 0.0), Vec3(4.0, 2.0, 0.0))!!,
+            positioner.resolve(origin, origin.add(4.0, 2.0, 0.0), Vec3(4.0, 2.0, 0.0))!!,
             1e-9,
         )
         assertVec3Equals(origin, positioner.resolve(origin, origin.add(4.0, 2.0, 0.0), Vec3.ZERO)!!, 1e-9)
+    }
+
+    @Test
+    fun `natural Elytra displacement never claims a virtual return position`() {
+        val positioner = SpearKillPhysicalReturnPositioner()
+        val origin = Vec3(10.0, 64.0, -3.0)
+
+        assertEquals(
+            null,
+            positioner.resolve(
+                origin = origin,
+                currentPosition = origin.add(5.0, 0.0, 0.0),
+                confirmedOffset = Vec3(17.32, 0.0, 0.0),
+            ),
+        )
     }
 
     @Test
@@ -3217,6 +3149,29 @@ class ModuleSpearKillTest {
             ClientboundPlayerPositionPacket(
                 7,
                 PositionMoveRotation(Vec3(18.0, 60.0, 2.0), Vec3.ZERO, 90f, 30f),
+                emptySet(),
+            ),
+        )
+
+        assertEquals(localState, restore)
+    }
+
+    @Test
+    fun `server rejection to the route origin stops the stale packet path`() {
+        val guard = SpearKillSetbackGuard(guardTicks = 2)
+        val localState = PositionMoveRotation(
+            Vec3(10.0, 64.0, 2.0),
+            Vec3.ZERO,
+            0f,
+            0f,
+        )
+        guard.record(Vec3(27.32, 64.0, 2.0), localState.position)
+
+        val restore = guard.localRestoreFor(
+            localState,
+            ClientboundPlayerPositionPacket(
+                12,
+                PositionMoveRotation(localState.position, Vec3.ZERO, 0f, 0f),
                 emptySet(),
             ),
         )
@@ -3461,15 +3416,3 @@ private fun JsonObject.choiceValue(choice: String, value: String): JsonObject = 
 private fun JsonObject.settingValue(setting: String) = getAsJsonArray("value")
     .map { it.asJsonObject }
     .single { it["name"].asString == setting }["value"]
-
-private fun JsonObject.choiceValues(choice: String): List<String> = getAsJsonObject(choice)
-    .getAsJsonArray("value")
-    .map { it.asJsonObject["name"].asString }
-
-private fun legacySpearKillMovementConfig(movement: String): JsonObject = JsonParser.parseString(
-    """{ "name": "SpearKill", "value": [{ "name": "Movement", "value": "$movement" }] }""",
-).asJsonObject
-
-private fun JsonObject.spearKillMovement(): JsonObject = getAsJsonArray("value")
-    .map { it.asJsonObject }
-    .single { it["name"].asString == "Movement" }

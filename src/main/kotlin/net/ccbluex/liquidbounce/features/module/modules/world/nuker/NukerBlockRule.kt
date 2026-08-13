@@ -19,7 +19,6 @@
 package net.ccbluex.liquidbounce.features.module.modules.world.nuker
 
 import net.ccbluex.liquidbounce.config.types.list.Tagged
-import net.minecraft.core.BlockPos
 import net.minecraft.world.level.block.Block
 
 internal enum class NukerBlockRule(override val tag: String) : Tagged {
@@ -35,46 +34,4 @@ internal enum class NukerBlockRule(override val tag: String) : Tagged {
 
 internal fun shouldNukerBreakImmediately(forceImmediateBreak: Boolean, fastBreakRunning: Boolean): Boolean {
     return forceImmediateBreak && !fastBreakRunning
-}
-
-internal fun isManualNukerSelection(
-    attackKeyDown: Boolean,
-    crosshairPos: BlockPos?,
-    minedPos: BlockPos,
-): Boolean {
-    return attackKeyDown && crosshairPos == minedPos
-}
-
-/**
- * Gives physical mouse input a short grace period in which Nuker must not renew its rotation target.
- * Repeated input refreshes the grace period so the player always wins an active rotation tug-of-war.
- */
-internal class NukerPlayerInputOverride(
-    private val durationTicks: Int = DEFAULT_DURATION_TICKS,
-) {
-
-    private var remainingTicks = 0
-
-    val active: Boolean
-        get() = remainingTicks > 0
-
-    init {
-        require(durationTicks > 0) { "durationTicks must be positive" }
-    }
-
-    fun activate() {
-        remainingTicks = durationTicks
-    }
-
-    fun tick() {
-        remainingTicks = (remainingTicks - 1).coerceAtLeast(0)
-    }
-
-    fun reset() {
-        remainingTicks = 0
-    }
-
-    private companion object {
-        const val DEFAULT_DURATION_TICKS = 8
-    }
 }

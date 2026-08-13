@@ -28,6 +28,8 @@ import net.ccbluex.liquidbounce.config.types.Config
 import net.ccbluex.liquidbounce.config.types.Value
 import net.ccbluex.liquidbounce.config.types.group.ModeValueGroup
 import net.ccbluex.liquidbounce.config.types.group.ValueGroup
+import net.ccbluex.liquidbounce.features.module.ModuleManager
+import net.ccbluex.liquidbounce.features.module.modules.combat.migrateLegacyFightBotConfig
 import net.ccbluex.liquidbounce.features.module.modules.combat.killaura.ModuleKillAura
 import net.ccbluex.liquidbounce.utils.client.clientLogger
 import net.ccbluex.liquidbounce.utils.client.mc
@@ -259,6 +261,10 @@ object ConfigSystem {
      */
     fun deserializeValueGroup(valueGroup: ValueGroup, jsonElement: JsonElement) {
         val jsonObject = jsonElement.asJsonObject
+
+        if (valueGroup === ModuleManager.modulesConfig) {
+            migrateLegacyFightBotConfig(jsonObject)
+        }
 
         // Check if the name is the same as the config name
         val name = jsonObject.getAsJsonPrimitive("name").asString

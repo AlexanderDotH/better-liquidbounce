@@ -25,7 +25,7 @@ import net.minecraft.world.phys.AABB
 import net.minecraft.world.phys.Vec3
 
 /** Mirrors the step-up part of [Entity.move] without mutating the real player. */
-internal fun resolveSpearKillDirectPacketMovement(
+internal fun resolveSpearKillServerPacketMovement(
     player: LocalPlayer,
     boundingBox: AABB,
     movement: Vec3,

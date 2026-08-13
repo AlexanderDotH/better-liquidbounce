@@ -33,6 +33,7 @@ import net.ccbluex.liquidbounce.config.gson.util.parseTree
 import net.ccbluex.liquidbounce.config.types.group.ValueGroup
 import net.ccbluex.liquidbounce.event.events.NotificationEvent
 import net.ccbluex.liquidbounce.features.module.ModuleManager
+import net.ccbluex.liquidbounce.features.module.modules.combat.migrateLegacyFightBotConfig
 import net.ccbluex.liquidbounce.features.module.modules.render.ModuleClickGui
 import net.ccbluex.liquidbounce.features.spoofer.SpooferManager
 import net.ccbluex.liquidbounce.utils.client.MessageMetadata
@@ -329,6 +330,8 @@ object AutoConfig {
         jsonObject: JsonObject,
         modules: Collection<ValueGroup> = emptyList()
     ) {
+        migrateLegacyFightBotConfig(jsonObject)
+
         // Deserialize full module configurable
         if (modules.isEmpty()) {
             deserializeValueGroup(ModuleManager.modulesConfig, jsonObject)

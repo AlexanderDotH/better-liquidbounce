@@ -41,6 +41,7 @@ import net.minecraft.world.entity.LivingEntity
 import net.minecraft.world.entity.NeutralMob
 import net.minecraft.world.entity.monster.Enemy
 import net.minecraft.world.entity.player.Player
+import java.util.SequencedSet
 import java.util.function.Predicate
 
 /**
@@ -49,14 +50,16 @@ import java.util.function.Predicate
 open class TargetTracker(
     defaultPriority: TargetPriority = TargetPriority.HEALTH,
     rangeValue: RangedValueProvider = NoneRangedValueProvider,
-    fovRange: ClosedFloatingPointRange<Float> = DEFAULT_FOV_RANGE
-) : TargetSelector(defaultPriority, rangeValue, fovRange) {
+    fovRange: ClosedFloatingPointRange<Float> = DEFAULT_FOV_RANGE,
+    defaultPriorities: SequencedSet<TargetPriority> = targetTrackerDefaultPriorities(defaultPriority),
+) : TargetSelector(defaultPriority, rangeValue, fovRange, defaultPriorities) {
 
     constructor(
         defaultPriority: TargetPriority = TargetPriority.HEALTH,
         range: RangedValue<*>,
-        fovRange: ClosedFloatingPointRange<Float> = DEFAULT_FOV_RANGE
-    ) : this(defaultPriority, DummyRangedValueProvider(range), fovRange)
+        fovRange: ClosedFloatingPointRange<Float> = DEFAULT_FOV_RANGE,
+        defaultPriorities: SequencedSet<TargetPriority> = targetTrackerDefaultPriorities(defaultPriority),
+    ) : this(defaultPriority, DummyRangedValueProvider(range), fovRange, defaultPriorities)
 
     var target: LivingEntity? = null
 
@@ -95,14 +98,16 @@ open class TargetTracker(
 open class TargetSelector(
     defaultPriority: TargetPriority = TargetPriority.HEALTH,
     rangeValue: RangedValueProvider = NoneRangedValueProvider,
-    fovRange: ClosedFloatingPointRange<Float> = DEFAULT_FOV_RANGE
+    fovRange: ClosedFloatingPointRange<Float> = DEFAULT_FOV_RANGE,
+    defaultPriorities: SequencedSet<TargetPriority> = targetTrackerDefaultPriorities(defaultPriority),
 ) : ValueGroup("Target") {
 
     constructor(
         defaultPriority: TargetPriority = TargetPriority.HEALTH,
         range: RangedValue<*>,
-        fovRange: ClosedFloatingPointRange<Float> = DEFAULT_FOV_RANGE
-    ) : this(defaultPriority, DummyRangedValueProvider(range), fovRange)
+        fovRange: ClosedFloatingPointRange<Float> = DEFAULT_FOV_RANGE,
+        defaultPriorities: SequencedSet<TargetPriority> = targetTrackerDefaultPriorities(defaultPriority),
+    ) : this(defaultPriority, DummyRangedValueProvider(range), fovRange, defaultPriorities)
 
     var closestSquaredEnemyDistance: Double = 0.0
         private set
@@ -111,16 +116,18 @@ open class TargetSelector(
     private val fov by float("FOV", DEFAULT_FOV.coerceIn(fovRange), fovRange)
     private val hurtTime by int("HurtTime", 10, 0..10)
 
+    private var comparator: Comparator<in LivingEntity> = ComparatorChain(
+        comparisonFunctions = defaultPriorities.toTypedArray(),
+    )
+
     @Suppress("unused", "UnusedPrivateProperty")
     private val priority by multiEnumChoice(
         name = "Priority",
-        default = objectLinkedSetOf(TargetPriority.TYPE, defaultPriority),
+        default = defaultPriorities,
         canBeNone = false,
     ).onChanged { set ->
         comparator = ComparatorChain(comparisonFunctions = set.toTypedArray())
     }
-
-    private var comparator: Comparator<in LivingEntity> = TargetPriority.TYPE
 
     /**
      * Counts available targets.
@@ -199,6 +206,11 @@ open class TargetSelector(
 
 private const val DEFAULT_FOV = 180f
 private val DEFAULT_FOV_RANGE = 0f..DEFAULT_FOV
+
+internal fun targetTrackerDefaultPriorities(
+    defaultPriority: TargetPriority,
+    explicitPriorities: SequencedSet<TargetPriority>? = null,
+): SequencedSet<TargetPriority> = explicitPriorities ?: objectLinkedSetOf(TargetPriority.TYPE, defaultPriority)
 
 enum class TargetPriority(override val tag: String) : Tagged, Comparator<LivingEntity> {
     /**

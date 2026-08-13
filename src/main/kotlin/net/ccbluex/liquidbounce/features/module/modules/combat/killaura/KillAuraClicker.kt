@@ -19,7 +19,6 @@
 package net.ccbluex.liquidbounce.features.module.modules.combat.killaura
 
 import net.ccbluex.liquidbounce.features.module.modules.combat.ModuleAutoWeapon
-import net.ccbluex.liquidbounce.features.module.modules.combat.ModuleSuperHit
 import net.ccbluex.liquidbounce.features.module.modules.combat.killaura.KillAuraRotationsValueGroup.rotationTiming
 import net.ccbluex.liquidbounce.features.module.modules.combat.killaura.ModuleKillAura.simulateInventoryClosing
 import net.ccbluex.liquidbounce.features.module.modules.combat.killaura.features.KillAuraAutoBlock
@@ -81,6 +80,9 @@ object KillAuraClicker : Clicker<ModuleKillAura>(
             if (target.hurtTime > 7) {
                 return false
             }
+            if (!shouldPredictKillAuraRangeExit(ModuleKillAura.shouldUseSuperHitFor(target))) {
+                return false
+            }
 
             val futurePos = PositionExtrapolation.getBestForEntity(player)
                 .getPositionInTicks(ticks)
@@ -90,22 +92,11 @@ object KillAuraClicker : Clicker<ModuleKillAura>(
             val ownEyePos = futurePos.add(0.0, player.getEyeHeight(player.pose).toDouble(), 0.0)
             val targetBox = target.getBoundingBoxAt(futureTargetPos)
 
-            val usesSuperHitRange = ModuleKillAura.shouldUseSuperHitFor(target)
-            val attackRange = if (usesSuperHitRange) {
-                ModuleSuperHit.maximumTargetRange
-            } else {
-                ModuleKillAura.range.interactionRange
-            }
-            val wallsRange = if (usesSuperHitRange) {
-                0.0
-            } else {
-                ModuleKillAura.range.interactionThroughWallsRange.toDouble()
-            }
             val isExitingRange = !canSeeBox(
                 eyes = ownEyePos,
                 box = targetBox,
-                range = attackRange.toDouble(),
-                wallsRange = wallsRange,
+                range = ModuleKillAura.range.interactionRange.toDouble(),
+                wallsRange = ModuleKillAura.range.interactionThroughWallsRange.toDouble(),
             )
             debugParameter("Is Exiting Range On ${round(ticks)}") { isExitingRange }
             if (isExitingRange) {

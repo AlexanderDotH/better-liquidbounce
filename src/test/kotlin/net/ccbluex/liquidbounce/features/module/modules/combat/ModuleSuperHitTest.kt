@@ -303,6 +303,30 @@ class ModuleSuperHitTest {
     }
 
     @Test
+    fun `automatic SuperHit failures back off without delaying a different target`() {
+        val retryGate = SuperHitAutomaticRetryGate(retryDelayTicks = 10)
+
+        assertTrue(retryGate.canAttempt(targetId = 7, currentTick = 100))
+        retryGate.recordFailure(targetId = 7, currentTick = 100)
+        assertFalse(retryGate.canAttempt(targetId = 7, currentTick = 109))
+        assertTrue(retryGate.canAttempt(targetId = 7, currentTick = 110))
+        assertTrue(retryGate.canAttempt(targetId = 8, currentTick = 101))
+    }
+
+    @Test
+    fun `automatic SuperHit retry gate resets after success or explicit clear`() {
+        val retryGate = SuperHitAutomaticRetryGate(retryDelayTicks = 10)
+
+        retryGate.recordFailure(targetId = 7, currentTick = 100)
+        retryGate.recordSuccess()
+        assertTrue(retryGate.canAttempt(targetId = 7, currentTick = 101))
+
+        retryGate.recordFailure(targetId = 7, currentTick = 102)
+        retryGate.clear()
+        assertTrue(retryGate.canAttempt(targetId = 7, currentTick = 103))
+    }
+
+    @Test
     fun `sentinel destination clears the target hitbox toward the player`() {
         assertVec3Equals(
             Vec3(9.3, 64.0, 0.0),

@@ -339,6 +339,13 @@ function createGlobalSettings(): ConfigurableSetting {
                 ["Modules", "Warnings", "Chat"],
             ),
         ]),
+        configurable("Combat", [
+            booleanSetting(
+                "DelegateKillAuraAttacks",
+                false,
+                "Allows KillAura to delegate attacks beyond normal reach to enabled SpearKill or SuperHit modules.",
+            ),
+        ]),
         togglable("DiscordRPC", [
             booleanSetting("Enabled", true),
             textSetting("Details", "Modern ClickGUI preview"),

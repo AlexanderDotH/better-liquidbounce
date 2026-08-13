@@ -116,6 +116,68 @@ class ModuleAutoDodgeSpearIntegrationTest {
     }
 
     @Test
+    fun `projectile movement takes precedence over an available spear teleport`() {
+        val projectile = DodgePlan(
+            directionalInput = DirectionalInput.LEFT,
+            shouldJump = true,
+            yawChange = 45F,
+            useTimer = false,
+        )
+        val teleport = SpearTeleportPlan(
+            destination = SpearTeleportPoint(3.0, 64.0, 4.0),
+            travelDistance = 5.0,
+        )
+
+        val result = AutoDodgeMovementArbitrator.chooseAction(
+            projectilePlan = projectile,
+            spearTeleportPlan = teleport,
+            spearPlan = SpearDodgePlan.NONE,
+        )
+
+        assertEquals(AutoDodgeMovementAction.Dodge(projectile), result)
+    }
+
+    @Test
+    fun `safe spear teleport takes precedence over walking juke`() {
+        val teleport = SpearTeleportPlan(
+            destination = SpearTeleportPoint(3.0, 64.0, 4.0),
+            travelDistance = 5.0,
+        )
+        val juke = SpearDodgePlan(
+            input = DirectionalInput.RIGHT,
+            minimumClearance = 0.5,
+            distanceFromAttacker = 3.0,
+            useTimer = true,
+        )
+
+        val result = AutoDodgeMovementArbitrator.chooseAction(
+            projectilePlan = null,
+            spearTeleportPlan = teleport,
+            spearPlan = juke,
+        )
+
+        assertEquals(AutoDodgeMovementAction.Teleport(teleport), result)
+    }
+
+    @Test
+    fun `walking juke remains the fallback when teleport is unavailable`() {
+        val juke = SpearDodgePlan(
+            input = DirectionalInput.RIGHT,
+            minimumClearance = 0.5,
+            distanceFromAttacker = 3.0,
+            useTimer = true,
+        )
+
+        val result = AutoDodgeMovementArbitrator.chooseAction(
+            projectilePlan = null,
+            spearTeleportPlan = null,
+            spearPlan = juke,
+        )
+
+        assertEquals(AutoDodgeMovementAction.Dodge(juke.asDodgePlan()), result)
+    }
+
+    @Test
     fun `simulation adapter captures exactly three post tick samples`() {
         var ticks = 0
 

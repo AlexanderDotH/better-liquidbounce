@@ -23,10 +23,12 @@ import net.ccbluex.liquidbounce.config.types.group.Mode
 import net.ccbluex.liquidbounce.config.types.group.ModeValueGroup
 import net.ccbluex.liquidbounce.config.types.group.ToggleableValueGroup
 import net.ccbluex.liquidbounce.config.types.group.ValueGroup
+import net.ccbluex.liquidbounce.config.types.list.Tagged
 import net.ccbluex.liquidbounce.event.events.BlockShapeEvent
 import net.ccbluex.liquidbounce.event.events.GameTickEvent
 import net.ccbluex.liquidbounce.event.events.PacketEvent
 import net.ccbluex.liquidbounce.event.events.PlayerJumpEvent
+import net.ccbluex.liquidbounce.event.events.PlayerMoveEvent
 import net.ccbluex.liquidbounce.event.handler
 import net.ccbluex.liquidbounce.event.sequenceHandler
 import net.ccbluex.liquidbounce.event.tickHandler
@@ -34,6 +36,7 @@ import net.ccbluex.liquidbounce.event.waitTicks
 import net.ccbluex.liquidbounce.features.module.modules.movement.fly.ModuleFly
 import net.ccbluex.liquidbounce.utils.client.chat
 import net.ccbluex.liquidbounce.utils.entity.withStrafe
+import net.ccbluex.liquidbounce.utils.kotlin.EventPriorityConvention.SAFETY_FEATURE
 import net.ccbluex.liquidbounce.utils.math.sq
 import net.ccbluex.liquidbounce.utils.math.withLength
 import net.ccbluex.liquidbounce.utils.network.MovePacketType
@@ -56,11 +59,47 @@ internal fun applyVanillaFlyCheckBypass(packet: ServerboundMovePlayerPacket, pre
     packet.y = previousY - VANILLA_CHECK_BYPASS_Y_OFFSET
 }
 
+internal enum class VanillaFlyCheckBypassMode(override val tag: String) : Tagged {
+    MOTION("Motion"),
+    PACKET("Packet"),
+}
+
+internal fun resolveVanillaFlyCheckBypassMode(
+    configuredMode: VanillaFlyCheckBypassMode,
+    isFallFlying: Boolean,
+) = if (isFallFlying) VanillaFlyCheckBypassMode.PACKET else configuredMode
+
+internal fun resolveVanillaFlyElytraVerticalMotion(
+    isFallFlying: Boolean,
+    movementY: Double,
+    requestedVerticalMotion: Double,
+) = if (isFallFlying && movementY < 0.0) requestedVerticalMotion else movementY
+
+internal inline fun applyVanillaFlyElytraVerticalMotion(
+    event: PlayerMoveEvent,
+    isFallFlying: Boolean,
+    requestedVerticalMotion: Double,
+    setVelocityY: (Double) -> Unit,
+) {
+    if (!isFallFlying || event.movement.y >= 0.0) {
+        return
+    }
+
+    val resolvedMotion = resolveVanillaFlyElytraVerticalMotion(
+        isFallFlying = true,
+        movementY = event.movement.y,
+        requestedVerticalMotion = requestedVerticalMotion,
+    )
+    event.movement.y = resolvedMotion
+    setVelocityY(resolvedMotion)
+}
+
 internal object FlyVanilla : Mode("Vanilla") {
 
     private val glide by float("Glide", 0.0f, -1f..1f)
 
     private val bypassVanillaCheck by boolean("BypassVanillaCheck", true)
+    private val bypassMode by enumChoice("BypassMode", VanillaFlyCheckBypassMode.PACKET)
 
     object BaseSpeed : ValueGroup("BaseSpeed") {
         val horizontalSpeed by float("Horizontal", 0.44f, 0.1f..10f)
@@ -80,29 +119,49 @@ internal object FlyVanilla : Mode("Vanilla") {
     override val parent: ModeValueGroup<*>
         get() = ModuleFly.modes
 
-    @Suppress("unused")
-    private val tickHandler = tickHandler {
-        val useSprintSpeed = mc.options.keySprint.isDown && SprintSpeed.enabled
-        val hSpeed =
-            if (useSprintSpeed) SprintSpeed.horizontalSpeed else BaseSpeed.horizontalSpeed
-        val vSpeed =
-            if (useSprintSpeed) SprintSpeed.verticalSpeed else BaseSpeed.verticalSpeed
+    private val useSprintSpeed
+        get() = mc.options.keySprint.isDown && SprintSpeed.enabled
 
-        player.deltaMovement = player.deltaMovement.withStrafe(speed = hSpeed.toDouble())
-        player.deltaMovement.y = when {
-            mc.options.keyJump.isDown && !mc.options.keyShift.isDown -> vSpeed.toDouble()
-            mc.options.keyShift.isDown && !mc.options.keyJump.isDown -> (-vSpeed).toDouble()
+    private val horizontalSpeed
+        get() = if (useSprintSpeed) SprintSpeed.horizontalSpeed else BaseSpeed.horizontalSpeed
+
+    private val verticalSpeed
+        get() = if (useSprintSpeed) SprintSpeed.verticalSpeed else BaseSpeed.verticalSpeed
+
+    private val requestedVerticalMotion
+        get() = when {
+            mc.options.keyJump.isDown && !mc.options.keyShift.isDown -> verticalSpeed.toDouble()
+            mc.options.keyShift.isDown && !mc.options.keyJump.isDown -> -verticalSpeed.toDouble()
             else -> glide.toDouble()
         }
 
-        // Most basic bypass for vanilla fly check. Send the dip as a packet so FreeCam can keep the real body still.
+    @Suppress("unused")
+    private val tickHandler = tickHandler {
+        player.deltaMovement = player.deltaMovement.withStrafe(speed = horizontalSpeed.toDouble())
+        player.deltaMovement.y = requestedVerticalMotion
+
         if (shouldRunVanillaFlyCheckBypass(bypassVanillaCheck, player.tickCount)) {
             waitTicks(1)
-            network.send(MovePacketType.POSITION_AND_ON_GROUND.generatePacket().apply {
-                applyVanillaFlyCheckBypass(this, player.yLast)
-            })
+            when (resolveVanillaFlyCheckBypassMode(bypassMode, player.isFallFlying)) {
+                VanillaFlyCheckBypassMode.MOTION ->
+                    player.deltaMovement.y = -VANILLA_CHECK_BYPASS_Y_OFFSET
+
+                VanillaFlyCheckBypassMode.PACKET ->
+                    network.send(MovePacketType.POSITION_AND_ON_GROUND.generatePacket().apply {
+                        applyVanillaFlyCheckBypass(this, player.yLast)
+                    })
+            }
             waitTicks(1)
         }
+    }
+
+    @Suppress("unused")
+    private val moveHandler = handler<PlayerMoveEvent>(priority = SAFETY_FEATURE) { event ->
+        applyVanillaFlyElytraVerticalMotion(
+            event = event,
+            isFallFlying = player.isFallFlying,
+            requestedVerticalMotion = requestedVerticalMotion,
+        ) { player.deltaMovement.y = it }
     }
 
 }

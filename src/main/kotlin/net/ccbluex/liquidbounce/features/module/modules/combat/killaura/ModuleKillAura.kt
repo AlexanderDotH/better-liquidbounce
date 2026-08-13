@@ -25,10 +25,17 @@ import net.ccbluex.liquidbounce.event.events.SprintEvent
 import net.ccbluex.liquidbounce.event.events.WorldRenderEvent
 import net.ccbluex.liquidbounce.event.handler
 import net.ccbluex.liquidbounce.event.tickHandler
+import net.ccbluex.liquidbounce.features.global.GlobalSettingsCombat
 import net.ccbluex.liquidbounce.features.module.ClientModule
 import net.ccbluex.liquidbounce.features.module.ModuleCategories
+import net.ccbluex.liquidbounce.features.module.modules.combat.FightBotTargetHandoff
 import net.ccbluex.liquidbounce.features.module.modules.combat.ModuleAutoWeapon
+import net.ccbluex.liquidbounce.features.module.modules.combat.ModuleFightBot
+import net.ccbluex.liquidbounce.features.module.modules.combat.ModuleSpearKill
 import net.ccbluex.liquidbounce.features.module.modules.combat.ModuleSuperHit
+import net.ccbluex.liquidbounce.features.module.modules.combat.lockedTarget
+import net.ccbluex.liquidbounce.features.module.modules.combat.selectKillAuraTargetForFightBot
+import net.ccbluex.liquidbounce.features.module.modules.combat.state
 import net.ccbluex.liquidbounce.features.module.modules.combat.criticals.ModuleCriticals.CriticalsSelectionMode
 import net.ccbluex.liquidbounce.features.module.modules.combat.elytratarget.ModuleElytraTarget
 import net.ccbluex.liquidbounce.features.module.modules.combat.killaura.KillAuraRotationsValueGroup.KillAuraRotationTiming.ON_TICK
@@ -41,7 +48,6 @@ import net.ccbluex.liquidbounce.features.module.modules.combat.killaura.features
 import net.ccbluex.liquidbounce.features.module.modules.combat.killaura.features.KillAuraVelocityHit
 import net.ccbluex.liquidbounce.features.module.modules.combat.killaura.features.KillAuraFailSwing
 import net.ccbluex.liquidbounce.features.module.modules.combat.killaura.features.KillAuraFailSwing.dealWithFakeSwing
-import net.ccbluex.liquidbounce.features.module.modules.combat.killaura.features.KillAuraFightBot
 import net.ccbluex.liquidbounce.features.module.modules.combat.killaura.features.KillAuraNotifyWhenFail
 import net.ccbluex.liquidbounce.features.module.modules.combat.killaura.features.KillAuraNotifyWhenFail.failedHits
 import net.ccbluex.liquidbounce.features.module.modules.combat.killaura.features.KillAuraNotifyWhenFail.renderFailedHits
@@ -82,7 +88,7 @@ import net.minecraft.world.item.ItemStack
  *
  * Automatically attacks enemies.
  */
-@Suppress("MagicNumber")
+@Suppress("MagicNumber", "TooManyFunctions")
 object ModuleKillAura : ClientModule("KillAura", ModuleCategories.COMBAT) {
 
     // Attack speed
@@ -122,7 +128,6 @@ object ModuleKillAura : ClientModule("KillAura", ModuleCategories.COMBAT) {
             targetTracker.target?.takeUnless { ModuleElytraTarget.isSameTargetRendering(it) }
         })
         tree(KillAuraFailSwing)
-        tree(KillAuraFightBot)
         tree(KillAuraRangeIndicator)
     }
 
@@ -134,8 +139,53 @@ object ModuleKillAura : ClientModule("KillAura", ModuleCategories.COMBAT) {
         }
 
     internal fun shouldUseSuperHitFor(target: LivingEntity): Boolean {
-        return ModuleSuperHit.running && ModuleSuperHit.isTargetInConfiguredRange(target) &&
+        return GlobalSettingsCombat.delegateKillAuraAttacks && ModuleSuperHit.running &&
+            ModuleSuperHit.isTargetInConfiguredRange(target) &&
             player.squaredBoxedDistanceTo(target) > extendedInteractionRange.sq()
+    }
+
+    private fun isDistantSpearKillTarget(target: LivingEntity): Boolean =
+        target.squaredBoxedDistanceTo(player) > extendedInteractionRange.sq() &&
+            ModuleSpearKill.canAcceptKillAuraTarget(target)
+
+    private fun delegatedAttackRotation(target: LivingEntity): Rotation? = when {
+        isDistantSpearKillTarget(target) -> player.rotation
+        shouldUseSuperHitFor(target) -> calculateKillAuraDelegatedAttackRotation(
+            eyes = player.eyePosition,
+            targetBox = target.boundingBox,
+        )
+        else -> null
+    }
+
+    private fun canDispatchSuperHit(target: LivingEntity, rotation: Rotation): Boolean =
+        isLookingAtEntity(
+            toEntity = target,
+            rotation = rotation,
+            range = ModuleSuperHit.maximumTargetRange.toDouble(),
+            throughWallsRange = 0.0,
+        ) != null
+
+    private fun shouldSuppressForSpearKill(target: LivingEntity?): Boolean {
+        val route = if (ModuleSpearKill.ownsKillAuraRoute || ModuleSpearKill.reservesFightBotSpearUse(target) ||
+            target?.let(::isDistantSpearKillTarget) == true
+        ) {
+            KillAuraAttackRoute.SPEAR_KILL
+        } else {
+            KillAuraAttackRoute.NONE
+        }
+        return selectKillAuraSpearKillSuppressionPolicy(route).suppressAutoWeapon
+    }
+
+    /**
+     * Narrow selection boundary consumed by SpearKill. KillAura retains ownership of filtering and
+     * priority while SpearKill remains independent from CPS and click scheduling.
+     */
+    internal fun targetForSpearKill(): LivingEntity? {
+        if (!running || !requirementsMet || CombatManager.shouldPauseCombat) return null
+        val inventoryOpen = isInventoryOpen || isInContainerScreen
+        if (inventoryOpen && !ignoreOpenInventory) return null
+
+        return targetTracker.target?.takeIf(::isDistantSpearKillTarget)
     }
 
     override fun onDisabled() {
@@ -172,8 +222,10 @@ object ModuleKillAura : ClientModule("KillAura", ModuleCategories.COMBAT) {
         // Update the current target tracker to make sure you attack the best enemy
         updateTarget()
 
-        // Update Auto Weapon
-        ModuleAutoWeapon.onTarget(targetTracker.target)
+        // The held kinetic spear is part of SpearKill's explicit intent and cannot be replaced.
+        if (!shouldSuppressForSpearKill(targetTracker.target)) {
+            ModuleAutoWeapon.onTarget(targetTracker.target)
+        }
     }
 
     @Suppress("unused")
@@ -185,10 +237,15 @@ object ModuleKillAura : ClientModule("KillAura", ModuleCategories.COMBAT) {
         // Check if there is target to attack
         val target = targetTracker.target
 
+        val spearReserved = ModuleSpearKill.reservesFightBotSpearUse(target)
         if (CombatManager.shouldPauseCombat) {
-            KillAuraAutoBlock.stopBlocking()
+            if (!ModuleSpearKill.ownsKillAuraRoute && !spearReserved) {
+                KillAuraAutoBlock.stopBlocking()
+            }
             return@tickHandler
         }
+
+        if (ModuleSpearKill.ownsKillAuraRoute || spearReserved) return@tickHandler
 
         if (target == null) {
             val hasUnblocked = KillAuraAutoBlock.stopBlocking()
@@ -209,7 +266,8 @@ object ModuleKillAura : ClientModule("KillAura", ModuleCategories.COMBAT) {
             return@tickHandler
         }
 
-        val rotation = (if (rotations.rotationTiming == ON_TICK) {
+        val delegatedRotation = (target as? LivingEntity)?.let(::delegatedAttackRotation)
+        val rotation = (delegatedRotation ?: if (rotations.rotationTiming == ON_TICK) {
             val targeting = targetingParameters(
                 target,
                 normalRange = range.interactionRange,
@@ -222,7 +280,7 @@ object ModuleKillAura : ClientModule("KillAura", ModuleCategories.COMBAT) {
             null
         } ?: RotationManager.currentRotation ?: player.rotation).normalize()
 
-        val crosshairTarget = when {
+        val raycastTarget = when {
             raycast != TRACE_NONE -> {
                 findEntityInCrosshair(range.interactionRange.toDouble(), rotation, predicate = {
                     when (raycast) {
@@ -230,16 +288,25 @@ object ModuleKillAura : ClientModule("KillAura", ModuleCategories.COMBAT) {
                         TRACE_ALL -> true
                         else -> false
                     }
-                })?.entity ?: target
+                })?.entity
             }
-            else -> target
+            else -> null
+        }
+        val handoff = ModuleFightBot.targetHandoff
+        val attackTarget = selectKillAuraTargetForFightBot<Entity>(
+            handoff = handoff.state,
+            lockedTarget = handoff.lockedTarget,
+            trackedTarget = target,
+            crosshairTarget = raycastTarget,
+        ) ?: return@tickHandler
+
+        if (handoff === FightBotTargetHandoff.Inactive && !ModuleSpearKill.ownsKillAuraRoute &&
+            attackTarget is LivingEntity && attackTarget.shouldBeAttacked() && attackTarget != target
+        ) {
+            targetTracker.target = attackTarget
         }
 
-        if (crosshairTarget is LivingEntity && crosshairTarget.shouldBeAttacked() && crosshairTarget != target) {
-            targetTracker.target = crosshairTarget
-        }
-
-        attackTarget(crosshairTarget, rotation)
+        attackTarget(attackTarget, rotation)
     }
 
     val shouldBlockSprinting
@@ -259,28 +326,20 @@ object ModuleKillAura : ClientModule("KillAura", ModuleCategories.COMBAT) {
 
     @Suppress("CognitiveComplexMethod", "CyclomaticComplexMethod")
     private suspend fun attackTarget(target: Entity, rotation: Rotation) {
-        // Make it seem like we are blocking
-        KillAuraAutoBlock.makeSeemBlock()
-
         debugParameter("Rotation") { rotation }
         debugParameter("Target") { target.scoreboardName }
 
-        val attackHitResult = isLookingAtEntity(
-            toEntity = target,
-            rotation = rotation,
-            range = extendedInteractionRange.toDouble(),
-            throughWallsRange = range.interactionThroughWallsRange.toDouble()
-        )
-
-        debugParameter("Target Hit Result") { attackHitResult?.location }
-
-        val isInRange = ModuleElytraTarget.canIgnoreKillAuraRotations ||
-            attackHitResult != null && range.isInRange(pos = attackHitResult.location)
-        debugParameter("Is In Range") { isInRange }
-
+        val isInRange = isNormalAttackPossible(target, rotation)
         val superHitTarget = target as? LivingEntity
         val attackRoute = determineAttackRoute(superHitTarget, rotation, isInRange)
         debugParameter("Attack Route") { attackRoute }
+
+        // SpearKill starts from its own tick handler immediately; KillAura must not click, block,
+        // switch weapons, or publish attack-success bookkeeping for this route.
+        if (attackRoute == KillAuraAttackRoute.SPEAR_KILL) return
+
+        // Make it seem like we are blocking for routes still owned by KillAura.
+        KillAuraAutoBlock.makeSeemBlock()
 
         // Check if our target is in range, otherwise deal with auto block
         if (attackRoute == KillAuraAttackRoute.NONE) {
@@ -310,7 +369,12 @@ object ModuleKillAura : ClientModule("KillAura", ModuleCategories.COMBAT) {
                     },
                     superHitAttack = {
                         val livingTarget = superHitTarget ?: return@executeKillAuraAttack false
-                        ModuleSuperHit.tryAttack(livingTarget, rotation, attackKeepSprint)
+                        ModuleSuperHit.tryAttack(
+                            livingTarget,
+                            rotation,
+                            attackKeepSprint,
+                            automatedByKillAura = true,
+                        )
                     },
                     onSuccess = {
                         range.update()
@@ -329,22 +393,38 @@ object ModuleKillAura : ClientModule("KillAura", ModuleCategories.COMBAT) {
         }
     }
 
+    private fun isNormalAttackPossible(target: Entity, rotation: Rotation): Boolean {
+        val attackHitResult = isLookingAtEntity(
+            toEntity = target,
+            rotation = rotation,
+            range = extendedInteractionRange.toDouble(),
+            throughWallsRange = range.interactionThroughWallsRange.toDouble()
+        )
+
+        debugParameter("Target Hit Result") { attackHitResult?.location }
+
+        val isInRange = ModuleElytraTarget.canIgnoreKillAuraRotations ||
+            attackHitResult != null && range.isInRange(pos = attackHitResult.location)
+        debugParameter("Is In Range") { isInRange }
+        return isInRange
+    }
+
     private fun determineAttackRoute(
         superHitTarget: LivingEntity?,
         rotation: Rotation,
         normalAttackPossible: Boolean,
     ): KillAuraAttackRoute {
-        val superHitTargetPossible = !normalAttackPossible && superHitTarget != null &&
-            shouldUseSuperHitFor(superHitTarget) && isLookingAtEntity(
-                toEntity = superHitTarget,
-                rotation = rotation,
-                range = ModuleSuperHit.maximumTargetRange.toDouble(),
-                throughWallsRange = 0.0,
-            ) != null
+        val spearKillTargetPossible = !normalAttackPossible && superHitTarget != null &&
+            isDistantSpearKillTarget(superHitTarget)
+        val superHitTargetPossible = !normalAttackPossible && !spearKillTargetPossible && superHitTarget != null &&
+            shouldUseSuperHitFor(superHitTarget) && canDispatchSuperHit(superHitTarget, rotation)
 
         return selectKillAuraAttackRoute(
+            delegateKillAuraAttacks = GlobalSettingsCombat.delegateKillAuraAttacks,
             normalAttackPossible = normalAttackPossible,
-            superHitRunning = ModuleSuperHit.running,
+            spearKillRunning = ModuleSpearKill.isKillAuraIntegrationArmed,
+            spearKillTargetPossible = spearKillTargetPossible,
+            superHitAvailable = ModuleSuperHit.running,
             superHitTargetPossible = superHitTargetPossible,
         )
     }
@@ -375,22 +455,49 @@ object ModuleKillAura : ClientModule("KillAura", ModuleCategories.COMBAT) {
         } else {
             extendedInteractionRange
         }
+
+        when (val handoff = ModuleFightBot.targetHandoff) {
+            FightBotTargetHandoff.Inactive -> Unit
+            FightBotTargetHandoff.Idle -> {
+                targetTracker.reset()
+                return
+            }
+            is FightBotTargetHandoff.Locked -> {
+                updateFightBotTarget(handoff.target, normalMaximumRange)
+                return
+            }
+        }
+
         val maximumRange = calculateKillAuraTargetingRange(
+            delegateKillAuraAttacks = GlobalSettingsCombat.delegateKillAuraAttacks,
             normalMaximumRange = normalMaximumRange,
-            superHitRunning = ModuleSuperHit.running,
+            superHitAvailable = ModuleSuperHit.running,
             superHitMaximumRange = ModuleSuperHit.maximumTargetRange,
+            spearKillRunning = ModuleSpearKill.isKillAuraIntegrationAvailable,
+            spearKillMaximumRange = ModuleSpearKill.maximumTargetRange,
         )
 
         debugParameter("Maximum Range") { maximumRange }
         debugParameter("Range") { range }
         val squaredMaxRange = maximumRange.sq()
-        val squaredNormalRange = range.interactionRange.sq()
+        val squaredNormalRange = extendedInteractionRange.sq()
 
         // Find a suitable target
         val target = targetTracker.targets()
             .filter { entity -> entity.squaredBoxedDistanceTo(player) <= squaredMaxRange }
-            .sortedBy { entity -> if (entity.squaredBoxedDistanceTo(player) <= squaredNormalRange) 0 else 1 }
+            .sortedBy { entity ->
+                killAuraAttackRoutePriority(entity.squaredBoxedDistanceTo(player), squaredNormalRange.toDouble())
+            }
             .firstOrNull { entity ->
+                val distantSpearKillTarget = isDistantSpearKillTarget(entity)
+                val delegatedSuperHitTarget = !distantSpearKillTarget && shouldUseSuperHitFor(entity)
+                if (!shouldUseKillAuraAimPipeline(distantSpearKillTarget, delegatedSuperHitTarget)) {
+                    return@firstOrNull distantSpearKillTarget || canDispatchSuperHit(
+                        entity,
+                        calculateKillAuraDelegatedAttackRotation(player.eyePosition, entity.boundingBox),
+                    )
+                }
+
                 val targeting = targetingParameters(
                     entity,
                     normalRange = normalMaximumRange,
@@ -402,19 +509,38 @@ object ModuleKillAura : ClientModule("KillAura", ModuleCategories.COMBAT) {
 
         if (target != null) {
             targetTracker.target = target
-        } else if (KillAuraFightBot.enabled) {
-            KillAuraFightBot.updateTarget()
-
-            RotationManager.setRotationTarget(
-                rotations.toRotationTarget(
-                    KillAuraFightBot.getMovementRotation(),
-                    considerInventory = !ignoreOpenInventory
-                ),
-                priority = Priority.IMPORTANT_FOR_USAGE_2,
-                provider = ModuleKillAura
-            )
         } else {
             targetTracker.reset()
+        }
+    }
+
+    private fun updateFightBotMovementRotation() {
+        RotationManager.setRotationTarget(
+            rotations.toRotationTarget(
+                ModuleFightBot.getMovementRotation(),
+                considerInventory = !ignoreOpenInventory
+            ),
+            priority = Priority.IMPORTANT_FOR_USAGE_2,
+            provider = ModuleKillAura
+        )
+    }
+
+    private fun updateFightBotTarget(fightBotTarget: LivingEntity, normalMaximumRange: Float) {
+        targetTracker.target = fightBotTarget
+        val targeting = targetingParameters(
+            fightBotTarget,
+            normalRange = normalMaximumRange,
+            normalWallsRange = range.interactionThroughWallsRange,
+        )
+
+        if (targeting == null || !processTarget(
+                fightBotTarget,
+                targeting.range,
+                targeting.wallsRange,
+                targeting.allowAimThroughWalls,
+            )
+        ) {
+            updateFightBotMovementRotation()
         }
     }
 
@@ -513,8 +639,12 @@ object ModuleKillAura : ClientModule("KillAura", ModuleCategories.COMBAT) {
         normalRange: Float,
         normalWallsRange: Float,
     ): TargetingParameters? {
-        if (shouldUseSuperHitFor(entity)) {
-            return TargetingParameters(ModuleSuperHit.maximumTargetRange, 0f, allowAimThroughWalls = false)
+        if (!shouldUseKillAuraAimPipeline(
+                distantSpearKillTarget = isDistantSpearKillTarget(entity),
+                delegatedSuperHitTarget = shouldUseSuperHitFor(entity),
+            )
+        ) {
+            return null
         }
 
         return TargetingParameters(normalRange, normalWallsRange, allowAimThroughWalls = true)
@@ -569,27 +699,41 @@ internal fun shouldBlockSprintForCriticals(
 internal enum class KillAuraAttackRoute {
     NONE,
     NORMAL,
+    SPEAR_KILL,
     SUPER_HIT,
 }
 
 internal fun selectKillAuraAttackRoute(
+    delegateKillAuraAttacks: Boolean,
     normalAttackPossible: Boolean,
-    superHitRunning: Boolean,
+    spearKillRunning: Boolean = false,
+    spearKillTargetPossible: Boolean = false,
+    superHitAvailable: Boolean,
     superHitTargetPossible: Boolean,
-): KillAuraAttackRoute = when {
-    normalAttackPossible -> KillAuraAttackRoute.NORMAL
-    superHitRunning && superHitTargetPossible -> KillAuraAttackRoute.SUPER_HIT
-    else -> KillAuraAttackRoute.NONE
-}
+): KillAuraAttackRoute = selectKillAuraSpearKillRoute(
+    delegateKillAuraAttacks = delegateKillAuraAttacks,
+    normalAttackPossible = normalAttackPossible,
+    spearKillRunning = spearKillRunning,
+    spearKillTargetPossible = spearKillTargetPossible,
+    superHitAvailable = superHitAvailable,
+    superHitTargetPossible = superHitTargetPossible,
+)
 
 internal fun calculateKillAuraTargetingRange(
+    delegateKillAuraAttacks: Boolean,
     normalMaximumRange: Float,
-    superHitRunning: Boolean,
+    superHitAvailable: Boolean,
     superHitMaximumRange: Float,
-): Float = if (superHitRunning) {
-    maxOf(normalMaximumRange, superHitMaximumRange)
-} else {
+    spearKillRunning: Boolean = false,
+    spearKillMaximumRange: Float = 0f,
+): Float = if (!delegateKillAuraAttacks) {
     normalMaximumRange
+} else {
+    maxOf(
+        normalMaximumRange,
+        superHitMaximumRange.takeIf { superHitAvailable } ?: 0f,
+        spearKillMaximumRange.takeIf { spearKillRunning } ?: 0f,
+    )
 }
 
 internal suspend fun executeKillAuraAttack(
@@ -601,6 +745,7 @@ internal suspend fun executeKillAuraAttack(
     val success = when (route) {
         KillAuraAttackRoute.NONE -> false
         KillAuraAttackRoute.NORMAL -> normalAttack()
+        KillAuraAttackRoute.SPEAR_KILL -> false
         KillAuraAttackRoute.SUPER_HIT -> superHitAttack()
     }
 

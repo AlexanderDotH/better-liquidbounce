@@ -85,6 +85,11 @@ test("module toggle and settings writes update only preview state", async () => 
 
 test("global settings, typing, and persistent storage round-trip through the router", async () => {
     const state = createModernClickGuiPreviewState();
+    const combat = state.globalSettings.value.find(setting => setting.name === "Combat");
+    assert.equal(
+        combat.value.find(setting => setting.name === "DelegateKillAuraAttacks").value,
+        false,
+    );
     const globals = structuredClone(state.globalSettings);
     globals.value[0].value[0].value = false;
 

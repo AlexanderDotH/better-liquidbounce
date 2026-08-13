@@ -32,7 +32,6 @@ import net.ccbluex.liquidbounce.event.once
 import net.ccbluex.liquidbounce.features.blink.BlinkManager
 import net.ccbluex.liquidbounce.features.module.ClientModule
 import net.ccbluex.liquidbounce.features.module.ModuleCategories
-import net.ccbluex.liquidbounce.features.module.modules.misc.antibot.ModuleAntiBot
 import net.ccbluex.liquidbounce.features.module.modules.player.ModuleBlink
 import net.ccbluex.liquidbounce.features.module.modules.render.ModuleDebug.debugParameter
 import net.ccbluex.liquidbounce.features.module.modules.render.murdermystery.ModuleMurderMystery
@@ -44,9 +43,7 @@ import net.ccbluex.liquidbounce.utils.entity.CachedPlayerSimulation
 import net.ccbluex.liquidbounce.utils.entity.PlayerSimulation
 import net.ccbluex.liquidbounce.utils.entity.PlayerSimulationCache
 import net.ccbluex.liquidbounce.utils.entity.SimulatedArrow
-import net.ccbluex.liquidbounce.utils.entity.SimulatedPlayer
 import net.ccbluex.liquidbounce.utils.entity.useItem
-import net.ccbluex.liquidbounce.utils.entity.wouldFallIntoVoid
 import net.ccbluex.liquidbounce.utils.input.InputTracker.isPressedOnAny
 import net.ccbluex.liquidbounce.utils.inventory.HotbarItemSlot
 import net.ccbluex.liquidbounce.utils.inventory.InventoryAction
@@ -57,15 +54,13 @@ import net.ccbluex.liquidbounce.utils.inventory.PlayerInventoryConstraints
 import net.ccbluex.liquidbounce.utils.inventory.Slots
 import net.ccbluex.liquidbounce.utils.inventory.isPlayerInventory
 import net.ccbluex.liquidbounce.utils.item.blocksAttacksComponent
-import net.ccbluex.liquidbounce.utils.item.isSpear
 import net.ccbluex.liquidbounce.utils.kotlin.EventPriorityConvention.SAFETY_FEATURE
 import net.ccbluex.liquidbounce.utils.kotlin.Priority
-import net.ccbluex.liquidbounce.utils.math.anyNotEmpty
 import net.ccbluex.liquidbounce.utils.movement.DirectionalInput
 import net.ccbluex.liquidbounce.utils.network.releaseUsingItemInTickLoop
+import net.ccbluex.liquidbounce.utils.network.sendPacketSilently
 import net.minecraft.client.gui.screens.inventory.ContainerScreen
 import net.minecraft.client.multiplayer.ClientLevel
-import net.minecraft.client.player.RemotePlayer
 import net.minecraft.world.InteractionHand
 import net.minecraft.world.entity.Entity
 import net.minecraft.world.entity.projectile.arrow.Arrow
@@ -80,8 +75,6 @@ import net.minecraft.world.phys.Vec3
 object ModuleAutoDodge : ClientModule("AutoDodge", ModuleCategories.COMBAT) {
     private const val MIN_PACKET_DISTANCE = 0.9
     private const val MIN_PACKET_DISTANCE_SQ = MIN_PACKET_DISTANCE * MIN_PACKET_DISTANCE
-    private const val SIGNIFICANT_POSITION_JUMP_SQ = 4.0
-    private const val SUPPORT_CHECK_DEPTH = 0.05
 
     private object AllowRotationChange : ToggleableValueGroup(this, "AllowRotationChange", false) {
         val allowJump by boolean("AllowJump", true)
@@ -95,6 +88,16 @@ object ModuleAutoDodge : ClientModule("AutoDodge", ModuleCategories.COMBAT) {
         val aimMargin by float("AimMargin", 0.75F, 0.0F..3.0F, suffix = "blocks")
         val jukeTicks by intRange("JukeTicks", 2..5, 1..10, suffix = "ticks")
         val threatMemory by int("ThreatMemory", 5, 0..20, suffix = "ticks")
+        val teleport = SpearTeleportValueGroup(this, ModuleAutoDodge::resetSpearTeleport)
+
+        fun movementSettings() = SpearMovementSettings(
+            enabled = enabled,
+            aimMargin = aimMargin.toDouble(),
+            jukeTicks = jukeTicks,
+            threatMemoryTicks = threatMemory,
+            teleportEnabled = teleport.enabled,
+            teleport = teleport.settings(),
+        )
 
         object Shield : ToggleableValueGroup(this, "Shield", true) {
             val releaseDelay by int("ReleaseDelay", 3, 0..20, suffix = "ticks")
@@ -114,19 +117,16 @@ object ModuleAutoDodge : ClientModule("AutoDodge", ModuleCategories.COMBAT) {
         }
 
         init {
+            tree(teleport)
             tree(Shield)
         }
     }
 
     private val ignore by multiEnumChoice("Ignore", Ignore.entries)
 
-    private val spearThreatDetector = SpearThreatDetector()
-    private val spearDodgePlanner = SpearDodgePlanner()
-    private val spearJukeCommitment = SpearJukeCommitment()
+    private val spearMovementController = SpearMovementController()
 
     private var primarySpearThreat: SpearThreat? = null
-    private var committedSpearThreatId: Int? = null
-    private var spearJukeDecision: SpearJukeDecision? = null
     private var spearShieldState: SpearShieldState<ItemStack> = SpearShieldState.Idle
     private var pendingShieldInventoryCommand: SpearShieldCommand<ItemStack>? = null
     private var ownsOffhandReservation = false
@@ -153,15 +153,42 @@ object ModuleAutoDodge : ClientModule("AutoDodge", ModuleCategories.COMBAT) {
         val availability = resolveAutoDodgeBranchAvailability(runtimeContext())
         val canStartDefense = enabled && availability.spear
         val projectilePlan = if (enabled && availability.projectile) projectileDodgePlan() else null
-        val spearPlan = updateSpearJuke(canStartDefense)
-        updateSpearShield(canStartDefense)
-        val dodgePlan = AutoDodgeMovementArbitrator.choose(projectilePlan, spearPlan)
+        val spearMovement = spearMovementController.update(
+            canStartDefense = canStartDefense,
+            projectilePlanActive = projectilePlan != null,
+            player = player,
+            world = world,
+            settings = Spear.movementSettings(),
+        )
+        primarySpearThreat = spearMovement.threat
+        val action = AutoDodgeMovementArbitrator.chooseAction(
+            projectilePlan,
+            spearMovement.teleportPlan,
+            spearMovement.jukePlan,
+        )
+        var teleported = false
+        val dodgePlan = when (action) {
+            is AutoDodgeMovementAction.Dodge -> action.plan
+            is AutoDodgeMovementAction.Teleport -> {
+                if (performSpearTeleport(action.plan)) {
+                    event.directionalInput = DirectionalInput.NONE
+                    teleported = true
+                    null
+                } else {
+                    spearMovement.jukePlan?.asDodgePlan()
+                }
+            }
+            AutoDodgeMovementAction.None -> null
+        }
 
+        // A teleport can change the shield arc immediately, so evaluate shield ownership at the final position.
+        updateSpearShield(canStartDefense)
         debugSpearState()
 
-        if (dodgePlan == null) {
+        if (teleported) {
             return@handler
         }
+        dodgePlan ?: return@handler
 
         event.directionalInput = dodgePlan.directionalInput
 
@@ -203,57 +230,14 @@ object ModuleAutoDodge : ClientModule("AutoDodge", ModuleCategories.COMBAT) {
         return planEvasion(DodgePlannerConfig(allowRotations = AllowRotationChange.enabled), inflictedHit)
     }
 
-    private fun updateSpearJuke(canStartDefense: Boolean): SpearDodgePlan? {
-        if (!Spear.enabled || !canStartDefense) {
-            resetSpearMovement()
-            return null
-        }
-
-        val threat = spearThreatDetector.update(
-            target = SpearThreatTargetSnapshot(player.boundingBox, player.deltaMovement),
-            candidates = world.players().asSequence()
-                .filterIsInstance<RemotePlayer>()
-                .map { it.toSpearThreatCandidate() }
-                .asIterable(),
-            aimMargin = Spear.aimMargin.toDouble(),
-            threatMemoryTicks = Spear.threatMemory,
+    private fun performSpearTeleport(plan: SpearTeleportPlan): Boolean {
+        return spearMovementController.executeTeleport(
+            player = player,
+            world = world,
+            plan = plan,
+            settings = Spear.teleport.settings(),
+            sendPacket = { sendPacketSilently(it) },
         )
-        primarySpearThreat = threat
-
-        if (threat == null) {
-            resetSpearCommitment()
-            return null
-        }
-
-        if (committedSpearThreatId != threat.candidate.entityId) {
-            spearJukeCommitment.reset()
-            committedSpearThreatId = threat.candidate.entityId
-        }
-
-        val playerPosition = player.position().horizontalPosition()
-        val startedSafelyGrounded = player.onGround() && isSupported(player.boundingBox) &&
-            !player.wouldFallIntoVoid(player.position(), world.minY.toDouble())
-        val decision = spearJukeCommitment.update(
-            durationTicks = Spear.jukeTicks,
-            isCurrentInputSafe = { input ->
-                spearDodgePlanner.isSafeSimulation(
-                    simulation = simulateSpearMovement(input),
-                    playerPosition = playerPosition,
-                    startedSafelyGrounded = startedSafelyGrounded,
-                )
-            },
-            replan = {
-                spearDodgePlanner.plan(
-                    attackerPosition = threat.candidate.position.horizontalPosition(),
-                    playerPosition = playerPosition,
-                    startedSafelyGrounded = startedSafelyGrounded,
-                    safeDistance = DodgePlanner.SAFE_DISTANCE_WITH_PADDING,
-                    simulate = ::simulateSpearMovement,
-                )
-            },
-        )
-        spearJukeDecision = decision
-        return decision.plan
     }
 
     private fun updateSpearShield(canStartDefense: Boolean) {
@@ -508,64 +492,13 @@ object ModuleAutoDodge : ClientModule("AutoDodge", ModuleCategories.COMBAT) {
         pendingShieldInventoryCommand = null
     }
 
-    private fun simulateSpearMovement(input: DirectionalInput): SpearMovementSimulation {
-        val simulatedInput = SimulatedPlayer.SimulatedPlayerInput.fromClientPlayer(
-            directionalInput = input,
-            jump = false,
-            sprinting = player.isSprinting,
-            sneaking = player.isShiftKeyDown,
-        )
-        val simulatedPlayer = SimulatedPlayer.fromClientPlayer(simulatedInput)
-
-        return collectSpearMovementSimulation(
-            tick = simulatedPlayer::tick,
-            sample = {
-                SpearMovementSample(
-                    position = simulatedPlayer.pos.horizontalPosition(),
-                    colliding = simulatedPlayer.horizontalCollision,
-                    supported = simulatedPlayer.onGround || isSupported(simulatedPlayer.boundingBox),
-                    overVoid = player.wouldFallIntoVoid(simulatedPlayer.pos, world.minY.toDouble()),
-                )
-            },
-        )
-    }
-
-    private fun isSupported(boundingBox: AABB): Boolean = world.getBlockCollisions(
-        player,
-        boundingBox.move(0.0, -SUPPORT_CHECK_DEPTH, 0.0),
-    ).anyNotEmpty()
-
-    private fun RemotePlayer.toSpearThreatCandidate(): SpearThreatCandidate {
-        val currentPosition = position()
-        val previousPosition = Vec3(xOld, yOld, zOld)
-        return SpearThreatCandidate(
-            entityId = id,
-            name = scoreboardName,
-            position = currentPosition,
-            eyePosition = eyePosition,
-            lookDirection = lookAngle,
-            isHoldingSpear = mainHandItem.isSpear || offhandItem.isSpear,
-            isUsingSpear = isUsingItem && useItem.isSpear,
-            isAlive = isAlive,
-            isRemoved = isRemoved,
-            isBot = ModuleAntiBot.isBot(this),
-            hasSignificantPositionJump = currentPosition.distanceToSqr(previousPosition) >=
-                SIGNIFICANT_POSITION_JUMP_SQ,
-        )
-    }
-
-    private fun Vec3.horizontalPosition() = HorizontalPosition(x, z)
-
     private fun resetSpearMovement() {
-        spearThreatDetector.reset()
+        spearMovementController.resetMovement()
         primarySpearThreat = null
-        resetSpearCommitment()
     }
 
-    private fun resetSpearCommitment() {
-        spearJukeCommitment.reset()
-        committedSpearThreatId = null
-        spearJukeDecision = null
+    private fun resetSpearTeleport() {
+        spearMovementController.resetTeleport()
     }
 
     private val shieldCleanupPending: Boolean
@@ -631,8 +564,16 @@ object ModuleAutoDodge : ClientModule("AutoDodge", ModuleCategories.COMBAT) {
         debugParameter("Spear/Threat") {
             primarySpearThreat?.let { "${it.candidate.name}/${it.kind}" } ?: "-"
         }
-        debugParameter("Spear/CommittedInput") { spearJukeDecision?.plan?.input ?: DirectionalInput.NONE }
-        debugParameter("Spear/CommittedTicks") { spearJukeDecision?.ticksRemaining ?: 0 }
+        debugParameter("Spear/CommittedInput") {
+            spearMovementController.jukeDecision?.plan?.input ?: DirectionalInput.NONE
+        }
+        debugParameter("Spear/CommittedTicks") {
+            spearMovementController.jukeDecision?.ticksRemaining ?: 0
+        }
+        debugParameter("Spear/TeleportState") { spearMovementController.teleportState.debugName }
+        debugParameter("Spear/TeleportDestination") {
+            spearMovementController.plannedTeleport?.destination ?: "-"
+        }
         debugParameter("Spear/ShieldState") { shieldStateName() }
         debugParameter("Spear/BlockReadyTick") {
             (spearShieldState as? SpearShieldState.Blocking)?.blockReadyAtTick ?: "-"
@@ -653,17 +594,20 @@ object ModuleAutoDodge : ClientModule("AutoDodge", ModuleCategories.COMBAT) {
     @Suppress("unused")
     private val worldChangeHandler = handler<WorldChangeEvent> {
         resetSpearMovement()
+        resetSpearTeleport()
         resetSpearShieldForWorldChange()
     }
 
     @Suppress("unused")
     private val disconnectHandler = handler<DisconnectEvent> {
         resetSpearMovement()
+        resetSpearTeleport()
         resetSpearShieldForWorldChange()
     }
 
     override fun onDisabled() {
         resetSpearMovement()
+        resetSpearTeleport()
         disableSpearShield()
         super.onDisabled()
     }
