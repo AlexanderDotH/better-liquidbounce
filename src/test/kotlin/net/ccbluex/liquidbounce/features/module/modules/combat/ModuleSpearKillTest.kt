@@ -2455,6 +2455,96 @@ class ModuleSpearKillTest {
     }
 
     @Test
+    fun `defeated Packet target can chain from its endpoint and still return to the first origin`() {
+        val session = SpearKillPacketBootSession()
+        session.startPhysicalReturn(
+            path = listOf(
+                Vec3(2.0, 0.0, 0.0),
+                Vec3(3.0, 0.0, 0.0),
+                Vec3(-3.0, 0.0, 0.0),
+                Vec3(-2.0, 0.0, 0.0),
+                Vec3.ZERO,
+            ),
+            outboundSteps = 2,
+            strikeHoldTicks = 2,
+        )
+        repeat(2) {
+            session.prepareNextStep()
+            session.confirmStep(delivered = true)
+        }
+
+        assertTrue(session.canStartChainedOutbound)
+        assertTrue(session.startChainedOutbound(
+            outboundMovements = listOf(
+                Vec3(0.0, 4.0, 0.0),
+                Vec3(0.0, 1.0, 0.0),
+            ),
+            strikeHoldTicks = 0,
+        ))
+        assertFalse(session.recovering)
+
+        repeat(2) {
+            session.prepareNextStep()
+            session.confirmStep(delivered = true)
+        }
+        assertTrue(session.canStartChainedOutbound)
+        assertTrue(session.startChainedOutbound(
+            outboundMovements = listOf(Vec3(0.0, 0.0, 3.0)),
+            strikeHoldTicks = 0,
+        ))
+
+        while (session.active) {
+            session.prepareNextStep()?.let { session.confirmStep(delivered = true) }
+            session.consumePhysicalPositionOffset()
+        }
+        assertVec3Equals(Vec3.ZERO, session.committedOffset, 1e-9)
+    }
+
+    @Test
+    fun `Packet origin fallback closes chaining before its first return packet`() {
+        val outbound = Vec3(5.0, 0.0, 0.0)
+        val session = SpearKillPacketBootSession()
+        session.startPhysicalReturn(
+            path = listOf(outbound, outbound.scale(-1.0), Vec3.ZERO),
+            outboundSteps = 1,
+        )
+        session.prepareNextStep()
+        session.confirmStep(delivered = true)
+
+        assertTrue(session.canStartChainedOutbound)
+        session.beginExactReturn()
+        assertFalse(session.canStartChainedOutbound)
+
+        while (session.active) {
+            session.prepareNextStep()?.let { session.confirmStep(delivered = true) }
+            session.consumePhysicalPositionOffset()
+        }
+        assertVec3Equals(Vec3.ZERO, session.committedOffset, 1e-9)
+    }
+
+    @Test
+    fun `Motion chain prepends a round trip and preserves its existing origin return tail`() {
+        val outbound = listOf(Vec3(0.0, 3.0, 0.0), Vec3(0.0, 2.0, 0.0))
+        val existingReturn = listOf(Vec3(-3.0, 0.0, 0.0), Vec3(-2.0, 0.0, 0.0), Vec3.ZERO)
+
+        val expected = listOf(
+            Vec3(0.0, 3.0, 0.0),
+            Vec3(0.0, 2.0, 0.0),
+            Vec3(0.0, -2.0, 0.0),
+            Vec3(0.0, -3.0, 0.0),
+            Vec3(-3.0, 0.0, 0.0),
+            Vec3(-2.0, 0.0, 0.0),
+            Vec3.ZERO,
+        )
+        val actual = buildSpearKillChainedAttackMovements(outbound, existingReturn)
+
+        assertEquals(expected.size, actual.size)
+        expected.zip(actual).forEach { (expectedMovement, actualMovement) ->
+            assertVec3Equals(expectedMovement, actualMovement, 1e-9)
+        }
+    }
+
+    @Test
     fun `selected round trip is rejected before emission when one server step clips`() {
         val origin = Vec3(10.0, 64.0, 2.0)
         val route = SpearKillAStarPacketRoute(

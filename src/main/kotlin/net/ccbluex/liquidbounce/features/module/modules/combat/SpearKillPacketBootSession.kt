@@ -185,6 +185,7 @@ internal class SpearKillPacketBootSession {
     private var configuredStepWaitTicks = 0
     private var physicalReturnEnabled = false
     private var physicalReturnStarted = false
+    private var chainedOutboundWindowOpen = false
     private var lastDeliveredMovement: Vec3? = null
     private var terminalCommitAuthorized = true
 
@@ -279,6 +280,15 @@ internal class SpearKillPacketBootSession {
             remainingStepWaitTicks == 0 &&
             remainingOutboundSteps > configuredTerminalSuffixSteps
 
+    /**
+     * True only at a freshly confirmed attack endpoint, before any return edge enters the packet
+     * pipeline. This is the only recovery phase where a defeated target may hand the session to a
+     * new outbound route without invalidating the exact return history.
+     */
+    val canStartChainedOutbound: Boolean
+        get() = physicalReturnEnabled && recovering && chainedOutboundWindowOpen &&
+            pendingOffset == null && committedOffset.lengthSqr() >= EPSILON
+
     val physicalReturnConfigured: Boolean
         get() = physicalReturnEnabled
 
@@ -332,6 +342,40 @@ internal class SpearKillPacketBootSession {
         requireTerminalAuthorization: Boolean = false,
     ): Boolean {
         if (!canReplaceRemainingOutbound) return false
+        return installReplacementOutbound(
+            outboundMovements = outboundMovements,
+            strikeHoldTicks = strikeHoldTicks,
+            preStrikeHoldTicks = preStrikeHoldTicks,
+            terminalSuffixSteps = terminalSuffixSteps,
+            requireTerminalAuthorization = requireTerminalAuthorization,
+        )
+    }
+
+    /** Replaces an untouched return tail with another attack while retaining the first origin. */
+    fun startChainedOutbound(
+        outboundMovements: List<Vec3>,
+        strikeHoldTicks: Int,
+        preStrikeHoldTicks: Int = 0,
+        terminalSuffixSteps: Int = 1,
+        requireTerminalAuthorization: Boolean = false,
+    ): Boolean {
+        if (!canStartChainedOutbound) return false
+        return installReplacementOutbound(
+            outboundMovements = outboundMovements,
+            strikeHoldTicks = strikeHoldTicks,
+            preStrikeHoldTicks = preStrikeHoldTicks,
+            terminalSuffixSteps = terminalSuffixSteps,
+            requireTerminalAuthorization = requireTerminalAuthorization,
+        )
+    }
+
+    private fun installReplacementOutbound(
+        outboundMovements: List<Vec3>,
+        strikeHoldTicks: Int,
+        preStrikeHoldTicks: Int,
+        terminalSuffixSteps: Int,
+        requireTerminalAuthorization: Boolean,
+    ): Boolean {
         if (strikeHoldTicks < 0 || preStrikeHoldTicks < 0) return false
         if (terminalSuffixSteps < 1 || terminalSuffixSteps > outboundMovements.size) return false
         if (requireTerminalAuthorization && preStrikeHoldTicks < 1) return false
@@ -349,6 +393,7 @@ internal class SpearKillPacketBootSession {
         remainingOutboundSteps = outboundMovements.size
         remainingStrikeHoldTicks = 0
         remainingPreStrikeHoldTicks = 0
+        remainingStepWaitTicks = 0
         holdingStrikeThisTick = false
         holdingPreStrikeThisTick = false
         configuredStrikeHoldTicks = strikeHoldTicks
@@ -359,7 +404,9 @@ internal class SpearKillPacketBootSession {
         terminalAimLockComplete = !requireTerminalAuthorization
         terminalCommitAuthorized = !requireTerminalAuthorization
         physicalReturnStarted = false
+        chainedOutboundWindowOpen = false
         pendingPhysicalPositionOffset = null
+        recovering = false
         return true
     }
 
@@ -406,6 +453,7 @@ internal class SpearKillPacketBootSession {
         configuredStepWaitTicks = stepWaitTicks
         physicalReturnEnabled = physicalReturn
         physicalReturnStarted = false
+        chainedOutboundWindowOpen = false
         lastDeliveredMovement = null
         recovering = false
     }
@@ -453,6 +501,7 @@ internal class SpearKillPacketBootSession {
                 } else {
                     pendingStepIsOutbound = remainingOutboundSteps > 0
                     pendingStepIsPhysicalReturn = physicalReturnStarted && !pendingStepIsOutbound
+                    chainedOutboundWindowOpen = chainedOutboundWindowOpen && pendingStepIsOutbound
                     committedOffset.add(movement).also { pendingOffset = it }
                 }
             }
@@ -480,6 +529,7 @@ internal class SpearKillPacketBootSession {
             if (remainingOutboundSteps == 0) {
                 remainingStrikeHoldTicks = configuredStrikeHoldTicks
                 recovering = true
+                chainedOutboundWindowOpen = true
                 if (physicalReturnEnabled) {
                     physicalReturnStarted = true
                     pendingPhysicalPositionOffset = committedOffset
@@ -527,6 +577,7 @@ internal class SpearKillPacketBootSession {
         configuredTerminalSuffixSteps = 1
         configuredTerminalAuthorizationRequired = false
         configuredStepWaitTicks = 0
+        chainedOutboundWindowOpen = false
         terminalAimLockComplete = false
         terminalCommitAuthorized = true
         movements.clear()
@@ -549,6 +600,7 @@ internal class SpearKillPacketBootSession {
     }
 
     fun beginExactReturn() {
+        chainedOutboundWindowOpen = false
         if (recovering) return
 
         pendingOffset = null
@@ -632,6 +684,7 @@ internal class SpearKillPacketBootSession {
         movements += Vec3.ZERO
         physicalReturnEnabled = physicalReturn
         physicalReturnStarted = physicalReturn
+        chainedOutboundWindowOpen = false
         pendingPhysicalPositionOffset = authoritativeOffset.takeIf { physicalReturn }
         recovering = true
     }
@@ -674,6 +727,7 @@ internal class SpearKillPacketBootSession {
         configuredStepWaitTicks = 0
         physicalReturnEnabled = false
         physicalReturnStarted = false
+        chainedOutboundWindowOpen = false
         lastDeliveredMovement = null
         terminalAimLockComplete = false
         terminalCommitAuthorized = true

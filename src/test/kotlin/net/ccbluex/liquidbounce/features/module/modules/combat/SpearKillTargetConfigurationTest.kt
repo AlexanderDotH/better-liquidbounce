@@ -302,4 +302,42 @@ class SpearKillTargetConfigurationTest {
 
         assertEquals("reachable", selected)
     }
+
+    @Test
+    fun `post-kill chaining tries nearby targets nearest first until one route is reachable`() {
+        data class Candidate(val name: String, val distanceSquared: Double)
+
+        val attempted = mutableListOf<String>()
+        val selection = selectNearestReachableSpearKillChainTarget(
+            candidates = listOf(
+                Candidate("far", 25.0),
+                Candidate("near-blocked", 4.0),
+                Candidate("middle", 9.0),
+            ),
+            distanceSquared = Candidate::distanceSquared,
+            createRoute = { candidate ->
+                attempted += candidate.name
+                candidate.name.takeIf { it == "middle" }?.let { "route-to-$it" }
+            },
+        )
+
+        assertEquals(listOf("near-blocked", "middle"), attempted)
+        assertEquals("middle", selection?.target?.name)
+        assertEquals("route-to-middle", selection?.route)
+    }
+
+    @Test
+    fun `post-kill chaining returns no selection only after every nearby route fails`() {
+        val attempted = mutableListOf<String>()
+
+        val selection: SpearKillTargetChainSelection<String, String>? =
+            selectNearestReachableSpearKillChainTarget(
+                candidates = listOf("second", "first"),
+                distanceSquared = { candidate -> if (candidate == "first") 1.0 else 4.0 },
+                createRoute = { candidate -> attempted += candidate; null },
+            )
+
+        assertEquals(listOf("first", "second"), attempted)
+        assertEquals(null, selection)
+    }
 }
