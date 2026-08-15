@@ -185,11 +185,13 @@ internal fun buildSpearKillAStarPacketMovements(
     outboundWaypoints: List<Vec3>,
     maxSpeed: Double,
     segmentValidator: SpearKillAStarSegmentValidator,
+    maxVerticalStep: Double = maxSpeed,
 ): List<Vec3>? = buildSpearKillAStarPacketRoute(
     origin = origin,
     outboundWaypoints = outboundWaypoints,
     maxSpeed = maxSpeed,
     segmentValidator = segmentValidator,
+    maxVerticalStep = maxVerticalStep,
 )?.roundTripMovements
 
 internal data class SpearKillAStarPacketRoute(
@@ -202,8 +204,11 @@ internal fun buildSpearKillAStarPacketRoute(
     outboundWaypoints: List<Vec3>,
     maxSpeed: Double,
     segmentValidator: SpearKillAStarSegmentValidator,
+    maxVerticalStep: Double = maxSpeed,
 ): SpearKillAStarPacketRoute? {
-    if (!origin.isFinite() || outboundWaypoints.isEmpty() || !maxSpeed.isFinite() || maxSpeed <= 0.0) {
+    if (!origin.isFinite() || outboundWaypoints.isEmpty() ||
+        !hasValidSpearKillPacketStepBounds(maxSpeed, maxVerticalStep)
+    ) {
         return null
     }
 
@@ -212,6 +217,7 @@ internal fun buildSpearKillAStarPacketRoute(
         waypoints = outboundWaypoints,
         maxSpeed = maxSpeed,
         segmentValidator = segmentValidator,
+        maxVerticalStep = maxVerticalStep,
     ) ?: return null
 
     val outboundEndpoint = outbound.fold(origin, Vec3::add)
@@ -255,6 +261,7 @@ internal fun buildSpearKillAStarOutboundMovements(
     waypoints: List<Vec3>,
     maxSpeed: Double,
     segmentValidator: SpearKillAStarSegmentValidator,
+    maxVerticalStep: Double = maxSpeed,
 ): List<Vec3>? {
     val outbound = ArrayList<Vec3>()
     var current = origin
@@ -265,6 +272,7 @@ internal fun buildSpearKillAStarOutboundMovements(
                 maxSpeed = maxSpeed,
                 segmentValidator = segmentValidator,
                 destination = outbound,
+                maxVerticalStep = maxVerticalStep,
             )
         ) {
             return null
@@ -297,10 +305,13 @@ private fun appendSpearKillAStarBoundedMovements(
     maxSpeed: Double,
     segmentValidator: SpearKillAStarSegmentValidator,
     destination: MutableList<Vec3>,
+    maxVerticalStep: Double,
 ): Boolean {
     val distance = from.distanceTo(to)
     if (distance <= SPEAR_KILL_A_STAR_POSITION_EPSILON) return true
-    if (!distance.isFinite() || !maxSpeed.isFinite() || maxSpeed <= 0.0) return false
+    if (!distance.isFinite() || !hasValidSpearKillPacketStepBounds(maxSpeed, maxVerticalStep)) {
+        return false
+    }
 
     val fixedSteps = if (distance <= maxSpeed + SPEAR_KILL_A_STAR_POSITION_EPSILON) {
         listOf(to.subtract(from))
@@ -314,19 +325,23 @@ private fun appendSpearKillAStarBoundedMovements(
 
     var stepStart = from
     for (stepIndex in fixedSteps.indices) {
-        val stepEnd = if (stepIndex == fixedSteps.lastIndex) {
+        val baseEnd = if (stepIndex == fixedSteps.lastIndex) {
             to
         } else {
             stepStart.add(fixedSteps[stepIndex])
         }
-        val movement = stepEnd.subtract(stepStart)
-        if (!movement.isFinite() || movement.length() > maxSpeed + SPEAR_KILL_A_STAR_POSITION_EPSILON ||
-            !segmentValidator.isClear(stepStart, stepEnd)
+        if (!appendSpearKillVerticalStepParts(
+                from = stepStart,
+                to = baseEnd,
+                maxSpeed = maxSpeed,
+                maxVerticalStep = maxVerticalStep,
+                segmentValidator = segmentValidator,
+                destination = destination,
+            )
         ) {
             return false
         }
-        destination += movement
-        stepStart = stepEnd
+        stepStart = baseEnd
     }
     return true
 }

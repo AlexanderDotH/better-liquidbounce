@@ -64,6 +64,7 @@ internal fun buildSpearKillDirectPacketRoute(
     distance: Double,
     maxSpeed: Double,
     segmentValidator: SpearKillAStarSegmentValidator,
+    maxVerticalStep: Double = maxSpeed,
 ): SpearKillAStarPacketRoute? {
     if (!origin.hasFiniteSpearKillCoordinates() || !direction.hasFiniteSpearKillCoordinates() ||
         !distance.isPositiveFinite() || !maxSpeed.isPositiveFinite()
@@ -82,6 +83,7 @@ internal fun buildSpearKillDirectPacketRoute(
         outboundWaypoints = listOf(endpoint),
         maxSpeed = maxSpeed,
         segmentValidator = segmentValidator,
+        maxVerticalStep = maxVerticalStep,
     )
 }
 

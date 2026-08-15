@@ -51,6 +51,7 @@ import org.junit.jupiter.api.Assertions.assertNotNull
 import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
+import org.junit.jupiter.api.assertThrows
 import kotlin.math.abs
 
 @Suppress("LargeClass")
@@ -320,149 +321,40 @@ class ModuleSpearKillTest {
     }
 
     @Test
-    fun `SpearKill accelerates charge only while idle and under the kinetic delay`() {
-        assertTrue(
-            shouldAccelerateSpearKillCharge(
-                attackPathActive = false,
-                isUseKeyDown = true,
-                isUsingSpear = true,
+    fun `held undercharged spear waits for vanilla charge cadence without packet acceleration`() {
+        assertEquals(
+            SpearKillChargeDecision.WAIT_FOR_VANILLA,
+            resolveSpearKillChargeDecision(
                 ticksUsingItem = 2,
                 delayTicks = 3,
-            ),
-        )
-        assertFalse(
-            shouldAccelerateSpearKillCharge(
-                attackPathActive = true,
-                isUseKeyDown = true,
                 isUsingSpear = true,
-                ticksUsingItem = 2,
-                delayTicks = 3,
-            ),
-        )
-        assertFalse(
-            shouldAccelerateSpearKillCharge(
-                attackPathActive = false,
-                isUseKeyDown = true,
-                isUsingSpear = true,
-                ticksUsingItem = 4,
-                delayTicks = 3,
-            ),
-        )
-        assertFalse(
-            shouldAccelerateSpearKillCharge(
-                attackPathActive = false,
-                isUseKeyDown = false,
-                isUsingSpear = true,
-                ticksUsingItem = 2,
-                delayTicks = 3,
+                useRequested = true,
             ),
         )
     }
 
     @Test
-    fun `FightBot charging never emits the manual packet acceleration burst`() {
-        assertFalse(
-            shouldAccelerateSpearKillChargeForRequest(
-                attackPathActive = false,
-                fightBotRequestActive = true,
-                physicalUseInputHeld = false,
-                isUsingSpear = true,
-                ticksUsingItem = 1,
+    fun `interrupted undercharged spear releases SpearKill ownership`() {
+        assertEquals(
+            SpearKillChargeDecision.RESET,
+            resolveSpearKillChargeDecision(
+                ticksUsingItem = 2,
                 delayTicks = 3,
+                isUsingSpear = true,
+                useRequested = false,
             ),
         )
     }
 
     @Test
-    fun `physical spear charging preserves acceleration outside FightBot ownership`() {
-        assertTrue(
-            shouldAccelerateSpearKillChargeForRequest(
-                attackPathActive = false,
-                fightBotRequestActive = false,
-                physicalUseInputHeld = true,
-                isUsingSpear = true,
-                ticksUsingItem = 1,
-                delayTicks = 3,
-            ),
-        )
-    }
-
-    @Test
-    fun `undercharged spear use does not tear down while still charging`() {
-        assertFalse(
-            shouldResetSpearKillOnUndercharge(
-                ticksUsingItem = 2,
-                delayTicks = 3,
-                isUsingSpear = true,
-                isUseKeyDown = true,
-            ),
-        )
-        assertTrue(
-            shouldResetSpearKillOnUndercharge(
-                ticksUsingItem = 2,
-                delayTicks = 3,
-                isUsingSpear = false,
-                isUseKeyDown = true,
-            ),
-        )
-        assertTrue(
-            shouldResetSpearKillOnUndercharge(
-                ticksUsingItem = 2,
-                delayTicks = 3,
-                isUsingSpear = true,
-                isUseKeyDown = false,
-            ),
-        )
-        assertFalse(
-            shouldResetSpearKillOnUndercharge(
+    fun `charged spear continues to route planning`() {
+        assertEquals(
+            SpearKillChargeDecision.READY,
+            resolveSpearKillChargeDecision(
                 ticksUsingItem = 4,
                 delayTicks = 3,
                 isUsingSpear = true,
-                isUseKeyDown = true,
-            ),
-        )
-    }
-
-    @Test
-    fun `SpearKill refreshes idle server use before the kinetic window expires`() {
-        assertTrue(
-            shouldRefreshSpearKillServerUse(
-                attackPathActive = false,
-                isUseKeyDown = true,
-                ticksUsingItem = 19,
-                damageUseDuration = 20,
-            ),
-        )
-        assertFalse(
-            shouldRefreshSpearKillServerUse(
-                attackPathActive = false,
-                isUseKeyDown = true,
-                ticksUsingItem = 18,
-                damageUseDuration = 20,
-            ),
-        )
-        assertFalse(
-            shouldRefreshSpearKillServerUse(
-                attackPathActive = false,
-                isUseKeyDown = false,
-                ticksUsingItem = 19,
-                damageUseDuration = 20,
-            ),
-        )
-        assertFalse(
-            shouldRefreshSpearKillServerUse(
-                attackPathActive = true,
-                isUseKeyDown = true,
-                ticksUsingItem = 19,
-                damageUseDuration = 20,
-            ),
-        )
-        assertFalse(
-            shouldRefreshSpearKillServerUse(
-                attackPathActive = false,
-                isUseKeyDown = true,
-                ticksUsingItem = 0,
-                damageUseDuration = 0,
+                useRequested = true,
             ),
         )
     }
@@ -1496,6 +1388,23 @@ class ModuleSpearKillTest {
     }
 
     @Test
+    fun `AStar packet route bounds every vertical delta below fall damage distance`() {
+        val origin = Vec3(0.5, 72.0, 0.5)
+        val destination = Vec3(0.5, 62.0, 0.5)
+        val route = buildSpearKillAStarPacketRoute(
+            origin = origin,
+            outboundWaypoints = listOf(destination),
+            maxSpeed = 7.4,
+            segmentValidator = SpearKillAStarSegmentValidator { _, _ -> true },
+            maxVerticalStep = 2.95,
+        )!!
+
+        assertTrue(route.roundTripMovements.dropLast(1).all { abs(it.y) <= 2.95 })
+        assertVec3Equals(destination, route.outboundMovements.fold(origin, Vec3::add), 1e-9)
+        assertVec3Equals(Vec3.ZERO, route.roundTripMovements.fold(Vec3.ZERO, Vec3::add), 1e-9)
+    }
+
+    @Test
     fun `AStar packet route rejects a server-blocked inverse return edge`() {
         val origin = Vec3(0.25, 64.0, 0.75)
         val waypoint = Vec3(1.5, 64.0, 0.75)
@@ -2206,25 +2115,20 @@ class ModuleSpearKillTest {
     }
 
     @Test
-    fun `path schedule places pre-hold before multi-step terminal suffix`() {
-        val schedule = buildSpearKillPathSchedule(
+    fun `path schedule rejects waits beyond one aim-lock tick`() {
+        assertNull(buildSpearKillPathSchedule(
             outboundStepCount = 6,
             stepWaitTicks = 1,
             terminalSuffixCount = 3,
             preStrikeHoldTicks = 2,
             strikeHoldTicks = 2,
-        )!!
-
-        assertEquals(listOf(0, 2, 4, 8, 10, 12), schedule.stepStartTicks)
-        assertEquals(8, schedule.terminalStartTick)
-        assertEquals(14, schedule.hitTick)
-        assertEquals(14, schedule.totalOutboundTicks)
+        ))
     }
 
     @Test
     fun `candidate lower bound includes approach terminal packets waits and strike hold`() {
         assertEquals(
-            6,
+            7,
             spearKillAStarCandidateLowerBoundHitTick(
                 routeOrigin = Vec3.ZERO,
                 plannerGoal = Vec3(20.0, 0.0, 0.0),
@@ -2245,42 +2149,17 @@ class ModuleSpearKillTest {
     }
 
     @Test
-    fun `earliest pre-strike hold is zero for an immediately feasible schedule`() {
-        val hold = findEarliestSpearKillPreStrikeHold(
-            outboundStepCount = 4,
-            stepWaitTicks = 0,
-            terminalSuffixCount = 1,
-            strikeHoldTicks = 2,
-        ) { true }
-
-        assertEquals(0, hold)
-    }
-
-    @Test
-    fun `earliest pre-strike hold honors a mandatory aim-lock tick`() {
-        val hold = findEarliestSpearKillPreStrikeHold(
-            outboundStepCount = 4,
-            stepWaitTicks = 0,
-            terminalSuffixCount = 1,
-            strikeHoldTicks = 2,
-            minPreStrikeHoldTicks = 1,
-        ) { true }
-
-        assertEquals(1, hold)
-    }
-
-    @Test
-    fun `earliest pre-strike hold increases until the schedule becomes feasible`() {
-        val hold = findEarliestSpearKillPreStrikeHold(
+    fun `AStar schedule uses one aim-lock tick without predictive waiting`() {
+        val schedule = buildSpearKillAStarPathSchedule(
             outboundStepCount = 3,
             stepWaitTicks = 0,
             terminalSuffixCount = 1,
             strikeHoldTicks = 2,
-            maxPreStrikeHoldTicks = SPEAR_KILL_MAX_PRE_STRIKE_HOLD,
-        ) { schedule -> schedule.hitTick >= 7 }
+        )!!
 
-        assertEquals(3, hold)
-        assertTrue(hold!! <= SPEAR_KILL_MAX_PRE_STRIKE_HOLD)
+        assertEquals(listOf(0, 1, 3), schedule.stepStartTicks)
+        assertEquals(3, schedule.terminalStartTick)
+        assertEquals(5, schedule.hitTick)
     }
 
     @Test
@@ -2677,7 +2556,23 @@ class ModuleSpearKillTest {
     }
 
     @Test
-    fun `AStar isolates its terminal lunge behind a suppressed movement barrier`() {
+    fun `AStar rejects waits longer than its one aim-lock tick`() {
+        val terminal = Vec3(3.0, 0.0, 0.0)
+        val session = SpearKillPacketBootSession()
+
+        assertThrows<IllegalArgumentException> {
+            session.start(
+                path = listOf(terminal, terminal.scale(-1.0), Vec3.ZERO),
+                outboundSteps = 1,
+                preStrikeHoldTicks = 2,
+                terminalSuffixSteps = 1,
+                requireTerminalAuthorization = true,
+            )
+        }
+    }
+
+    @Test
+    fun `AStar isolates its terminal lunge behind a one-tick movement barrier`() {
         val session = SpearKillPacketBootSession()
         session.start(
             path = listOf(
@@ -2688,7 +2583,7 @@ class ModuleSpearKillTest {
                 Vec3.ZERO,
             ),
             outboundSteps = 2,
-            preStrikeHoldTicks = 2,
+            preStrikeHoldTicks = 1,
             terminalSuffixSteps = 1,
         )
 
@@ -2697,14 +2592,12 @@ class ModuleSpearKillTest {
 
         assertNull(session.prepareNextStep())
         assertTrue(session.holdingKineticBarrier)
-        assertNull(session.prepareNextStep())
-        assertTrue(session.holdingKineticBarrier)
         assertVec3Equals(Vec3(3.0, 0.0, 0.0), session.prepareNextStep()!!, 1e-9)
         assertFalse(session.holdingKineticBarrier)
     }
 
     @Test
-    fun `AStar pre-strike hold gates the entire multi-step terminal suffix`() {
+    fun `AStar keeps one aim-lock tick before the multi-step terminal suffix`() {
         val session = SpearKillPacketBootSession()
         session.start(
             path = listOf(
@@ -2720,15 +2613,13 @@ class ModuleSpearKillTest {
             ),
             outboundSteps = 4,
             stepWaitTicks = 0,
-            preStrikeHoldTicks = 2,
+            preStrikeHoldTicks = 1,
             terminalSuffixSteps = 3,
         )
 
         assertVec3Equals(Vec3(1.0, 0.0, 0.0), session.prepareNextStep()!!, 1e-9)
         session.confirmStep(delivered = true)
 
-        assertNull(session.prepareNextStep())
-        assertTrue(session.holdingKineticBarrier)
         assertNull(session.prepareNextStep())
         assertTrue(session.holdingKineticBarrier)
 
@@ -3449,10 +3340,11 @@ class ModuleSpearKillTest {
                 Vec3.ZERO,
             ),
             outboundSteps = 2,
-            preStrikeHoldTicks = 2,
+            preStrikeHoldTicks = 1,
             terminalSuffixSteps = 1,
         )
 
+        assertEquals(Rotation.fromRotationVec(approachMovement), session.pathHeading)
         session.prepareNextStep()
         session.confirmStep(delivered = true)
 

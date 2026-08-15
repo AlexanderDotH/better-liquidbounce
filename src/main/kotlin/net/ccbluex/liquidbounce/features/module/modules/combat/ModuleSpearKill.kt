@@ -54,7 +54,6 @@ import net.ccbluex.liquidbounce.utils.aiming.RotationManager
 import net.ccbluex.liquidbounce.utils.aiming.data.Rotation
 import net.ccbluex.liquidbounce.utils.aiming.utils.RotationUtil
 import net.ccbluex.liquidbounce.utils.client.SilentHotbar
-import net.ccbluex.liquidbounce.utils.client.Timer
 import net.ccbluex.liquidbounce.utils.client.isNewerThanOrEquals1_21_6
 import net.ccbluex.liquidbounce.utils.client.notification
 import net.ccbluex.liquidbounce.utils.client.usesViaFabricPlus
@@ -174,12 +173,16 @@ object ModuleSpearKill : ClientModule("SpearKill", ModuleCategories.COMBAT, alia
     private val setbackGuard = SpearKillSetbackGuard()
     private val setbackRollback = SpearKillSetbackRollback()
     private val fallDamageDeliveryTracker = SpearKillFallDamagePacketTracker()
+    private val virtualFallState = SpearKillVirtualFallState()
     private val attemptTracker = SpearKillAttemptTracker()
     private val damageEvidenceTracker = SpearKillDamageEvidenceTracker()
     private val failureNotificationGate = SpearKillFailureNotificationGate(
         SPEAR_KILL_FAILURE_NOTIFICATION_COOLDOWN_TICKS,
     )
     private val virtualSessionPackets = Collections.newSetFromMap(
+        IdentityHashMap<ServerboundMovePlayerPacket, Boolean>(),
+    )
+    private val virtualFallGroundingPackets = Collections.newSetFromMap(
         IdentityHashMap<ServerboundMovePlayerPacket, Boolean>(),
     )
     private val rejectedTargets = Collections.newSetFromMap(
@@ -202,6 +205,7 @@ object ModuleSpearKill : ClientModule("SpearKill", ModuleCategories.COMBAT, alia
     private var movementAssistPreparationActive = false
     private var motionPacketHeading: Rotation? = null
     private var packetRecoveryStallTicks = 0
+    private var virtualFallGroundingDelivered = false
     private var attemptRouteCompleted = false
     private var manualAttackRequestLatched = false
     private var serverSneaking = false
@@ -576,6 +580,10 @@ object ModuleSpearKill : ClientModule("SpearKill", ModuleCategories.COMBAT, alia
             safeFallDistance = player.getAttributeValue(Attributes.SAFE_FALL_DISTANCE),
             tickCount = player.tickCount,
         )
+    private val safeVirtualFallStep
+        get() = spearKillSafeVirtualVerticalStep(
+            player.getAttributeValue(Attributes.SAFE_FALL_DISTANCE),
+        )
 
     private val isUsingSpear get() = player.isUsingItem && player.useItem.isSpear
     private val holdingSpear get() = player.mainHandItem.isSpear || player.offhandItem.isSpear
@@ -587,21 +595,23 @@ object ModuleSpearKill : ClientModule("SpearKill", ModuleCategories.COMBAT, alia
     private val isSpearUseRequested
         get() = isUseInputHeld || hasFightBotSpearRequest || hasKillAuraSpearRequest
     private val isAttackInputHeld get() = mc.options.keyAttack.isPressedOnAny
-    private val movementAssistLeaseActive
-        get() = movementAssistPreparationActive || hasActiveAttackPath
     private val movementAssistLease
         get() = resolveSpearKillMovementAssistLease(
-            active = movementAssistLeaseActive,
+            preparationActive = movementAssistPreparationActive,
+            routeActive = hasActiveAttackPath,
             sneakMode = sneakWhileMoving,
             elytraMode = elytraWhileMoving,
             elytraUsable = hasUsableSpearKillElytra,
             elytraActive = activeMovementTransport?.elytraActive ?: isSpearKillElytraActive,
         )
-    private val canUseSpearKillServerSneak
-        get() = movementAssistLease.serverSneak && !player.isFallFlying &&
-            player.getDimensions(Pose.CROUCHING).height.toDouble() < player.boundingBox.ysize
     private val shouldMaintainSpearKillServerSneak
-        get() = canUseSpearKillServerSneak && movementAssistLeaseActive
+        get() = SpearKillServerSneak.shouldMaintain(
+            requestedByRoute = movementAssistLease.serverSneak,
+            serverSneaking = serverSneaking,
+            isFallFlying = player.isFallFlying,
+            currentHeight = player.boundingBox.ysize,
+            crouchingHeight = player.getDimensions(Pose.CROUCHING).height.toDouble(),
+        )
     private val physicalAttackRequest
         get() = isSpearKillAttackRequested(
             attackKeyDown = isAttackInputHeld,
@@ -709,7 +719,7 @@ object ModuleSpearKill : ClientModule("SpearKill", ModuleCategories.COMBAT, alia
     }
 
     /** Collision pose the server will use after SpearKill's optional sneak input has arrived. */
-    private fun spearKillServerCollisionBoxAt(position: Vec3): AABB = if (canUseSpearKillServerSneak) {
+    private fun spearKillServerCollisionBoxAt(position: Vec3): AABB = if (shouldMaintainSpearKillServerSneak) {
         player.getDimensions(Pose.CROUCHING).makeBoundingBox(position)
     } else {
         player.boundingBox.move(position.subtract(player.position()))
@@ -875,6 +885,7 @@ object ModuleSpearKill : ClientModule("SpearKill", ModuleCategories.COMBAT, alia
             packetAStarAttackActive = false
             clearAStarRenderPath()
             activeMovementTransport = null
+            resetVirtualFallSafety()
         }
         if (!damageEvidenceTracker.isArmed) {
             attemptTracker.complete()
@@ -970,10 +981,12 @@ object ModuleSpearKill : ClientModule("SpearKill", ModuleCategories.COMBAT, alia
         motionPacketHeading = null
         BlinkManager.packetQueue.removeIf { snapshot ->
             val packet = snapshot.packet
-            packet === plannedPacket || packet is ServerboundMovePlayerPacket && packet in virtualSessionPackets
+            packet === plannedPacket || packet is ServerboundMovePlayerPacket &&
+                (packet in virtualSessionPackets || packet in virtualFallGroundingPackets)
         }
         virtualSessionPackets.clear()
         fallDamageDeliveryTracker.clear()
+        resetVirtualFallSafety()
         plannedPacket = null
         awaitingVanillaMovementPacket = false
         movementAssistPreparationActive = false
@@ -983,6 +996,18 @@ object ModuleSpearKill : ClientModule("SpearKill", ModuleCategories.COMBAT, alia
 
     private fun clearAStarRenderPath() {
         plannedAStarRenderPath = emptyList()
+    }
+
+    private fun beginVirtualFallSafety() {
+        virtualFallGroundingPackets.clear()
+        virtualFallState.begin(player.fallDistance.toDouble())
+        virtualFallGroundingDelivered = false
+    }
+
+    private fun resetVirtualFallSafety() {
+        virtualFallGroundingPackets.clear()
+        virtualFallState.reset()
+        virtualFallGroundingDelivered = false
     }
 
     private fun clearAStarTargetLock() {
@@ -1342,6 +1367,7 @@ object ModuleSpearKill : ClientModule("SpearKill", ModuleCategories.COMBAT, alia
         packetSessionOrigin = origin
         physicalReturnPositioner.clear()
         returnRecoveryTracker.begin(origin)
+        beginVirtualFallSafety()
         startSpearKillDirectPacketSession(
             session = packetBootSession,
             route = route,
@@ -1399,6 +1425,7 @@ object ModuleSpearKill : ClientModule("SpearKill", ModuleCategories.COMBAT, alia
         packetSessionOrigin = origin
         physicalReturnPositioner.clear()
         returnRecoveryTracker.begin(origin)
+        beginVirtualFallSafety()
         packetBootSession.startPhysicalReturn(
             path = plan.packetRoute.roundTripMovements,
             outboundSteps = plan.packetRoute.outboundMovements.size,
@@ -1560,11 +1587,10 @@ object ModuleSpearKill : ClientModule("SpearKill", ModuleCategories.COMBAT, alia
             lineOfSightShortcuts = lineOfSightShortcuts,
         ) ?: return null
 
-        val seedSchedule = buildSpearKillPathSchedule(
+        val seedSchedule = buildSpearKillAStarPathSchedule(
             outboundStepCount = seedSpatialPlan.packetRoute.outboundMovements.size,
             stepWaitTicks = stepWaitTicks,
             terminalSuffixCount = seedSpatialPlan.terminalSuffixCount,
-            preStrikeHoldTicks = 0,
             strikeHoldTicks = SPEAR_KILL_PACKET_STRIKE_HOLD_TICKS,
         ) ?: return null
         val hitPrediction = predictAStarTarget(target, targetExtrapolation, seedSchedule.hitTick)
@@ -1644,6 +1670,7 @@ object ModuleSpearKill : ClientModule("SpearKill", ModuleCategories.COMBAT, alia
             outboundWaypoints = outboundWaypoints,
             maxSpeed = effectiveMaxSpeed,
             segmentValidator = segmentValidator,
+            maxVerticalStep = safeVirtualFallStep,
         ) ?: return null
         if (!isSpearKillAStarTerminalStepValid(packetRoute.outboundMovements, approach, effectiveMaxSpeed)) {
             return null
@@ -1670,25 +1697,21 @@ object ModuleSpearKill : ClientModule("SpearKill", ModuleCategories.COMBAT, alia
         targetExtrapolation: PositionExtrapolation,
         stepWaitTicks: Int,
     ): AStarAttackPlan? {
-        val preStrikeHold = findEarliestSpearKillPreStrikeHold(
+        val schedule = buildSpearKillAStarPathSchedule(
             outboundStepCount = spatialPlan.packetRoute.outboundMovements.size,
             stepWaitTicks = stepWaitTicks,
             terminalSuffixCount = spatialPlan.terminalSuffixCount,
-            strikeHoldTicks = SPEAR_KILL_PACKET_STRIKE_HOLD_TICKS,
-            minPreStrikeHoldTicks = SPEAR_KILL_A_STAR_MIN_AIM_LOCK_TICKS,
-        ) { schedule ->
-            val prediction = predictAStarTarget(target, targetExtrapolation, schedule.hitTick)
-            hasValidAStarTerminalAttackRay(prediction.boundingBox, eyeOffset, spatialPlan.approach)
-        } ?: return null
-
-        val schedule = buildSpearKillPathSchedule(
-            outboundStepCount = spatialPlan.packetRoute.outboundMovements.size,
-            stepWaitTicks = stepWaitTicks,
-            terminalSuffixCount = spatialPlan.terminalSuffixCount,
-            preStrikeHoldTicks = preStrikeHold,
             strikeHoldTicks = SPEAR_KILL_PACKET_STRIKE_HOLD_TICKS,
         ) ?: return null
         val hitPrediction = predictAStarTarget(target, targetExtrapolation, schedule.hitTick)
+        if (!hasValidAStarTerminalAttackRay(
+                targetBox = hitPrediction.boundingBox,
+                eyeOffset = eyeOffset,
+                approach = spatialPlan.approach,
+            )
+        ) {
+            return null
+        }
         return AStarAttackPlan(
             approach = spatialPlan.approach,
             packetRoute = spatialPlan.packetRoute,
@@ -1696,7 +1719,7 @@ object ModuleSpearKill : ClientModule("SpearKill", ModuleCategories.COMBAT, alia
             targetPosition = hitPrediction.observedPosition,
             targetVelocity = target.position().subtract(target.lastPos),
             schedule = schedule,
-            preStrikeHoldTicks = preStrikeHold,
+            preStrikeHoldTicks = SPEAR_KILL_PACKET_MAX_PRE_STRIKE_HOLD_TICKS,
             terminalSuffixCount = spatialPlan.terminalSuffixCount,
         )
     }
@@ -2223,6 +2246,7 @@ object ModuleSpearKill : ClientModule("SpearKill", ModuleCategories.COMBAT, alia
                 origin = sessionOrigin,
                 playerBoundingBox = sessionBoundingBox,
             ),
+            maxVerticalStep = safeVirtualFallStep,
         )
     }
 
@@ -2264,6 +2288,7 @@ object ModuleSpearKill : ClientModule("SpearKill", ModuleCategories.COMBAT, alia
                 waypoints = compactedRoute + sessionOrigin,
                 maxSpeed = effectiveMaxSpeed,
                 segmentValidator = segmentValidator,
+                maxVerticalStep = safeVirtualFallStep,
             )
         } ?: return null
         val serverValidator = createServerMovementSpearKillSegmentValidator(
@@ -2343,6 +2368,7 @@ object ModuleSpearKill : ClientModule("SpearKill", ModuleCategories.COMBAT, alia
             waypoints = listOf(to),
             maxSpeed = effectiveStepLimit,
             segmentValidator = segmentValidator,
+            maxVerticalStep = safeVirtualFallStep,
         )?.let { return it }
 
         val aStar = movementConfiguration.packet.aStar
@@ -2363,6 +2389,7 @@ object ModuleSpearKill : ClientModule("SpearKill", ModuleCategories.COMBAT, alia
             waypoints = compactedRoute + to,
             maxSpeed = effectiveStepLimit,
             segmentValidator = segmentValidator,
+            maxVerticalStep = safeVirtualFallStep,
         )
     }
 
@@ -2376,6 +2403,7 @@ object ModuleSpearKill : ClientModule("SpearKill", ModuleCategories.COMBAT, alia
         packetRecoveryStallTicks = 0
         packetSetbackRecoveryAttempted = true
         attemptTracker.markRecovery()
+        beginVirtualFallSafety()
         if (movements.isNotEmpty()) {
             packetBootSession.beginPacketExactRecoveryFrom(attempt.authoritativeOffset, movements)
         }
@@ -2553,52 +2581,18 @@ object ModuleSpearKill : ClientModule("SpearKill", ModuleCategories.COMBAT, alia
         }
         val chargeDuration = kineticWeapon.computeDamageUseDuration()
 
-        // Keep the finite kinetic use window alive while aiming / standing still. Mid-path
-        // refresh is skipped so Packet/A* cannot get aborted by an undercharged restart.
-        if (
-            shouldRefreshSpearKillServerUse(
-                attackPathActive = attackActive,
-                isUseKeyDown = isSpearUseRequested,
-                ticksUsingItem = player.ticksUsingItem,
-                damageUseDuration = chargeDuration,
-            )
-        ) {
-            refreshSpearKillServerUse()
-            return@handler
-        }
-
-        if (player.ticksUsingItem <= kineticWeapon.delayTicks) {
-            if (
-                shouldAccelerateSpearKillChargeForRequest(
-                    attackPathActive = attackActive,
-                    fightBotRequestActive = hasFightBotSpearRequest,
-                    physicalUseInputHeld = isUseInputHeld,
-                    isUsingSpear = isUsingSpear,
-                    ticksUsingItem = player.ticksUsingItem,
-                    delayTicks = kineticWeapon.delayTicks,
-                )
-            ) {
-                Timer.requestTimerSpeed(
-                    SPEAR_KILL_CHARGE_TIMER_SPEED,
-                    Priority.IMPORTANT_FOR_USAGE_1,
-                    ModuleSpearKill,
-                    resetAfterTicks = 1,
-                )
-                repeat(SPEAR_KILL_CHARGE_ACCEL_PACKETS) {
-                    network.send(MovePacketType.FULL.generatePacket())
-                }
-            }
-            if (
-                shouldResetSpearKillOnUndercharge(
-                    ticksUsingItem = player.ticksUsingItem,
-                    delayTicks = kineticWeapon.delayTicks,
-                    isUsingSpear = isUsingSpear,
-                    isUseKeyDown = isSpearUseRequested,
-                )
-            ) {
+        when (resolveSpearKillChargeDecision(
+            ticksUsingItem = player.ticksUsingItem,
+            delayTicks = kineticWeapon.delayTicks,
+            isUsingSpear = isUsingSpear,
+            useRequested = isSpearUseRequested,
+        )) {
+            SpearKillChargeDecision.WAIT_FOR_VANILLA -> return@handler
+            SpearKillChargeDecision.RESET -> {
                 resetAttack()
+                return@handler
             }
-            return@handler
+            SpearKillChargeDecision.READY -> Unit
         }
 
         if (!attackActive) {
@@ -2700,12 +2694,45 @@ object ModuleSpearKill : ClientModule("SpearKill", ModuleCategories.COMBAT, alia
             }
             return@handler
         }
+        val movement = packetBootSession.pendingMovement
+        if (movement != null && shouldStabilizeVirtualFall(movement)) {
+            packetBootSession.confirmStep(delivered = false)
+            awaitingVanillaMovementPacket = false
+            sendVirtualFallGroundingPacket()
+            return@handler
+        }
         val position = packetPositionOrigin().add(offset)
         event.x = position.x
         event.y = position.y
         event.z = position.z
         event.ground = isSpearKillGrounded(event.ground, offset)
         awaitingVanillaMovementPacket = true
+    }
+
+    private fun shouldStabilizeVirtualFall(movement: Vec3): Boolean =
+        shouldStabilizeSpearKillVirtualFall(
+            groundingDelivered = virtualFallGroundingDelivered,
+            physicalFallDanger = shouldProtectFallDamage,
+            state = virtualFallState,
+            nextMovement = movement,
+            safeFallDistance = player.getAttributeValue(Attributes.SAFE_FALL_DISTANCE),
+        )
+
+    private fun sendVirtualFallGroundingPacket() {
+        val position = packetPositionOrigin().add(packetBootSession.committedOffset)
+        val heading = packetBootSession.pathHeading
+        val packet = ServerboundMovePlayerPacket.PosRot(
+            position.x,
+            position.y,
+            position.z,
+            heading?.yaw ?: player.yRot,
+            heading?.pitch ?: player.xRot,
+            true,
+            player.horizontalCollision,
+        )
+        virtualFallGroundingPackets += packet
+        network.send(packet)
+        virtualFallGroundingPackets.remove(packet)
     }
 
     private fun sendFallbackMovementPacket() {
@@ -2819,16 +2846,19 @@ object ModuleSpearKill : ClientModule("SpearKill", ModuleCategories.COMBAT, alia
 
     @Suppress("unused")
     private val fallDamagePacketHandler = handler<PacketEvent>(priority = (SAFETY_FEATURE - 1).toShort()) { event ->
+        val packet = event.packet as? ServerboundMovePlayerPacket ?: return@handler
         if (
             event.origin != TransferOrigin.OUTGOING ||
-            !hasActiveAttackPath ||
-            setbackRollback.confirming ||
-            !shouldProtectFallDamage
+            setbackRollback.confirming
         ) {
             return@handler
         }
 
-        val packet = event.packet as? ServerboundMovePlayerPacket ?: return@handler
+        if (packet in virtualFallGroundingPackets) {
+            fallDamageDeliveryTracker.protect(packet)
+            return@handler
+        }
+        if (!hasActiveAttackPath || !shouldProtectFallDamage) return@handler
         if (packetBootSession.active && (packet !== plannedPacket || packetBootSession.virtualOffset.y != 0.0)) {
             return@handler
         }
@@ -2858,9 +2888,10 @@ object ModuleSpearKill : ClientModule("SpearKill", ModuleCategories.COMBAT, alia
         }
 
         val packet = event.packet as? ServerboundMovePlayerPacket ?: return@handler
+        val virtualFallGroundingPacket = virtualFallGroundingPackets.remove(packet)
         val virtualPacket = virtualSessionPackets.remove(packet)
         val plannedPathPacket = packet === plannedPacket
-        val pathPacket = virtualPacket || plannedPathPacket
+        val pathPacket = virtualFallGroundingPacket || virtualPacket || plannedPathPacket
 
         val queuedByBlink = pathPacket && BlinkManager.packetQueue.any { it.packet === packet }
         if (queuedByBlink) {
@@ -2870,6 +2901,11 @@ object ModuleSpearKill : ClientModule("SpearKill", ModuleCategories.COMBAT, alia
         val delivered = !event.isCancelled && !queuedByBlink
         if (fallDamageDeliveryTracker.confirmFinalState(packet, cancelled = !delivered)) {
             player.resetFallDistance()
+        }
+
+        if (virtualFallGroundingPacket && delivered) {
+            virtualFallState.confirmGrounded()
+            virtualFallGroundingDelivered = true
         }
 
         if (!pathPacket) return@handler
@@ -2883,6 +2919,7 @@ object ModuleSpearKill : ClientModule("SpearKill", ModuleCategories.COMBAT, alia
 
         if (!plannedPathPacket) return@handler
 
+        val deliveredMovement = packetBootSession.pendingMovement
         val deliveredOutboundStep = delivered && packetBootSession.pendingOutboundStep
         packetBootSession.confirmStep(delivered)
         if (delivered) {
@@ -2895,6 +2932,8 @@ object ModuleSpearKill : ClientModule("SpearKill", ModuleCategories.COMBAT, alia
             attemptTracker.recordOutboundStep()
         }
         if (delivered) {
+            deliveredMovement?.let(virtualFallState::confirmMovement)
+            virtualFallGroundingDelivered = false
             sendReturnArrivalConfirmations(packetPositionOrigin().add(packetBootSession.committedOffset))
         }
         applyConfirmedPhysicalReturnPosition()
@@ -3057,10 +3096,7 @@ private const val KILL_AURA_INHERITED_TARGET_SOURCE = "KillAura"
 private const val SPEAR_KILL_LOOK_RAY_EPSILON_SQUARED = 1e-9
 private const val SPEAR_KILL_MIN_ATTACK_RAY_RANGE = 2.0
 private const val SPEAR_KILL_ATTACK_RAY_RANGE = 4.5
-private const val SPEAR_KILL_A_STAR_MIN_AIM_LOCK_TICKS = 1
 private const val SPEAR_KILL_ATTACK_REQUEST_WINDOW_MS = 250L
-private const val SPEAR_KILL_CHARGE_TIMER_SPEED = 5f
-private const val SPEAR_KILL_CHARGE_ACCEL_PACKETS = 20
 private const val SPEAR_KILL_FAILURE_NOTIFICATION_COOLDOWN_TICKS = 200
 private const val SPEAR_KILL_MAX_RECOVERY_STALL_TICKS = 40
 private const val SPEAR_KILL_RECOVERY_STEP_EPSILON = 1.0E-6

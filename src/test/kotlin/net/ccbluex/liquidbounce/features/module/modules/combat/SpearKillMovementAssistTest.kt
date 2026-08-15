@@ -58,7 +58,8 @@ class SpearKillMovementAssistTest {
     @Test
     fun `Input assist ORs automated input with physical input`() {
         val lease = resolveSpearKillMovementAssistLease(
-            active = true,
+            preparationActive = false,
+            routeActive = true,
             sneakMode = SpearKillMovementAssistMode.INPUT,
             elytraMode = SpearKillMovementAssistMode.NONE,
             elytraUsable = false,
@@ -80,7 +81,8 @@ class SpearKillMovementAssistTest {
     fun `active Elytra suppresses Packet and Input sneak automation`() {
         for (sneakMode in listOf(SpearKillMovementAssistMode.PACKET, SpearKillMovementAssistMode.INPUT)) {
             val lease = resolveSpearKillMovementAssistLease(
-                active = true,
+                preparationActive = false,
+                routeActive = true,
                 sneakMode = sneakMode,
                 elytraMode = SpearKillMovementAssistMode.INPUT,
                 elytraUsable = true,
@@ -95,7 +97,8 @@ class SpearKillMovementAssistTest {
     @Test
     fun `usable selected Elytra owns preparation before fall flight becomes active`() {
         val lease = resolveSpearKillMovementAssistLease(
-            active = true,
+            preparationActive = true,
+            routeActive = false,
             sneakMode = SpearKillMovementAssistMode.INPUT,
             elytraMode = SpearKillMovementAssistMode.INPUT,
             elytraUsable = true,
@@ -110,7 +113,8 @@ class SpearKillMovementAssistTest {
     @Test
     fun `inactive lease releases every injected assist without clearing physical input`() {
         val lease = resolveSpearKillMovementAssistLease(
-            active = false,
+            preparationActive = false,
+            routeActive = false,
             sneakMode = SpearKillMovementAssistMode.INPUT,
             elytraMode = SpearKillMovementAssistMode.INPUT,
             elytraUsable = true,
@@ -133,14 +137,16 @@ class SpearKillMovementAssistTest {
     @Test
     fun `Packet Elytra requests flight while Input Elytra only injects jump`() {
         val packet = resolveSpearKillMovementAssistLease(
-            active = true,
+            preparationActive = true,
+            routeActive = false,
             sneakMode = SpearKillMovementAssistMode.NONE,
             elytraMode = SpearKillMovementAssistMode.PACKET,
             elytraUsable = true,
             elytraActive = false,
         )
         val input = resolveSpearKillMovementAssistLease(
-            active = true,
+            preparationActive = true,
+            routeActive = false,
             sneakMode = SpearKillMovementAssistMode.NONE,
             elytraMode = SpearKillMovementAssistMode.INPUT,
             elytraUsable = true,
@@ -151,5 +157,28 @@ class SpearKillMovementAssistTest {
         assertFalse(packet.injectJump)
         assertFalse(input.requestPacketFallFlying)
         assertTrue(input.injectJump)
+    }
+
+    @Test
+    fun `Packet sneak starts with route movement and not while merely charging a target`() {
+        val preparation = resolveSpearKillMovementAssistLease(
+            preparationActive = true,
+            routeActive = false,
+            sneakMode = SpearKillMovementAssistMode.PACKET,
+            elytraMode = SpearKillMovementAssistMode.NONE,
+            elytraUsable = false,
+            elytraActive = false,
+        )
+        val route = resolveSpearKillMovementAssistLease(
+            preparationActive = false,
+            routeActive = true,
+            sneakMode = SpearKillMovementAssistMode.PACKET,
+            elytraMode = SpearKillMovementAssistMode.NONE,
+            elytraUsable = false,
+            elytraActive = false,
+        )
+
+        assertFalse(preparation.serverSneak)
+        assertTrue(route.serverSneak)
     }
 }

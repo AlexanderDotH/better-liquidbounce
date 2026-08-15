@@ -65,56 +65,20 @@ internal fun spearKillAnimationTicks(
     return delayTicks.toFloat()
 }
 
-/**
- * Idle keep-alive for the finite kinetic use window: release + re-use the same hand right before
- * expiry. Never refresh mid-path — that would drop ticks under delayTicks and abort Packet/A*.
- */
-internal fun shouldRefreshSpearKillServerUse(
-    attackPathActive: Boolean,
-    isUseKeyDown: Boolean,
-    ticksUsingItem: Int,
-    damageUseDuration: Int,
-): Boolean = !attackPathActive &&
-    isUseKeyDown &&
-    damageUseDuration > 0 &&
-    ticksUsingItem >= damageUseDuration - 1
+internal enum class SpearKillChargeDecision {
+    WAIT_FOR_VANILLA,
+    RESET,
+    READY,
+}
 
-/**
- * After a keep-alive refresh, ticks drop below [delayTicks]. That is still a valid charge — do not
- * tear down preview/path state unless the player actually stopped using the spear.
- */
-internal fun shouldResetSpearKillOnUndercharge(
+/** Leaves undercharged spear use on vanilla packet cadence instead of manufacturing movement ticks. */
+internal fun resolveSpearKillChargeDecision(
     ticksUsingItem: Int,
     delayTicks: Int,
     isUsingSpear: Boolean,
-    isUseKeyDown: Boolean,
-): Boolean = ticksUsingItem <= delayTicks && !(isUsingSpear && isUseKeyDown)
-
-/** Speeds the kinetic delay while idle-charging so keep-alive restarts become attack-ready quickly. */
-internal fun shouldAccelerateSpearKillCharge(
-    attackPathActive: Boolean,
-    isUseKeyDown: Boolean,
-    isUsingSpear: Boolean,
-    ticksUsingItem: Int,
-    delayTicks: Int,
-): Boolean = !attackPathActive &&
-    isUseKeyDown &&
-    isUsingSpear &&
-    delayTicks >= 0 &&
-    ticksUsingItem <= delayTicks
-
-/** FightBot charges at the normal rate and never owns the manual movement-packet acceleration burst. */
-internal fun shouldAccelerateSpearKillChargeForRequest(
-    attackPathActive: Boolean,
-    fightBotRequestActive: Boolean,
-    physicalUseInputHeld: Boolean,
-    isUsingSpear: Boolean,
-    ticksUsingItem: Int,
-    delayTicks: Int,
-): Boolean = !fightBotRequestActive && shouldAccelerateSpearKillCharge(
-    attackPathActive = attackPathActive,
-    isUseKeyDown = physicalUseInputHeld,
-    isUsingSpear = isUsingSpear,
-    ticksUsingItem = ticksUsingItem,
-    delayTicks = delayTicks,
-)
+    useRequested: Boolean,
+): SpearKillChargeDecision = when {
+    ticksUsingItem > delayTicks -> SpearKillChargeDecision.READY
+    isUsingSpear && useRequested -> SpearKillChargeDecision.WAIT_FOR_VANILLA
+    else -> SpearKillChargeDecision.RESET
+}

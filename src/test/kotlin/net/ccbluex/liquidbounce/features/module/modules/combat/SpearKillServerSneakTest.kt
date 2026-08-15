@@ -20,9 +20,37 @@
 package net.ccbluex.liquidbounce.features.module.modules.combat
 
 import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertFalse
+import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 
 class SpearKillServerSneakTest {
+
+    @Test
+    fun `active route keeps Packet sneak after the crouching pose reaches the client`() {
+        assertTrue(
+            SpearKillServerSneak.shouldMaintain(
+                requestedByRoute = true,
+                serverSneaking = true,
+                isFallFlying = false,
+                currentHeight = 1.5,
+                crouchingHeight = 1.5,
+            ),
+        )
+    }
+
+    @Test
+    fun `completed route releases Packet sneak even while the client is crouched`() {
+        assertFalse(
+            SpearKillServerSneak.shouldMaintain(
+                requestedByRoute = false,
+                serverSneaking = true,
+                isFallFlying = false,
+                currentHeight = 1.5,
+                crouchingHeight = 1.5,
+            ),
+        )
+    }
 
     @Test
     fun `server sneak sends only the transitions needed to bracket a packet route`() {

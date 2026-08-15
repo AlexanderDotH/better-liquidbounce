@@ -21,7 +21,7 @@ package net.ccbluex.liquidbounce.features.module.modules.combat
 import net.minecraft.world.phys.Vec3
 import kotlin.math.ceil
 
-/** Per-step outbound timing for Packet A* attacks, including terminal pre-hold and strike hold. */
+/** Per-step outbound timing for Packet A* attacks, including terminal aim-lock and strike holds. */
 internal data class SpearKillPathSchedule(
     val stepStartTicks: List<Int>,
     val terminalStartTick: Int,
@@ -32,8 +32,8 @@ internal data class SpearKillPathSchedule(
 /**
  * Builds relative tick indices for outbound packet emission.
  *
- * Pre-strike hold is inserted immediately before the first terminal-suffix step. Strike hold is
- * counted after the last outbound step for [SpearKillPathSchedule.hitTick].
+ * The optional single pre-strike tick is inserted immediately before the terminal suffix. Strike
+ * hold is counted after the last outbound step for [SpearKillPathSchedule.hitTick].
  */
 internal fun buildSpearKillPathSchedule(
     outboundStepCount: Int,
@@ -45,7 +45,7 @@ internal fun buildSpearKillPathSchedule(
     if (outboundStepCount <= 0 ||
         terminalSuffixCount !in 1..outboundStepCount ||
         stepWaitTicks !in 0..SPEAR_KILL_MAX_WAIT_TICKS ||
-        preStrikeHoldTicks < 0 ||
+        preStrikeHoldTicks !in 0..SPEAR_KILL_PACKET_MAX_PRE_STRIKE_HOLD_TICKS ||
         strikeHoldTicks < 0
     ) {
         return null
@@ -74,6 +74,20 @@ internal fun buildSpearKillPathSchedule(
         totalOutboundTicks = hitTick,
     )
 }
+
+/** Builds an A* schedule with its single terminal aim-lock tick and no predictive waiting. */
+internal fun buildSpearKillAStarPathSchedule(
+    outboundStepCount: Int,
+    stepWaitTicks: Int,
+    terminalSuffixCount: Int,
+    strikeHoldTicks: Int,
+): SpearKillPathSchedule? = buildSpearKillPathSchedule(
+    outboundStepCount = outboundStepCount,
+    stepWaitTicks = stepWaitTicks,
+    terminalSuffixCount = terminalSuffixCount,
+    preStrikeHoldTicks = SPEAR_KILL_PACKET_MAX_PRE_STRIKE_HOLD_TICKS,
+    strikeHoldTicks = strikeHoldTicks,
+)
 
 /** Counts trailing outbound steps that sum exactly to the approach terminal corridor. */
 @Suppress("ReturnCount")
@@ -105,33 +119,6 @@ internal fun countSpearKillAStarTerminalSuffix(
         if (accumulated.length() > expectedMovement.length() + SPEAR_KILL_PATH_SCHEDULE_EPSILON) {
             return null
         }
-    }
-    return null
-}
-
-/**
- * Smallest pre-strike hold in `0..[maxPreStrikeHoldTicks]` whose schedule satisfies [isFeasible].
- * [isFeasible] receives the candidate schedule (typically used to check hit-tick prediction + window).
- */
-internal fun findEarliestSpearKillPreStrikeHold(
-    outboundStepCount: Int,
-    stepWaitTicks: Int,
-    terminalSuffixCount: Int,
-    strikeHoldTicks: Int,
-    minPreStrikeHoldTicks: Int = 0,
-    maxPreStrikeHoldTicks: Int = SPEAR_KILL_MAX_PRE_STRIKE_HOLD,
-    isFeasible: (SpearKillPathSchedule) -> Boolean,
-): Int? {
-    if (minPreStrikeHoldTicks < 0 || maxPreStrikeHoldTicks < minPreStrikeHoldTicks) return null
-    for (hold in minPreStrikeHoldTicks..maxPreStrikeHoldTicks) {
-        val schedule = buildSpearKillPathSchedule(
-            outboundStepCount = outboundStepCount,
-            stepWaitTicks = stepWaitTicks,
-            terminalSuffixCount = terminalSuffixCount,
-            preStrikeHoldTicks = hold,
-            strikeHoldTicks = strikeHoldTicks,
-        ) ?: return null
-        if (isFeasible(schedule)) return hold
     }
     return null
 }
@@ -169,11 +156,10 @@ internal fun spearKillAStarCandidateLowerBoundHitTick(
     val approachSteps = ceil(routeOrigin.distanceTo(plannerGoal) / stepLimit).toInt()
     val terminalSteps = ceil(terminalLungeDistance / stepLimit).toInt().coerceAtLeast(1)
     val outboundSteps = approachSteps + terminalSteps
-    return buildSpearKillPathSchedule(
+    return buildSpearKillAStarPathSchedule(
         outboundStepCount = outboundSteps,
         stepWaitTicks = stepWaitTicks,
         terminalSuffixCount = terminalSteps,
-        preStrikeHoldTicks = 0,
         strikeHoldTicks = strikeHoldTicks,
     )?.hitTick ?: Int.MAX_VALUE
 }
@@ -220,7 +206,6 @@ internal fun horizontalDistanceSquared(left: Vec3, right: Vec3): Double {
 
 private fun Vec3.isFinite(): Boolean = x.isFinite() && y.isFinite() && z.isFinite()
 
-internal const val SPEAR_KILL_MAX_PRE_STRIKE_HOLD = 20
 internal const val SPEAR_KILL_A_STAR_REFINEMENT_DISTANCE_SQUARED = 0.25
 private const val SPEAR_KILL_PATH_SCHEDULE_EPSILON = 1.0E-6
 private const val SPEAR_KILL_PATH_SCHEDULE_EPSILON_SQUARED = 1.0E-12

@@ -66,13 +66,15 @@ internal fun resolveSpearKillMovementTransport(
 }
 
 internal fun resolveSpearKillMovementAssistLease(
-    active: Boolean,
+    preparationActive: Boolean,
+    routeActive: Boolean,
     sneakMode: SpearKillMovementAssistMode,
     elytraMode: SpearKillMovementAssistMode,
     elytraUsable: Boolean,
     elytraActive: Boolean,
 ): SpearKillMovementAssistLease {
-    if (!active) {
+    val assistActive = preparationActive || routeActive
+    if (!assistActive) {
         return SpearKillMovementAssistLease(
             injectJump = false,
             injectSneak = false,
@@ -85,8 +87,8 @@ internal fun resolveSpearKillMovementAssistLease(
         elytraUsable && elytraMode != SpearKillMovementAssistMode.NONE
     return SpearKillMovementAssistLease(
         injectJump = elytraMode == SpearKillMovementAssistMode.INPUT && elytraUsable,
-        injectSneak = sneakMode == SpearKillMovementAssistMode.INPUT && !elytraOwnsMovement,
-        serverSneak = sneakMode == SpearKillMovementAssistMode.PACKET && !elytraOwnsMovement,
+        injectSneak = routeActive && sneakMode == SpearKillMovementAssistMode.INPUT && !elytraOwnsMovement,
+        serverSneak = routeActive && sneakMode == SpearKillMovementAssistMode.PACKET && !elytraOwnsMovement,
         requestPacketFallFlying = elytraMode == SpearKillMovementAssistMode.PACKET &&
             elytraUsable && !elytraActive,
     )

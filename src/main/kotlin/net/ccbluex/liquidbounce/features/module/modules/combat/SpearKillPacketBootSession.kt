@@ -29,6 +29,7 @@ import java.util.Collections
 import java.util.IdentityHashMap
 
 internal const val SPEAR_KILL_PACKET_STRIKE_HOLD_TICKS = 2
+internal const val SPEAR_KILL_PACKET_MAX_PRE_STRIKE_HOLD_TICKS = 1
 
 internal fun buildSpearKillAttackMovements(
     direction: Vec3,
@@ -376,7 +377,11 @@ internal class SpearKillPacketBootSession {
         terminalSuffixSteps: Int,
         requireTerminalAuthorization: Boolean,
     ): Boolean {
-        if (strikeHoldTicks < 0 || preStrikeHoldTicks < 0) return false
+        if (strikeHoldTicks < 0 ||
+            preStrikeHoldTicks !in 0..SPEAR_KILL_PACKET_MAX_PRE_STRIKE_HOLD_TICKS
+        ) {
+            return false
+        }
         if (terminalSuffixSteps < 1 || terminalSuffixSteps > outboundMovements.size) return false
         if (requireTerminalAuthorization && preStrikeHoldTicks < 1) return false
         if (outboundMovements.isEmpty() ||
@@ -384,7 +389,6 @@ internal class SpearKillPacketBootSession {
         ) {
             return false
         }
-
         movements.clear()
         movements.addAll(outboundMovements)
         outboundMovements.asReversed().forEach { movements += it.scale(-1.0) }
@@ -423,7 +427,9 @@ internal class SpearKillPacketBootSession {
         check(!active && committedOffset.lengthSqr() < EPSILON) { "A PacketBoot session is already active" }
         require(outboundSteps >= 0) { "Outbound step count must not be negative" }
         require(strikeHoldTicks >= 0) { "Strike hold duration must not be negative" }
-        require(preStrikeHoldTicks >= 0) { "Pre-strike hold duration must not be negative" }
+        require(preStrikeHoldTicks in 0..SPEAR_KILL_PACKET_MAX_PRE_STRIKE_HOLD_TICKS) {
+            "Pre-strike hold may contain only the one terminal aim-lock tick"
+        }
         require(terminalSuffixSteps >= 1) { "Terminal suffix step count must be positive" }
         require(!requireTerminalAuthorization || preStrikeHoldTicks >= 1) {
             "Terminal authorization requires at least one pre-strike aim-lock tick"
@@ -435,7 +441,6 @@ internal class SpearKillPacketBootSession {
         require(outboundSteps <= path.count { it.lengthSqr() >= EPSILON }) {
             "Outbound step count must not exceed movement count"
         }
-
         movements.addAll(path)
         committedMovements.clear()
         remainingOutboundSteps = outboundSteps

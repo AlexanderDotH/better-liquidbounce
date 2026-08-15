@@ -26,6 +26,16 @@ internal object SpearKillServerSneak {
         NONE,
     }
 
+    /** Packet sneak is latched only while an actual route owns it, even after the local box shrinks. */
+    fun shouldMaintain(
+        requestedByRoute: Boolean,
+        serverSneaking: Boolean,
+        isFallFlying: Boolean,
+        currentHeight: Double,
+        crouchingHeight: Double,
+    ): Boolean = requestedByRoute && !isFallFlying &&
+        (serverSneaking || crouchingHeight < currentHeight)
+
     fun nextAction(
         serverSneaking: Boolean,
         shouldSneak: Boolean,
