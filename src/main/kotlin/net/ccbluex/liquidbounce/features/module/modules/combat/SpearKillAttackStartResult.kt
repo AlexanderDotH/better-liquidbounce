@@ -87,6 +87,35 @@ internal fun buildSpearKillDirectPacketRoute(
     )
 }
 
+/** Builds a direct route using the shared acceleration profile instead of one fixed step cap. */
+internal fun buildSpearKillProfiledDirectPacketRoute(
+    origin: Vec3,
+    direction: Vec3,
+    distance: Double,
+    profile: SpearKillSpeedProfile,
+    segmentValidator: SpearKillAStarSegmentValidator,
+    maxVerticalStep: Double = profile.maximumStepLimit,
+): SpearKillAStarPacketRoute? {
+    if (!origin.hasFiniteSpearKillCoordinates() || !direction.hasFiniteSpearKillCoordinates() ||
+        !distance.isPositiveFinite()
+    ) {
+        return null
+    }
+
+    val directionLength = direction.length()
+    if (!directionLength.isFinite() || directionLength <= 0.0) return null
+    val endpoint = origin.add(direction.scale(distance / directionLength))
+    if (!endpoint.hasFiniteSpearKillCoordinates()) return null
+
+    return buildSpearKillProfiledAStarPacketRoute(
+        origin = origin,
+        outboundWaypoints = listOf(endpoint),
+        profile = profile,
+        segmentValidator = segmentValidator,
+        maxVerticalStep = maxVerticalStep,
+    )
+}
+
 /** Applies the server-facing kinetic hold consistently to every direct Packet session. */
 internal fun startSpearKillDirectPacketSession(
     session: SpearKillPacketBootSession,
@@ -98,6 +127,8 @@ internal fun startSpearKillDirectPacketSession(
         outboundSteps = route.outboundMovements.size,
         strikeHoldTicks = SPEAR_KILL_PACKET_STRIKE_HOLD_TICKS,
         stepWaitTicks = stepWaitTicks,
+        terminalSuffixSteps = route.terminalBurstSteps.coerceAtLeast(1),
+        terminalBurstSteps = route.terminalBurstSteps,
     )
 }
 

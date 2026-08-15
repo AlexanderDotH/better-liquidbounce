@@ -42,6 +42,18 @@ internal class SpearKillMovementConfiguration(eventListener: EventListener?) {
         SPEAR_KILL_MIN_TARGET_SPEED..SPEAR_KILL_EXPERIMENTAL_MAX_SPEED,
         "blocks/tick",
     ).onChange { it.coerceIn(SPEAR_KILL_MIN_TARGET_SPEED, SPEAR_KILL_EXPERIMENTAL_MAX_SPEED) }
+    val acceleration by choice.float(
+        "Acceleration",
+        SPEAR_KILL_EXPERIMENTAL_MAX_SPEED,
+        SPEAR_KILL_MIN_SPEED_CHANGE..SPEAR_KILL_EXPERIMENTAL_MAX_SPEED,
+        "blocks/tick²",
+    ).onChange { it.coerceIn(SPEAR_KILL_MIN_SPEED_CHANGE, SPEAR_KILL_EXPERIMENTAL_MAX_SPEED) }
+    val deceleration by choice.float(
+        "Deceleration",
+        SPEAR_KILL_EXPERIMENTAL_MAX_SPEED,
+        SPEAR_KILL_MIN_SPEED_CHANGE..SPEAR_KILL_EXPERIMENTAL_MAX_SPEED,
+        "blocks/tick²",
+    ).onChange { it.coerceIn(SPEAR_KILL_MIN_SPEED_CHANGE, SPEAR_KILL_EXPERIMENTAL_MAX_SPEED) }
 
     internal sealed class SpearKillMovementChoice(
         name: String,
@@ -131,6 +143,7 @@ internal fun canStartSpearKillElytraFlight(
 
 internal const val SPEAR_KILL_MIN_SPEED = 2f
 internal const val SPEAR_KILL_MIN_TARGET_SPEED = 1f
+internal const val SPEAR_KILL_MIN_SPEED_CHANGE = 0.1f
 internal const val SPEAR_KILL_NORMAL_MAX_SPEED = 10f
 internal const val SPEAR_KILL_ELYTRA_MAX_SPEED = 17.32f
 internal const val SPEAR_KILL_EXPERIMENTAL_MAX_SPEED = 500f

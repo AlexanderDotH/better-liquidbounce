@@ -108,7 +108,7 @@ class ModuleSpearKillTest {
         val movement = configuration.choice
 
         assertEquals("Packet", movement.activeMode.name)
-        assertEquals(listOf("TargetSpeed"), movement.inner.map { it.name })
+        assertEquals(listOf("TargetSpeed", "Acceleration", "Deceleration"), movement.inner.map { it.name })
         assertEquals(
             mapOf(
                 "Motion" to listOf("StepDistance"),
@@ -128,6 +128,8 @@ class ModuleSpearKillTest {
         val motionStepDistance = configuration.motion.inner.single {
             it.name == "StepDistance"
         } as RangedValue<Float>
+        val acceleration = movement.inner.single { it.name == "Acceleration" } as RangedValue<Float>
+        val deceleration = movement.inner.single { it.name == "Deceleration" } as RangedValue<Float>
         val packetStepDistance = configuration.packet.inner.single {
             it.name == "StepDistance"
         } as RangedValue<Float>
@@ -136,6 +138,10 @@ class ModuleSpearKillTest {
         } as RangedValue<Int>
         assertEquals(10f, motionStepDistance.get())
         assertEquals(17.32f, packetStepDistance.get())
+        assertEquals(500f, acceleration.get())
+        assertEquals(500f, deceleration.get())
+        assertEquals(0.1f..500f, acceleration.range)
+        assertEquals(0.1f..500f, deceleration.range)
         assertEquals(2f..500f, motionStepDistance.range)
         assertEquals(2f..500f, packetStepDistance.range)
         assertEquals(listOf("StepsPerTeleport", "StepLimit"), motionStepDistance.aliases)
@@ -167,6 +173,8 @@ class ModuleSpearKillTest {
             serializedMovement.getAsJsonObject("choices")
                 .choiceValue("Packet", "StepDistance")["value"].asFloat,
         )
+        assertEquals(500f, serializedMovement.settingValue("Acceleration").asFloat)
+        assertEquals(500f, serializedMovement.settingValue("Deceleration").asFloat)
         assertEquals(
             0,
             serializedMovement.getAsJsonObject("choices")
@@ -2067,6 +2075,42 @@ class ModuleSpearKillTest {
         assertNull(session.prepareNextStep())
         assertNull(session.prepareNextStep())
         assertVec3Equals(Vec3(6.0, 0.0, 0.0), session.prepareNextStep()!!, 1e-9)
+    }
+
+    @Test
+    fun `vertical dive burst skips waits and completes one logical outbound step`() {
+        val dive = listOf(
+            Vec3(0.0, -2.95, 0.0),
+            Vec3(0.0, -2.95, 0.0),
+            Vec3(0.0, -2.10, 0.0),
+        )
+        val session = SpearKillPacketBootSession()
+        session.startPhysicalReturn(
+            path = dive + dive.asReversed().map { it.scale(-1.0) } + Vec3.ZERO,
+            outboundSteps = dive.size,
+            stepWaitTicks = 2,
+            terminalSuffixSteps = dive.size,
+            terminalBurstSteps = dive.size,
+        )
+
+        assertVec3Equals(Vec3(0.0, -2.95, 0.0), session.prepareNextStep()!!, 1e-9)
+        assertTrue(session.pendingTerminalBurstStart)
+        assertFalse(session.pendingLogicalOutboundCompletion)
+        assertVec3Equals(Vec3(0.0, -8.0, 0.0), session.pendingTerminalBurstMovement!!, 1e-9)
+        session.confirmStep(delivered = true)
+
+        assertVec3Equals(Vec3(0.0, -5.90, 0.0), session.prepareNextStep()!!, 1e-9)
+        assertFalse(session.pendingTerminalBurstStart)
+        assertFalse(session.pendingLogicalOutboundCompletion)
+        session.confirmStep(delivered = true)
+
+        assertVec3Equals(Vec3(0.0, -8.0, 0.0), session.prepareNextStep()!!, 1e-9)
+        assertTrue(session.pendingLogicalOutboundCompletion)
+        session.confirmStep(delivered = true)
+
+        dive.asReversed().map { it.scale(-1.0) }
+            .zip(session.exactRecoveryMovementsFrom(Vec3(0.0, -8.0, 0.0))!!)
+            .forEach { (expected, actual) -> assertVec3Equals(expected, actual, 1e-9) }
     }
 
     @Test

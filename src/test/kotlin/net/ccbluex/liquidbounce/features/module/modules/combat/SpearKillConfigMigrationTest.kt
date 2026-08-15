@@ -273,6 +273,36 @@ class SpearKillConfigMigrationTest {
     }
 
     @Test
+    fun `canonical acceleration and deceleration survive migration`() {
+        val config = JsonParser.parseString(
+            """
+            {
+              "name": "SpearKill",
+              "value": [{
+                "name": "Movement",
+                "active": "Packet",
+                "value": [
+                  { "name": "TargetSpeed", "value": 100.0 },
+                  { "name": "Acceleration", "value": 2.5 },
+                  { "name": "Deceleration", "value": 1.25 }
+                ],
+                "choices": {
+                  "Motion": { "name": "Motion", "value": [] },
+                  "Packet": { "name": "Packet", "value": [] }
+                }
+              }]
+            }
+            """.trimIndent(),
+        ).asJsonObject
+
+        migrateLegacySpearKillConfig(config)
+
+        val movementValues = config.valuesByName().getValue("Movement").valuesByName()
+        assertEquals(2.5f, movementValues.getValue("Acceleration")["value"].asFloat)
+        assertEquals(1.25f, movementValues.getValue("Deceleration")["value"].asFloat)
+    }
+
+    @Test
     fun `flat legacy Movement keeps its selected transport`() {
         val config = JsonParser.parseString(
             """{ "name": "SpearKill", "value": [{ "name": "Movement", "value": "PacketBoot" }] }""",

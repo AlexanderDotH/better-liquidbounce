@@ -19,7 +19,7 @@ internal enum class SpearKillMovementAssistMode(override val tag: String) : Tagg
     INPUT("Input"),
 }
 
-/** Immutable movement caps selected before a route emits its first movement. */
+/** Immutable target and route caps selected before a route emits its first movement. */
 internal data class SpearKillMovementTransport(
     val maxSpeed: Double,
     val stepLimit: Double,
@@ -49,12 +49,9 @@ internal fun resolveSpearKillMovementTransport(
         SPEAR_KILL_MIN_TARGET_SPEED.toDouble(),
         SPEAR_KILL_EXPERIMENTAL_MAX_SPEED.toDouble(),
     )
-    val stepLimit = minOf(
-        configuredMaximum,
-        configuredStepLimit.coerceIn(
-            SPEAR_KILL_MIN_SPEED.toDouble(),
-            SPEAR_KILL_EXPERIMENTAL_MAX_SPEED.toDouble(),
-        ),
+    val stepLimit = configuredStepLimit.coerceIn(
+        SPEAR_KILL_MIN_SPEED.toDouble(),
+        SPEAR_KILL_EXPERIMENTAL_MAX_SPEED.toDouble(),
     )
     return SpearKillMovementTransport(configuredMaximum, stepLimit, elytraActive)
 }

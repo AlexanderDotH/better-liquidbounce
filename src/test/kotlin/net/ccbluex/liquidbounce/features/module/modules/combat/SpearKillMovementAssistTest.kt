@@ -18,7 +18,7 @@ import org.junit.jupiter.api.Test
 class SpearKillMovementAssistTest {
 
     @Test
-    fun `configured speed five remains five with and without Elytra`() {
+    fun `TargetSpeed remains independent from StepDistance with and without Elytra`() {
         for (elytraActive in listOf(false, true)) {
             val transport = resolveSpearKillMovementTransport(
                 configuredSpeed = 5.0,
@@ -27,7 +27,7 @@ class SpearKillMovementAssistTest {
             )
 
             assertEquals(5.0, transport.maxSpeed, 1e-9)
-            assertEquals(5.0, transport.stepLimit, 1e-9)
+            assertEquals(17.32, transport.stepLimit, 1e-9)
             assertEquals(elytraActive, transport.elytraActive)
         }
     }

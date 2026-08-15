@@ -197,7 +197,18 @@ internal fun buildSpearKillAStarPacketMovements(
 internal data class SpearKillAStarPacketRoute(
     val outboundMovements: List<Vec3>,
     val roundTripMovements: List<Vec3>,
-)
+    val terminalBurstSteps: Int = 0,
+) {
+    init {
+        require(terminalBurstSteps == 0 || terminalBurstSteps in 2..outboundMovements.size) {
+            "A terminal burst must contain at least two outbound movements"
+        }
+    }
+
+    /** Physical burst packets share one client tick and therefore one acceleration confirmation. */
+    val outboundTickCount: Int
+        get() = outboundMovements.size - terminalBurstSteps + if (terminalBurstSteps > 0) 1 else 0
+}
 
 internal fun buildSpearKillAStarPacketRoute(
     origin: Vec3,

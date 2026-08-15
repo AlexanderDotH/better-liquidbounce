@@ -63,6 +63,8 @@ class SpearKillLanguageTest {
             "liquidbounce.module.spearKill.targetSource.description",
             "liquidbounce.module.spearKill.movement.targetSpeed.description",
             "liquidbounce.module.spearKill.movement.targetSpeed.warning",
+            "liquidbounce.module.spearKill.movement.acceleration.description",
+            "liquidbounce.module.spearKill.movement.deceleration.description",
             "liquidbounce.module.spearKill.movement.motion.stepDistance.description",
             "liquidbounce.module.spearKill.movement.packet.stepDistance.description",
             "liquidbounce.module.spearKill.movement.packet.stepDelay.description",

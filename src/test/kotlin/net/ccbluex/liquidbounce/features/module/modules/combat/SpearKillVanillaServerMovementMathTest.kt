@@ -10,7 +10,6 @@
  */
 package net.ccbluex.liquidbounce.features.module.modules.combat
 
-import net.minecraft.network.protocol.game.ServerboundMovePlayerPacket
 import net.minecraft.world.phys.Vec3
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
@@ -41,26 +40,48 @@ class SpearKillVanillaServerMovementMathTest {
     }
 
     @Test
-    fun `emitted five hundred block Packet route exceeds both vanilla movement budgets`() {
+    fun `five hundred target is segmented to the one-packet Vanilla budget`() {
         val packetOrigin = Vec3(12.0, 64.0, -4.0)
-        val transport = resolveSpearKillMovementTransport(500.0, 500.0, elytraActive = true)
-        val route = buildSpearKillAStarPacketRoute(
-            origin = packetOrigin,
-            outboundWaypoints = listOf(packetOrigin.add(500.0, 0.0, 0.0)),
-            maxSpeed = transport.stepLimit,
-            segmentValidator = SpearKillAStarSegmentValidator { _, _ -> true },
-        )!!
-        val packet = ServerboundMovePlayerPacket.StatusOnly(false, false)
-        applySpearKillVirtualPosition(packet, packetOrigin, route.outboundMovements.single())
-        val emittedMovement = Vec3(
-            packet.getX(packetOrigin.x),
-            packet.getY(packetOrigin.y),
-            packet.getZ(packetOrigin.z),
-        ).subtract(packetOrigin)
+        for (fallFlying in listOf(false, true)) {
+            val budget = calculateSpearKillVanillaMovementBudget(Vec3.ZERO, fallFlying)
+            val route = buildSpearKillProfiledAStarPacketRoute(
+                origin = packetOrigin,
+                outboundWaypoints = listOf(packetOrigin.add(500.0, 0.0, 0.0)),
+                profile = SpearKillSpeedProfile(
+                    currentSpeed = 0.0,
+                    limits = SpearKillSpeedLimits(
+                        targetSpeed = 500.0,
+                        acceleration = 500.0,
+                        deceleration = 500.0,
+                        stepDistance = 500.0,
+                        vanillaBudget = budget,
+                    ),
+                ),
+                segmentValidator = SpearKillAStarSegmentValidator { _, _ -> true },
+            )!!
 
-        assertEquals(500.0, emittedMovement.length(), 1e-9)
-        assertTrue(Minecraft262ServerMovementMath.movedTooQuickly(emittedMovement, fallFlying = false))
-        assertTrue(Minecraft262ServerMovementMath.movedTooQuickly(emittedMovement, fallFlying = true))
+            assertTrue(route.outboundMovements.size > 1)
+            assertTrue(route.outboundMovements.all { it.length() <= budget })
+            assertTrue(route.outboundMovements.all {
+                !Minecraft262ServerMovementMath.movedTooQuickly(it, fallFlying = fallFlying)
+            })
+            assertEquals(500.0, route.outboundMovements.fold(Vec3.ZERO, Vec3::add).length(), 1e-8)
+        }
+    }
+
+    @Test
+    fun `production normal and Elytra budgets accept the exact boundary and reject nextUp`() {
+        val velocity = Vec3(3.0, 4.0, 0.0)
+        for (fallFlying in listOf(false, true)) {
+            val boundary = calculateSpearKillVanillaMovementBudget(velocity, fallFlying)
+            val exact = Vec3(boundary, 0.0, 0.0)
+            val above = Vec3(Math.nextUp(boundary), 0.0, 0.0)
+
+            assertFalse(Minecraft262ServerMovementMath.movedTooQuickly(exact, velocity, fallFlying = fallFlying))
+            assertTrue(Minecraft262ServerMovementMath.movedTooQuickly(above, velocity, fallFlying = fallFlying))
+            assertTrue(isSpearKillWithinVanillaMovementBudget(exact, velocity, fallFlying))
+            assertFalse(isSpearKillWithinVanillaMovementBudget(above, velocity, fallFlying))
+        }
     }
 
     @Test

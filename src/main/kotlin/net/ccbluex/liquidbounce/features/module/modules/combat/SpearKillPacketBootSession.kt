@@ -182,6 +182,7 @@ internal class SpearKillPacketBootSession {
     private var configuredStrikeHoldTicks = 0
     private var configuredPreStrikeHoldTicks = 0
     private var configuredTerminalSuffixSteps = 1
+    private var configuredTerminalBurstSteps = 0
     private var configuredTerminalAuthorizationRequired = false
     private var configuredStepWaitTicks = 0
     private var physicalReturnEnabled = false
@@ -215,6 +216,24 @@ internal class SpearKillPacketBootSession {
 
     val pendingMovement: Vec3?
         get() = pendingOffset?.subtract(committedOffset)
+
+    val pendingTerminalBurstStart: Boolean
+        get() = pendingTerminalBurstStep && remainingOutboundSteps == configuredTerminalBurstSteps
+
+    val pendingLogicalOutboundCompletion: Boolean
+        get() = pendingOutboundStep && (!pendingTerminalBurstStep || remainingOutboundSteps == 1)
+
+    val pendingTerminalBurstMovement: Vec3?
+        get() {
+            if (!pendingTerminalBurstStep) return null
+            return movements.asSequence()
+                .take(remainingOutboundSteps)
+                .fold(Vec3.ZERO, Vec3::add)
+        }
+
+    private val pendingTerminalBurstStep: Boolean
+        get() = pendingOutboundStep && configuredTerminalBurstSteps > 1 &&
+            remainingOutboundSteps in 1..configuredTerminalBurstSteps
 
     /**
      * Rotation enforced for the current route phase.
@@ -300,6 +319,7 @@ internal class SpearKillPacketBootSession {
         stepWaitTicks: Int = 0,
         preStrikeHoldTicks: Int = 0,
         terminalSuffixSteps: Int = 1,
+        terminalBurstSteps: Int = 0,
         requireTerminalAuthorization: Boolean = false,
     ) = startInternal(
         path = path,
@@ -308,6 +328,7 @@ internal class SpearKillPacketBootSession {
         stepWaitTicks = stepWaitTicks,
         preStrikeHoldTicks = preStrikeHoldTicks,
         terminalSuffixSteps = terminalSuffixSteps,
+        terminalBurstSteps = terminalBurstSteps,
         requireTerminalAuthorization = requireTerminalAuthorization,
         physicalReturn = false,
     )
@@ -319,6 +340,7 @@ internal class SpearKillPacketBootSession {
         stepWaitTicks: Int = 0,
         preStrikeHoldTicks: Int = 0,
         terminalSuffixSteps: Int = 1,
+        terminalBurstSteps: Int = 0,
         requireTerminalAuthorization: Boolean = false,
     ) = startInternal(
         path = path,
@@ -327,6 +349,7 @@ internal class SpearKillPacketBootSession {
         stepWaitTicks = stepWaitTicks,
         preStrikeHoldTicks = preStrikeHoldTicks,
         terminalSuffixSteps = terminalSuffixSteps,
+        terminalBurstSteps = terminalBurstSteps,
         requireTerminalAuthorization = requireTerminalAuthorization,
         physicalReturn = true,
     )
@@ -340,6 +363,7 @@ internal class SpearKillPacketBootSession {
         strikeHoldTicks: Int,
         preStrikeHoldTicks: Int = 0,
         terminalSuffixSteps: Int = 1,
+        terminalBurstSteps: Int = 0,
         requireTerminalAuthorization: Boolean = false,
     ): Boolean {
         if (!canReplaceRemainingOutbound) return false
@@ -348,6 +372,7 @@ internal class SpearKillPacketBootSession {
             strikeHoldTicks = strikeHoldTicks,
             preStrikeHoldTicks = preStrikeHoldTicks,
             terminalSuffixSteps = terminalSuffixSteps,
+            terminalBurstSteps = terminalBurstSteps,
             requireTerminalAuthorization = requireTerminalAuthorization,
         )
     }
@@ -358,6 +383,7 @@ internal class SpearKillPacketBootSession {
         strikeHoldTicks: Int,
         preStrikeHoldTicks: Int = 0,
         terminalSuffixSteps: Int = 1,
+        terminalBurstSteps: Int = 0,
         requireTerminalAuthorization: Boolean = false,
     ): Boolean {
         if (!canStartChainedOutbound) return false
@@ -366,6 +392,7 @@ internal class SpearKillPacketBootSession {
             strikeHoldTicks = strikeHoldTicks,
             preStrikeHoldTicks = preStrikeHoldTicks,
             terminalSuffixSteps = terminalSuffixSteps,
+            terminalBurstSteps = terminalBurstSteps,
             requireTerminalAuthorization = requireTerminalAuthorization,
         )
     }
@@ -375,6 +402,7 @@ internal class SpearKillPacketBootSession {
         strikeHoldTicks: Int,
         preStrikeHoldTicks: Int,
         terminalSuffixSteps: Int,
+        terminalBurstSteps: Int,
         requireTerminalAuthorization: Boolean,
     ): Boolean {
         if (strikeHoldTicks < 0 ||
@@ -383,6 +411,7 @@ internal class SpearKillPacketBootSession {
             return false
         }
         if (terminalSuffixSteps < 1 || terminalSuffixSteps > outboundMovements.size) return false
+        if (!hasValidTerminalBurst(terminalBurstSteps, terminalSuffixSteps)) return false
         if (requireTerminalAuthorization && preStrikeHoldTicks < 1) return false
         if (outboundMovements.isEmpty() ||
             outboundMovements.any { !it.isFinite() || it.lengthSqr() < EPSILON }
@@ -403,6 +432,7 @@ internal class SpearKillPacketBootSession {
         configuredStrikeHoldTicks = strikeHoldTicks
         configuredPreStrikeHoldTicks = preStrikeHoldTicks
         configuredTerminalSuffixSteps = terminalSuffixSteps
+        configuredTerminalBurstSteps = terminalBurstSteps
         configuredTerminalAuthorizationRequired = requireTerminalAuthorization
         preStrikeHoldPending = preStrikeHoldTicks > 0
         terminalAimLockComplete = !requireTerminalAuthorization
@@ -421,6 +451,7 @@ internal class SpearKillPacketBootSession {
         stepWaitTicks: Int,
         preStrikeHoldTicks: Int,
         terminalSuffixSteps: Int,
+        terminalBurstSteps: Int,
         requireTerminalAuthorization: Boolean,
         physicalReturn: Boolean,
     ) {
@@ -437,6 +468,12 @@ internal class SpearKillPacketBootSession {
         require(outboundSteps == 0 || terminalSuffixSteps <= outboundSteps) {
             "Terminal suffix must not exceed outbound steps"
         }
+        require(hasValidTerminalBurst(terminalBurstSteps, terminalSuffixSteps)) {
+            "Terminal burst must be disabled or contain at least two terminal suffix steps"
+        }
+        require(terminalBurstSteps == 0 || outboundSteps > 0) {
+            "Terminal burst requires outbound movement"
+        }
         require(stepWaitTicks in 0..SPEAR_KILL_MAX_WAIT_TICKS) { "Step wait duration is outside the configured range" }
         require(outboundSteps <= path.count { it.lengthSqr() >= EPSILON }) {
             "Outbound step count must not exceed movement count"
@@ -451,6 +488,7 @@ internal class SpearKillPacketBootSession {
         configuredStrikeHoldTicks = strikeHoldTicks
         configuredPreStrikeHoldTicks = preStrikeHoldTicks
         configuredTerminalSuffixSteps = terminalSuffixSteps
+        configuredTerminalBurstSteps = terminalBurstSteps
         configuredTerminalAuthorizationRequired = requireTerminalAuthorization
         preStrikeHoldPending = outboundSteps > 0 && preStrikeHoldTicks > 0
         terminalAimLockComplete = !requireTerminalAuthorization
@@ -523,6 +561,7 @@ internal class SpearKillPacketBootSession {
         }
 
         val completedPhysicalReturnStep = pendingStepIsPhysicalReturn
+        val completedTerminalBurstStep = pendingTerminalBurstStep
         val movement = pending.subtract(committedOffset)
         committedOffset = pending
         committedMovements += movement
@@ -549,7 +588,10 @@ internal class SpearKillPacketBootSession {
         while (movements.firstOrNull()?.lengthSqr()?.let { it < EPSILON } == true) {
             movements.removeFirst()
         }
-        remainingStepWaitTicks = if (movements.firstOrNull()?.lengthSqr()?.let { it >= EPSILON } == true) {
+        val terminalBurstContinues = completedTerminalBurstStep && remainingOutboundSteps > 0
+        remainingStepWaitTicks = if (terminalBurstContinues) {
+            0
+        } else if (movements.firstOrNull()?.lengthSqr()?.let { it >= EPSILON } == true) {
             configuredStepWaitTicks
         } else {
             0
@@ -580,6 +622,7 @@ internal class SpearKillPacketBootSession {
         configuredStrikeHoldTicks = 0
         configuredPreStrikeHoldTicks = 0
         configuredTerminalSuffixSteps = 1
+        configuredTerminalBurstSteps = 0
         configuredTerminalAuthorizationRequired = false
         configuredStepWaitTicks = 0
         chainedOutboundWindowOpen = false
@@ -621,6 +664,7 @@ internal class SpearKillPacketBootSession {
         configuredStrikeHoldTicks = 0
         configuredPreStrikeHoldTicks = 0
         configuredTerminalSuffixSteps = 1
+        configuredTerminalBurstSteps = 0
         configuredTerminalAuthorizationRequired = false
         configuredStepWaitTicks = 0
         terminalAimLockComplete = false
@@ -728,6 +772,7 @@ internal class SpearKillPacketBootSession {
         configuredStrikeHoldTicks = 0
         configuredPreStrikeHoldTicks = 0
         configuredTerminalSuffixSteps = 1
+        configuredTerminalBurstSteps = 0
         configuredTerminalAuthorizationRequired = false
         configuredStepWaitTicks = 0
         physicalReturnEnabled = false
@@ -746,6 +791,9 @@ internal class SpearKillPacketBootSession {
         lastDeliveredMovement = null
         recovering = false
     }
+
+    private fun hasValidTerminalBurst(terminalBurstSteps: Int, terminalSuffixSteps: Int): Boolean =
+        terminalBurstSteps == 0 || terminalBurstSteps in 2..terminalSuffixSteps
 
     private companion object {
         const val EPSILON = 1.0E-12

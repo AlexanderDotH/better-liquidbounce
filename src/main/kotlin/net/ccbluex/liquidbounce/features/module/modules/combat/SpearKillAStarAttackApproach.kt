@@ -55,6 +55,36 @@ internal fun createSpearKillAStarAttackApproach(
     )
 }
 
+/** Places the player above the target for one straight, downward kinetic lunge. */
+internal fun createSpearKillVerticalDiveAttackApproach(
+    targetBox: AABB,
+    targetEyePosition: Vec3,
+    playerEyeOffset: Vec3,
+    terminalLungeDistance: Double,
+): SpearKillAStarAttackApproach? {
+    if (!targetEyePosition.isFinite() || !playerEyeOffset.isFinite() ||
+        !terminalLungeDistance.isFinite() || terminalLungeDistance <= 0.0
+    ) {
+        return null
+    }
+
+    val downward = Vec3(0.0, -1.0, 0.0)
+    val terminalEyePosition = targetEyePosition.subtract(
+        downward.scale(SPEAR_KILL_A_STAR_TARGET_STAND_OFF),
+    )
+    val hitPoint = targetBox.clip(
+        terminalEyePosition,
+        terminalEyePosition.add(downward.scale(SPEAR_KILL_A_STAR_CANDIDATE_RAY_RANGE)),
+    ).orElse(null) ?: return null
+    val terminalWaypoint = hitPoint
+        .subtract(downward.scale(SPEAR_KILL_A_STAR_TARGET_STAND_OFF))
+        .subtract(playerEyeOffset)
+    return SpearKillAStarAttackApproach(
+        plannerGoal = terminalWaypoint.subtract(downward.scale(terminalLungeDistance)),
+        terminalWaypoint = terminalWaypoint,
+    )
+}
+
 /** Builds horizontal alternatives so the final spear lunge never descends onto the target. */
 internal fun createSpearKillAStarAttackApproachCandidates(
     targetBox: AABB,
