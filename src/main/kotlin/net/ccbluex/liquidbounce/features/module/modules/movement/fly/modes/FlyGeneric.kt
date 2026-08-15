@@ -19,16 +19,21 @@
 
 package net.ccbluex.liquidbounce.features.module.modules.movement.fly.modes
 
+import net.ccbluex.liquidbounce.additions.rawInput
+import net.ccbluex.liquidbounce.additions.suppressSneak
 import net.ccbluex.liquidbounce.config.types.group.Mode
 import net.ccbluex.liquidbounce.config.types.group.ModeValueGroup
 import net.ccbluex.liquidbounce.config.types.group.ToggleableValueGroup
 import net.ccbluex.liquidbounce.config.types.group.ValueGroup
 import net.ccbluex.liquidbounce.config.types.list.Tagged
+import net.ccbluex.liquidbounce.event.EventState
 import net.ccbluex.liquidbounce.event.events.BlockShapeEvent
 import net.ccbluex.liquidbounce.event.events.GameTickEvent
 import net.ccbluex.liquidbounce.event.events.PacketEvent
 import net.ccbluex.liquidbounce.event.events.PlayerJumpEvent
 import net.ccbluex.liquidbounce.event.events.PlayerMoveEvent
+import net.ccbluex.liquidbounce.event.events.PlayerNetworkMovementTickEvent
+import net.ccbluex.liquidbounce.event.events.TransferOrigin
 import net.ccbluex.liquidbounce.event.handler
 import net.ccbluex.liquidbounce.event.sequenceHandler
 import net.ccbluex.liquidbounce.event.tickHandler
@@ -44,6 +49,8 @@ import net.minecraft.client.player.LocalPlayer
 import net.minecraft.network.protocol.game.ClientboundExplodePacket
 import net.minecraft.network.protocol.game.ClientboundSetEntityMotionPacket
 import net.minecraft.network.protocol.game.ServerboundMovePlayerPacket
+import net.minecraft.network.protocol.game.ServerboundPlayerInputPacket
+import net.minecraft.world.entity.player.Input
 import net.minecraft.world.level.block.LiquidBlock
 import net.minecraft.world.phys.Vec3
 import net.minecraft.world.phys.shapes.Shapes
@@ -55,8 +62,10 @@ private const val VANILLA_CHECK_BYPASS_Y_OFFSET = 0.04
 internal fun shouldRunVanillaFlyCheckBypass(enabled: Boolean, tickCount: Int) =
     enabled && tickCount % VANILLA_CHECK_BYPASS_INTERVAL == 0
 
-internal fun applyVanillaFlyCheckBypass(packet: ServerboundMovePlayerPacket, previousY: Double) {
-    packet.y = previousY - VANILLA_CHECK_BYPASS_Y_OFFSET
+internal fun vanillaFlyCheckBypassY(currentY: Double) = currentY - VANILLA_CHECK_BYPASS_Y_OFFSET
+
+internal fun applyVanillaFlyCheckBypass(packet: ServerboundMovePlayerPacket, currentY: Double) {
+    packet.y = vanillaFlyCheckBypassY(currentY)
 }
 
 internal enum class VanillaFlyCheckBypassMode(override val tag: String) : Tagged {
@@ -69,11 +78,23 @@ internal fun resolveVanillaFlyCheckBypassMode(
     isFallFlying: Boolean,
 ) = if (isFallFlying) VanillaFlyCheckBypassMode.PACKET else configuredMode
 
+internal fun shouldSendVanillaFlyPacketBypass(
+    eventState: EventState,
+    enabled: Boolean,
+    tickCount: Int,
+    configuredMode: VanillaFlyCheckBypassMode,
+    isFallFlying: Boolean,
+) = eventState == EventState.POST &&
+    shouldRunVanillaFlyCheckBypass(enabled, tickCount) &&
+    resolveVanillaFlyCheckBypassMode(configuredMode, isFallFlying) == VanillaFlyCheckBypassMode.PACKET
+
 internal fun resolveVanillaFlyElytraVerticalMotion(
     isFallFlying: Boolean,
     movementY: Double,
     requestedVerticalMotion: Double,
 ) = if (isFallFlying && movementY < 0.0) requestedVerticalMotion else movementY
+
+internal fun shouldSuppressVanillaFlyServerSneak(input: Input) = input.shift && !input.jump
 
 internal inline fun applyVanillaFlyElytraVerticalMotion(
     event: PlayerMoveEvent,
@@ -140,19 +161,30 @@ internal object FlyVanilla : Mode("Vanilla") {
         player.deltaMovement = player.deltaMovement.withStrafe(speed = horizontalSpeed.toDouble())
         player.deltaMovement.y = requestedVerticalMotion
 
-        if (shouldRunVanillaFlyCheckBypass(bypassVanillaCheck, player.tickCount)) {
-            waitTicks(1)
-            when (resolveVanillaFlyCheckBypassMode(bypassMode, player.isFallFlying)) {
-                VanillaFlyCheckBypassMode.MOTION ->
-                    player.deltaMovement.y = -VANILLA_CHECK_BYPASS_Y_OFFSET
-
-                VanillaFlyCheckBypassMode.PACKET ->
-                    network.send(MovePacketType.POSITION_AND_ON_GROUND.generatePacket().apply {
-                        applyVanillaFlyCheckBypass(this, player.yLast)
-                    })
-            }
-            waitTicks(1)
+        if (
+            shouldRunVanillaFlyCheckBypass(bypassVanillaCheck, player.tickCount) &&
+            resolveVanillaFlyCheckBypassMode(bypassMode, player.isFallFlying) == VanillaFlyCheckBypassMode.MOTION
+        ) {
+            player.deltaMovement.y = -VANILLA_CHECK_BYPASS_Y_OFFSET
         }
+    }
+
+    @Suppress("unused")
+    private val networkMovementHandler = handler<PlayerNetworkMovementTickEvent> { event ->
+        if (!shouldSendVanillaFlyPacketBypass(
+                eventState = event.state,
+                enabled = bypassVanillaCheck,
+                tickCount = player.tickCount,
+                configuredMode = bypassMode,
+                isFallFlying = player.isFallFlying,
+            )
+        ) {
+            return@handler
+        }
+
+        network.send(MovePacketType.POSITION_AND_ON_GROUND.generatePacket().apply {
+            applyVanillaFlyCheckBypass(this, player.y)
+        })
     }
 
     @Suppress("unused")
@@ -162,6 +194,16 @@ internal object FlyVanilla : Mode("Vanilla") {
             isFallFlying = player.isFallFlying,
             requestedVerticalMotion = requestedVerticalMotion,
         ) { player.deltaMovement.y = it }
+    }
+
+    @Suppress("unused")
+    private val inputPacketHandler = handler<PacketEvent> { event ->
+        if (event.origin != TransferOrigin.OUTGOING) return@handler
+
+        val packet = event.packet as? ServerboundPlayerInputPacket ?: return@handler
+        if (shouldSuppressVanillaFlyServerSneak(packet.rawInput)) {
+            packet.suppressSneak = true
+        }
     }
 
 }

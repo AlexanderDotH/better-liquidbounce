@@ -19,16 +19,52 @@
 
 package net.ccbluex.liquidbounce.features.module.modules.movement.fly.modes
 
+import net.ccbluex.liquidbounce.additions.resolveServerboundPlayerInputSneak
+import net.ccbluex.liquidbounce.event.EventState
 import net.ccbluex.liquidbounce.event.events.PlayerMoveEvent
 import net.minecraft.network.protocol.game.ServerboundMovePlayerPacket
 import net.minecraft.world.entity.MoverType
+import net.minecraft.world.entity.player.Input
 import net.minecraft.world.phys.Vec3
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
+import org.junit.jupiter.api.Assertions.assertNotEquals
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 
 class FlyVanillaTest {
+
+    @Test
+    fun `shift descent stays local instead of changing the server collision pose`() {
+        assertTrue(
+            shouldSuppressVanillaFlyServerSneak(
+                Input(false, false, false, false, false, true, false),
+            )
+        )
+        assertFalse(
+            shouldSuppressVanillaFlyServerSneak(
+                Input(false, false, false, false, true, true, false),
+            )
+        )
+    }
+
+    @Test
+    fun `explicit route sneak wins over local fly shift suppression`() {
+        assertFalse(
+            resolveServerboundPlayerInputSneak(
+                rawSneak = true,
+                suppressSneak = true,
+                forceSneak = false,
+            )
+        )
+        assertTrue(
+            resolveServerboundPlayerInputSneak(
+                rawSneak = true,
+                suppressSneak = true,
+                forceSneak = true,
+            )
+        )
+    }
 
     @Test
     fun `vanilla check bypass runs every forty ticks only when enabled`() {
@@ -38,16 +74,49 @@ class FlyVanillaTest {
     }
 
     @Test
-    fun `vanilla check bypass packet dips only the previous player Y`() {
+    fun `vanilla check bypass packet dips only the current player Y`() {
         val packet = ServerboundMovePlayerPacket.Pos(12.5, 90.0, -4.25, true, true)
 
-        applyVanillaFlyCheckBypass(packet, previousY = 64.0)
+        applyVanillaFlyCheckBypass(packet, currentY = 64.0)
 
         assertEquals(12.5, packet.x)
         assertEquals(63.96, packet.y, 1e-9)
         assertEquals(-4.25, packet.z)
         assertTrue(packet.isOnGround)
         assertTrue(packet.horizontalCollision())
+    }
+
+    @Test
+    fun `packet bypass follows current Y during 3 point 6 block sprint descent`() {
+        val previousTickY = 64.0
+        val currentY = 60.4
+
+        val bypassY = vanillaFlyCheckBypassY(currentY)
+
+        assertEquals(60.36, bypassY, 1e-9)
+        assertNotEquals(previousTickY - 0.04, bypassY, 1e-9)
+    }
+
+    @Test
+    fun `packet bypass is emitted only after vanilla movement packet`() {
+        assertFalse(
+            shouldSendVanillaFlyPacketBypass(
+                eventState = EventState.PRE,
+                enabled = true,
+                tickCount = 40,
+                configuredMode = VanillaFlyCheckBypassMode.PACKET,
+                isFallFlying = false,
+            )
+        )
+        assertTrue(
+            shouldSendVanillaFlyPacketBypass(
+                eventState = EventState.POST,
+                enabled = true,
+                tickCount = 40,
+                configuredMode = VanillaFlyCheckBypassMode.PACKET,
+                isFallFlying = false,
+            )
+        )
     }
 
     @Test

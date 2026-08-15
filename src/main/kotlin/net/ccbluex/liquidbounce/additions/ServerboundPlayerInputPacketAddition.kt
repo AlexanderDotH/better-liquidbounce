@@ -24,8 +24,12 @@ package net.ccbluex.liquidbounce.additions
 import net.minecraft.network.protocol.game.ServerboundPlayerInputPacket
 import net.minecraft.world.entity.player.Input
 
+fun resolveServerboundPlayerInputSneak(rawSneak: Boolean, suppressSneak: Boolean, forceSneak: Boolean) =
+    (rawSneak && !suppressSneak) || forceSneak
+
 interface ServerboundPlayerInputPacketAddition {
     var `liquidBounce$forceSneak`: Boolean
+    var `liquidBounce$suppressSneak`: Boolean
     var `liquidBounce$forceSprint`: Boolean
 
     fun `liquidBounce$getRawInput`(): Input
@@ -38,6 +42,16 @@ inline var ServerboundPlayerInputPacket.forceSneak: Boolean
     get() = (this as ServerboundPlayerInputPacketAddition).`liquidBounce$forceSneak`
     set(value) {
         (this as ServerboundPlayerInputPacketAddition).`liquidBounce$forceSneak` = value
+    }
+
+/**
+ * Removes physical sneaking from this packet without changing the player's local input or pose.
+ * An explicit [forceSneak] still takes precedence during packet serialization.
+ */
+inline var ServerboundPlayerInputPacket.suppressSneak: Boolean
+    get() = (this as ServerboundPlayerInputPacketAddition).`liquidBounce$suppressSneak`
+    set(value) {
+        (this as ServerboundPlayerInputPacketAddition).`liquidBounce$suppressSneak` = value
     }
 
 inline var ServerboundPlayerInputPacket.forceSprint: Boolean

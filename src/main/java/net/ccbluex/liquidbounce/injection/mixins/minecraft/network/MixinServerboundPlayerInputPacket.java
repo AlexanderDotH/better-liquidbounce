@@ -21,6 +21,7 @@ package net.ccbluex.liquidbounce.injection.mixins.minecraft.network;
 
 import com.llamalad7.mixinextras.injector.ModifyReturnValue;
 import net.ccbluex.liquidbounce.additions.ServerboundPlayerInputPacketAddition;
+import net.ccbluex.liquidbounce.additions.ServerboundPlayerInputPacketAdditionKt;
 import net.minecraft.network.protocol.game.ServerboundPlayerInputPacket;
 import net.minecraft.world.entity.player.Input;
 import org.jspecify.annotations.NullMarked;
@@ -42,6 +43,9 @@ public abstract class MixinServerboundPlayerInputPacket implements ServerboundPl
     private boolean liquidBounce$forceSneak = false;
 
     @Unique
+    private boolean liquidBounce$suppressSneak = false;
+
+    @Unique
     private boolean liquidBounce$forceSprint = false;
 
     @Override
@@ -52,6 +56,16 @@ public abstract class MixinServerboundPlayerInputPacket implements ServerboundPl
     @Override
     public boolean getLiquidBounce$forceSneak() {
         return this.liquidBounce$forceSneak;
+    }
+
+    @Override
+    public void setLiquidBounce$suppressSneak(boolean b) {
+        this.liquidBounce$suppressSneak = b;
+    }
+
+    @Override
+    public boolean getLiquidBounce$suppressSneak() {
+        return this.liquidBounce$suppressSneak;
     }
 
     @Override
@@ -70,7 +84,11 @@ public abstract class MixinServerboundPlayerInputPacket implements ServerboundPl
 
     @ModifyReturnValue(method = "input", at = @At("RETURN"))
     private Input applyForcedInput(Input original) {
-        boolean shift = original.shift() || this.liquidBounce$forceSneak;
+        boolean shift = ServerboundPlayerInputPacketAdditionKt.resolveServerboundPlayerInputSneak(
+            original.shift(),
+            this.liquidBounce$suppressSneak,
+            this.liquidBounce$forceSneak
+        );
         boolean sprint = original.sprint() || this.liquidBounce$forceSprint;
 
         if (shift != original.shift() || sprint != original.sprint()) {
