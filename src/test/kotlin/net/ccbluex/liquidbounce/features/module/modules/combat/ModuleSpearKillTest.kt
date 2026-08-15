@@ -69,7 +69,6 @@ class ModuleSpearKillTest {
             listOf(
                 "Hidden",
                 "TargetDistance",
-                "Speed",
                 "Activation",
                 "TargetSource",
                 "Movement",
@@ -109,6 +108,7 @@ class ModuleSpearKillTest {
         val movement = configuration.choice
 
         assertEquals("Packet", movement.activeMode.name)
+        assertEquals(listOf("TargetSpeed"), movement.inner.map { it.name })
         assertEquals(
             mapOf(
                 "Motion" to listOf("StepDistance"),
@@ -136,8 +136,8 @@ class ModuleSpearKillTest {
         } as RangedValue<Int>
         assertEquals(10f, motionStepDistance.get())
         assertEquals(17.32f, packetStepDistance.get())
-        assertEquals(2f..17.32f, motionStepDistance.range)
-        assertEquals(2f..17.32f, packetStepDistance.range)
+        assertEquals(2f..500f, motionStepDistance.range)
+        assertEquals(2f..500f, packetStepDistance.range)
         assertEquals(listOf("StepsPerTeleport", "StepLimit"), motionStepDistance.aliases)
         assertEquals(listOf("StepsPerTeleport", "StepLimit"), packetStepDistance.aliases)
         assertEquals(0, packetStepDelay.get())
@@ -185,17 +185,18 @@ class ModuleSpearKillTest {
 
     @Test
     @Suppress("UNCHECKED_CAST")
-    fun `one Speed slider exposes the merged movement range`() {
-        val maxSpeed = ModuleSpearKill.inner.single { it.name == "Speed" } as RangedValue<Float>
+    fun `TargetSpeed is shared by both movement modes without a vanilla clamp`() {
+        val movement = ModuleSpearKill.inner.single { it.name == "Movement" } as ModeValueGroup<*>
+        val targetSpeed = movement.inner.single { it.name == "TargetSpeed" } as RangedValue<Float>
 
-        assertEquals(10f, maxSpeed.get())
-        assertEquals(2f..17.32f, maxSpeed.range)
+        assertEquals(10f, targetSpeed.get())
+        assertEquals(1f..500f, targetSpeed.range)
         try {
-            maxSpeed.set(18f)
+            targetSpeed.set(500f)
 
-            assertEquals(17.32f, maxSpeed.get())
+            assertEquals(500f, targetSpeed.get())
         } finally {
-            maxSpeed.restore()
+            targetSpeed.restore()
         }
     }
 
@@ -1203,6 +1204,22 @@ class ModuleSpearKillTest {
             outbound.asReversed().map { it.scale(-1.0) },
             route.roundTripMovements.drop(outbound.size).dropLast(1),
         )
+    }
+
+    @Test
+    fun `experimental Packet route supports one five hundred block step and its exact inverse`() {
+        val route = buildSpearKillAStarPacketRoute(
+            origin = Vec3.ZERO,
+            outboundWaypoints = listOf(Vec3(500.0, 0.0, 0.0)),
+            maxSpeed = 500.0,
+            segmentValidator = SpearKillAStarSegmentValidator { _, _ -> true },
+        )!!
+
+        assertEquals(listOf(Vec3(500.0, 0.0, 0.0)), route.outboundMovements)
+        assertEquals(3, route.roundTripMovements.size)
+        assertVec3Equals(Vec3(500.0, 0.0, 0.0), route.roundTripMovements[0], 1e-9)
+        assertVec3Equals(Vec3(-500.0, 0.0, 0.0), route.roundTripMovements[1], 1e-9)
+        assertVec3Equals(Vec3.ZERO, route.roundTripMovements[2], 1e-9)
     }
 
     @Test

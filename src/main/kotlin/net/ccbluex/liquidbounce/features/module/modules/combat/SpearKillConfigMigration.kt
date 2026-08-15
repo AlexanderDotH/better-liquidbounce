@@ -31,14 +31,7 @@ private data class LegacySpearKillMovementProfile(
  */
 internal fun migrateLegacySpearKillConfig(jsonObject: JsonObject) {
     val originalValues = jsonObject["value"]?.takeIf(JsonElement::isJsonArray)?.asJsonArray ?: return
-    val explicitSpeed = originalValues.spearKillConfigValue("Speed")?.let { storedSpeed ->
-        storedSpeed.numberValue()?.let { speed ->
-            spearKillScalarValue(
-                "Speed",
-                speed.coerceIn(SPEAR_KILL_MIN_SPEED.toDouble(), SPEAR_KILL_ELYTRA_MAX_SPEED_DOUBLE),
-            )
-        } ?: storedSpeed.deepCopy()
-    }
+    val explicitSpeed = originalValues.spearKillConfigValue("Speed")?.numberValue()
     val legacySpeed = originalValues.spearKillConfigValue("MaxSpeed")?.numberValue()
     val explicitSneak = originalValues.spearKillConfigValue("SneakWhileMoving")?.deepCopy()
     val legacyServerSneak = originalValues.spearKillConfigValue("ServerSneak")?.booleanValue()
@@ -57,19 +50,34 @@ internal fun migrateLegacySpearKillConfig(jsonObject: JsonObject) {
         }
         ?.let { values.spearKillConfigValue("TargetSource")?.addProperty("value", "Crosshair") }
 
-    val movement = values.spearKillConfigValue("Movement")
+    var movement = values.spearKillConfigValue("Movement")
+    if (movement == null && (explicitSpeed != null || legacySpeed != null)) {
+        values = values.withSpearKillConfigValue(spearKillMovementValue())
+        movement = values.spearKillConfigValue("Movement")
+    }
     val legacyMovement = movement?.let(::migrateSpearKillMovementConfig)
         ?: LegacySpearKillMovementProfile(null, null, null)
 
-    val speed = explicitSpeed ?: spearKillScalarValue(
-        name = "Speed",
-        value = (
-            legacyMovement.elytraMaxSpeed.takeIf { legacyMovement.elytraEnabled == true }
-                ?: legacySpeed
-                ?: SPEAR_KILL_NORMAL_MAX_SPEED.toDouble()
-            ).coerceIn(SPEAR_KILL_MIN_SPEED.toDouble(), SPEAR_KILL_ELYTRA_MAX_SPEED_DOUBLE),
-    ).takeIf { legacySpeed != null || legacyMovement.elytraMaxSpeed != null }
-    values = values.withSpearKillConfigValue(speed)
+    movement?.let { movementValue ->
+        val movementValues = movementValue.spearKillConfigValues()
+        val storedTargetSpeed = movementValues.spearKillConfigValue("TargetSpeed")
+        val migratedTargetSpeed = storedTargetSpeed?.numberValue()
+            ?: explicitSpeed
+            ?: legacyMovement.elytraMaxSpeed.takeIf { legacyMovement.elytraEnabled == true }
+            ?: legacySpeed
+        val targetSpeed = when {
+            migratedTargetSpeed != null -> spearKillScalarValue(
+                "TargetSpeed",
+                migratedTargetSpeed.coerceIn(
+                    SPEAR_KILL_MIN_TARGET_SPEED.toDouble(),
+                    SPEAR_KILL_EXPERIMENTAL_MAX_SPEED.toDouble(),
+                ),
+            )
+            storedTargetSpeed != null -> storedTargetSpeed.deepCopy()
+            else -> null
+        }
+        movementValue.add("value", movementValues.withSpearKillConfigValue(targetSpeed))
+    }
 
     val sneak = explicitSneak ?: legacyServerSneak?.let { enabled ->
         spearKillScalarValue("SneakWhileMoving", if (enabled) "Packet" else "None")
@@ -83,6 +91,16 @@ internal fun migrateLegacySpearKillConfig(jsonObject: JsonObject) {
 
     migrateSpearKillRenderPath(values, legacyMovement.renderPath)
     jsonObject.add("value", values)
+}
+
+private fun spearKillMovementValue() = JsonObject().apply {
+    addProperty("name", "Movement")
+    addProperty("active", "Packet")
+    add("value", JsonArray())
+    add("choices", JsonObject().apply {
+        add("Motion", spearKillChoice("Motion"))
+        add("Packet", spearKillChoice("Packet"))
+    })
 }
 
 private fun migrateSpearKillMovementConfig(movement: JsonObject): LegacySpearKillMovementProfile {

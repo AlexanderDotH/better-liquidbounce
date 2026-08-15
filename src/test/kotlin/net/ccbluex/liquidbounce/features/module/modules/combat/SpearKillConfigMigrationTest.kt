@@ -95,7 +95,10 @@ class SpearKillConfigMigrationTest {
 
         val values = legacy.valuesByName()
         assertEquals(123f, values.getValue("TargetDistance")["value"].asFloat)
-        assertEquals(16.5f, values.getValue("Speed")["value"].asFloat)
+        assertEquals(
+            16.5f,
+            values.getValue("Movement").valuesByName().getValue("TargetSpeed")["value"].asFloat,
+        )
         assertEquals("HoldUse", values.getValue("Activation")["value"].asString)
         assertEquals("Crosshair", values.getValue("TargetSource")["value"].asString)
         assertEquals("Packet", values.getValue("SneakWhileMoving")["value"].asString)
@@ -142,7 +145,7 @@ class SpearKillConfigMigrationTest {
                 {
                   "name": "Movement",
                   "active": "Packet",
-                  "value": [],
+                  "value": [{ "name": "TargetSpeed", "value": 100.0 }],
                   "choices": {
                     "Motion": { "name": "Motion", "value": [] },
                     "Packet": {
@@ -197,7 +200,10 @@ class SpearKillConfigMigrationTest {
         migrateLegacySpearKillConfig(mixed)
 
         val values = mixed.valuesByName()
-        assertEquals(5f, values.getValue("Speed")["value"].asFloat)
+        assertEquals(
+            100f,
+            values.getValue("Movement").valuesByName().getValue("TargetSpeed")["value"].asFloat,
+        )
         assertEquals("Input", values.getValue("SneakWhileMoving")["value"].asString)
         assertEquals("Input", values.getValue("ElytraWhileMoving")["value"].asString)
 
@@ -211,7 +217,7 @@ class SpearKillConfigMigrationTest {
     }
 
     @Test
-    fun `disabled legacy assists migrate to None and merged speed is clamped`() {
+    fun `disabled legacy assists migrate to None without a vanilla speed clamp`() {
         val legacy = JsonParser.parseString(
             """
             {
@@ -242,20 +248,28 @@ class SpearKillConfigMigrationTest {
         migrateLegacySpearKillConfig(legacy)
 
         val values = legacy.valuesByName()
-        assertEquals(17.32f, values.getValue("Speed")["value"].asFloat)
+        assertEquals(
+            30f,
+            values.getValue("Movement").valuesByName().getValue("TargetSpeed")["value"].asFloat,
+        )
         assertEquals("None", values.getValue("SneakWhileMoving")["value"].asString)
         assertEquals("None", values.getValue("ElytraWhileMoving")["value"].asString)
     }
 
     @Test
-    fun `explicit canonical Speed remains authoritative and is clamped`() {
+    fun `legacy root Speed migrates to Movement TargetSpeed without a vanilla clamp`() {
         val config = JsonParser.parseString(
-            """{ "name": "SpearKill", "value": [{ "name": "Speed", "value": 30.0 }] }""",
+            """{ "name": "SpearKill", "value": [{ "name": "Speed", "value": 100.0 }] }""",
         ).asJsonObject
 
         migrateLegacySpearKillConfig(config)
 
-        assertEquals(17.32f, config.valuesByName().getValue("Speed")["value"].asFloat)
+        val values = config.valuesByName()
+        assertEquals(
+            100f,
+            values.getValue("Movement").valuesByName().getValue("TargetSpeed")["value"].asFloat,
+        )
+        assertFalse(values.containsKey("Speed"))
     }
 
     @Test
@@ -326,6 +340,6 @@ class SpearKillConfigMigrationTest {
         getAsJsonObject("choices").getAsJsonObject(name)
 
     private companion object {
-        val LEGACY_ROOT_NAMES = setOf("MaxTargetDistance", "MaxSpeed", "ServerSneak")
+        val LEGACY_ROOT_NAMES = setOf("MaxTargetDistance", "Speed", "MaxSpeed", "ServerSneak")
     }
 }

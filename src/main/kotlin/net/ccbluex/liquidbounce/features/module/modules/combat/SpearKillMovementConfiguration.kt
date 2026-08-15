@@ -36,6 +36,12 @@ internal class SpearKillMovementConfiguration(eventListener: EventListener?) {
             Packet(parent).also { packet = it },
         )
     }
+    val targetSpeed by choice.float(
+        "TargetSpeed",
+        SPEAR_KILL_NORMAL_MAX_SPEED,
+        SPEAR_KILL_MIN_TARGET_SPEED..SPEAR_KILL_EXPERIMENTAL_MAX_SPEED,
+        "blocks/tick",
+    ).onChange { it.coerceIn(SPEAR_KILL_MIN_TARGET_SPEED, SPEAR_KILL_EXPERIMENTAL_MAX_SPEED) }
 
     internal sealed class SpearKillMovementChoice(
         name: String,
@@ -50,10 +56,10 @@ internal class SpearKillMovementConfiguration(eventListener: EventListener?) {
         val stepDistance by float(
             "StepDistance",
             SPEAR_KILL_NORMAL_MAX_SPEED,
-            SPEAR_KILL_MIN_SPEED..SPEAR_KILL_ELYTRA_MAX_SPEED,
+            SPEAR_KILL_MIN_SPEED..SPEAR_KILL_EXPERIMENTAL_MAX_SPEED,
             "blocks",
             aliases = listOf("StepsPerTeleport", "StepLimit"),
-        ).onChange { it.coerceIn(SPEAR_KILL_MIN_SPEED, SPEAR_KILL_ELYTRA_MAX_SPEED) }
+        ).onChange { it.coerceIn(SPEAR_KILL_MIN_SPEED, SPEAR_KILL_EXPERIMENTAL_MAX_SPEED) }
     }
 
     internal class Packet(parent: ModeValueGroup<SpearKillMovementChoice>) : SpearKillMovementChoice(
@@ -69,10 +75,10 @@ internal class SpearKillMovementConfiguration(eventListener: EventListener?) {
         val stepDistance by float(
             "StepDistance",
             SPEAR_KILL_ELYTRA_MAX_SPEED,
-            SPEAR_KILL_MIN_SPEED..SPEAR_KILL_ELYTRA_MAX_SPEED,
+            SPEAR_KILL_MIN_SPEED..SPEAR_KILL_EXPERIMENTAL_MAX_SPEED,
             "blocks",
             aliases = listOf("StepsPerTeleport", "StepLimit"),
-        ).onChange { it.coerceIn(SPEAR_KILL_MIN_SPEED, SPEAR_KILL_ELYTRA_MAX_SPEED) }
+        ).onChange { it.coerceIn(SPEAR_KILL_MIN_SPEED, SPEAR_KILL_EXPERIMENTAL_MAX_SPEED) }
         val stepDelay by int(
             "StepDelay",
             0,
@@ -124,7 +130,8 @@ internal fun canStartSpearKillElytraFlight(
     !isInWater && !hasLevitation && (isFallFlying || !isOnGround)
 
 internal const val SPEAR_KILL_MIN_SPEED = 2f
+internal const val SPEAR_KILL_MIN_TARGET_SPEED = 1f
 internal const val SPEAR_KILL_NORMAL_MAX_SPEED = 10f
 internal const val SPEAR_KILL_ELYTRA_MAX_SPEED = 17.32f
-internal const val SPEAR_KILL_ELYTRA_MAX_SPEED_DOUBLE = 17.32
+internal const val SPEAR_KILL_EXPERIMENTAL_MAX_SPEED = 500f
 internal const val SPEAR_KILL_MAX_WAIT_TICKS = 4

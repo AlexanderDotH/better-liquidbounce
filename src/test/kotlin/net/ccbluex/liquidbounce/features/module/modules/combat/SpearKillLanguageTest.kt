@@ -29,7 +29,20 @@ class SpearKillLanguageTest {
             val spearKillText = translations.entrySet()
                 .filter { it.key.startsWith("liquidbounce.module.spearKill") }
                 .joinToString(" ") { it.value.asString }
-            listOf("Adaptive", "LookRay", "StepLimit", "StepsPerTeleport", "WaitBeforeTeleport").forEach { staleTerm ->
+            assertTrue(
+                translations["liquidbounce.module.spearKill.movement.targetSpeed.warning"]
+                    .asString.lowercase().contains("server"),
+                "$locale: TargetSpeed warning must mention server authority",
+            )
+            listOf(
+                "Adaptive",
+                "LookRay",
+                "StepLimit",
+                "StepsPerTeleport",
+                "WaitBeforeTeleport",
+                "10-block-per-tick cap",
+                "Limit von 10 Blöcken pro Tick",
+            ).forEach { staleTerm ->
                 assertFalse(spearKillText.contains(staleTerm), "$locale: $staleTerm")
             }
         }
@@ -46,10 +59,10 @@ class SpearKillLanguageTest {
         val REQUIRED_KEYS = setOf(
             "liquidbounce.module.spearKill.description",
             "liquidbounce.module.spearKill.targetDistance.description",
-            "liquidbounce.module.spearKill.speed.description",
-            "liquidbounce.module.spearKill.speed.warning",
             "liquidbounce.module.spearKill.activation.description",
             "liquidbounce.module.spearKill.targetSource.description",
+            "liquidbounce.module.spearKill.movement.targetSpeed.description",
+            "liquidbounce.module.spearKill.movement.targetSpeed.warning",
             "liquidbounce.module.spearKill.movement.motion.stepDistance.description",
             "liquidbounce.module.spearKill.movement.packet.stepDistance.description",
             "liquidbounce.module.spearKill.movement.packet.stepDelay.description",
@@ -67,6 +80,8 @@ class SpearKillLanguageTest {
         )
 
         val RETIRED_KEYS = setOf(
+            "liquidbounce.module.spearKill.speed.description",
+            "liquidbounce.module.spearKill.speed.warning",
             "liquidbounce.module.spearKill.maxSpeed.description",
             "liquidbounce.module.spearKill.serverSneak.description",
             "liquidbounce.module.spearKill.movement.motion.stepLimit.description",

@@ -33,25 +33,36 @@ class SpearKillMovementAssistTest {
     }
 
     @Test
-    fun `configured speed seventeen point three two requires active Elytra`() {
+    fun `configured speed is independent from Elytra assistance`() {
         val normal = resolveSpearKillMovementTransport(17.32, 17.32, elytraActive = false)
         val elytra = resolveSpearKillMovementTransport(17.32, 17.32, elytraActive = true)
 
-        assertEquals(10.0, normal.maxSpeed, 1e-9)
-        assertEquals(10.0, normal.stepLimit, 1e-9)
+        assertEquals(17.32, normal.maxSpeed, 1e-9)
+        assertEquals(17.32, normal.stepLimit, 1e-9)
         assertEquals(17.32, elytra.maxSpeed, 1e-9)
         assertEquals(17.32, elytra.stepLimit, 1e-9)
     }
 
     @Test
-    fun `steps per teleport independently limits route chunks`() {
+    fun `configured TargetSpeed supports five hundred blocks per tick`() {
+        for (elytraActive in listOf(false, true)) {
+            val transport = resolveSpearKillMovementTransport(500.0, 500.0, elytraActive)
+
+            assertEquals(500.0, transport.maxSpeed, 1e-9)
+            assertEquals(500.0, transport.stepLimit, 1e-9)
+            assertEquals(elytraActive, transport.elytraActive)
+        }
+    }
+
+    @Test
+    fun `StepDistance independently limits experimental route chunks`() {
         val transport = resolveSpearKillMovementTransport(
-            configuredSpeed = 17.32,
+            configuredSpeed = 500.0,
             configuredStepLimit = 6.0,
-            elytraActive = true,
+            elytraActive = false,
         )
 
-        assertEquals(17.32, transport.maxSpeed, 1e-9)
+        assertEquals(500.0, transport.maxSpeed, 1e-9)
         assertEquals(6.0, transport.stepLimit, 1e-9)
     }
 

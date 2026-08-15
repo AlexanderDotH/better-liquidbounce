@@ -114,14 +114,6 @@ object ModuleSpearKill : ClientModule("SpearKill", ModuleCategories.COMBAT, alia
         3f..500f,
         aliases = listOf("MaxTargetDistance"),
     )
-    private val maxAllowedSpeedValue = float(
-        "Speed",
-        SPEAR_KILL_NORMAL_MAX_SPEED,
-        SPEAR_KILL_MIN_SPEED..SPEAR_KILL_ELYTRA_MAX_SPEED,
-        "blocks/tick",
-        aliases = listOf("MaxSpeed"),
-    ).onChange { it.coerceIn(SPEAR_KILL_MIN_SPEED, SPEAR_KILL_ELYTRA_MAX_SPEED) }
-    private val maxAllowedSpeed by maxAllowedSpeedValue
     private val activationMode by enumChoice("Activation", DEFAULT_SPEAR_KILL_ACTIVATION_MODE)
     private val targetSource by enumChoice("TargetSource", DEFAULT_SPEAR_KILL_TARGET_SOURCE)
     private val movementConfiguration = SpearKillMovementConfiguration(this)
@@ -509,7 +501,7 @@ object ModuleSpearKill : ClientModule("SpearKill", ModuleCategories.COMBAT, alia
         get() = activeMovementTransport?.stepLimit ?: configuredEffectiveStepLimit
     private val configuredEffectiveStepLimit
         get() = resolveSpearKillMovementTransport(
-            configuredSpeed = maxAllowedSpeed.toDouble(),
+            configuredSpeed = movementConfiguration.targetSpeed.toDouble(),
             configuredStepLimit = activeStepLimit.toDouble(),
             elytraActive = isSpearKillElytraActive,
         ).stepLimit
@@ -529,7 +521,7 @@ object ModuleSpearKill : ClientModule("SpearKill", ModuleCategories.COMBAT, alia
         }
         return SpearKillPacketSessionSettings(
             transport = resolveSpearKillMovementTransport(
-                configuredSpeed = maxAllowedSpeed.toDouble(),
+                configuredSpeed = movementConfiguration.targetSpeed.toDouble(),
                 configuredStepLimit = packet.stepDistance.toDouble(),
                 elytraActive = isSpearKillElytraActive,
             ),
@@ -1282,7 +1274,7 @@ object ModuleSpearKill : ClientModule("SpearKill", ModuleCategories.COMBAT, alia
             clearAStarRenderPath()
             requestSpearKillPacketFallFlight()
             val transport = resolveSpearKillMovementTransport(
-                configuredSpeed = maxAllowedSpeed.toDouble(),
+                configuredSpeed = movementConfiguration.targetSpeed.toDouble(),
                 configuredStepLimit = movementConfiguration.motion.stepDistance.toDouble(),
                 elytraActive = isSpearKillElytraActive,
             )

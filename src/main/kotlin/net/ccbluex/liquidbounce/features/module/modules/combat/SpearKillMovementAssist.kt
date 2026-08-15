@@ -46,23 +46,17 @@ internal fun resolveSpearKillMovementTransport(
     elytraActive: Boolean,
 ): SpearKillMovementTransport {
     val configuredMaximum = configuredSpeed.coerceIn(
-        SPEAR_KILL_MIN_SPEED.toDouble(),
-        SPEAR_KILL_ELYTRA_MAX_SPEED_DOUBLE,
+        SPEAR_KILL_MIN_TARGET_SPEED.toDouble(),
+        SPEAR_KILL_EXPERIMENTAL_MAX_SPEED.toDouble(),
     )
-    val transportMaximum = if (elytraActive) {
-        SPEAR_KILL_ELYTRA_MAX_SPEED_DOUBLE
-    } else {
-        SPEAR_KILL_NORMAL_MAX_SPEED.toDouble()
-    }
-    val maxSpeed = minOf(configuredMaximum, transportMaximum)
     val stepLimit = minOf(
-        maxSpeed,
+        configuredMaximum,
         configuredStepLimit.coerceIn(
             SPEAR_KILL_MIN_SPEED.toDouble(),
-            SPEAR_KILL_ELYTRA_MAX_SPEED_DOUBLE,
+            SPEAR_KILL_EXPERIMENTAL_MAX_SPEED.toDouble(),
         ),
     )
-    return SpearKillMovementTransport(maxSpeed, stepLimit, elytraActive)
+    return SpearKillMovementTransport(configuredMaximum, stepLimit, elytraActive)
 }
 
 internal fun resolveSpearKillMovementAssistLease(
