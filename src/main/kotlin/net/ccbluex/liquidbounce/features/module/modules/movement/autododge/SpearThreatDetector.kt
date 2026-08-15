@@ -47,9 +47,11 @@ data class SpearThreatCandidate(
     val isFriend: Boolean = false,
     val isTeammate: Boolean = false,
     val hasSignificantPositionJump: Boolean = false,
+    val visibilityAgeTicks: Int = Int.MAX_VALUE,
 )
 
 enum class SpearThreatKind(val priority: Int) {
+    HOLDING_NEWLY_VISIBLE(0),
     HOLDING_AIMED(1),
     USING(2),
     USING_AIMED(3),
@@ -76,13 +78,16 @@ class SpearThreatDetector {
         candidates: Iterable<SpearThreatCandidate>,
         aimMargin: Double,
         threatMemoryTicks: Int,
+        visibilityGraceTicks: Int = 0,
     ): SpearThreat? {
         val candidateList = candidates.toList()
         discardSelectionIfNowIneligible(candidateList)
 
         val targetBox = target.sweptBoundingBox(aimMargin)
         val eligibleCandidates = candidateList.filter(SpearThreatCandidate::isEligible)
-        val detectedThreats = eligibleCandidates.mapNotNull { it.toThreat(targetBox, target.center) }
+        val detectedThreats = eligibleCandidates.mapNotNull {
+            it.toThreat(targetBox, target.center, visibilityGraceTicks)
+        }
 
         val refreshed = refreshSelectedThreat(eligibleCandidates, detectedThreats, target, threatMemoryTicks)
         replaceWithHigherRankedThreat(detectedThreats, threatMemoryTicks)
@@ -183,12 +188,18 @@ private fun SpearThreatTargetSnapshot.sweptBoundingBox(aimMargin: Double): AABB 
 private fun SpearThreatCandidate.isEligible(): Boolean =
     !isSelf && isAlive && !isRemoved && !isBot
 
-private fun SpearThreatCandidate.toThreat(targetBox: AABB, targetPosition: Vec3): SpearThreat? {
+private fun SpearThreatCandidate.toThreat(
+    targetBox: AABB,
+    targetPosition: Vec3,
+    visibilityGraceTicks: Int,
+): SpearThreat? {
     val aimed = isAimedAt(targetBox)
     val kind = when {
         isUsingSpear && aimed -> SpearThreatKind.USING_AIMED
         isUsingSpear -> SpearThreatKind.USING
         isHoldingSpear && aimed -> SpearThreatKind.HOLDING_AIMED
+        isHoldingSpear && visibilityAgeTicks < visibilityGraceTicks.coerceAtLeast(0) ->
+            SpearThreatKind.HOLDING_NEWLY_VISIBLE
         else -> return null
     }
 

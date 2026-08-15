@@ -706,6 +706,7 @@
   "liquidbounce.module.autoDodge.description": "Predictively dodges incoming projectiles and charged spear attacks, with optional aggressive repositioning.",
   "liquidbounce.module.autoDodge.spear.description": "Predictively counters tracked spear users with collision-safe jukes, behind-attacker teleports, and an optional shield.",
   "liquidbounce.module.autoDodge.spear.aimMargin.description": "Extra blocks added around your short-term movement path when deciding whether a held spear is aimed at you.",
+  "liquidbounce.module.autoDodge.spear.visibilityGrace.description": "HvH protection window after a spear holder first becomes visible. During these ticks they count as a threat even before their aim or item-use state has synchronized; set to 0 to disable.",
   "liquidbounce.module.autoDodge.spear.jukeTicks.description": "Random tick range for keeping one safe lateral juke before replanning.",
   "liquidbounce.module.autoDodge.spear.threatMemory.description": "Ticks to retain the selected spear threat through brief remote-state gaps.",
   "liquidbounce.module.autoDodge.spear.teleport.description": "Aggressively teleports behind a nearby spear attacker, or sideways from a distant one, only after the landing and full packet route pass collision, support, void, loaded-chunk, and world-border checks; otherwise the normal juke remains active.",

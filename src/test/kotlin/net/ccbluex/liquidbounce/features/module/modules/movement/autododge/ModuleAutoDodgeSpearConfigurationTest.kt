@@ -35,8 +35,18 @@ import org.junit.jupiter.api.Test
 class ModuleAutoDodgeSpearConfigurationTest {
 
     companion object {
+        private val SPEAR_VALUE_NAMES = listOf(
+            "Enabled",
+            "AimMargin",
+            "VisibilityGrace",
+            "JukeTicks",
+            "ThreatMemory",
+            "Teleport",
+            "Shield",
+        )
         private val SPEAR_SETTING_NAMES = setOf(
             "AimMargin",
+            "VisibilityGrace",
             "JukeTicks",
             "ThreatMemory",
             "Teleport",
@@ -64,10 +74,7 @@ class ModuleAutoDodgeSpearConfigurationTest {
 
         assertFalse(spear.enabled)
         assertTrue(shield.enabled)
-        assertEquals(
-            listOf("Enabled", "AimMargin", "JukeTicks", "ThreatMemory", "Teleport", "Shield"),
-            spear.inner.map { it.name },
-        )
+        assertEquals(SPEAR_VALUE_NAMES, spear.inner.map { it.name })
         assertEquals(
             listOf(
                 "Enabled",
@@ -88,6 +95,8 @@ class ModuleAutoDodgeSpearConfigurationTest {
 
         assertEquals(0.75F, spear.setting("AimMargin").get())
         assertEquals(0.0F..3.0F, spear.rangedSetting("AimMargin").range)
+        assertEquals(8, spear.setting("VisibilityGrace").get())
+        assertEquals(0..40, spear.rangedSetting("VisibilityGrace").range)
         assertEquals(2..5, spear.setting("JukeTicks").get())
         assertEquals(1..10, spear.rangedSetting("JukeTicks").range)
         assertEquals(5, spear.setting("ThreatMemory").get())
@@ -124,10 +133,7 @@ class ModuleAutoDodgeSpearConfigurationTest {
         val teleport = spear.values().single { it["name"].asString == "Teleport" }
         val shield = spear.values().single { it["name"].asString == "Shield" }
 
-        assertEquals(
-            listOf("Enabled", "AimMargin", "JukeTicks", "ThreatMemory", "Teleport", "Shield"),
-            spear.valueNames(),
-        )
+        assertEquals(SPEAR_VALUE_NAMES, spear.valueNames())
         assertEquals(
             listOf(
                 "Enabled",
@@ -174,6 +180,10 @@ class ModuleAutoDodgeSpearConfigurationTest {
         assertEquals(
             "liquidbounce.module.autoDodge.spear.aimMargin.description",
             spear.setting("AimMargin").descriptionKey,
+        )
+        assertEquals(
+            "liquidbounce.module.autoDodge.spear.visibilityGrace.description",
+            spear.setting("VisibilityGrace").descriptionKey,
         )
         assertEquals(
             "liquidbounce.module.autoDodge.spear.jukeTicks.description",

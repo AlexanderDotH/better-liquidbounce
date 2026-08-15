@@ -86,6 +86,7 @@ object ModuleAutoDodge : ClientModule("AutoDodge", ModuleCategories.COMBAT) {
 
     private object Spear : ToggleableValueGroup(this, "Spear", false) {
         val aimMargin by float("AimMargin", 0.75F, 0.0F..3.0F, suffix = "blocks")
+        val visibilityGrace by int("VisibilityGrace", 8, 0..40, suffix = "ticks")
         val jukeTicks by intRange("JukeTicks", 2..5, 1..10, suffix = "ticks")
         val threatMemory by int("ThreatMemory", 5, 0..20, suffix = "ticks")
         val teleport = SpearTeleportValueGroup(this, ModuleAutoDodge::resetSpearTeleport)
@@ -93,6 +94,7 @@ object ModuleAutoDodge : ClientModule("AutoDodge", ModuleCategories.COMBAT) {
         fun movementSettings() = SpearMovementSettings(
             enabled = enabled,
             aimMargin = aimMargin.toDouble(),
+            visibilityGraceTicks = visibilityGrace,
             jukeTicks = jukeTicks,
             threatMemoryTicks = threatMemory,
             teleportEnabled = teleport.enabled,

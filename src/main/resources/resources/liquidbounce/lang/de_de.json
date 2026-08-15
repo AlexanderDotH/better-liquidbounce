@@ -477,6 +477,7 @@
   "liquidbounce.module.autoDodge.description": "Weicht Projektilen und aufgeladenen Speerangriffen vorausschauend aus, optional mit aggressiver Neupositionierung.",
   "liquidbounce.module.autoDodge.spear.description": "Kontert erkennbare Speernutzer vorausschauend mit kollisionssicheren Ausweichbewegungen, Teleports hinter den Angreifer und einem optionalen Schild.",
   "liquidbounce.module.autoDodge.spear.aimMargin.description": "Zusätzliche Blöcke um deinen kurzfristigen Bewegungspfad, anhand derer erkannt wird, ob ein gehaltener Speer auf dich zielt.",
+  "liquidbounce.module.autoDodge.spear.visibilityGrace.description": "HvH-Schutzfenster, nachdem ein Speerträger erstmals sichtbar wird. Während dieser Ticks gilt er schon vor der Synchronisierung von Blick- oder Benutzungsstatus als Gefahr; 0 deaktiviert den Schutz.",
   "liquidbounce.module.autoDodge.spear.jukeTicks.description": "Zufälliger Tickbereich, für den eine sichere seitliche Ausweichrichtung beibehalten wird, bevor neu geplant wird.",
   "liquidbounce.module.autoDodge.spear.threatMemory.description": "Ticks, für die der ausgewählte Speerangreifer trotz kurzer Lücken im Remote-Status beibehalten wird.",
   "liquidbounce.module.autoDodge.spear.teleport.description": "Teleportiert aggressiv hinter einen nahen Speerangreifer oder seitlich von einem entfernten weg, aber nur wenn Landepunkt und gesamter Paketpfad Kollisions-, Boden-, Void-, Chunk- und Weltgrenzenprüfungen bestehen; andernfalls bleibt die normale Ausweichbewegung aktiv.",

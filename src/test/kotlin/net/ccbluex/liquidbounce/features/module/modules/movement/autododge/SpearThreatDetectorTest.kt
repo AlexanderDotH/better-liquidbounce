@@ -75,6 +75,82 @@ class SpearThreatDetectorTest {
     }
 
     @Test
+    fun `visibility grace reacts before a freshly loaded spear holder synchronizes aim or use`() {
+        val freshlyVisible = candidate(
+            entityId = 1,
+            lookDirection = Vec3(-1.0, 0.0, 0.0),
+            isHoldingSpear = true,
+            visibilityAgeTicks = 3,
+        )
+
+        val threat = SpearThreatDetector().update(
+            stationaryTarget,
+            listOf(freshlyVisible),
+            aimMargin = 0.0,
+            visibilityGraceTicks = 8,
+            threatMemoryTicks = 0,
+        )
+
+        assertEquals(SpearThreatKind.HOLDING_NEWLY_VISIBLE, threat?.kind)
+    }
+
+    @Test
+    fun `visibility grace expires at its configured tick and zero disables it`() {
+        val atBoundary = candidate(
+            entityId = 1,
+            lookDirection = Vec3(-1.0, 0.0, 0.0),
+            isHoldingSpear = true,
+            visibilityAgeTicks = 8,
+        )
+        val firstVisibleTick = atBoundary.copy(visibilityAgeTicks = 0)
+
+        val expired = SpearThreatDetector().update(
+            stationaryTarget,
+            listOf(atBoundary),
+            aimMargin = 0.0,
+            visibilityGraceTicks = 8,
+            threatMemoryTicks = 0,
+        )
+        val disabled = SpearThreatDetector().update(
+            stationaryTarget,
+            listOf(firstVisibleTick),
+            aimMargin = 0.0,
+            visibilityGraceTicks = 0,
+            threatMemoryTicks = 0,
+        )
+
+        assertNull(expired)
+        assertNull(disabled)
+    }
+
+    @Test
+    fun `aimed spear telegraph outranks a nearer visibility grace threat`() {
+        val newlyVisible = candidate(
+            entityId = 1,
+            position = Vec3(-1.0, 0.0, 0.0),
+            lookDirection = Vec3(-1.0, 0.0, 0.0),
+            isHoldingSpear = true,
+            visibilityAgeTicks = 0,
+        )
+        val aimed = candidate(
+            entityId = 2,
+            position = Vec3(-20.0, 0.0, 0.0),
+            isHoldingSpear = true,
+        )
+
+        val threat = SpearThreatDetector().update(
+            stationaryTarget,
+            listOf(newlyVisible, aimed),
+            aimMargin = 0.0,
+            visibilityGraceTicks = 8,
+            threatMemoryTicks = 0,
+        )
+
+        assertEquals(2, threat?.candidate?.entityId)
+        assertEquals(SpearThreatKind.HOLDING_AIMED, threat?.kind)
+    }
+
+    @Test
     fun `aim includes the target swept over the next two ticks`() {
         val movingTarget = stationaryTarget.copy(velocity = Vec3(0.0, 0.0, 1.0))
         val aimedAtFuturePosition = candidate(
@@ -365,6 +441,7 @@ class SpearThreatDetectorTest {
         isFriend: Boolean = false,
         isTeammate: Boolean = false,
         hasSignificantPositionJump: Boolean = false,
+        visibilityAgeTicks: Int = Int.MAX_VALUE,
     ) = SpearThreatCandidate(
         entityId = entityId,
         name = "player-$entityId",
@@ -380,5 +457,6 @@ class SpearThreatDetectorTest {
         isFriend = isFriend,
         isTeammate = isTeammate,
         hasSignificantPositionJump = hasSignificantPositionJump,
+        visibilityAgeTicks = visibilityAgeTicks,
     )
 }

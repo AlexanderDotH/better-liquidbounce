@@ -34,6 +34,7 @@ import net.minecraft.world.phys.Vec3
 internal data class SpearMovementSettings(
     val enabled: Boolean,
     val aimMargin: Double,
+    val visibilityGraceTicks: Int,
     val jukeTicks: IntRange,
     val threatMemoryTicks: Int,
     val teleportEnabled: Boolean,
@@ -150,6 +151,7 @@ internal class SpearMovementController(
                 .asIterable(),
             aimMargin = settings.aimMargin,
             threatMemoryTicks = settings.threatMemoryTicks,
+            visibilityGraceTicks = settings.visibilityGraceTicks,
         )
         if (primaryThreat == null) {
             resetCommitment()
@@ -239,6 +241,7 @@ internal class SpearMovementController(
             isBot = ModuleAntiBot.isBot(this),
             hasSignificantPositionJump = currentPosition.distanceToSqr(previousPosition) >=
                 SIGNIFICANT_POSITION_JUMP_SQ,
+            visibilityAgeTicks = tickCount.coerceAtLeast(0),
         )
     }
 
