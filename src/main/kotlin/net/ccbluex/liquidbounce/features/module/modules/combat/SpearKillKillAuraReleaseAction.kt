@@ -18,22 +18,25 @@
  */
 package net.ccbluex.liquidbounce.features.module.modules.combat
 
-/** Cleanup required when KillAura gives up ownership of an inherited SpearKill request. */
+/** Cleanup required when KillAura shuts down while SpearKill may still own movement or item use. */
 internal enum class SpearKillKillAuraReleaseAction {
     NONE,
     RELEASE_INHERITED_USE,
     CANCEL_INHERITED_PREPARATION,
     CANCEL_INHERITED_ROUTE,
-    BEGIN_EXACT_PACKET_RETURN,
+    DEACTIVATE,
+    DEACTIVATE_AND_RETURN,
 }
 
 internal fun resolveSpearKillKillAuraReleaseAction(
+    spearKillEnabled: Boolean,
     killAuraOwnsAttempt: Boolean,
-    packetRouteActive: Boolean,
+    routeActive: Boolean,
     killAuraPreparationActive: Boolean,
     inheritedUseActive: Boolean,
 ): SpearKillKillAuraReleaseAction = when {
-    killAuraOwnsAttempt && packetRouteActive -> SpearKillKillAuraReleaseAction.BEGIN_EXACT_PACKET_RETURN
+    spearKillEnabled && routeActive -> SpearKillKillAuraReleaseAction.DEACTIVATE_AND_RETURN
+    spearKillEnabled -> SpearKillKillAuraReleaseAction.DEACTIVATE
     killAuraOwnsAttempt -> SpearKillKillAuraReleaseAction.CANCEL_INHERITED_ROUTE
     killAuraPreparationActive -> SpearKillKillAuraReleaseAction.CANCEL_INHERITED_PREPARATION
     inheritedUseActive -> SpearKillKillAuraReleaseAction.RELEASE_INHERITED_USE

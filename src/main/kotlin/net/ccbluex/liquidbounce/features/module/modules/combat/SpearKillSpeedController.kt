@@ -201,6 +201,24 @@ internal fun spearKillConfirmedMotionRecoveryTail(
     return queuedMovements.drop(retainedRecoveryIndex)
 }
 
+/** Keeps only the inverse of already delivered Motion steps when an external owner stops the route. */
+internal fun spearKillMotionReturnTailOnDisable(
+    queuedMovements: List<Vec3>,
+    plannedOutboundSteps: Int,
+    confirmedOutboundSteps: Int,
+): List<Vec3>? {
+    if (plannedOutboundSteps < 0 || confirmedOutboundSteps !in 0..plannedOutboundSteps ||
+        queuedMovements.any { !it.hasFiniteCoordinates() }
+    ) {
+        return null
+    }
+
+    val remainingOutboundSteps = plannedOutboundSteps - confirmedOutboundSteps
+    val retainedRecoveryIndex = remainingOutboundSteps * 2
+    if (retainedRecoveryIndex >= queuedMovements.size) return null
+    return queuedMovements.drop(retainedRecoveryIndex)
+}
+
 /**
  * Rebuilds only the untouched portion of a Motion route. The already confirmed inverse tail is
  * retained byte-for-byte so a smaller live budget cannot alter recovery back to the session origin.

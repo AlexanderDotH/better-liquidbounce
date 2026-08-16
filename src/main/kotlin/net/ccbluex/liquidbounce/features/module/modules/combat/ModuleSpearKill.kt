@@ -226,6 +226,8 @@ object ModuleSpearKill : ClientModule("SpearKill", ModuleCategories.COMBAT, alia
     private var killAuraSpearPrechargeActive = false
     private var killAuraStartedSpearUse = false
     private var killAuraSpearUseHand: InteractionHand? = null
+    private var pendingKillAuraReleaseAction = SpearKillKillAuraReleaseAction.NONE
+    private var gracefulDisableActive = false
 
     private object FightBotSpearUseRequester
 
@@ -314,6 +316,9 @@ object ModuleSpearKill : ClientModule("SpearKill", ModuleCategories.COMBAT, alia
     internal val usesPacketMovement get() = packetBootSession.active
     private val currentMovement get() = attackMovements.firstOrNull() ?: Vec3.ZERO
     private val hasActiveAttackPath get() = attackMovements.isNotEmpty() || packetBootSession.active
+    private val hasSpearKillReturnWork
+        get() = hasActiveAttackPath || setbackGuard.armed || setbackRollback.confirming ||
+            packetSetbackRecoveryAttempted
     private val activeRouteHeading: Rotation?
         get() = when {
             packetBootSession.active -> packetBootSession.pathHeading
@@ -883,11 +888,12 @@ object ModuleSpearKill : ClientModule("SpearKill", ModuleCategories.COMBAT, alia
         killAuraSpearUseHand = null
     }
 
-    /** Releases only the route, preparation, and item use inherited from KillAura. */
+    /** KillAura shutdown is authoritative: SpearKill stops acquiring targets and returns to origin. */
     internal fun onKillAuraDisabled() {
         val action = resolveSpearKillKillAuraReleaseAction(
+            spearKillEnabled = enabled,
             killAuraOwnsAttempt = killAuraOwnsAttempt,
-            packetRouteActive = packetBootSession.active,
+            routeActive = hasSpearKillReturnWork,
             killAuraPreparationActive = packetRoutePreparationActive &&
                 (pendingKillAuraTarget != null || killAuraSpearTarget != null),
             inheritedUseActive = hasKillAuraSpearUseRequest || killAuraStartedSpearUse,
@@ -896,9 +902,14 @@ object ModuleSpearKill : ClientModule("SpearKill", ModuleCategories.COMBAT, alia
             SpearKillKillAuraReleaseAction.NONE -> return
             SpearKillKillAuraReleaseAction.RELEASE_INHERITED_USE -> Unit
             SpearKillKillAuraReleaseAction.CANCEL_INHERITED_PREPARATION -> cancelKillAuraPreparation()
-            SpearKillKillAuraReleaseAction.CANCEL_INHERITED_ROUTE,
-            SpearKillKillAuraReleaseAction.BEGIN_EXACT_PACKET_RETURN,
-            -> cancelKillAuraRoute()
+            SpearKillKillAuraReleaseAction.CANCEL_INHERITED_ROUTE -> cancelKillAuraRoute()
+            SpearKillKillAuraReleaseAction.DEACTIVATE,
+            SpearKillKillAuraReleaseAction.DEACTIVATE_AND_RETURN,
+            -> {
+                pendingKillAuraReleaseAction = action
+                enabled = false
+                return
+            }
         }
         clearKillAuraSpearUse()
     }
@@ -915,6 +926,56 @@ object ModuleSpearKill : ClientModule("SpearKill", ModuleCategories.COMBAT, alia
         resetAttack()
         pendingKillAuraTarget = null
         clearAStarTargetLock()
+    }
+
+    private fun beginKillAuraDisabledReturn() {
+        gracefulDisableActive = true
+        val motionReturnPrepared = prepareKillAuraDisabledMotionReturn()
+
+        abortSpearKillAttempt(KILL_AURA_DISABLED_REASON)
+        clearKillAuraSpearUse()
+        clearFightBotSpearUse(SpearKillFightBotTerminal.TargetLoss)
+        manualAttackRequestLatched = false
+        movementAssistPreparationActive = false
+        pendingKillAuraTarget = null
+        previewTarget = null
+
+        if (packetBootSession.active) {
+            resetAttack()
+        } else if (!motionReturnPrepared) {
+            attackMovements.clear()
+            player.deltaMovement = Vec3.ZERO
+        }
+
+        packetAStarAttackActive = false
+        clearAStarRenderPath()
+        clearAStarTargetLock()
+        fallDamageDeliveryTracker.clear()
+        synchronizeSpearKillServerSneak()
+        gracefulDisableActive = hasSpearKillReturnWork
+    }
+
+    private fun prepareKillAuraDisabledMotionReturn(): Boolean {
+        if (packetBootSession.active || attackMovements.isEmpty()) return false
+
+        val attempt = attemptTracker.current
+        val recovery = if (attempt == null) {
+            attackMovements.toList()
+        } else {
+            spearKillMotionReturnTailOnDisable(
+                queuedMovements = attackMovements.toList(),
+                plannedOutboundSteps = attempt.plannedOutboundStepCount,
+                confirmedOutboundSteps = attempt.outboundStepCount,
+            )
+        }
+        if (recovery == null) return false
+
+        attackMovements.clear()
+        attackMovements.addAll(recovery)
+        player.deltaMovement = Vec3.ZERO
+        motionPacketHeading = null
+        resetSpearKillSpeedSession()
+        return attackMovements.isNotEmpty()
     }
 
     /** Collision pose the server will use after SpearKill's optional sneak input has arrived. */
@@ -1513,6 +1574,7 @@ object ModuleSpearKill : ClientModule("SpearKill", ModuleCategories.COMBAT, alia
         finishFallSafety: Boolean = true,
         allowFallSafetyPacket: Boolean = true,
     ) {
+        gracefulDisableActive = false
         abortSpearKillAttempt(reason)
         clearKillAuraSpearUse()
         clearVirtualAttack(finishFallSafety, allowFallSafetyPacket)
@@ -3506,8 +3568,10 @@ object ModuleSpearKill : ClientModule("SpearKill", ModuleCategories.COMBAT, alia
             returnRecoveryTracker.observeCombatPosition(player.position())
         }
 
-        followLockedMotionTarget()
-        followLockedPacketTarget()
+        if (enabled) {
+            followLockedMotionTarget()
+            followLockedPacketTarget()
+        }
         synchronizeSpearKillServerSneak()
 
         if (packetBootSession.recovering) {
@@ -3530,6 +3594,10 @@ object ModuleSpearKill : ClientModule("SpearKill", ModuleCategories.COMBAT, alia
         if (!enabled) {
             manualAttackRequestLatched = false
             movementAssistPreparationActive = false
+            if (gracefulDisableActive && attackMovements.isNotEmpty()) {
+                applyNextGracefulMotionReturnStep()
+            }
+            gracefulDisableActive = hasSpearKillReturnWork
             synchronizeSpearKillServerSneak()
             return@handler
         }
@@ -3733,6 +3801,14 @@ object ModuleSpearKill : ClientModule("SpearKill", ModuleCategories.COMBAT, alia
             attemptTracker.recordOutboundStep()
             lastDeliveredOutboundMovement = movement
         }
+        motionPacketHeading = spearKillKineticHeading(movement)
+        player.deltaMovement = movement
+        lastDeliveredMovement = movement
+        if (attackMovements.isEmpty()) resetSpearKillSpeedSession()
+    }
+
+    private fun applyNextGracefulMotionReturnStep() {
+        val movement = attackMovements.removeFirst()
         motionPacketHeading = spearKillKineticHeading(movement)
         player.deltaMovement = movement
         lastDeliveredMovement = movement
@@ -4369,7 +4445,7 @@ object ModuleSpearKill : ClientModule("SpearKill", ModuleCategories.COMBAT, alia
 
     override val running: Boolean
         get() = super.running || packetBootSession.active || fallSafetyLifecycle.active ||
-            setbackGuard.armed || setbackRollback.confirming
+            setbackGuard.armed || setbackRollback.confirming || gracefulDisableActive
 
     override fun prepareDeserialize(jsonObject: JsonObject) {
         super.prepareDeserialize(jsonObject)
@@ -4377,9 +4453,15 @@ object ModuleSpearKill : ClientModule("SpearKill", ModuleCategories.COMBAT, alia
     }
 
     override fun onDisabled() {
+        val killAuraReleaseAction = pendingKillAuraReleaseAction
+        pendingKillAuraReleaseAction = SpearKillKillAuraReleaseAction.NONE
         failureNotificationGate.clear()
         networkOptimizer.reset()
-        clearAttack("disabled")
+        when (killAuraReleaseAction) {
+            SpearKillKillAuraReleaseAction.DEACTIVATE_AND_RETURN -> beginKillAuraDisabledReturn()
+            SpearKillKillAuraReleaseAction.DEACTIVATE -> clearAttack(KILL_AURA_DISABLED_REASON)
+            else -> clearAttack("disabled")
+        }
         super.onDisabled()
     }
 }

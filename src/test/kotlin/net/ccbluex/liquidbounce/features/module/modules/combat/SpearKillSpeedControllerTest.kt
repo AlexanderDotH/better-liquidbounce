@@ -350,6 +350,45 @@ class SpearKillSpeedControllerTest {
     }
 
     @Test
+    fun `KillAura disable drops unconfirmed Motion travel and returns only confirmed movement`() {
+        val first = Vec3(4.0, 0.0, 0.0)
+        val second = Vec3(6.0, 0.0, 0.0)
+        val third = Vec3(8.0, 0.0, 0.0)
+
+        assertEquals(
+            listOf(first.scale(-1.0), Vec3.ZERO),
+            spearKillMotionReturnTailOnDisable(
+                queuedMovements = listOf(
+                    second,
+                    third,
+                    third.scale(-1.0),
+                    second.scale(-1.0),
+                    first.scale(-1.0),
+                    Vec3.ZERO,
+                ),
+                plannedOutboundSteps = 3,
+                confirmedOutboundSteps = 1,
+            ),
+        )
+        assertEquals(
+            listOf(Vec3.ZERO),
+            spearKillMotionReturnTailOnDisable(
+                queuedMovements = listOf(
+                    first,
+                    second,
+                    third,
+                    third.scale(-1.0),
+                    second.scale(-1.0),
+                    first.scale(-1.0),
+                    Vec3.ZERO,
+                ),
+                plannedOutboundSteps = 3,
+                confirmedOutboundSteps = 0,
+            ),
+        )
+    }
+
+    @Test
     fun `exact confirmed return is not reshaped by a lower outbound budget`() {
         val session = SpearKillPacketBootSession()
         session.startPhysicalReturn(

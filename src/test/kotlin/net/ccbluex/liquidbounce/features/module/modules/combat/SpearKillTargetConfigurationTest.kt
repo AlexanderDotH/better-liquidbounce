@@ -102,12 +102,13 @@ class SpearKillTargetConfigurationTest {
     }
 
     @Test
-    fun `disabling KillAura immediately returns its active SpearKill Packet route`() {
+    fun `disabling KillAura deactivates SpearKill and returns its active route`() {
         assertEquals(
-            SpearKillKillAuraReleaseAction.BEGIN_EXACT_PACKET_RETURN,
+            SpearKillKillAuraReleaseAction.DEACTIVATE_AND_RETURN,
             resolveSpearKillKillAuraReleaseAction(
+                spearKillEnabled = true,
                 killAuraOwnsAttempt = true,
-                packetRouteActive = true,
+                routeActive = true,
                 killAuraPreparationActive = false,
                 inheritedUseActive = true,
             ),
@@ -119,8 +120,9 @@ class SpearKillTargetConfigurationTest {
         assertEquals(
             SpearKillKillAuraReleaseAction.CANCEL_INHERITED_PREPARATION,
             resolveSpearKillKillAuraReleaseAction(
+                spearKillEnabled = false,
                 killAuraOwnsAttempt = false,
-                packetRouteActive = false,
+                routeActive = false,
                 killAuraPreparationActive = true,
                 inheritedUseActive = true,
             ),
@@ -128,8 +130,9 @@ class SpearKillTargetConfigurationTest {
         assertEquals(
             SpearKillKillAuraReleaseAction.RELEASE_INHERITED_USE,
             resolveSpearKillKillAuraReleaseAction(
+                spearKillEnabled = false,
                 killAuraOwnsAttempt = false,
-                packetRouteActive = false,
+                routeActive = false,
                 killAuraPreparationActive = false,
                 inheritedUseActive = true,
             ),
@@ -137,23 +140,39 @@ class SpearKillTargetConfigurationTest {
     }
 
     @Test
-    fun `disabling KillAura never interrupts an unrelated SpearKill Packet route`() {
+    fun `disabling KillAura deactivates an unrelated SpearKill route instead of chaining targets`() {
         assertEquals(
-            SpearKillKillAuraReleaseAction.NONE,
+            SpearKillKillAuraReleaseAction.DEACTIVATE_AND_RETURN,
             resolveSpearKillKillAuraReleaseAction(
+                spearKillEnabled = true,
                 killAuraOwnsAttempt = false,
-                packetRouteActive = true,
+                routeActive = true,
                 killAuraPreparationActive = false,
                 inheritedUseActive = false,
             ),
         )
         assertEquals(
-            SpearKillKillAuraReleaseAction.RELEASE_INHERITED_USE,
+            SpearKillKillAuraReleaseAction.DEACTIVATE_AND_RETURN,
             resolveSpearKillKillAuraReleaseAction(
+                spearKillEnabled = true,
                 killAuraOwnsAttempt = false,
-                packetRouteActive = true,
+                routeActive = true,
                 killAuraPreparationActive = false,
                 inheritedUseActive = true,
+            ),
+        )
+    }
+
+    @Test
+    fun `disabling KillAura deactivates idle SpearKill`() {
+        assertEquals(
+            SpearKillKillAuraReleaseAction.DEACTIVATE,
+            resolveSpearKillKillAuraReleaseAction(
+                spearKillEnabled = true,
+                killAuraOwnsAttempt = false,
+                routeActive = false,
+                killAuraPreparationActive = false,
+                inheritedUseActive = false,
             ),
         )
     }
