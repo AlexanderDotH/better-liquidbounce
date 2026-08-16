@@ -116,7 +116,10 @@ class SpearKillConfigMigrationTest {
 
         val routing = packetValues.getValue("Routing")
         assertEquals("AStar", routing["active"].asString)
-        assertEquals(setOf("Direct", "AStar"), routing.getAsJsonObject("choices").keySet())
+        assertEquals(
+            setOf("Direct", "AStar", "NetworkOptimized"),
+            routing.getAsJsonObject("choices").keySet(),
+        )
         val aStar = routing.choice("AStar").valuesByName()
         assertEquals(321, aStar.getValue("MaxCost")["value"].asInt)
         assertTrue(aStar.getValue("Diagonal")["value"].asBoolean)
@@ -358,6 +361,53 @@ class SpearKillConfigMigrationTest {
         assertEquals(3, packetValues.getValue("StepDelay")["value"].asInt)
         assertEquals("AStar", routing["active"].asString)
         assertEquals(333, routing.choice("AStar").valuesByName().getValue("MaxCost")["value"].asInt)
+    }
+
+    @Test
+    fun `canonical NetworkOptimized routing and tuning survive migration`() {
+        val config = JsonParser.parseString(
+            """
+            {
+              "name": "SpearKill",
+              "value": [{
+                "name": "Movement",
+                "active": "Packet",
+                "value": [],
+                "choices": {
+                  "Motion": { "name": "Motion", "value": [] },
+                  "Packet": {
+                    "name": "Packet",
+                    "value": [{
+                      "name": "Routing",
+                      "active": "NetworkOptimized",
+                      "value": [],
+                      "choices": {
+                        "Direct": { "name": "Direct", "value": [] },
+                        "AStar": { "name": "AStar", "value": [] },
+                        "NetworkOptimized": {
+                          "name": "NetworkOptimized",
+                          "value": [
+                            { "name": "MaxSpeed", "value": 8.0 },
+                            { "name": "SetbackBackoff", "value": 60 }
+                          ]
+                        }
+                      }
+                    }]
+                  }
+                }
+              }]
+            }
+            """.trimIndent(),
+        ).asJsonObject
+
+        migrateLegacySpearKillConfig(config)
+
+        val routing = config.valuesByName().getValue("Movement")
+            .choice("Packet").valuesByName().getValue("Routing")
+        assertEquals("NetworkOptimized", routing["active"].asString)
+        val networkOptimized = routing.choice("NetworkOptimized").valuesByName()
+        assertEquals(8f, networkOptimized.getValue("MaxSpeed")["value"].asFloat)
+        assertEquals(60, networkOptimized.getValue("SetbackBackoff")["value"].asInt)
     }
 
     private fun JsonObject.valuesByName(): Map<String, JsonObject> =

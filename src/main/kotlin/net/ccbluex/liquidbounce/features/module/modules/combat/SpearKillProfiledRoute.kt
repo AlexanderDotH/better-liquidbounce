@@ -25,15 +25,13 @@ private data class SpearKillProfiledRouteCursor(
 )
 
 internal data class SpearKillProfiledDirectAttackRoute(
+    val line: SpearKillDirectAttackLine,
     val approach: SpearKillAStarAttackApproach,
     val packetRoute: SpearKillAStarPacketRoute,
 )
 
-/**
- * Lower targets use a collision-validated run-up and one logical full-speed dive. Other targets
- * retain the lateral terminal approach. A dive is physically segmented but remains one tick.
- */
-@Suppress("LongParameterList")
+/** Builds one collision-validated, terminal-loaded diagonal without lateral or vertical staging. */
+@Suppress("LongParameterList", "ReturnCount")
 internal fun buildSpearKillProfiledDirectAttackRoute(
     origin: Vec3,
     targetBox: AABB,
@@ -42,164 +40,51 @@ internal fun buildSpearKillProfiledDirectAttackRoute(
     preferredDirection: Vec3,
     profile: SpearKillSpeedProfile,
     segmentValidator: SpearKillAStarSegmentValidator,
-    maxVerticalStep: Double = profile.maximumStepLimit,
-): SpearKillProfiledDirectAttackRoute? = if (
-    targetBox.maxY < origin.y - SPEAR_KILL_VERTICAL_DIVE_EPSILON
-) {
-    buildSpearKillProfiledVerticalDiveRoute(
-        origin = origin,
-        targetBox = targetBox,
-        targetEyePosition = targetEyePosition,
-        playerEyeOffset = playerEyeOffset,
-        profile = profile,
-        segmentValidator = segmentValidator,
-        maxVerticalStep = maxVerticalStep,
-    )
-} else {
-    buildSpearKillProfiledLateralAttackRoute(
-        origin = origin,
-        targetBox = targetBox,
-        targetEyePosition = targetEyePosition,
-        playerEyeOffset = playerEyeOffset,
-        preferredDirection = preferredDirection,
-        profile = profile,
-        segmentValidator = segmentValidator,
-        maxVerticalStep = maxVerticalStep,
-    )
-}
-
-@Suppress("LongParameterList")
-private fun buildSpearKillProfiledVerticalDiveRoute(
-    origin: Vec3,
-    targetBox: AABB,
-    targetEyePosition: Vec3,
-    playerEyeOffset: Vec3,
-    profile: SpearKillSpeedProfile,
-    segmentValidator: SpearKillAStarSegmentValidator,
-    maxVerticalStep: Double,
+    kineticRequirements: SpearKillKineticDamageRequirements? = null,
+    targetMovement: Vec3 = Vec3.ZERO,
 ): SpearKillProfiledDirectAttackRoute? {
-    if (!maxVerticalStep.isFinite() || maxVerticalStep <= 0.0) return null
-
-    val refined = refineSpearKillVerticalDiveApproach(
+    val line = solveSpearKillDirectAttackLine(
         origin = origin,
         targetBox = targetBox,
         targetEyePosition = targetEyePosition,
         playerEyeOffset = playerEyeOffset,
-        profile = profile,
-        segmentValidator = segmentValidator,
-        maxVerticalStep = maxVerticalStep,
+        fallbackDirection = preferredDirection,
     ) ?: return null
-    val (approach, approachRoute) = refined
-    val terminalMovement = approach.terminalWaypoint.subtract(approach.plannerGoal)
-    val terminalMovements = buildSpearKillFixedStepMovements(
-        direction = terminalMovement,
-        distance = terminalMovement.length(),
-        maxSpeed = maxVerticalStep,
-    )
-    var terminalPosition = approachRoute.position
-    for (movement in terminalMovements) {
-        val next = terminalPosition.add(movement)
-        if (!segmentValidator.isClear(terminalPosition, next)) return null
-        terminalPosition = next
+    val displacement = line.terminalWaypoint.subtract(origin)
+    val movements = buildSpearKillTerminalLoadedProfiledMovements(
+        direction = displacement,
+        distance = displacement.length(),
+        profile = profile,
+        maxVerticalStep = profile.maximumStepLimit,
+    ) ?: return null
+    var position = origin
+    for (movement in movements) {
+        val next = position.add(movement)
+        if (!segmentValidator.isClear(position, next)) return null
+        position = next
     }
-    val outbound = SpearKillProfiledRouteCursor(
-        movements = approachRoute.movements + terminalMovements,
-        position = terminalPosition,
+    val outbound = SpearKillProfiledRouteCursor(movements, position)
+    val terminalMovement = movements.lastOrNull() ?: return null
+    val approach = SpearKillAStarAttackApproach(
+        plannerGoal = line.terminalWaypoint.subtract(terminalMovement),
+        terminalWaypoint = line.terminalWaypoint,
     )
+    if (kineticRequirements != null && !estimateSpearKillKineticDamage(
+            deliveredMovement = terminalMovement,
+            targetMovement = targetMovement,
+            lookDirection = line.direction,
+            requirements = kineticRequirements,
+        ).meetsRequirements
+    ) {
+        return null
+    }
     val packetRoute = buildSpearKillProfiledRoundTrip(
         origin = origin,
         outbound = outbound,
-        destination = approach.terminalWaypoint,
+        destination = line.terminalWaypoint,
         segmentValidator = segmentValidator,
-        terminalBurstSteps = terminalMovements.size.takeIf { it > 1 } ?: 0,
     ) ?: return null
-    if (!isSpearKillAStarTerminalStepValid(
-            outboundMovements = packetRoute.outboundMovements,
-            approach = approach,
-            stepLimit = profile.maximumStepLimit,
-        )
-    ) {
-        return null
-    }
-    return SpearKillProfiledDirectAttackRoute(approach, packetRoute)
-}
-
-@Suppress("LongParameterList")
-private fun buildSpearKillProfiledLateralAttackRoute(
-    origin: Vec3,
-    targetBox: AABB,
-    targetEyePosition: Vec3,
-    playerEyeOffset: Vec3,
-    preferredDirection: Vec3,
-    profile: SpearKillSpeedProfile,
-    segmentValidator: SpearKillAStarSegmentValidator,
-    maxVerticalStep: Double,
-): SpearKillProfiledDirectAttackRoute? {
-    val approach = createSpearKillAStarAttackApproachCandidates(
-        targetBox = targetBox,
-        targetEyePosition = targetEyePosition,
-        playerEyeOffset = playerEyeOffset,
-        preferredDirection = preferredDirection,
-        terminalLungeDistance = profile.maximumStepLimit,
-        bearingCount = 1,
-    ).firstOrNull { candidate ->
-        segmentValidator.isClear(candidate.plannerGoal, candidate.terminalWaypoint)
-    } ?: return null
-    val packetRoute = buildSpearKillProfiledAStarPacketRoute(
-        origin = origin,
-        outboundWaypoints = listOf(approach.plannerGoal, approach.terminalWaypoint),
-        profile = profile,
-        segmentValidator = segmentValidator,
-        maxVerticalStep = maxVerticalStep,
-    ) ?: return null
-    if (!isSpearKillAStarTerminalStepValid(
-            outboundMovements = packetRoute.outboundMovements,
-            approach = approach,
-            stepLimit = profile.maximumStepLimit,
-        )
-    ) {
-        return null
-    }
-    return SpearKillProfiledDirectAttackRoute(approach, packetRoute)
-}
-
-@Suppress("LongParameterList")
-private fun refineSpearKillVerticalDiveApproach(
-    origin: Vec3,
-    targetBox: AABB,
-    targetEyePosition: Vec3,
-    playerEyeOffset: Vec3,
-    profile: SpearKillSpeedProfile,
-    segmentValidator: SpearKillAStarSegmentValidator,
-    maxVerticalStep: Double,
-): Pair<SpearKillAStarAttackApproach, SpearKillProfiledRouteCursor>? {
-    var terminalLungeDistance = profile.maximumStepLimit
-    repeat(SPEAR_KILL_VERTICAL_DIVE_PROFILE_REFINEMENTS) {
-        val approach = createSpearKillVerticalDiveAttackApproach(
-            targetBox = targetBox,
-            targetEyePosition = targetEyePosition,
-            playerEyeOffset = playerEyeOffset,
-            terminalLungeDistance = terminalLungeDistance,
-        ) ?: return null
-        val approachVerticalStep = if (approach.plannerGoal.y >= origin.y) {
-            profile.maximumStepLimit
-        } else {
-            maxVerticalStep
-        }
-        val approachRoute = buildSpearKillProfiledOutbound(
-            origin = origin,
-            waypoints = listOf(approach.plannerGoal),
-            profile = profile,
-            segmentValidator = segmentValidator,
-            maxVerticalStep = approachVerticalStep,
-        ) ?: return null
-        val resolvedLungeDistance = profile.stepAt(approachRoute.movements.size).stepLimit
-        if (abs(resolvedLungeDistance - terminalLungeDistance) <= SPEAR_KILL_VERTICAL_DIVE_EPSILON) {
-            return approach to approachRoute
-        }
-        terminalLungeDistance = resolvedLungeDistance
-    }
-    return null
+    return SpearKillProfiledDirectAttackRoute(line, approach, packetRoute)
 }
 
 /** Profile-aware A* segmentation with the same exact inverse recovery contract as PacketBoot. */
@@ -304,6 +189,3 @@ private fun buildSpearKillProfiledRoundTrip(
 }
 
 private fun Vec3.hasFiniteProfileCoordinates(): Boolean = x.isFinite() && y.isFinite() && z.isFinite()
-
-private const val SPEAR_KILL_VERTICAL_DIVE_PROFILE_REFINEMENTS = 32
-private const val SPEAR_KILL_VERTICAL_DIVE_EPSILON = 1.0E-9

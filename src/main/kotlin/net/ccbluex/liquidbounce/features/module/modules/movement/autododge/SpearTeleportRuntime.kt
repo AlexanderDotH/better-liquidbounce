@@ -29,6 +29,7 @@ import net.minecraft.client.player.LocalPlayer
 import net.minecraft.network.protocol.game.ServerboundMovePlayerPacket
 import net.minecraft.world.entity.Pose
 import net.minecraft.world.phys.Vec3
+import kotlin.random.Random
 
 internal data class SpearTeleportSettings(
     val behindDistance: Double,
@@ -42,7 +43,8 @@ internal data class SpearTeleportSettings(
 internal class SpearTeleportValueGroup(
     parent: EventListener,
     private val resetRuntime: () -> Unit,
-) : ToggleableValueGroup(parent, "Teleport", false) {
+    defaultEnabled: Boolean = false,
+) : ToggleableValueGroup(parent, "Teleport", defaultEnabled) {
     val behindDistance by float("BehindDistance", 2.0F, 0.5F..5.0F, suffix = "blocks")
     val maxDistance by float("MaxDistance", 12.0F, 2.0F..32.0F, suffix = "blocks")
     val searchRadius by int("SearchRadius", 2, 0..5, suffix = "blocks")
@@ -79,10 +81,19 @@ internal enum class SpearTeleportState(val debugName: String) {
     TELEPORTED("Teleported"),
 }
 
+private data class CombatTeleportThreat(
+    val position: Vec3,
+    val lookDirection: Vec3,
+    val trustsAttackerLook: Boolean,
+)
+
 /** Owns spear-teleport planning, cooldown, execution, and compact debug state. */
 internal class SpearTeleportRuntime(
     private val planner: SpearTeleportPlanner = SpearTeleportPlanner(),
     private val cooldown: SpearTeleportCooldown = SpearTeleportCooldown(),
+    private val chooseLateralSide: () -> SpearTeleportLateralSide = {
+        if (Random.nextBoolean()) SpearTeleportLateralSide.POSITIVE else SpearTeleportLateralSide.NEGATIVE
+    },
 ) {
     var plannedTeleport: SpearTeleportPlan? = null
         private set
@@ -99,6 +110,50 @@ internal class SpearTeleportRuntime(
         threat: SpearThreat?,
         settings: SpearTeleportSettings,
         isSafe: (SpearTeleportPoint) -> Boolean,
+    ): SpearTeleportPlan? = planThreat(
+        enabled,
+        canStartDefense,
+        projectilePlanActive,
+        tick,
+        playerPosition,
+        threat?.let {
+            CombatTeleportThreat(it.candidate.position, it.candidate.lookDirection, it.trustsAttackerLook)
+        },
+        settings,
+        isSafe,
+    )
+
+    fun planMace(
+        enabled: Boolean,
+        canStartDefense: Boolean,
+        projectilePlanActive: Boolean,
+        tick: Long,
+        playerPosition: Vec3,
+        threat: MaceThreat?,
+        settings: SpearTeleportSettings,
+        isSafe: (SpearTeleportPoint) -> Boolean,
+    ): SpearTeleportPlan? = planThreat(
+        enabled,
+        canStartDefense,
+        projectilePlanActive,
+        tick,
+        playerPosition,
+        threat?.let {
+            CombatTeleportThreat(it.candidate.position, it.candidate.lookDirection, trustsAttackerLook = false)
+        },
+        settings,
+        isSafe,
+    )
+
+    private fun planThreat(
+        enabled: Boolean,
+        canStartDefense: Boolean,
+        projectilePlanActive: Boolean,
+        tick: Long,
+        playerPosition: Vec3,
+        threat: CombatTeleportThreat?,
+        settings: SpearTeleportSettings,
+        isSafe: (SpearTeleportPoint) -> Boolean,
     ): SpearTeleportPlan? {
         plannedTeleport = null
         state = resolveState(enabled, canStartDefense, projectilePlanActive, threat, tick, settings)
@@ -106,17 +161,18 @@ internal class SpearTeleportRuntime(
             return null
         }
 
-        val candidate = threat.candidate
         val request = SpearTeleportRequest(
             playerPosition = playerPosition.toSpearTeleportPoint(),
-            attackerPosition = candidate.position.toSpearTeleportPoint(),
-            attackerLook = SpearTeleportDirection(candidate.lookDirection.x, candidate.lookDirection.z),
+            attackerPosition = threat.position.toSpearTeleportPoint(),
+            attackerLook = SpearTeleportDirection(threat.lookDirection.x, threat.lookDirection.z),
             behindDistance = settings.behindDistance,
             lateralDistance = settings.behindDistance
                 .coerceAtLeast(DodgePlanner.SAFE_DISTANCE_WITH_PADDING)
                 .coerceAtMost(settings.maxDistance),
             maxDistance = settings.maxDistance,
             searchRadius = settings.searchRadius,
+            preferredLateralSide = chooseLateralSide(),
+            preferLocalEscape = !threat.trustsAttackerLook,
         )
         plannedTeleport = planner.plan(request, isSafe)
         state = if (plannedTeleport == null) {
@@ -176,7 +232,7 @@ internal class SpearTeleportRuntime(
         enabled: Boolean,
         canStartDefense: Boolean,
         projectilePlanActive: Boolean,
-        threat: SpearThreat?,
+        threat: CombatTeleportThreat?,
         tick: Long,
         settings: SpearTeleportSettings,
     ) = when {
@@ -197,16 +253,20 @@ internal fun isSafeSpearTeleportCandidate(
     val destination = candidate.toVec3()
     val dimensions = player.getDimensions(Pose.STANDING)
     val destinationBox = dimensions.makeBoundingBox(destination)
+    val requiresLandingSupport = player.onGround()
+    val supported = !requiresLandingSupport || world.getBlockCollisions(
+        player,
+        destinationBox.move(0.0, -SUPPORT_CHECK_DEPTH, 0.0),
+    ).anyNotEmpty()
+    val overVoid = requiresLandingSupport && player.wouldFallIntoVoid(destination, world.minY.toDouble())
     val landingSafe = isSpearTeleportCandidateSafe(
         destinationCollisionFree = world.noCollision(player, destinationBox),
-        supported = world.getBlockCollisions(
-            player,
-            destinationBox.move(0.0, -SUPPORT_CHECK_DEPTH, 0.0),
-        ).anyNotEmpty(),
-        overVoid = player.wouldFallIntoVoid(destination, world.minY.toDouble()),
+        supported = supported,
+        overVoid = overVoid,
         routeCollisionFree = true,
         loaded = world.hasChunkAt(BlockPos.containing(destination)),
         withinWorldBorder = world.worldBorder.isWithinBounds(destinationBox),
+        requiresLandingSupport = requiresLandingSupport,
     )
     if (!landingSafe) {
         return false

@@ -122,6 +122,14 @@ class ModuleSpearKillTest {
             mapOf(
                 "Direct" to emptyList(),
                 "AStar" to listOf("MaxCost", "Diagonal", "LineOfSightShortcuts"),
+                "NetworkOptimized" to listOf(
+                    "MaxSpeed",
+                    "MinimumStepDelay",
+                    "SetbackBackoff",
+                    "MaxCost",
+                    "Diagonal",
+                    "LineOfSightShortcuts",
+                ),
             ),
             routing.modes.associate { it.name to it.inner.map { value -> value.name } },
         )
@@ -154,15 +162,26 @@ class ModuleSpearKillTest {
         val serializedRouting = serializedMovement.getAsJsonObject("choices")
             .choiceValue("Packet", "Routing")
         val serializedAStar = serializedRouting.getAsJsonObject("choices").getAsJsonObject("AStar")
+        val serializedNetworkOptimized = serializedRouting.getAsJsonObject("choices")
+            .getAsJsonObject("NetworkOptimized")
 
         assertEquals(
             "Direct",
             serializedRouting["active"].asString,
         )
-        assertEquals(setOf("Direct", "AStar"), serializedRouting.getAsJsonObject("choices").keySet())
+        assertEquals(
+            setOf("Direct", "AStar", "NetworkOptimized"),
+            serializedRouting.getAsJsonObject("choices").keySet(),
+        )
         assertEquals(250, serializedAStar.settingValue("MaxCost").asInt)
         assertFalse(serializedAStar.settingValue("Diagonal").asBoolean)
         assertFalse(serializedAStar.settingValue("LineOfSightShortcuts").asBoolean)
+        assertEquals(10f, serializedNetworkOptimized.settingValue("MaxSpeed").asFloat)
+        assertEquals(1, serializedNetworkOptimized.settingValue("MinimumStepDelay").asInt)
+        assertEquals(40, serializedNetworkOptimized.settingValue("SetbackBackoff").asInt)
+        assertEquals(250, serializedNetworkOptimized.settingValue("MaxCost").asInt)
+        assertTrue(serializedNetworkOptimized.settingValue("Diagonal").asBoolean)
+        assertTrue(serializedNetworkOptimized.settingValue("LineOfSightShortcuts").asBoolean)
         assertEquals(
             10f,
             serializedMovement.getAsJsonObject("choices")
@@ -366,6 +385,15 @@ class ModuleSpearKillTest {
                 useRequested = true,
             ),
         )
+    }
+
+    @Test
+    fun `only a transient weapon state keeps route preparation active`() {
+        assertTrue(SpearKillAttackStartResult.RETRY_LATER.keepsRoutePreparation)
+        assertFalse(SpearKillAttackStartResult.STARTED.keepsRoutePreparation)
+        assertFalse(SpearKillAttackStartResult.BLOCKED.keepsRoutePreparation)
+        assertTrue(shouldRestartSpearKillCharge(SpearKillAttackStartResult.RETRY_LATER))
+        assertFalse(shouldRestartSpearKillCharge(SpearKillAttackStartResult.STARTED))
     }
 
     @Test
@@ -1760,18 +1788,35 @@ class ModuleSpearKillTest {
     }
 
     @Test
-    fun `AStar route failure rejects hard but a short damage window only retries`() {
+    fun `AStar route start rejects missing paths and blocks impossible terminal windows`() {
         assertEquals(
             SpearKillAttackStartResult.REJECTED,
-            classifySpearKillAStarStartFailure(routeFound = false, hasDamageWindow = true),
+            classifySpearKillAStarStartFailure(
+                routeFound = false,
+                hasRefreshableTerminalDamageWindow = true,
+            ),
         )
         assertEquals(
-            SpearKillAttackStartResult.RETRY_LATER,
-            classifySpearKillAStarStartFailure(routeFound = true, hasDamageWindow = false),
+            SpearKillAttackStartResult.BLOCKED,
+            classifySpearKillAStarStartFailure(
+                routeFound = true,
+                hasRefreshableTerminalDamageWindow = false,
+            ),
         )
         assertEquals(
             SpearKillAttackStartResult.STARTED,
-            classifySpearKillAStarStartFailure(routeFound = true, hasDamageWindow = true),
+            classifySpearKillAStarStartFailure(
+                routeFound = true,
+                hasRefreshableTerminalDamageWindow = true,
+            ),
+        )
+        assertEquals(
+            SpearKillAttackStartResult.BLOCKED,
+            classifySpearKillAStarStartFailure(
+                routeFound = true,
+                hasRefreshableTerminalDamageWindow = true,
+                serverRouteAccepted = false,
+            ),
         )
     }
 
@@ -1982,13 +2027,20 @@ class ModuleSpearKillTest {
     fun `fall protection confirms only its selected movement packet`() {
         val tracker = SpearKillFallDamagePacketTracker()
         val protectedPacket = ServerboundMovePlayerPacket.StatusOnly(false, false)
+        val cancelledPacket = ServerboundMovePlayerPacket.StatusOnly(false, false)
+        val retryPacket = ServerboundMovePlayerPacket.StatusOnly(false, false)
         val unrelatedPacket = ServerboundMovePlayerPacket.StatusOnly(false, false)
 
         tracker.protect(protectedPacket)
+        tracker.protect(cancelledPacket)
 
         assertTrue(protectedPacket.onGround)
         assertFalse(tracker.confirmFinalState(unrelatedPacket, cancelled = false))
+        assertFalse(tracker.confirmFinalState(cancelledPacket, cancelled = true))
         assertTrue(tracker.confirmFinalState(protectedPacket, cancelled = false))
+
+        tracker.protect(retryPacket)
+        assertTrue(tracker.confirmFinalState(retryPacket, cancelled = false))
     }
 
     @Test
@@ -2134,23 +2186,52 @@ class ModuleSpearKillTest {
     }
 
     @Test
-    fun `direct Packet prediction includes the terminal strike hold`() {
-        assertEquals(2, spearKillDirectPacketHitTicks(stepCount = 1, stepWaitTicks = 0))
-        assertEquals(11, spearKillDirectPacketHitTicks(stepCount = 4, stepWaitTicks = 2))
+    fun `direct Packet prediction includes live aim lock without a return hold`() {
+        assertEquals(1, spearKillDirectPacketHitTicks(
+            stepCount = 1,
+            stepWaitTicks = 0,
+            strikeHoldTicks = 0,
+        ))
+        assertEquals(10, spearKillDirectPacketHitTicks(
+            stepCount = 4,
+            stepWaitTicks = 2,
+            strikeHoldTicks = 0,
+        ))
+        assertEquals(3, spearKillDirectPacketHitTicks(
+            stepCount = 1,
+            stepWaitTicks = 0,
+            strikeHoldTicks = SPEAR_KILL_PACKET_STRIKE_HOLD_TICKS,
+        ))
     }
 
     @Test
     fun `direct Packet start waits for a damage window that reaches the server hit tick`() {
         assertTrue(hasSpearKillDirectPacketDamageWindow(
-            ticksUsingItem = 8,
+            ticksUsingItem = 9,
             damageUseDuration = 10,
             stepCount = 1,
             stepWaitTicks = 0,
         ))
         assertFalse(hasSpearKillDirectPacketDamageWindow(
-            ticksUsingItem = 9,
+            ticksUsingItem = 10,
             damageUseDuration = 10,
             stepCount = 1,
+            stepWaitTicks = 0,
+        ))
+    }
+
+    @Test
+    fun `paced Packet route may start when a fresh terminal charge still reaches the hit`() {
+        assertFalse(hasSpearKillDirectPacketDamageWindow(
+            ticksUsingItem = 6,
+            damageUseDuration = 10,
+            stepCount = 12,
+            stepWaitTicks = 0,
+        ))
+        assertTrue(hasSpearKillRefreshableTerminalDamageWindow(
+            delayTicks = 5,
+            damageUseDuration = 10,
+            terminalStepCount = 1,
             stepWaitTicks = 0,
         ))
     }
@@ -2302,6 +2383,50 @@ class ModuleSpearKillTest {
             hasLiveAttackRay = false,
             aimAligned = true,
         ))
+    }
+
+    @Test
+    fun `expired terminal charge refreshes in place instead of stalling the lunge`() {
+        assertEquals(
+            SpearKillTerminalChargeAction.REFRESH,
+            resolveSpearKillTerminalChargeAction(
+                isUsingSpear = true,
+                ticksUsingItem = 18,
+                delayTicks = 5,
+                damageUseDuration = 20,
+                remainingHitTicks = 4,
+            ),
+        )
+        assertEquals(
+            SpearKillTerminalChargeAction.WAIT,
+            resolveSpearKillTerminalChargeAction(
+                isUsingSpear = true,
+                ticksUsingItem = 5,
+                delayTicks = 5,
+                damageUseDuration = 20,
+                remainingHitTicks = 4,
+            ),
+        )
+        assertEquals(
+            SpearKillTerminalChargeAction.READY,
+            resolveSpearKillTerminalChargeAction(
+                isUsingSpear = true,
+                ticksUsingItem = 8,
+                delayTicks = 5,
+                damageUseDuration = 20,
+                remainingHitTicks = 4,
+            ),
+        )
+        assertEquals(
+            SpearKillTerminalChargeAction.INVALID,
+            resolveSpearKillTerminalChargeAction(
+                isUsingSpear = true,
+                ticksUsingItem = 5,
+                delayTicks = 5,
+                damageUseDuration = 8,
+                remainingHitTicks = 3,
+            ),
+        )
     }
 
     @Test
@@ -2589,7 +2714,7 @@ class ModuleSpearKillTest {
     }
 
     @Test
-    fun `direct Packet preserves terminal motion through its strike hold before exact return`() {
+    fun `direct Packet live-locks its terminal motion before immediate exact return`() {
         val outbound = Vec3(6.0, 0.0, 0.0)
         val session = SpearKillPacketBootSession()
         val route = SpearKillAStarPacketRoute(
@@ -2601,15 +2726,17 @@ class ModuleSpearKillTest {
             session = session,
             route = route,
             stepWaitTicks = 0,
+            strikeHoldTicks = 0,
         )
+
+        assertTrue(session.awaitingTerminalCommitAuthorization)
+        assertFalse(session.terminalAimLockComplete)
+        assertNull(session.prepareNextStep())
+        assertTrue(session.terminalAimLockComplete)
+        assertNull(session.prepareNextStep())
+        assertTrue(session.authorizeTerminalCommit())
         assertVec3Equals(outbound, session.prepareNextStep()!!, 1e-9)
         session.confirmStep(delivered = true)
-
-        repeat(SPEAR_KILL_PACKET_STRIKE_HOLD_TICKS) {
-            assertNull(session.prepareNextStep())
-            assertTrue(session.holdingStrike)
-            assertEquals(spearKillKineticHeading(outbound), session.pathHeading)
-        }
 
         assertVec3Equals(Vec3.ZERO, session.prepareNextStep()!!, 1e-9)
         assertVec3Equals(outbound.scale(-1.0), session.pendingMovement!!, 1e-9)
@@ -2820,6 +2947,52 @@ class ModuleSpearKillTest {
         assertFalse(session.holdingStrike)
         assertNull(session.prepareNextStep())
         assertVec3Equals(Vec3.ZERO, session.prepareNextStep()!!, 1e-9)
+    }
+
+    @Test
+    fun `NetworkOptimized immediate return retains its configured packet cadence`() {
+        val outbound = Vec3(3.0, 0.0, 0.0)
+        val session = SpearKillPacketBootSession()
+        session.startPhysicalReturn(
+            path = listOf(outbound, outbound.scale(-1.0), Vec3.ZERO),
+            outboundSteps = 1,
+            strikeHoldTicks = 0,
+            stepWaitTicks = 2,
+        )
+
+        assertVec3Equals(outbound, session.prepareNextStep()!!, 1e-9)
+        session.confirmStep(delivered = true)
+
+        repeat(2) {
+            assertNull(session.prepareNextStep())
+            assertFalse(session.holdingStrike)
+        }
+        assertVec3Equals(Vec3.ZERO, session.prepareNextStep()!!, 1e-9)
+        assertVec3Equals(outbound.scale(-1.0), session.pendingMovement!!, 1e-9)
+    }
+
+    @Test
+    fun `NetworkOptimized exact abort returns on the next cadence slot`() {
+        val first = Vec3(3.0, 0.0, 0.0)
+        val second = Vec3(2.0, 0.0, 0.0)
+        val session = SpearKillPacketBootSession()
+        session.startPhysicalReturn(
+            path = listOf(first, second, second.scale(-1.0), first.scale(-1.0), Vec3.ZERO),
+            outboundSteps = 2,
+            strikeHoldTicks = 0,
+            stepWaitTicks = 2,
+        )
+
+        assertVec3Equals(first, session.prepareNextStep()!!, 1e-9)
+        session.confirmStep(delivered = true)
+        session.beginExactReturn()
+
+        repeat(2) {
+            assertNull(session.prepareNextStep())
+            assertFalse(session.holdingStrike)
+        }
+        assertVec3Equals(Vec3.ZERO, session.prepareNextStep()!!, 1e-9)
+        assertVec3Equals(first.scale(-1.0), session.pendingMovement!!, 1e-9)
     }
 
     @Test
@@ -3314,7 +3487,7 @@ class ModuleSpearKillTest {
     }
 
     @Test
-    fun `virtual position keeps ground state during horizontal movement`() {
+    fun `virtual position uses physical ground proximity even during horizontal movement`() {
         val packet = ServerboundMovePlayerPacket.PosRot(
             10.0,
             20.0,
@@ -3325,9 +3498,14 @@ class ModuleSpearKillTest {
             true,
         )
 
-        applySpearKillVirtualPosition(packet, Vec3(10.0, 20.0, 30.0), Vec3(4.0, 0.0, 2.0))
+        applySpearKillVirtualPosition(
+            packet,
+            Vec3(10.0, 20.0, 30.0),
+            Vec3(4.0, 0.0, 2.0),
+            grounded = false,
+        )
 
-        assertTrue(packet.isOnGround)
+        assertFalse(packet.isOnGround)
     }
 
     @Test

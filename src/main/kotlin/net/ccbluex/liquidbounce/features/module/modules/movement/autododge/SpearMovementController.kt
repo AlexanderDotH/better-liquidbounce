@@ -27,6 +27,7 @@ import net.ccbluex.liquidbounce.utils.movement.DirectionalInput
 import net.minecraft.client.multiplayer.ClientLevel
 import net.minecraft.client.player.LocalPlayer
 import net.minecraft.client.player.RemotePlayer
+import net.minecraft.core.component.DataComponents
 import net.minecraft.network.protocol.game.ServerboundMovePlayerPacket
 import net.minecraft.world.phys.AABB
 import net.minecraft.world.phys.Vec3
@@ -61,6 +62,7 @@ internal class SpearMovementController(
         private set
 
     private var committedThreatId: Int? = null
+    private var committedResponse: SpearThreatResponse? = null
 
     val teleportState: SpearTeleportState
         get() = teleportRuntime.state
@@ -83,7 +85,7 @@ internal class SpearMovementController(
             projectilePlanActive = projectilePlanActive,
             tick = player.tickCount.toLong(),
             playerPosition = player.position(),
-            threat = threat,
+            threat = threat.takeIf { it.requiresTeleport },
             settings = settings.teleport,
             isSafe = { candidate ->
                 isSafeSpearTeleportCandidate(world, player, settings.teleport, candidate)
@@ -166,20 +168,24 @@ internal class SpearMovementController(
         world: ClientLevel,
         settings: SpearMovementSettings,
     ): SpearDodgePlan? {
-        if (!settings.enabled || !canStartDefense || threat == null) {
+        if (!settings.enabled || !canStartDefense || !threat.requiresJuke) {
+            resetCommitment()
             return null
         }
+        checkNotNull(threat)
 
-        if (committedThreatId != threat.candidate.entityId) {
+        if (committedThreatId != threat.candidate.entityId || committedResponse != threat.response) {
             jukeCommitment.reset()
+            jukeDecision = null
             committedThreatId = threat.candidate.entityId
+            committedResponse = threat.response
         }
 
         val playerPosition = player.position().horizontalPosition()
         val startedSafelyGrounded = player.onGround() && isSupported(world, player, player.boundingBox) &&
             !player.wouldFallIntoVoid(player.position(), world.minY.toDouble())
         jukeDecision = jukeCommitment.update(
-            durationTicks = settings.jukeTicks,
+            durationTicks = if (threat.response == SpearThreatResponse.FEINT) 1..1 else settings.jukeTicks,
             isCurrentInputSafe = { input ->
                 dodgePlanner.isSafeSimulation(
                     simulation = simulateMovement(input, player, world),
@@ -191,6 +197,14 @@ internal class SpearMovementController(
                 dodgePlanner.plan(
                     attackerPosition = threat.candidate.position.horizontalPosition(),
                     playerPosition = playerPosition,
+                    attackDirection = if (threat.trustsAttackerLook) {
+                        SpearTeleportDirection(
+                            threat.candidate.lookDirection.x,
+                            threat.candidate.lookDirection.z,
+                        )
+                    } else {
+                        PACKET_ESCAPE_AXIS
+                    },
                     startedSafelyGrounded = startedSafelyGrounded,
                     safeDistance = DodgePlanner.SAFE_DISTANCE_WITH_PADDING,
                     simulate = { simulateMovement(it, player, world) },
@@ -228,6 +242,8 @@ internal class SpearMovementController(
     private fun RemotePlayer.toSpearThreatCandidate(): SpearThreatCandidate {
         val currentPosition = position()
         val previousPosition = Vec3(xOld, yOld, zOld)
+        val usingSpear = isUsingItem && useItem.isSpear
+        val kineticWeapon = useItem.get(DataComponents.KINETIC_WEAPON).takeIf { usingSpear }
         return SpearThreatCandidate(
             entityId = id,
             name = scoreboardName,
@@ -235,7 +251,10 @@ internal class SpearMovementController(
             eyePosition = eyePosition,
             lookDirection = lookAngle,
             isHoldingSpear = mainHandItem.isSpear || offhandItem.isSpear,
-            isUsingSpear = isUsingItem && useItem.isSpear,
+            isUsingSpear = usingSpear,
+            spearUseTicks = ticksUsingItem.takeIf { usingSpear } ?: 0,
+            spearDelayTicks = kineticWeapon?.delayTicks,
+            spearDamageUseDurationTicks = kineticWeapon?.computeDamageUseDuration(),
             isAlive = isAlive,
             isRemoved = isRemoved,
             isBot = ModuleAntiBot.isBot(this),
@@ -248,12 +267,14 @@ internal class SpearMovementController(
     private fun resetCommitment() {
         jukeCommitment.reset()
         committedThreatId = null
+        committedResponse = null
         jukeDecision = null
     }
 
     private companion object {
         const val SIGNIFICANT_POSITION_JUMP_SQ = 4.0
         const val SUPPORT_CHECK_DEPTH = 0.05
+        val PACKET_ESCAPE_AXIS = SpearTeleportDirection(1.0, 0.0)
 
         fun Vec3.horizontalPosition() = HorizontalPosition(x, z)
 

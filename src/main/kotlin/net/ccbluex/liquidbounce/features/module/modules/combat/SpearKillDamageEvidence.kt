@@ -45,8 +45,13 @@ internal class SpearKillDamageEvidenceTracker(
         get() = pendingEvidence != null
 
     /** Replaces any older pending target correlation. */
-    fun arm(targetEntityId: Int, predictedHitTick: Int) {
-        pendingEvidence = PendingEvidence(targetEntityId, predictedHitTick)
+    fun arm(
+        targetEntityId: Int,
+        predictedHitTick: Int,
+        windowTicks: Int = this.windowTicks,
+    ) {
+        require(windowTicks >= 0) { "Damage evidence window must not be negative" }
+        pendingEvidence = PendingEvidence(targetEntityId, predictedHitTick, windowTicks)
     }
 
     /**
@@ -57,12 +62,16 @@ internal class SpearKillDamageEvidenceTracker(
      */
     fun observe(entityId: Int, observedTick: Int): SpearKillDamageEvidence? {
         val pending = pendingEvidence ?: return null
-        if (isSpearKillDamageEvidenceExpired(pending.predictedHitTick, observedTick, windowTicks)) {
+        if (isSpearKillDamageEvidenceExpired(pending.predictedHitTick, observedTick, pending.windowTicks)) {
             clear()
             return null
         }
         if (pending.targetEntityId != entityId ||
-            !isSpearKillDamageEvidenceWithinWindow(pending.predictedHitTick, observedTick, windowTicks)
+            !isSpearKillDamageEvidenceWithinWindow(
+                pending.predictedHitTick,
+                observedTick,
+                pending.windowTicks,
+            )
         ) {
             return null
         }
@@ -74,7 +83,7 @@ internal class SpearKillDamageEvidenceTracker(
     /** Clears the correlation once a game tick has moved past its inclusive window. */
     fun expire(currentTick: Int): Boolean {
         val pending = pendingEvidence ?: return false
-        if (!isSpearKillDamageEvidenceExpired(pending.predictedHitTick, currentTick, windowTicks)) {
+        if (!isSpearKillDamageEvidenceExpired(pending.predictedHitTick, currentTick, pending.windowTicks)) {
             return false
         }
 
@@ -89,6 +98,7 @@ internal class SpearKillDamageEvidenceTracker(
     private data class PendingEvidence(
         val targetEntityId: Int,
         val predictedHitTick: Int,
+        val windowTicks: Int,
     )
 }
 

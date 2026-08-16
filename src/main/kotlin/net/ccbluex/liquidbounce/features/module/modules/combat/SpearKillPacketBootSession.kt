@@ -89,6 +89,7 @@ internal fun applySpearKillVirtualPosition(
     packet: ServerboundMovePlayerPacket,
     playerPosition: Vec3,
     virtualOffset: Vec3,
+    grounded: Boolean = false,
     heading: Rotation? = null,
 ) {
     val virtualPosition = playerPosition.add(virtualOffset)
@@ -96,7 +97,7 @@ internal fun applySpearKillVirtualPosition(
     packet.y = virtualPosition.y
     packet.z = virtualPosition.z
     packet.hasPos = true
-    packet.onGround = isSpearKillGrounded(packet.isOnGround, virtualOffset)
+    packet.onGround = grounded
     applySpearKillPathHeading(packet, heading)
 }
 
@@ -115,9 +116,6 @@ internal fun applySpearKillPathHeading(packet: ServerboundMovePlayerPacket, head
     packet.xRot = heading.pitch
     packet.hasRot = true
 }
-
-internal fun isSpearKillGrounded(wasOnGround: Boolean, virtualOffset: Vec3): Boolean =
-    wasOnGround && virtualOffset.y == 0.0
 
 /** Keeps the final kinetic lunge intact instead of letting a camera packet reset its server-side speed. */
 internal fun shouldSuppressSpearKillStrikeHoldPacket(holdingStrike: Boolean): Boolean = holdingStrike
@@ -657,7 +655,6 @@ internal class SpearKillPacketBootSession {
         remainingOutboundSteps = 0
         remainingStrikeHoldTicks = 0
         remainingPreStrikeHoldTicks = 0
-        remainingStepWaitTicks = 0
         holdingStrikeThisTick = false
         holdingPreStrikeThisTick = false
         preStrikeHoldPending = false
@@ -666,7 +663,6 @@ internal class SpearKillPacketBootSession {
         configuredTerminalSuffixSteps = 1
         configuredTerminalBurstSteps = 0
         configuredTerminalAuthorizationRequired = false
-        configuredStepWaitTicks = 0
         terminalAimLockComplete = false
         terminalCommitAuthorized = true
         movements.clear()
@@ -703,19 +699,38 @@ internal class SpearKillPacketBootSession {
     }
 
     /** Starts a physical recovery using an already collision-validated route back to zero. */
-    fun beginPhysicalExactRecoveryFrom(authoritativeOffset: Vec3, recoveryMovements: List<Vec3>) {
-        beginExactRecoveryFrom(authoritativeOffset, recoveryMovements, physicalReturn = true)
+    fun beginPhysicalExactRecoveryFrom(
+        authoritativeOffset: Vec3,
+        recoveryMovements: List<Vec3>,
+        stepWaitTicks: Int = 0,
+    ) {
+        beginExactRecoveryFrom(
+            authoritativeOffset,
+            recoveryMovements,
+            physicalReturn = true,
+            stepWaitTicks = stepWaitTicks,
+        )
     }
 
     /** Starts a packet-only recovery before any physical-position fallback is allowed. */
-    fun beginPacketExactRecoveryFrom(authoritativeOffset: Vec3, recoveryMovements: List<Vec3>) {
-        beginExactRecoveryFrom(authoritativeOffset, recoveryMovements, physicalReturn = false)
+    fun beginPacketExactRecoveryFrom(
+        authoritativeOffset: Vec3,
+        recoveryMovements: List<Vec3>,
+        stepWaitTicks: Int = 0,
+    ) {
+        beginExactRecoveryFrom(
+            authoritativeOffset,
+            recoveryMovements,
+            physicalReturn = false,
+            stepWaitTicks = stepWaitTicks,
+        )
     }
 
     private fun beginExactRecoveryFrom(
         authoritativeOffset: Vec3,
         recoveryMovements: List<Vec3>,
         physicalReturn: Boolean,
+        stepWaitTicks: Int,
     ) {
         require(authoritativeOffset.isFinite()) { "Authoritative offset must be finite" }
         require(
@@ -726,6 +741,9 @@ internal class SpearKillPacketBootSession {
         }
         val recoveredOffset = recoveryMovements.fold(authoritativeOffset, Vec3::add)
         require(recoveredOffset.lengthSqr() < EPSILON) { "Exact recovery must end at the session origin" }
+        require(stepWaitTicks in 0..SPEAR_KILL_MAX_WAIT_TICKS) {
+            "Exact recovery wait duration is outside the configured range"
+        }
 
         clear()
         committedOffset = authoritativeOffset
@@ -733,6 +751,7 @@ internal class SpearKillPacketBootSession {
         movements += Vec3.ZERO
         physicalReturnEnabled = physicalReturn
         physicalReturnStarted = physicalReturn
+        configuredStepWaitTicks = stepWaitTicks
         chainedOutboundWindowOpen = false
         pendingPhysicalPositionOffset = authoritativeOffset.takeIf { physicalReturn }
         recovering = true

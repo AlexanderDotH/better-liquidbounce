@@ -69,6 +69,15 @@ data class SpearTeleportDirection(
     }
 }
 
+enum class SpearTeleportLateralSide(val multiplier: Double) {
+    POSITIVE(1.0),
+    NEGATIVE(-1.0),
+    ;
+
+    val opposite: SpearTeleportLateralSide
+        get() = if (this == POSITIVE) NEGATIVE else POSITIVE
+}
+
 data class SpearTeleportRequest(
     val playerPosition: SpearTeleportPoint,
     val attackerPosition: SpearTeleportPoint,
@@ -77,6 +86,8 @@ data class SpearTeleportRequest(
     val lateralDistance: Double,
     val maxDistance: Double,
     val searchRadius: Int,
+    val preferredLateralSide: SpearTeleportLateralSide = SpearTeleportLateralSide.POSITIVE,
+    val preferLocalEscape: Boolean = false,
 ) {
     init {
         require(behindDistance.isFinite() && behindDistance > 0.0) { "Behind distance must be positive" }
@@ -98,22 +109,32 @@ class SpearTeleportPlanner {
         request: SpearTeleportRequest,
         isSafe: (SpearTeleportPoint) -> Boolean,
     ): SpearTeleportPlan? {
-        val direction = request.attackerLook.normalizedOrNull()
-            ?: SpearTeleportDirection.from(request.attackerPosition, request.playerPosition).normalizedOrNull()
-            ?: return null
+        val direction = if (request.preferLocalEscape) {
+            DEFAULT_LOCAL_ESCAPE_DIRECTION
+        } else {
+            request.attackerLook.normalizedOrNull()
+                ?: SpearTeleportDirection.from(request.attackerPosition, request.playerPosition).normalizedOrNull()
+                ?: return null
+        }
         val ideal = request.attackerPosition.offset(
             x = -direction.x * request.behindDistance,
             y = request.playerPosition.y - request.attackerPosition.y,
             z = -direction.z * request.behindDistance,
         )
         val perpendicular = SpearTeleportDirection(-direction.z, direction.x)
-        val anchors = listOf(
-            SearchAnchor(ideal) { candidate ->
-                candidate.isBehind(request.attackerPosition, direction)
-            },
-            request.lateralAnchor(perpendicular, 1.0),
-            request.lateralAnchor(perpendicular, -1.0),
+        val lateralSides = listOf(
+            request.preferredLateralSide,
+            request.preferredLateralSide.opposite,
         )
+        val behindAnchor = SearchAnchor(ideal) { candidate ->
+            candidate.isBehind(request.attackerPosition, direction)
+        }
+        val lateralAnchors = lateralSides.map { side -> request.lateralAnchor(perpendicular, side.multiplier) }
+        val anchors = if (request.preferLocalEscape) {
+            lateralAnchors
+        } else {
+            listOf(behindAnchor) + lateralAnchors
+        }
 
         return anchors.asSequence()
             .flatMap { anchor ->
@@ -168,6 +189,7 @@ class SpearTeleportPlanner {
         const val MINIMUM_TRAVEL_DISTANCE = 1.0
         const val MINIMUM_BEHIND_PROJECTION = -0.25
         const val MINIMUM_LATERAL_PROJECTION = 0.75
+        val DEFAULT_LOCAL_ESCAPE_DIRECTION = SpearTeleportDirection(1.0, 0.0)
     }
 
     private data class SearchAnchor(
@@ -237,7 +259,9 @@ internal fun isSpearTeleportCandidateSafe(
     routeCollisionFree: Boolean,
     loaded: Boolean = true,
     withinWorldBorder: Boolean = true,
-): Boolean = loaded && withinWorldBorder && destinationCollisionFree && supported && !overVoid && routeCollisionFree
+    requiresLandingSupport: Boolean = true,
+): Boolean = loaded && withinWorldBorder && destinationCollisionFree && routeCollisionFree &&
+    (!requiresLandingSupport || supported && !overVoid)
 
 internal const val SPEAR_TELEPORT_COLLISION_SAMPLE_DISTANCE = 0.25
 

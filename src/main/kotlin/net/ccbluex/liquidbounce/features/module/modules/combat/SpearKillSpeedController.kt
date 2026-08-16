@@ -284,29 +284,6 @@ internal fun isSpearKillWithinVanillaMovementBudget(
 ): Boolean = movementFromFirstGood.hasFiniteCoordinates() &&
     movementFromFirstGood.length() <= calculateSpearKillVanillaMovementBudget(serverPhysicsVelocity, fallFlying)
 
-internal data class SpearKillKineticSpeedEstimate(
-    val attackerSpeed: Double,
-    val targetSpeed: Double,
-    val relativeSpeed: Double,
-)
-
-/** Mirrors KineticWeapon's known-speed projection, using delivered displacement rather than intent. */
-internal fun estimateSpearKillKineticSpeed(
-    deliveredMovement: Vec3,
-    targetMovement: Vec3,
-    lookDirection: Vec3,
-): SpearKillKineticSpeedEstimate {
-    if (!deliveredMovement.hasFiniteCoordinates() || !targetMovement.hasFiniteCoordinates() ||
-        !lookDirection.hasFiniteCoordinates() || lookDirection.lengthSqr() <= SPEAR_KILL_PROFILE_EPSILON_SQUARED
-    ) {
-        return SpearKillKineticSpeedEstimate(0.0, 0.0, 0.0)
-    }
-    val look = lookDirection.normalize()
-    val attacker = look.dot(deliveredMovement)
-    val target = look.dot(targetMovement)
-    return SpearKillKineticSpeedEstimate(attacker, target, max(0.0, attacker - target))
-}
-
 internal fun boundedSpearKillProfileStep(remaining: Vec3, cap: Double): Vec3 {
     var step = remaining.scale(cap / remaining.length())
     if (step.length() > cap) {

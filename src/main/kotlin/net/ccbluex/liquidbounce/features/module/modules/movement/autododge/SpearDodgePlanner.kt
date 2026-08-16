@@ -90,11 +90,13 @@ class SpearDodgePlanner(
         playerPosition: HorizontalPosition,
         startedSafelyGrounded: Boolean,
         safeDistance: Double,
+        attackDirection: SpearTeleportDirection? = null,
         simulate: (DirectionalInput) -> SpearMovementSimulation,
     ): SpearDodgePlan {
         require(safeDistance.isFinite() && safeDistance >= 0.0) { "Safe distance must be finite and non-negative" }
 
-        val attackAxis = AttackAxis.between(attackerPosition, playerPosition) ?: return SpearDodgePlan.NONE
+        val attackAxis = AttackAxis.from(attackerPosition, playerPosition, attackDirection)
+            ?: return SpearDodgePlan.NONE
         val candidates = CANDIDATE_INPUTS.mapNotNull { input ->
             evaluate(
                 input = input,
@@ -181,6 +183,19 @@ class SpearDodgePlanner(
         }
 
         companion object {
+            fun from(
+                attacker: HorizontalPosition,
+                player: HorizontalPosition,
+                attackDirection: SpearTeleportDirection?,
+            ): AttackAxis? {
+                val direction = attackDirection?.normalizedOrNull()
+                return if (direction == null) {
+                    between(attacker, player)
+                } else {
+                    AttackAxis(attacker, direction.x, direction.z, length = 1.0)
+                }
+            }
+
             fun between(attacker: HorizontalPosition, player: HorizontalPosition): AttackAxis? {
                 val x = player.x - attacker.x
                 val z = player.z - attacker.z
@@ -297,16 +312,29 @@ object AutoDodgeMovementArbitrator {
         projectilePlan: DodgePlan?,
         spearTeleportPlan: SpearTeleportPlan?,
         spearPlan: SpearDodgePlan?,
+        maceTeleportPlan: SpearTeleportPlan? = null,
     ): AutoDodgeMovementAction = when {
         projectilePlan != null -> AutoDodgeMovementAction.Dodge(projectilePlan)
+        maceTeleportPlan != null -> AutoDodgeMovementAction.Teleport(
+            maceTeleportPlan,
+            AutoDodgeTeleportDefense.MACE,
+        )
         spearTeleportPlan != null -> AutoDodgeMovementAction.Teleport(spearTeleportPlan)
         spearPlan != null -> AutoDodgeMovementAction.Dodge(spearPlan.asDodgePlan())
         else -> AutoDodgeMovementAction.None
     }
 }
 
+enum class AutoDodgeTeleportDefense {
+    SPEAR,
+    MACE,
+}
+
 sealed interface AutoDodgeMovementAction {
     data class Dodge(val plan: DodgePlan) : AutoDodgeMovementAction
-    data class Teleport(val plan: SpearTeleportPlan) : AutoDodgeMovementAction
+    data class Teleport(
+        val plan: SpearTeleportPlan,
+        val defense: AutoDodgeTeleportDefense = AutoDodgeTeleportDefense.SPEAR,
+    ) : AutoDodgeMovementAction
     data object None : AutoDodgeMovementAction
 }

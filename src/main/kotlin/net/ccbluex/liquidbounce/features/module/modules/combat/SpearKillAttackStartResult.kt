@@ -28,13 +28,23 @@ internal enum class SpearKillAttackStartResult {
     REJECTED,
 }
 
-/** Classifies whether a failed A* launch should hard-lock the target or wait for a fresh spear window. */
+/** A transient weapon state may rebuild its spear charge before the synchronous route is retried. */
+internal fun shouldRestartSpearKillCharge(
+    startResult: SpearKillAttackStartResult,
+): Boolean = startResult == SpearKillAttackStartResult.RETRY_LATER
+
+internal val SpearKillAttackStartResult.keepsRoutePreparation: Boolean
+    get() = this == SpearKillAttackStartResult.RETRY_LATER
+
+/** Classifies whether an A* route has permanent launch constraints before it owns movement. */
 internal fun classifySpearKillAStarStartFailure(
     routeFound: Boolean,
-    hasDamageWindow: Boolean,
+    hasRefreshableTerminalDamageWindow: Boolean,
+    serverRouteAccepted: Boolean = true,
 ): SpearKillAttackStartResult = when {
     !routeFound -> SpearKillAttackStartResult.REJECTED
-    !hasDamageWindow -> SpearKillAttackStartResult.RETRY_LATER
+    !serverRouteAccepted -> SpearKillAttackStartResult.BLOCKED
+    !hasRefreshableTerminalDamageWindow -> SpearKillAttackStartResult.BLOCKED
     else -> SpearKillAttackStartResult.STARTED
 }
 
@@ -116,19 +126,22 @@ internal fun buildSpearKillProfiledDirectPacketRoute(
     )
 }
 
-/** Applies the server-facing kinetic hold consistently to every direct Packet session. */
+/** Applies live terminal aim-lock and the server-facing kinetic hold to every direct Packet session. */
 internal fun startSpearKillDirectPacketSession(
     session: SpearKillPacketBootSession,
     route: SpearKillAStarPacketRoute,
     stepWaitTicks: Int,
+    strikeHoldTicks: Int = SPEAR_KILL_PACKET_STRIKE_HOLD_TICKS,
 ) {
     session.startPhysicalReturn(
         path = route.roundTripMovements,
         outboundSteps = route.outboundMovements.size,
-        strikeHoldTicks = SPEAR_KILL_PACKET_STRIKE_HOLD_TICKS,
+        strikeHoldTicks = strikeHoldTicks,
         stepWaitTicks = stepWaitTicks,
+        preStrikeHoldTicks = SPEAR_KILL_PACKET_MAX_PRE_STRIKE_HOLD_TICKS,
         terminalSuffixSteps = route.terminalBurstSteps.coerceAtLeast(1),
         terminalBurstSteps = route.terminalBurstSteps,
+        requireTerminalAuthorization = true,
     )
 }
 
@@ -137,10 +150,11 @@ internal fun hasSpearKillDirectPacketDamageWindow(
     damageUseDuration: Int,
     stepCount: Int,
     stepWaitTicks: Int,
+    strikeHoldTicks: Int = 0,
 ): Boolean = hasSpearKillScheduleDamageWindow(
     ticksUsingItem = ticksUsingItem,
     damageUseDuration = damageUseDuration,
-    hitTick = spearKillDirectPacketHitTicks(stepCount, stepWaitTicks),
+    hitTick = spearKillDirectPacketHitTicks(stepCount, stepWaitTicks, strikeHoldTicks),
 )
 
 private fun Vec3.hasFiniteSpearKillCoordinates(): Boolean = x.isFinite() && y.isFinite() && z.isFinite()

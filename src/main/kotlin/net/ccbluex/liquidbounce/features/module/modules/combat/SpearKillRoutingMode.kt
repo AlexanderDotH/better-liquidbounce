@@ -25,6 +25,27 @@ import net.ccbluex.liquidbounce.config.types.list.Tagged
 internal enum class SpearKillRoutingMode(override val tag: String) : Tagged {
     DIRECT("Direct"),
     A_STAR("AStar"),
+    NETWORK_OPTIMIZED("NetworkOptimized"),
+}
+
+internal fun SpearKillRoutingMode.directRouteLabel(): String = when (this) {
+    SpearKillRoutingMode.DIRECT -> "Direct"
+    SpearKillRoutingMode.A_STAR -> "AStar→Direct"
+    SpearKillRoutingMode.NETWORK_OPTIMIZED -> "NetworkOptimized→Direct"
+}
+
+internal fun SpearKillRoutingMode.aStarRouteLabel(): String = when (this) {
+    SpearKillRoutingMode.DIRECT -> "Direct"
+    SpearKillRoutingMode.A_STAR -> "AStar"
+    SpearKillRoutingMode.NETWORK_OPTIMIZED -> "NetworkOptimized→AStar"
+}
+
+/** Direct-style modes return as soon as the terminal packet is delivered; standalone A* retains its hold. */
+internal fun spearKillStrikeHoldTicks(routingMode: SpearKillRoutingMode): Int = when (routingMode) {
+    SpearKillRoutingMode.DIRECT,
+    SpearKillRoutingMode.NETWORK_OPTIMIZED,
+    -> 0
+    SpearKillRoutingMode.A_STAR -> SPEAR_KILL_PACKET_STRIKE_HOLD_TICKS
 }
 
 /**
@@ -37,7 +58,9 @@ internal fun shouldRouteSpearKillViaAStar(
     directRouteAvailable: Boolean,
 ): Boolean = when (routingMode) {
     SpearKillRoutingMode.DIRECT -> false
-    SpearKillRoutingMode.A_STAR -> !directRouteAvailable
+    SpearKillRoutingMode.A_STAR,
+    SpearKillRoutingMode.NETWORK_OPTIMIZED,
+    -> !directRouteAvailable
 }
 
 /**

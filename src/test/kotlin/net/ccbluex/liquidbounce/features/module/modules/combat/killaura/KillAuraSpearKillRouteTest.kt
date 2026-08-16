@@ -136,4 +136,38 @@ class KillAuraSpearKillRouteTest {
             assertFalse(policy.suppressAutoWeapon)
         }
     }
+
+    @Test
+    fun `SpearKill precharges only after selection and never over a normal target`() {
+        assertFalse(shouldPrechargeKillAuraSpear(
+            acquisitionAvailable = true,
+            targetSelectionEvaluated = false,
+            hasTrackedTarget = false,
+            trackedTargetUsesSpearKill = false,
+        ))
+        assertTrue(shouldPrechargeKillAuraSpear(
+            acquisitionAvailable = true,
+            targetSelectionEvaluated = true,
+            hasTrackedTarget = false,
+            trackedTargetUsesSpearKill = false,
+        ))
+        assertFalse(shouldPrechargeKillAuraSpear(
+            acquisitionAvailable = true,
+            targetSelectionEvaluated = true,
+            hasTrackedTarget = true,
+            trackedTargetUsesSpearKill = false,
+        ))
+        assertTrue(shouldPrechargeKillAuraSpear(
+            acquisitionAvailable = true,
+            targetSelectionEvaluated = true,
+            hasTrackedTarget = true,
+            trackedTargetUsesSpearKill = true,
+        ))
+        assertFalse(shouldPrechargeKillAuraSpear(
+            acquisitionAvailable = false,
+            targetSelectionEvaluated = true,
+            hasTrackedTarget = false,
+            trackedTargetUsesSpearKill = false,
+        ))
+    }
 }

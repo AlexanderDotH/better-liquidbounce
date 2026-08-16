@@ -151,7 +151,10 @@ private fun migrateSpearKillPacketConfig(packet: JsonObject): LegacySpearKillMov
     val legacyAStar = originalValues.spearKillConfigValue("AStar")
     val legacyAStarValues = legacyAStar?.spearKillConfigValues() ?: JsonArray()
     val routingRecord = originalValues.spearKillConfigValue("Routing")
-    val routingIsCanonical = routingRecord?.has("choices") == true
+    val routingChoices = routingRecord?.get("choices")
+        ?.takeIf(JsonElement::isJsonObject)
+        ?.asJsonObject
+    val routingIsCanonical = routingChoices != null
     val routingTag = canonicalSpearKillRoutingMode(
         if (routingIsCanonical) {
             routingRecord?.get("active")?.takeIf(JsonElement::isJsonPrimitive)?.asString
@@ -165,13 +168,11 @@ private fun migrateSpearKillPacketConfig(packet: JsonObject): LegacySpearKillMov
         },
     )
     val canonicalAStarValues = if (routingIsCanonical) {
-        routingRecord?.getAsJsonObject("choices")
-            ?.spearKillMovementChoice("AStar", "Adaptive")
-            ?.spearKillConfigValues()
-            ?: JsonArray()
+        routingChoices.spearKillMovementChoiceValues("AStar", "Adaptive")
     } else {
         legacyAStarValues
     }
+    val canonicalNetworkOptimizedValues = routingChoices.spearKillNetworkOptimizedChoiceValues()
     val renderPath = canonicalAStarValues.spearKillConfigValue("RenderPath")?.booleanValue()
         ?: legacyAStarValues.spearKillConfigValue("RenderPath")?.booleanValue()
 
@@ -196,6 +197,7 @@ private fun migrateSpearKillPacketConfig(packet: JsonObject): LegacySpearKillMov
                 "WaitTicks",
                 "RenderPath",
             ),
+            networkOptimizedValues = canonicalNetworkOptimizedValues,
         ),
     )
     packet.add("value", retainedValues)
@@ -216,13 +218,18 @@ private fun migrateSpearKillRenderPath(values: JsonArray, legacyRenderPath: Bool
     )
 }
 
-private fun spearKillRoutingValue(active: String, aStarValues: JsonArray) = JsonObject().apply {
+private fun spearKillRoutingValue(
+    active: String,
+    aStarValues: JsonArray,
+    networkOptimizedValues: JsonArray,
+) = JsonObject().apply {
     addProperty("name", "Routing")
     addProperty("active", active)
     add("value", JsonArray())
     add("choices", JsonObject().apply {
         add("Direct", spearKillChoice("Direct"))
         add("AStar", spearKillChoice("AStar", aStarValues))
+        add("NetworkOptimized", spearKillChoice("NetworkOptimized", networkOptimizedValues))
     })
 }
 
@@ -247,12 +254,14 @@ private fun canonicalSpearKillMovementMode(value: String?): String = when {
     else -> "Motion"
 }
 
-private fun canonicalSpearKillRoutingMode(value: String?): String =
-    if (value.equals("AStar", ignoreCase = true) || value.equals("Adaptive", ignoreCase = true)) {
-        "AStar"
-    } else {
-        "Direct"
-    }
+private fun canonicalSpearKillRoutingMode(value: String?): String = when {
+    value.equals("AStar", ignoreCase = true) || value.equals("Adaptive", ignoreCase = true) -> "AStar"
+    value.equals("NetworkOptimized", ignoreCase = true) ||
+        value.equals("Network", ignoreCase = true) ||
+        value.equals("LagOptimized", ignoreCase = true) ||
+        value.equals("Network-Optimized", ignoreCase = true) -> "NetworkOptimized"
+    else -> "Direct"
+}
 
 private fun JsonObject.spearKillConfigValues(): JsonArray =
     get("value")?.takeIf(JsonElement::isJsonArray)?.asJsonArray ?: JsonArray()
@@ -263,6 +272,18 @@ private fun JsonObject.spearKillMovementChoice(name: String, vararg aliases: Str
         acceptedNames.any { choiceName.equals(it, ignoreCase = true) }
     }?.value?.takeIf(JsonElement::isJsonObject)?.asJsonObject
 }
+
+private fun JsonObject?.spearKillMovementChoiceValues(
+    name: String,
+    vararg aliases: String,
+): JsonArray = this?.spearKillMovementChoice(name, *aliases)?.spearKillConfigValues() ?: JsonArray()
+
+private fun JsonObject?.spearKillNetworkOptimizedChoiceValues(): JsonArray = spearKillMovementChoiceValues(
+    "NetworkOptimized",
+    "Network",
+    "LagOptimized",
+    "Network-Optimized",
+)
 
 private fun JsonArray.spearKillConfigValue(name: String): JsonObject? = firstOrNull { element ->
     element.isJsonObject && element.asJsonObject["name"]

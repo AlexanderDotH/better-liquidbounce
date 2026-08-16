@@ -112,6 +112,7 @@ import net.ccbluex.liquidbounce.features.module.modules.misc.ModuleMacros
 import net.ccbluex.liquidbounce.features.module.modules.misc.ModuleMiddleClickAction
 import net.ccbluex.liquidbounce.features.module.modules.misc.ModuleNotifier
 import net.ccbluex.liquidbounce.features.module.modules.misc.ModulePacketLogger
+import net.ccbluex.liquidbounce.features.module.modules.misc.ModulePlayerPositionLogger
 import net.ccbluex.liquidbounce.features.module.modules.misc.ModuleSpammer
 import net.ccbluex.liquidbounce.features.module.modules.misc.ModuleTargetLock
 import net.ccbluex.liquidbounce.features.module.modules.misc.ModuleTeams
@@ -247,6 +248,7 @@ import net.ccbluex.liquidbounce.features.module.modules.render.nametags.ModuleNa
 import net.ccbluex.liquidbounce.features.module.modules.render.trajectories.ModuleTrajectories
 import net.ccbluex.liquidbounce.features.module.modules.world.ModuleAirPlace
 import net.ccbluex.liquidbounce.features.module.modules.world.ModuleAutoDisable
+import net.ccbluex.liquidbounce.features.module.modules.world.ModuleAutoTimestamp
 import net.ccbluex.liquidbounce.features.module.modules.world.ModuleAutoTool
 import net.ccbluex.liquidbounce.features.module.modules.world.ModuleBedDefender
 import net.ccbluex.liquidbounce.features.module.modules.world.ModuleBlockIn
@@ -561,6 +563,7 @@ object ModuleManager : EventListener, Collection<ClientModule> by modules {
             ModuleAntiStaff,
             ModuleFlagCheck,
             ModulePacketLogger,
+            ModulePlayerPositionLogger,
             ModuleDebugRecorder,
             ModuleAntiCheatDetect,
             ModulePlayerCheatDetector,
@@ -697,6 +700,7 @@ object ModuleManager : EventListener, Collection<ClientModule> by modules {
             ModuleAirPlace,
             ModuleAutoBuild,
             ModuleAutoDisable,
+            ModuleAutoTimestamp,
             ModuleAutoFarm,
             ModuleAutoTool,
             ModuleCrystalAura,

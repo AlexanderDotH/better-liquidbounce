@@ -84,3 +84,14 @@ internal fun calculateKillAuraDelegatedAttackRotation(eyes: Vec3, targetBox: AAB
 
 /** KillAura's melee exit prediction is irrelevant and expensive for a teleport-owned attack. */
 internal fun shouldPredictKillAuraRangeExit(delegatedSuperHit: Boolean): Boolean = !delegatedSuperHit
+
+/**
+ * Overlaps SpearKill's vanilla charge with KillAura acquisition without blocking ordinary melee.
+ */
+internal fun shouldPrechargeKillAuraSpear(
+    acquisitionAvailable: Boolean,
+    targetSelectionEvaluated: Boolean,
+    hasTrackedTarget: Boolean,
+    trackedTargetUsesSpearKill: Boolean,
+): Boolean = acquisitionAvailable && targetSelectionEvaluated &&
+    (!hasTrackedTarget || trackedTargetUsesSpearKill)

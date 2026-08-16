@@ -120,6 +120,7 @@ object ModuleKillAura : ClientModule("KillAura", ModuleCategories.COMBAT) {
      * such as KillAura. So back to the basics.
      */
     internal var waitTicks = 0
+    private var targetSelectionEvaluated = false
 
     init {
         tree(KillAuraAutoBlock)
@@ -181,15 +182,39 @@ object ModuleKillAura : ClientModule("KillAura", ModuleCategories.COMBAT) {
      * priority while SpearKill remains independent from CPS and click scheduling.
      */
     internal fun targetForSpearKill(): LivingEntity? {
-        if (!running || !requirementsMet || CombatManager.shouldPauseCombat) return null
-        val inventoryOpen = isInventoryOpen || isInContainerScreen
-        if (inventoryOpen && !ignoreOpenInventory) return null
+        if (!canProvideSpearKillSelection()) return null
 
         return targetTracker.target?.takeIf(::isDistantSpearKillTarget)
     }
 
+    /** True only after KillAura has ruled out an ordinary melee target for this selection cycle. */
+    internal fun shouldPrechargeForSpearKill(): Boolean {
+        if (!canProvideSpearKillSelection() ||
+            ModuleFightBot.targetHandoff != FightBotTargetHandoff.Inactive
+        ) {
+            return false
+        }
+
+        val trackedTarget = targetTracker.target
+        return shouldPrechargeKillAuraSpear(
+            acquisitionAvailable = ModuleSpearKill.isKillAuraIntegrationAvailable,
+            targetSelectionEvaluated = targetSelectionEvaluated,
+            hasTrackedTarget = trackedTarget != null,
+            trackedTargetUsesSpearKill = trackedTarget?.let(::isDistantSpearKillTarget) == true,
+        )
+    }
+
+    private fun canProvideSpearKillSelection(): Boolean {
+        if (!running || !requirementsMet || CombatManager.shouldPauseCombat) return false
+        val inventoryOpen = isInventoryOpen || isInContainerScreen
+        return !inventoryOpen || ignoreOpenInventory
+    }
+
     override fun onDisabled() {
+        ModuleSpearKill.onKillAuraDisabled()
         targetTracker.reset()
+        targetSelectionEvaluated = false
+        waitTicks = 0
         failedHits.clear()
         KillAuraNotifyWhenFail.failedHitsIncrement = 0
         KillAuraVelocityHit.reset()
@@ -216,11 +241,13 @@ object ModuleKillAura : ClientModule("KillAura", ModuleCategories.COMBAT) {
         if (isInInventoryScreen && !ignoreOpenInventory || shouldResetTarget) {
             // Reset current target
             targetTracker.reset()
+            targetSelectionEvaluated = false
             return@handler
         }
 
         // Update the current target tracker to make sure you attack the best enemy
         updateTarget()
+        targetSelectionEvaluated = true
 
         // The held kinetic spear is part of SpearKill's explicit intent and cannot be replaced.
         if (!shouldSuppressForSpearKill(targetTracker.target)) {

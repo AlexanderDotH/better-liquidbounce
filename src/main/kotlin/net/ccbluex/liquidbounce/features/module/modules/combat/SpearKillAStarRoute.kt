@@ -28,8 +28,9 @@ import kotlin.math.sqrt
 /**
  * Finds collision-aware block routes for SpearKill's Packet mode via bidirectional A*.
  *
- * World lookups run on the client thread. The waypoint list omits the origin, matching the
- * historical path-builder contract.
+ * The default callbacks are world-backed and must stay on the client thread. SpearKill's runtime
+ * supplies a complete collision snapshot and finishes this CPU search synchronously.
+ * The waypoint list omits the origin, matching the historical path-builder contract.
  */
 internal class SpearKillAStarRoutePlanner(
     val allowDiagonal: Boolean,

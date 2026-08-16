@@ -177,13 +177,17 @@ internal fun hasSpearKillScheduleDamageWindow(
 }
 
 /** Server tick at which a direct Packet lunge should deal kinetic damage. */
-internal fun spearKillDirectPacketHitTicks(stepCount: Int, stepWaitTicks: Int): Int =
+internal fun spearKillDirectPacketHitTicks(
+    stepCount: Int,
+    stepWaitTicks: Int,
+    strikeHoldTicks: Int = SPEAR_KILL_PACKET_STRIKE_HOLD_TICKS,
+): Int =
     checkNotNull(buildSpearKillPathSchedule(
         outboundStepCount = stepCount,
         stepWaitTicks = stepWaitTicks,
         terminalSuffixCount = 1,
-        preStrikeHoldTicks = 0,
-        strikeHoldTicks = SPEAR_KILL_PACKET_STRIKE_HOLD_TICKS,
+        preStrikeHoldTicks = SPEAR_KILL_PACKET_MAX_PRE_STRIKE_HOLD_TICKS,
+        strikeHoldTicks = strikeHoldTicks,
     )).hitTick
 
 /** Prefer earlier kinetic hits; break ties with fewer outbound packets. */

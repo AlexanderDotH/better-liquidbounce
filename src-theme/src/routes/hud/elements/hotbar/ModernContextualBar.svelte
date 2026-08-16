@@ -29,8 +29,7 @@
     }
 </script>
 
-{#key data.mode}
-    <section
+<section
             class="contextual-island"
             class:contextual-island--experience={data.mode === "experience"}
             class:contextual-island--locator={data.mode === "locator"}
@@ -99,8 +98,7 @@
             </div>
             <span class="locator-count" aria-label="Waypoint count">{data.markers.length}</span>
         {/if}
-    </section>
-{/key}
+</section>
 
 <style lang="scss">
   .contextual-island {

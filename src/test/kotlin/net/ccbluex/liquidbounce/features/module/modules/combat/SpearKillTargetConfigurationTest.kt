@@ -102,6 +102,63 @@ class SpearKillTargetConfigurationTest {
     }
 
     @Test
+    fun `disabling KillAura immediately returns its active SpearKill Packet route`() {
+        assertEquals(
+            SpearKillKillAuraReleaseAction.BEGIN_EXACT_PACKET_RETURN,
+            resolveSpearKillKillAuraReleaseAction(
+                killAuraOwnsAttempt = true,
+                packetRouteActive = true,
+                killAuraPreparationActive = false,
+                inheritedUseActive = true,
+            ),
+        )
+    }
+
+    @Test
+    fun `disabling KillAura releases inherited preparation and spear use`() {
+        assertEquals(
+            SpearKillKillAuraReleaseAction.CANCEL_INHERITED_PREPARATION,
+            resolveSpearKillKillAuraReleaseAction(
+                killAuraOwnsAttempt = false,
+                packetRouteActive = false,
+                killAuraPreparationActive = true,
+                inheritedUseActive = true,
+            ),
+        )
+        assertEquals(
+            SpearKillKillAuraReleaseAction.RELEASE_INHERITED_USE,
+            resolveSpearKillKillAuraReleaseAction(
+                killAuraOwnsAttempt = false,
+                packetRouteActive = false,
+                killAuraPreparationActive = false,
+                inheritedUseActive = true,
+            ),
+        )
+    }
+
+    @Test
+    fun `disabling KillAura never interrupts an unrelated SpearKill Packet route`() {
+        assertEquals(
+            SpearKillKillAuraReleaseAction.NONE,
+            resolveSpearKillKillAuraReleaseAction(
+                killAuraOwnsAttempt = false,
+                packetRouteActive = true,
+                killAuraPreparationActive = false,
+                inheritedUseActive = false,
+            ),
+        )
+        assertEquals(
+            SpearKillKillAuraReleaseAction.RELEASE_INHERITED_USE,
+            resolveSpearKillKillAuraReleaseAction(
+                killAuraOwnsAttempt = false,
+                packetRouteActive = true,
+                killAuraPreparationActive = false,
+                inheritedUseActive = true,
+            ),
+        )
+    }
+
+    @Test
     fun `Manual activation keeps one click armed until launch or spear-use release`() {
         val latched = nextSpearKillManualAttackRequestLatch(
             activationMode = SpearKillActivationMode.Manual,
@@ -285,6 +342,84 @@ class SpearKillTargetConfigurationTest {
         )
         assertEquals("locked", preferLockedSpearKillTarget("locked", "retargeted"))
         assertEquals("selected", preferLockedSpearKillTarget(null, "selected"))
+    }
+
+    @Test
+    fun `a transient route retry keeps the selected target locked`() {
+        assertEquals(
+            "locked",
+            activeSpearKillTargetLock(
+                lockedTarget = "locked",
+                routeActive = false,
+                routePreparationActive = true,
+            ),
+        )
+        assertEquals(
+            null,
+            activeSpearKillTargetLock(
+                lockedTarget = "locked",
+                routeActive = false,
+                routePreparationActive = false,
+            ),
+        )
+    }
+
+    @Test
+    fun `locked target remains valid inside attack reach and at the outer hysteresis edge`() {
+        assertTrue(isSpearKillLockedTargetEligible(
+            isCombatSafe = true,
+            isAlive = true,
+            isInCurrentWorld = true,
+            distance = 2.25,
+            maximumDistance = 50.0,
+            hysteresis = 0.75,
+            isRejected = false,
+        ))
+        assertTrue(isSpearKillLockedTargetEligible(
+            isCombatSafe = true,
+            isAlive = true,
+            isInCurrentWorld = true,
+            distance = 50.75,
+            maximumDistance = 50.0,
+            hysteresis = 0.75,
+            isRejected = false,
+        ))
+        assertFalse(isSpearKillLockedTargetEligible(
+            isCombatSafe = true,
+            isAlive = true,
+            isInCurrentWorld = true,
+            distance = 50.751,
+            maximumDistance = 50.0,
+            hysteresis = 0.75,
+            isRejected = false,
+        ))
+    }
+
+    @Test
+    fun `packet attack request acquires its target lock during preparation`() {
+        assertTrue(shouldAcquireSpearKillPreparationLock(
+            packetMovementMode = true,
+            attackActive = false,
+            attackRequested = true,
+            hasTarget = true,
+            hasLockedTarget = false,
+        ))
+
+        listOf(
+            booleanArrayOf(false, false, true, true, false),
+            booleanArrayOf(true, true, true, true, false),
+            booleanArrayOf(true, false, false, true, false),
+            booleanArrayOf(true, false, true, false, false),
+            booleanArrayOf(true, false, true, true, true),
+        ).forEach { values ->
+            assertFalse(shouldAcquireSpearKillPreparationLock(
+                packetMovementMode = values[0],
+                attackActive = values[1],
+                attackRequested = values[2],
+                hasTarget = values[3],
+                hasLockedTarget = values[4],
+            ))
+        }
     }
 
     @Test

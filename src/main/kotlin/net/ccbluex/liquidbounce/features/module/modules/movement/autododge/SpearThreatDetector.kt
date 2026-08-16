@@ -40,6 +40,9 @@ data class SpearThreatCandidate(
     val lookDirection: Vec3,
     val isHoldingSpear: Boolean,
     val isUsingSpear: Boolean,
+    val spearUseTicks: Int = 0,
+    val spearDelayTicks: Int? = null,
+    val spearDamageUseDurationTicks: Int? = null,
     val isAlive: Boolean = true,
     val isRemoved: Boolean = false,
     val isBot: Boolean = false,
@@ -53,15 +56,33 @@ data class SpearThreatCandidate(
 enum class SpearThreatKind(val priority: Int) {
     HOLDING_NEWLY_VISIBLE(0),
     HOLDING_AIMED(1),
-    USING(2),
+    USING_PACKET_CAPABLE(2),
     USING_AIMED(3),
+    ATTACK_COMMITTED(4),
+}
+
+/** How aggressively movement should react while shield preparation can still use every telegraph. */
+enum class SpearThreatResponse(val priority: Int) {
+    MONITOR(0),
+    FEINT(1),
+    EVADE(2),
+    EMERGENCY(3),
 }
 
 data class SpearThreat(
     val candidate: SpearThreatCandidate,
     val kind: SpearThreatKind,
+    val response: SpearThreatResponse,
     val distanceSquared: Double,
+    val trustsAttackerLook: Boolean = kind == SpearThreatKind.HOLDING_AIMED ||
+        kind == SpearThreatKind.USING_AIMED,
 )
+
+val SpearThreat?.requiresJuke: Boolean
+    get() = this != null && response.priority >= SpearThreatResponse.FEINT.priority
+
+val SpearThreat?.requiresTeleport: Boolean
+    get() = this != null && response.priority >= SpearThreatResponse.EVADE.priority
 
 /**
  * Selects the primary spear threat and bridges short gaps in remote player state.
@@ -129,6 +150,8 @@ class SpearThreatDetector {
 
         val refreshed = selected.copy(
             candidate = jumped,
+            kind = SpearThreatKind.ATTACK_COMMITTED,
+            response = SpearThreatResponse.EMERGENCY,
             distanceSquared = jumped.position.distanceToSqr(target.center),
         )
         remember(refreshed, memoryTicks)
@@ -194,20 +217,45 @@ private fun SpearThreatCandidate.toThreat(
     visibilityGraceTicks: Int,
 ): SpearThreat? {
     val aimed = isAimedAt(targetBox)
+    val distanceSquared = position.distanceToSqr(targetPosition)
+    val packetCapable = distanceSquared <= SPEAR_PACKET_THREAT_RANGE_SQUARED
     val kind = when {
+        hasSignificantPositionJump && (aimed || packetCapable) && (isUsingSpear || isHoldingSpear) ->
+            SpearThreatKind.ATTACK_COMMITTED
         isUsingSpear && aimed -> SpearThreatKind.USING_AIMED
-        isUsingSpear -> SpearThreatKind.USING
+        isUsingSpear && packetCapable -> SpearThreatKind.USING_PACKET_CAPABLE
         isHoldingSpear && aimed -> SpearThreatKind.HOLDING_AIMED
         isHoldingSpear && visibilityAgeTicks < visibilityGraceTicks.coerceAtLeast(0) ->
             SpearThreatKind.HOLDING_NEWLY_VISIBLE
         else -> return null
     }
+    val response = when (kind) {
+        SpearThreatKind.ATTACK_COMMITTED -> SpearThreatResponse.EMERGENCY
+        SpearThreatKind.USING_AIMED,
+        SpearThreatKind.USING_PACKET_CAPABLE -> spearUseResponse()
+        SpearThreatKind.HOLDING_AIMED,
+        SpearThreatKind.HOLDING_NEWLY_VISIBLE -> SpearThreatResponse.EVADE
+    }
 
     return SpearThreat(
         candidate = this,
         kind = kind,
-        distanceSquared = position.distanceToSqr(targetPosition),
+        response = response,
+        distanceSquared = distanceSquared,
+        trustsAttackerLook = aimed,
     )
+}
+
+private fun SpearThreatCandidate.spearUseResponse(): SpearThreatResponse {
+    val damageUseDurationTicks = spearDamageUseDurationTicks
+    if (spearDelayTicks != null && spearDelayTicks < 0 || spearUseTicks < 0 ||
+        damageUseDurationTicks != null && spearUseTicks >= damageUseDurationTicks) {
+        return SpearThreatResponse.MONITOR
+    }
+
+    // Packet routes can reach the defender before remote aim or position state is useful.
+    // Move as soon as a valid use starts instead of waiting for the first damaging tick.
+    return SpearThreatResponse.EVADE
 }
 
 private fun SpearThreatCandidate.isAimedAt(targetBox: AABB): Boolean {
@@ -235,13 +283,17 @@ private fun List<SpearThreat>.bestThreat(): SpearThreat? = minWithOrNull(
 )
 
 private fun SpearThreat.isHigherRankedThan(other: SpearThreat): Boolean = when {
+    response.priority != other.response.priority -> response.priority > other.response.priority
     kind.priority != other.kind.priority -> kind.priority > other.kind.priority
     else -> distanceSquared < other.distanceSquared
 }
 
-private val SPEAR_THREAT_ORDER = compareByDescending<SpearThreat> { it.kind.priority }
+private val SPEAR_THREAT_ORDER = compareByDescending<SpearThreat> { it.response.priority }
+    .thenByDescending { it.kind.priority }
     .thenBy { it.distanceSquared }
     .thenBy { it.candidate.entityId }
 
 private const val SWEEP_TICKS = 2.0
 private const val MIN_DIRECTION_LENGTH_SQUARED = 1.0E-12
+private const val SPEAR_PACKET_THREAT_RANGE = 512.0
+private const val SPEAR_PACKET_THREAT_RANGE_SQUARED = SPEAR_PACKET_THREAT_RANGE * SPEAR_PACKET_THREAT_RANGE

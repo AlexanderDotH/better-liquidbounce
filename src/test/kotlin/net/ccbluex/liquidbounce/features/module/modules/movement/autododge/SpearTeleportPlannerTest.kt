@@ -53,6 +53,23 @@ class SpearTeleportPlannerTest {
     }
 
     @Test
+    fun `packet capable threat escapes locally when remote position and look reveal no attack axis`() {
+        val plan = planner.plan(
+            request(
+                playerX = 0.0,
+                attackerLookX = 0.0,
+                attackerLookZ = 0.0,
+                searchRadius = 0,
+                lateralDistance = 3.0,
+                preferLocalEscape = true,
+            ),
+        ) { true }
+
+        assertEquals(SpearTeleportPoint(0.0, 64.0, 3.0), plan?.destination)
+        assertEquals(3.0, plan?.travelDistance)
+    }
+
+    @Test
     fun `refuses a teleport beyond the configured maximum distance`() {
         val plan = planner.plan(
             request(maxDistance = 6.0, searchRadius = 0, lateralDistance = 8.0),
@@ -69,6 +86,21 @@ class SpearTeleportPlannerTest {
 
         assertEquals(SpearTeleportPoint(50.0, 64.0, 3.0), plan?.destination)
         assertEquals(3.0, plan?.travelDistance)
+    }
+
+    @Test
+    fun `lateral fallback honors the selected unpredictable side`() {
+        val plan = planner.plan(
+            request(
+                playerX = 50.0,
+                maxDistance = 12.0,
+                searchRadius = 0,
+                lateralDistance = 3.0,
+                preferredLateralSide = SpearTeleportLateralSide.NEGATIVE,
+            ),
+        ) { true }
+
+        assertEquals(SpearTeleportPoint(50.0, 64.0, -3.0), plan?.destination)
     }
 
     @Test
@@ -243,6 +275,37 @@ class SpearTeleportPlannerTest {
     }
 
     @Test
+    fun `airborne lateral escape keeps collision checks without requiring a landing block`() {
+        assertTrue(
+            isSpearTeleportCandidateSafe(
+                destinationCollisionFree = true,
+                supported = false,
+                overVoid = true,
+                routeCollisionFree = true,
+                requiresLandingSupport = false,
+            )
+        )
+        assertFalse(
+            isSpearTeleportCandidateSafe(
+                destinationCollisionFree = false,
+                supported = false,
+                overVoid = true,
+                routeCollisionFree = true,
+                requiresLandingSupport = false,
+            )
+        )
+        assertFalse(
+            isSpearTeleportCandidateSafe(
+                destinationCollisionFree = true,
+                supported = false,
+                overVoid = true,
+                routeCollisionFree = false,
+                requiresLandingSupport = false,
+            )
+        )
+    }
+
+    @Test
     fun `collision sampling checks space between packet endpoints`() {
         val samples = buildSpearTeleportCollisionSamples(
             from = Vec3.ZERO,
@@ -344,7 +407,9 @@ class SpearTeleportPlannerTest {
 
     @Test
     fun `runtime keeps lateral fallback outside the spear danger line at minimum settings`() {
-        val runtime = SpearTeleportRuntime()
+        val runtime = SpearTeleportRuntime(
+            chooseLateralSide = { SpearTeleportLateralSide.POSITIVE },
+        )
 
         val plan = runtime.plan(
             enabled = true,
@@ -360,6 +425,86 @@ class SpearTeleportPlannerTest {
         assertEquals(SpearTeleportPoint(50.0, 64.0, DodgePlanner.SAFE_DISTANCE_WITH_PADDING), plan?.destination)
     }
 
+    @Test
+    fun `runtime applies its per burst lateral side choice`() {
+        val runtime = SpearTeleportRuntime(
+            chooseLateralSide = { SpearTeleportLateralSide.NEGATIVE },
+        )
+
+        val plan = runtime.plan(
+            enabled = true,
+            canStartDefense = true,
+            projectilePlanActive = false,
+            tick = 10,
+            playerPosition = Vec3(50.0, 64.0, 0.0),
+            threat = threat(),
+            settings = teleportSettings(behindDistance = 3.0, searchRadius = 0),
+            isSafe = { true },
+        )
+
+        assertEquals(SpearTeleportPoint(50.0, 64.0, -3.0), plan?.destination)
+    }
+
+    @Test
+    fun `runtime uses local escape for packet capable threat instead of remote look`() {
+        val runtime = SpearTeleportRuntime(
+            chooseLateralSide = { SpearTeleportLateralSide.POSITIVE },
+        )
+        val packetThreat = threat().copy(
+            candidate = threat().candidate.copy(
+                position = Vec3(0.0, 320.0, 0.0),
+                eyePosition = Vec3(0.0, 321.62, 0.0),
+                lookDirection = Vec3.ZERO,
+            ),
+            kind = SpearThreatKind.USING_PACKET_CAPABLE,
+            trustsAttackerLook = false,
+        )
+
+        val plan = runtime.plan(
+            enabled = true,
+            canStartDefense = true,
+            projectilePlanActive = false,
+            tick = 10,
+            playerPosition = Vec3(0.0, 64.0, 0.0),
+            threat = packetThreat,
+            settings = teleportSettings(behindDistance = 3.0, searchRadius = 0),
+            isSafe = { true },
+        )
+
+        assertEquals(SpearTeleportPoint(0.0, 64.0, 3.0), plan?.destination)
+    }
+
+    @Test
+    fun `runtime gives a distant packet capable mace holder a local escape without line of sight`() {
+        val runtime = SpearTeleportRuntime(
+            chooseLateralSide = { SpearTeleportLateralSide.POSITIVE },
+        )
+        val maceThreat = MaceThreat(
+            candidate = MaceThreatCandidate(
+                entityId = 7,
+                name = "packet-attacker",
+                position = Vec3(-0.5, 0.0001, -0.5),
+                lookDirection = Vec3.ZERO,
+                isHoldingMace = true,
+            ),
+            kind = MaceThreatKind.PACKET_CAPABLE,
+            distanceSquared = 10_000.0,
+        )
+
+        val plan = runtime.planMace(
+            enabled = true,
+            canStartDefense = true,
+            projectilePlanActive = false,
+            tick = 10,
+            playerPosition = Vec3(-14.5, 92.0, 26.7),
+            threat = maceThreat,
+            settings = teleportSettings(behindDistance = 3.0, searchRadius = 0),
+            isSafe = { true },
+        )
+
+        assertEquals(SpearTeleportPoint(-14.5, 92.0, 29.7), plan?.destination)
+    }
+
     private fun request(
         playerX: Double = 5.0,
         attackerLookX: Double = 1.0,
@@ -367,6 +512,8 @@ class SpearTeleportPlannerTest {
         maxDistance: Double = 12.0,
         searchRadius: Int = 2,
         lateralDistance: Double = 2.0,
+        preferredLateralSide: SpearTeleportLateralSide = SpearTeleportLateralSide.POSITIVE,
+        preferLocalEscape: Boolean = false,
     ) = SpearTeleportRequest(
         playerPosition = SpearTeleportPoint(playerX, 64.0, 0.0),
         attackerPosition = SpearTeleportPoint(0.0, 64.0, 0.0),
@@ -375,6 +522,8 @@ class SpearTeleportPlannerTest {
         lateralDistance = lateralDistance,
         maxDistance = maxDistance,
         searchRadius = searchRadius,
+        preferredLateralSide = preferredLateralSide,
+        preferLocalEscape = preferLocalEscape,
     )
 
     private fun threat() = SpearThreat(
@@ -386,8 +535,12 @@ class SpearTeleportPlannerTest {
             lookDirection = Vec3(1.0, 0.0, 0.0),
             isHoldingSpear = true,
             isUsingSpear = true,
+            spearUseTicks = 11,
+            spearDelayTicks = 10,
+            spearDamageUseDurationTicks = 30,
         ),
         kind = SpearThreatKind.USING_AIMED,
+        response = SpearThreatResponse.EVADE,
         distanceSquared = 25.0,
     )
 

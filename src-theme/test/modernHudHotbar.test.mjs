@@ -58,6 +58,14 @@ test("Modern hotbar owns one contextual island while Classic keeps its current X
     assert.match(contextual, /marker\.elevation/);
 });
 
+test("Modern contextual island keeps one transition root during rapid mode changes", () => {
+    const contextual = read("elements/hotbar/ModernContextualBar.svelte");
+    const transitions = contextual.match(/transition:fly=/g) ?? [];
+
+    assert.equal(transitions.length, 1);
+    assert.doesNotMatch(contextual, /\{#key\s+data\.mode\}/);
+});
+
 test("Modern experience bar uses the recovered space without changing its height", () => {
     const contextual = read("elements/hotbar/ModernContextualBar.svelte");
     const experienceBranch = contextual.match(

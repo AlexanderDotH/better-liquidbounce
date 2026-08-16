@@ -22,8 +22,10 @@ import net.minecraft.world.phys.AABB
 import net.minecraft.world.phys.Vec3
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
+import kotlin.test.assertTrue
 
 class SpearThreatDetectorTest {
 
@@ -33,7 +35,7 @@ class SpearThreatDetectorTest {
     )
 
     @Test
-    fun `active spear use triggers while far away and looking elsewhere`() {
+    fun `active spear use beyond packet threat range does not trigger global evasion`() {
         val detector = SpearThreatDetector()
         val farAwayUser = candidate(
             entityId = 1,
@@ -44,8 +46,90 @@ class SpearThreatDetectorTest {
 
         val threat = detector.update(stationaryTarget, listOf(farAwayUser), aimMargin = 0.0, threatMemoryTicks = 0)
 
-        assertEquals(1, threat?.candidate?.entityId)
-        assertEquals(SpearThreatKind.USING, threat?.kind)
+        assertNull(threat)
+    }
+
+    @Test
+    fun `active spear use inside packet threat range evades without trusting remote aim`() {
+        val packetCapableUser = candidate(
+            entityId = 1,
+            position = Vec3(0.0, 320.0, 0.0),
+            lookDirection = Vec3.ZERO,
+            isUsingSpear = true,
+            spearUseTicks = 1,
+        )
+
+        val threat = SpearThreatDetector().update(
+            stationaryTarget,
+            listOf(packetCapableUser),
+            aimMargin = 0.0,
+            threatMemoryTicks = 0,
+        )
+
+        assertEquals(SpearThreatKind.USING_PACKET_CAPABLE, threat?.kind)
+        assertEquals(SpearThreatResponse.EVADE, threat?.response)
+        assertFalse(threat?.trustsAttackerLook ?: true)
+        assertTrue(threat.requiresJuke)
+        assertTrue(threat.requiresTeleport)
+    }
+
+    @Test
+    fun `active spear use evades for the entire valid charge and stops after damage window`() {
+        fun detect(useTicks: Int) = SpearThreatDetector().update(
+            stationaryTarget,
+            listOf(
+                candidate(
+                    entityId = 1,
+                    isUsingSpear = true,
+                    spearUseTicks = useTicks,
+                    spearDelayTicks = 10,
+                    spearDamageUseDurationTicks = 30,
+                )
+            ),
+            aimMargin = 0.0,
+            threatMemoryTicks = 0,
+        )
+
+        val started = detect(useTicks = 0)
+        val charging = detect(useTicks = 9)
+        val arming = detect(useTicks = 10)
+        val ready = detect(useTicks = 11)
+        val expired = detect(useTicks = 30)
+
+        assertEquals(SpearThreatResponse.EVADE, started?.response)
+        assertEquals(SpearThreatResponse.EVADE, charging?.response)
+        assertEquals(SpearThreatResponse.EVADE, arming?.response)
+        assertEquals(SpearThreatResponse.EVADE, ready?.response)
+        assertEquals(SpearThreatResponse.MONITOR, expired?.response)
+        assertTrue(started.requiresTeleport)
+        assertTrue(charging.requiresJuke)
+        assertTrue(arming.requiresTeleport)
+        assertTrue(ready.requiresTeleport)
+        assertFalse(expired.requiresJuke)
+    }
+
+    @Test
+    fun `spear position jump is treated as an emergency commit without trusting remote aim`() {
+        val jumped = candidate(
+            entityId = 1,
+            lookDirection = Vec3.ZERO,
+            isUsingSpear = true,
+            spearUseTicks = 5,
+            spearDelayTicks = 10,
+            hasSignificantPositionJump = true,
+        )
+
+        val threat = SpearThreatDetector().update(
+            stationaryTarget,
+            listOf(jumped),
+            aimMargin = 0.0,
+            threatMemoryTicks = 0,
+        )
+
+        assertEquals(SpearThreatKind.ATTACK_COMMITTED, threat?.kind)
+        assertEquals(SpearThreatResponse.EMERGENCY, threat?.response)
+        assertFalse(threat?.trustsAttackerLook ?: true)
+        assertTrue(threat.requiresTeleport)
     }
 
     @Test
@@ -71,6 +155,8 @@ class SpearThreatDetectorTest {
         )
 
         assertEquals(SpearThreatKind.HOLDING_AIMED, aimedThreat?.kind)
+        assertEquals(SpearThreatResponse.EVADE, aimedThreat?.response)
+        assertTrue(aimedThreat.requiresTeleport)
         assertNull(lookingAwayThreat)
     }
 
@@ -92,6 +178,8 @@ class SpearThreatDetectorTest {
         )
 
         assertEquals(SpearThreatKind.HOLDING_NEWLY_VISIBLE, threat?.kind)
+        assertEquals(SpearThreatResponse.EVADE, threat?.response)
+        assertTrue(threat.requiresTeleport)
     }
 
     @Test
@@ -234,34 +322,36 @@ class SpearThreatDetectorTest {
     }
 
     @Test
-    fun `using and aimed outranks using and holding aimed`() {
+    fun `ready aimed spear outranks charging and held aimed threats`() {
         val heldAndAimed = candidate(entityId = 1, position = Vec3(-1.0, 0.0, 0.0), isHoldingSpear = true)
-        val using = candidate(
+        val charging = candidate(
             entityId = 2,
             position = Vec3(-2.0, 0.0, 0.0),
             lookDirection = Vec3(-1.0, 0.0, 0.0),
             isUsingSpear = true,
+            spearUseTicks = 5,
+            spearDelayTicks = 10,
         )
-        val usingAndAimed = candidate(entityId = 3, position = Vec3(-20.0, 0.0, 0.0), isUsingSpear = true)
+        val readyAndAimed = candidate(entityId = 3, position = Vec3(-20.0, 0.0, 0.0), isUsingSpear = true)
 
         val threat = SpearThreatDetector().update(
             stationaryTarget,
-            listOf(heldAndAimed, using, usingAndAimed),
+            listOf(heldAndAimed, charging, readyAndAimed),
             aimMargin = 0.0,
             threatMemoryTicks = 0,
         )
 
         assertEquals(3, threat?.candidate?.entityId)
         assertEquals(SpearThreatKind.USING_AIMED, threat?.kind)
+        assertEquals(SpearThreatResponse.EVADE, threat?.response)
     }
 
     @Test
-    fun `using outranks a nearer held and aimed candidate`() {
+    fun `ready aimed use outranks a nearer held and aimed candidate`() {
         val heldAndAimed = candidate(entityId = 1, position = Vec3(-1.0, 0.0, 0.0), isHoldingSpear = true)
         val using = candidate(
             entityId = 2,
             position = Vec3(-20.0, 0.0, 0.0),
-            lookDirection = Vec3(-1.0, 0.0, 0.0),
             isUsingSpear = true,
         )
 
@@ -273,7 +363,7 @@ class SpearThreatDetectorTest {
         )
 
         assertEquals(2, threat?.candidate?.entityId)
-        assertEquals(SpearThreatKind.USING, threat?.kind)
+        assertEquals(SpearThreatKind.USING_AIMED, threat?.kind)
     }
 
     @Test
@@ -314,6 +404,8 @@ class SpearThreatDetectorTest {
             position = Vec3(-10.0, 0.0, 0.0),
             lookDirection = Vec3(-1.0, 0.0, 0.0),
             isUsingSpear = true,
+            spearUseTicks = 5,
+            spearDelayTicks = 10,
         )
         val lowerRank = candidate(entityId = 2, position = Vec3(-1.0, 0.0, 0.0), isHoldingSpear = true)
         val higherRank = candidate(entityId = 3, position = Vec3(-20.0, 0.0, 0.0), isUsingSpear = true)
@@ -434,6 +526,9 @@ class SpearThreatDetectorTest {
         lookDirection: Vec3 = Vec3(1.0, 0.0, 0.0),
         isHoldingSpear: Boolean = false,
         isUsingSpear: Boolean = false,
+        spearUseTicks: Int = if (isUsingSpear) 11 else 0,
+        spearDelayTicks: Int? = if (isUsingSpear) 10 else null,
+        spearDamageUseDurationTicks: Int? = if (isUsingSpear) 30 else null,
         isAlive: Boolean = true,
         isRemoved: Boolean = false,
         isBot: Boolean = false,
@@ -450,6 +545,9 @@ class SpearThreatDetectorTest {
         lookDirection = lookDirection,
         isHoldingSpear = isHoldingSpear,
         isUsingSpear = isUsingSpear,
+        spearUseTicks = spearUseTicks,
+        spearDelayTicks = spearDelayTicks,
+        spearDamageUseDurationTicks = spearDamageUseDurationTicks,
         isAlive = isAlive,
         isRemoved = isRemoved,
         isBot = isBot,

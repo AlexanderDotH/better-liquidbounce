@@ -97,4 +97,19 @@ class SpearKillDamageEvidenceTest {
             tracker.observe(entityId = 42, observedTick = 200),
         )
     }
+
+    @Test
+    fun `one network optimized attempt may widen only its own evidence window`() {
+        val tracker = SpearKillDamageEvidenceTracker(windowTicks = 2)
+
+        tracker.arm(targetEntityId = 41, predictedHitTick = 100, windowTicks = 6)
+        assertEquals(
+            SpearKillDamageEvidence(targetEntityId = 41, predictedHitTick = 100, observedTick = 106),
+            tracker.observe(entityId = 41, observedTick = 106),
+        )
+
+        tracker.arm(targetEntityId = 42, predictedHitTick = 200)
+        assertNull(tracker.observe(entityId = 42, observedTick = 203))
+        assertFalse(tracker.isArmed)
+    }
 }

@@ -124,11 +124,41 @@ object ModuleAutoDodge : ClientModule("AutoDodge", ModuleCategories.COMBAT) {
         }
     }
 
+    private object Mace : ToggleableValueGroup(this, "Mace", true) {
+        val packetThreatRange by float("PacketThreatRange", 512.0F, 16.0F..512.0F, suffix = "blocks")
+        val threatMemory by int("ThreatMemory", 5, 0..20, suffix = "ticks")
+        val teleport = SpearTeleportValueGroup(
+            this,
+            ModuleAutoDodge::resetMaceTeleport,
+            defaultEnabled = true,
+        )
+
+        init {
+            tree(teleport)
+        }
+
+        fun movementSettings() = MaceMovementSettings(
+            enabled = enabled,
+            packetThreatRange = packetThreatRange.toDouble(),
+            threatMemoryTicks = threatMemory,
+            teleportEnabled = teleport.enabled,
+            teleport = teleport.settings(),
+        )
+
+        override fun onDisabled() {
+            ModuleAutoDodge.resetMaceMovement()
+            ModuleAutoDodge.resetMaceTeleport()
+            super.onDisabled()
+        }
+    }
+
     private val ignore by multiEnumChoice("Ignore", Ignore.entries)
 
     private val spearMovementController = SpearMovementController()
+    private val maceMovementController = MaceMovementController()
 
     private var primarySpearThreat: SpearThreat? = null
+    private var primaryMaceThreat: MaceThreat? = null
     private var spearShieldState: SpearShieldState<ItemStack> = SpearShieldState.Idle
     private var pendingShieldInventoryCommand: SpearShieldCommand<ItemStack>? = null
     private var ownsOffhandReservation = false
@@ -137,6 +167,7 @@ object ModuleAutoDodge : ClientModule("AutoDodge", ModuleCategories.COMBAT) {
         tree(AllowRotationChange)
         tree(AllowTimer)
         tree(Spear)
+        tree(Mace)
     }
 
     override val running: Boolean
@@ -162,17 +193,30 @@ object ModuleAutoDodge : ClientModule("AutoDodge", ModuleCategories.COMBAT) {
             world = world,
             settings = Spear.movementSettings(),
         )
+        val maceMovement = maceMovementController.update(
+            canStartDefense = canStartDefense,
+            projectilePlanActive = projectilePlan != null,
+            player = player,
+            world = world,
+            settings = Mace.movementSettings(),
+        )
         primarySpearThreat = spearMovement.threat
+        primaryMaceThreat = maceMovement.threat
         val action = AutoDodgeMovementArbitrator.chooseAction(
             projectilePlan,
             spearMovement.teleportPlan,
             spearMovement.jukePlan,
+            maceMovement.teleportPlan,
         )
         var teleported = false
         val dodgePlan = when (action) {
             is AutoDodgeMovementAction.Dodge -> action.plan
             is AutoDodgeMovementAction.Teleport -> {
-                if (performSpearTeleport(action.plan)) {
+                val executed = when (action.defense) {
+                    AutoDodgeTeleportDefense.SPEAR -> performSpearTeleport(action.plan)
+                    AutoDodgeTeleportDefense.MACE -> performMaceTeleport(action.plan)
+                }
+                if (executed) {
                     event.directionalInput = DirectionalInput.NONE
                     teleported = true
                     null
@@ -238,6 +282,16 @@ object ModuleAutoDodge : ClientModule("AutoDodge", ModuleCategories.COMBAT) {
             world = world,
             plan = plan,
             settings = Spear.teleport.settings(),
+            sendPacket = { sendPacketSilently(it) },
+        )
+    }
+
+    private fun performMaceTeleport(plan: SpearTeleportPlan): Boolean {
+        return maceMovementController.executeTeleport(
+            player = player,
+            world = world,
+            plan = plan,
+            settings = Mace.teleport.settings(),
             sendPacket = { sendPacketSilently(it) },
         )
     }
@@ -503,6 +557,15 @@ object ModuleAutoDodge : ClientModule("AutoDodge", ModuleCategories.COMBAT) {
         spearMovementController.resetTeleport()
     }
 
+    private fun resetMaceMovement() {
+        maceMovementController.resetMovement()
+        primaryMaceThreat = null
+    }
+
+    private fun resetMaceTeleport() {
+        maceMovementController.resetTeleport()
+    }
+
     private val shieldCleanupPending: Boolean
         get() = spearShieldState !is SpearShieldState.Idle &&
             spearShieldState !is SpearShieldState.Aborted
@@ -564,7 +627,7 @@ object ModuleAutoDodge : ClientModule("AutoDodge", ModuleCategories.COMBAT) {
 
     private fun debugSpearState() {
         debugParameter("Spear/Threat") {
-            primarySpearThreat?.let { "${it.candidate.name}/${it.kind}" } ?: "-"
+            primarySpearThreat?.let { "${it.candidate.name}/${it.kind}/${it.response}" } ?: "-"
         }
         debugParameter("Spear/CommittedInput") {
             spearMovementController.jukeDecision?.plan?.input ?: DirectionalInput.NONE
@@ -591,12 +654,21 @@ object ModuleAutoDodge : ClientModule("AutoDodge", ModuleCategories.COMBAT) {
                 else -> "-"
             }
         }
+        debugParameter("Mace/Threat") {
+            primaryMaceThreat?.let { "${it.candidate.name}/${it.kind}" } ?: "-"
+        }
+        debugParameter("Mace/TeleportState") { maceMovementController.teleportState.debugName }
+        debugParameter("Mace/TeleportDestination") {
+            maceMovementController.plannedTeleport?.destination ?: "-"
+        }
     }
 
     @Suppress("unused")
     private val worldChangeHandler = handler<WorldChangeEvent> {
         resetSpearMovement()
         resetSpearTeleport()
+        resetMaceMovement()
+        resetMaceTeleport()
         resetSpearShieldForWorldChange()
     }
 
@@ -604,12 +676,16 @@ object ModuleAutoDodge : ClientModule("AutoDodge", ModuleCategories.COMBAT) {
     private val disconnectHandler = handler<DisconnectEvent> {
         resetSpearMovement()
         resetSpearTeleport()
+        resetMaceMovement()
+        resetMaceTeleport()
         resetSpearShieldForWorldChange()
     }
 
     override fun onDisabled() {
         resetSpearMovement()
         resetSpearTeleport()
+        resetMaceMovement()
+        resetMaceTeleport()
         disableSpearShield()
         super.onDisabled()
     }

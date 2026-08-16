@@ -47,7 +47,9 @@ internal object SpearKillRoutingPolicy {
         aStarResult: SpearKillAttackStartResult?,
     ): SpearKillRoutingDecision = when (mode) {
         SpearKillRoutingMode.DIRECT -> directDecision(directResult)
-        SpearKillRoutingMode.A_STAR -> directThenAStarDecision(directResult, aStarAvailable, aStarResult)
+        SpearKillRoutingMode.A_STAR,
+        SpearKillRoutingMode.NETWORK_OPTIMIZED,
+        -> directThenAStarDecision(directResult, aStarAvailable, aStarResult)
     }
 
     private fun directDecision(

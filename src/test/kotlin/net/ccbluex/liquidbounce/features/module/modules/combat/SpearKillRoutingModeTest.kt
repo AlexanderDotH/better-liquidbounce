@@ -54,11 +54,18 @@ class SpearKillRoutingModeTest {
     }
 
     @Test
-    fun `routing exposes only Direct and AStar`() {
+    fun `routing exposes Direct AStar and NetworkOptimized`() {
         assertEquals(
-            listOf("Direct", "AStar"),
+            listOf("Direct", "AStar", "NetworkOptimized"),
             SpearKillRoutingMode.entries.map { it.tag },
         )
+    }
+
+    @Test
+    fun `Direct and NetworkOptimized return immediately while standalone AStar retains its hold`() {
+        assertEquals(0, spearKillStrikeHoldTicks(SpearKillRoutingMode.DIRECT))
+        assertEquals(SPEAR_KILL_PACKET_STRIKE_HOLD_TICKS, spearKillStrikeHoldTicks(SpearKillRoutingMode.A_STAR))
+        assertEquals(0, spearKillStrikeHoldTicks(SpearKillRoutingMode.NETWORK_OPTIMIZED))
     }
 
     @Test

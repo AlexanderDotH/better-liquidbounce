@@ -115,7 +115,7 @@ class SpearKillSpeedControllerTest {
             targetMovement = Vec3.ZERO,
             lookDirection = Vec3(1.0, 0.0, 0.0),
         )
-        assertEquals(500.0, kinetic.attackerSpeed, 1e-9)
+        assertEquals(10_000.0, kinetic.attackerSpeed, 1e-9)
         assertEquals(10.0, calculateSpearKillVanillaMovementBudget(Vec3.ZERO, fallFlying = false), 1e-9)
     }
 
@@ -157,96 +157,117 @@ class SpearKillSpeedControllerTest {
     }
 
     @Test
-    fun `close lower target uses one full speed vertical dive burst`() {
+    fun `lower target Direct route stays collinear and keeps one full speed downward step`() {
         val profile = SpearKillSpeedProfile(
             currentSpeed = 0.0,
             limits = speedLimits(targetSpeed = 10.0, stepDistance = 10.0, budget = 10.0),
         )
         val attackRoute = buildSpearKillProfiledDirectAttackRoute(
             origin = Vec3.ZERO,
-            targetBox = AABB(3.0, -6.0, -0.3, 3.6, -4.2, 0.3),
-            targetEyePosition = Vec3(3.3, -4.38, 0.0),
+            targetBox = AABB(3.0, -20.0, -0.3, 3.6, -18.2, 0.3),
+            targetEyePosition = Vec3(3.3, -18.38, 0.0),
             playerEyeOffset = Vec3(0.0, 1.62, 0.0),
-            preferredDirection = Vec3(3.3, -6.0, 0.0),
+            preferredDirection = Vec3(3.3, -20.0, 0.0),
             profile = profile,
             segmentValidator = SpearKillAStarSegmentValidator { _, _ -> true },
-            maxVerticalStep = 2.95,
         )!!
         val route = attackRoute.packetRoute
         val outbound = route.outboundMovements
-        val dive = outbound.takeLast(route.terminalBurstSteps)
-        val logicalDive = dive.fold(Vec3.ZERO, Vec3::add)
+        val routeDirection = attackRoute.line.direction
 
-        assertEquals(4, route.terminalBurstSteps)
-        assertEquals(2, route.outboundTickCount)
-        assertEquals(outbound.size - route.terminalBurstSteps + 1, route.outboundTickCount)
-        assertEquals(10.0, logicalDive.length(), 1e-9)
-        assertEquals(0.0, logicalDive.x, 1e-9)
-        assertEquals(-10.0, logicalDive.y, 1e-9)
-        assertEquals(0.0, logicalDive.z, 1e-9)
-        assertTrue(dive.all { it.x == 0.0 && it.y < 0.0 && it.z == 0.0 })
-        assertTrue(dive.all { kotlin.math.abs(it.y) <= 2.95 + 1e-9 })
-        assertTrue(outbound.all { it.length() <= 10.0 + 1e-9 })
-        assertVec3Equals(
-            attackRoute.approach.plannerGoal,
-            outbound.dropLast(route.terminalBurstSteps).fold(Vec3.ZERO, Vec3::add),
-            1e-9,
-        )
+        assertEquals(0, route.terminalBurstSteps)
+        assertTrue(outbound.all { it.cross(routeDirection).lengthSqr() < 1e-12 })
+        assertTrue(outbound.all { it.dot(routeDirection) > 0.0 })
+        assertEquals(profile.maximumStepLimit, outbound.last().length(), 1e-9)
+        assertTrue(kotlin.math.abs(outbound.last().y) > 2.95)
+        assertTrue(outbound.all { it.length() <= profile.maximumStepLimit + 1e-9 })
+        assertVec3Equals(attackRoute.line.terminalWaypoint, outbound.fold(Vec3.ZERO, Vec3::add), 1e-9)
         assertEquals(
             outbound.asReversed().map { it.scale(-1.0) },
             route.roundTripMovements.drop(outbound.size).dropLast(1),
         )
+        val fallPlan = (SpearKillServerFallSafetyPlan.create(
+            outboundMovements = outbound,
+            initialFallDistance = 0.0,
+            safeFallDistance = 3.0,
+            groundedSteps = List(outbound.size * 2) { index -> index == outbound.size * 2 - 1 },
+        ) as SpearKillServerFallSafetyPlanResult.Ready).plan
+        assertFalse(fallPlan.steps.take(outbound.size).last().groundExactPacket)
+        assertTrue(fallPlan.steps.last().groundExactPacket)
     }
 
     @Test
-    fun `target at eye level retains a lateral terminal lunge`() {
+    fun `Direct route terminal-loads the maximum final movement`() {
         val profile = SpearKillSpeedProfile(
             currentSpeed = 0.0,
             limits = speedLimits(targetSpeed = 10.0, stepDistance = 10.0, budget = 10.0),
         )
         val attackRoute = buildSpearKillProfiledDirectAttackRoute(
             origin = Vec3.ZERO,
-            targetBox = AABB(3.0, 0.0, -0.3, 3.6, 1.8, 0.3),
-            targetEyePosition = Vec3(3.3, 1.62, 0.0),
+            targetBox = AABB(25.0, 0.0, -0.3, 25.6, 1.8, 0.3),
+            targetEyePosition = Vec3(25.3, 1.62, 0.0),
             playerEyeOffset = Vec3(0.0, 1.62, 0.0),
             preferredDirection = Vec3(1.0, 0.0, 0.0),
             profile = profile,
             segmentValidator = SpearKillAStarSegmentValidator { _, _ -> true },
-            maxVerticalStep = 2.95,
         )!!
 
-        assertEquals(0, attackRoute.packetRoute.terminalBurstSteps)
-        assertEquals(10.0, attackRoute.packetRoute.outboundMovements.last().length(), 1e-9)
-        assertEquals(0.0, attackRoute.packetRoute.outboundMovements.last().y, 1e-9)
+        val outbound = attackRoute.packetRoute.outboundMovements
+        assertEquals(listOf(2.75, 10.0, 10.0), outbound.map(Vec3::length))
+        assertEquals(attackRoute.line.terminalWaypoint, outbound.fold(Vec3.ZERO, Vec3::add))
+        assertEquals(attackRoute.line.terminalWaypoint.subtract(outbound.last()), attackRoute.approach.plannerGoal)
     }
 
     @Test
-    fun `vertical dive uses the acceleration cap of its one logical terminal tick`() {
+    fun `Direct route rejects a blocked segment instead of staging around it`() {
+        var validations = 0
+        val route = buildSpearKillProfiledDirectAttackRoute(
+            origin = Vec3.ZERO,
+            targetBox = AABB(25.0, 0.0, -0.3, 25.6, 1.8, 0.3),
+            targetEyePosition = Vec3(25.3, 1.62, 0.0),
+            playerEyeOffset = Vec3(0.0, 1.62, 0.0),
+            preferredDirection = Vec3(1.0, 0.0, 0.0),
+            profile = SpearKillSpeedProfile(
+                currentSpeed = 0.0,
+                limits = speedLimits(targetSpeed = 10.0),
+            ),
+            segmentValidator = SpearKillAStarSegmentValidator { _, _ ->
+                validations++
+                validations < 2
+            },
+        )
+
+        assertEquals(null, route)
+        assertEquals(2, validations)
+    }
+
+    @Test
+    fun `Direct route rejects a final step below the supplied kinetic requirement`() {
         val profile = SpearKillSpeedProfile(
             currentSpeed = 0.0,
             limits = speedLimits(
-                targetSpeed = 100.0,
-                acceleration = 5.0,
+                targetSpeed = 10.0,
                 stepDistance = 500.0,
                 budget = 500.0,
             ),
         )
         val route = buildSpearKillProfiledDirectAttackRoute(
             origin = Vec3.ZERO,
-            targetBox = AABB(3.0, -6.0, -0.3, 3.6, -4.2, 0.3),
-            targetEyePosition = Vec3(3.3, -4.38, 0.0),
+            targetBox = AABB(25.0, 0.0, -0.3, 25.6, 1.8, 0.3),
+            targetEyePosition = Vec3(25.3, 1.62, 0.0),
             playerEyeOffset = Vec3(0.0, 1.62, 0.0),
-            preferredDirection = Vec3(3.3, -6.0, 0.0),
+            preferredDirection = Vec3(1.0, 0.0, 0.0),
             profile = profile,
             segmentValidator = SpearKillAStarSegmentValidator { _, _ -> true },
-            maxVerticalStep = 2.95,
-        )!!.packetRoute
+            kineticRequirements = SpearKillKineticDamageRequirements(
+                minimumAttackerSpeed = 201.0,
+                minimumRelativeSpeed = 201.0,
+                damageMultiplier = 1.075,
+            ),
+            targetMovement = Vec3.ZERO,
+        )
 
-        val terminalTickIndex = route.outboundTickCount - 1
-        val logicalDive = route.outboundMovements
-            .takeLast(route.terminalBurstSteps)
-            .fold(Vec3.ZERO, Vec3::add)
-        assertEquals(profile.stepAt(terminalTickIndex).stepLimit, logicalDive.length(), 1e-9)
+        assertEquals(null, route)
     }
 
     @Test
@@ -399,9 +420,29 @@ class SpearKillSpeedControllerTest {
             lookDirection = Vec3(1.0, 0.0, 0.0),
         )
 
-        assertEquals(3.0, estimate.attackerSpeed, 1e-9)
-        assertEquals(1.0, estimate.targetSpeed, 1e-9)
-        assertEquals(2.0, estimate.relativeSpeed, 1e-9)
+        assertEquals(60.0, estimate.attackerSpeed, 1e-9)
+        assertEquals(20.0, estimate.targetSpeed, 1e-9)
+        assertEquals(40.0, estimate.relativeSpeed, 1e-9)
+    }
+
+    @Test
+    fun `kinetic damage estimate applies minimum speeds and vanilla floored multiplier`() {
+        val estimate = estimateSpearKillKineticDamage(
+            deliveredMovement = Vec3(0.25, 0.0, 0.0),
+            targetMovement = Vec3(0.02, 0.0, 0.0),
+            lookDirection = Vec3(1.0, 0.0, 0.0),
+            requirements = SpearKillKineticDamageRequirements(
+                minimumAttackerSpeed = 4.6,
+                minimumRelativeSpeed = 4.5,
+                damageMultiplier = 1.075,
+            ),
+        )
+
+        assertEquals(5.0, estimate.speed.attackerSpeed, 1e-9)
+        assertEquals(0.4, estimate.speed.targetSpeed, 1e-9)
+        assertEquals(4.6, estimate.speed.relativeSpeed, 1e-9)
+        assertTrue(estimate.meetsRequirements)
+        assertEquals(4, estimate.bonusDamage)
     }
 
     private fun speedLimits(

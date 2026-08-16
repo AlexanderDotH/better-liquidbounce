@@ -80,6 +80,25 @@ class SpearDodgePlannerTest {
     }
 
     @Test
+    fun `uses the remote look direction instead of the stale attacker to player axis`() {
+        val result = planner().plan(
+            attackerPosition = ATTACKER,
+            playerPosition = PLAYER,
+            attackDirection = SpearTeleportDirection(1.0, 0.0),
+            startedSafelyGrounded = true,
+            safeDistance = SAFE_DISTANCE,
+        ) { input ->
+            when (input) {
+                DirectionalInput.LEFT -> safeSimulation(clearance = 3.0, z = 1.0)
+                DirectionalInput.RIGHT -> safeSimulation(clearance = 1.0, z = 3.0)
+                else -> collidingSimulation()
+            }
+        }
+
+        assertEquals(DirectionalInput.RIGHT, result.directionalInput)
+    }
+
+    @Test
     fun `random choice among near-best candidates is reproducible with a seed`() {
         val firstPlanner = SpearDodgePlanner(Random(0x5EED))
         val secondPlanner = SpearDodgePlanner(Random(0x5EED))

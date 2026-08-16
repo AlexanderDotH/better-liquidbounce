@@ -160,6 +160,30 @@ class ModuleAutoDodgeSpearIntegrationTest {
     }
 
     @Test
+    fun `mace packet teleport takes precedence over spear responses`() {
+        val maceTeleport = SpearTeleportPlan(
+            destination = SpearTeleportPoint(-5.0, 92.0, 26.7),
+            travelDistance = 5.0,
+        )
+        val spearTeleport = SpearTeleportPlan(
+            destination = SpearTeleportPoint(5.0, 92.0, 26.7),
+            travelDistance = 5.0,
+        )
+
+        val result = AutoDodgeMovementArbitrator.chooseAction(
+            projectilePlan = null,
+            spearTeleportPlan = spearTeleport,
+            spearPlan = SpearDodgePlan.NONE,
+            maceTeleportPlan = maceTeleport,
+        )
+
+        assertEquals(
+            AutoDodgeMovementAction.Teleport(maceTeleport, AutoDodgeTeleportDefense.MACE),
+            result,
+        )
+    }
+
+    @Test
     fun `walking juke remains the fallback when teleport is unavailable`() {
         val juke = SpearDodgePlan(
             input = DirectionalInput.RIGHT,

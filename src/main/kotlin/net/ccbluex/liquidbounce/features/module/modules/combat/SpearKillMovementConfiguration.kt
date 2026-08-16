@@ -83,6 +83,8 @@ internal class SpearKillMovementConfiguration(eventListener: EventListener?) {
             private set
         lateinit var aStar: AStar
             private set
+        lateinit var networkOptimized: NetworkOptimized
+            private set
 
         val stepDistance by float(
             "StepDistance",
@@ -102,6 +104,7 @@ internal class SpearKillMovementConfiguration(eventListener: EventListener?) {
             arrayOf(
                 Direct(routingParent).also { direct = it },
                 AStar(routingParent).also { aStar = it },
+                NetworkOptimized(routingParent).also { networkOptimized = it },
             )
         }
     }
@@ -125,6 +128,31 @@ internal class SpearKillMovementConfiguration(eventListener: EventListener?) {
         val maxCost by int("MaxCost", 250, 50..500)
         val diagonal by boolean("Diagonal", false)
         val lineOfSightShortcuts by boolean("LineOfSightShortcuts", false)
+    }
+
+    internal class NetworkOptimized(
+        parent: ModeValueGroup<SpearKillRoutingChoice>,
+    ) : SpearKillRoutingChoice(
+        name = "NetworkOptimized",
+        aliases = listOf("Network", "LagOptimized", "Network-Optimized"),
+        parent = parent,
+    ) {
+        val maxSpeed by float(
+            "MaxSpeed",
+            SPEAR_KILL_NORMAL_MAX_SPEED,
+            SPEAR_KILL_MIN_SPEED..SPEAR_KILL_ELYTRA_MAX_SPEED,
+            "blocks/tick",
+        )
+        val minimumStepDelay by int(
+            "MinimumStepDelay",
+            1,
+            0..SPEAR_KILL_MAX_WAIT_TICKS,
+            "ticks",
+        )
+        val setbackBackoff by int("SetbackBackoff", 40, 0..200, "ticks")
+        val maxCost by int("MaxCost", 250, 50..500)
+        val diagonal by boolean("Diagonal", true)
+        val lineOfSightShortcuts by boolean("LineOfSightShortcuts", true)
     }
 }
 

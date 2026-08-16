@@ -133,6 +133,13 @@ internal inline fun <T> selectSpearKillTargetForSource(
 internal fun <T> preferLockedSpearKillTarget(lockedTarget: T?, selectedTarget: T?): T? =
     lockedTarget ?: selectedTarget
 
+/** A transient route retry owns the same target lock as an already committed movement route. */
+internal fun <T> activeSpearKillTargetLock(
+    lockedTarget: T?,
+    routeActive: Boolean,
+    routePreparationActive: Boolean,
+): T? = lockedTarget.takeIf { routeActive || routePreparationActive }
+
 /**
  * Shared fail-closed acceptance boundary for every target source.
  *

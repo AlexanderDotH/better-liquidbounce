@@ -34,24 +34,34 @@ import net.ccbluex.liquidbounce.event.events.PlayerJumpEvent
 import net.ccbluex.liquidbounce.event.events.PlayerMoveEvent
 import net.ccbluex.liquidbounce.event.events.PlayerNetworkMovementTickEvent
 import net.ccbluex.liquidbounce.event.events.TransferOrigin
+import net.ccbluex.liquidbounce.event.events.WorldChangeEvent
 import net.ccbluex.liquidbounce.event.handler
 import net.ccbluex.liquidbounce.event.sequenceHandler
 import net.ccbluex.liquidbounce.event.tickHandler
 import net.ccbluex.liquidbounce.event.waitTicks
+import net.ccbluex.liquidbounce.features.module.modules.combat.ModuleSpearKill
 import net.ccbluex.liquidbounce.features.module.modules.movement.fly.ModuleFly
+import net.ccbluex.liquidbounce.features.module.modules.player.nofall.modes.GroundPacketDeliveryTracker
+import net.ccbluex.liquidbounce.features.module.modules.player.nofall.modes.outgoingMovementPacket
 import net.ccbluex.liquidbounce.utils.client.chat
 import net.ccbluex.liquidbounce.utils.entity.withStrafe
+import net.ccbluex.liquidbounce.utils.kotlin.EventPriorityConvention.READ_FINAL_STATE
 import net.ccbluex.liquidbounce.utils.kotlin.EventPriorityConvention.SAFETY_FEATURE
+import net.ccbluex.liquidbounce.utils.math.anyNotEmpty
 import net.ccbluex.liquidbounce.utils.math.sq
 import net.ccbluex.liquidbounce.utils.math.withLength
 import net.ccbluex.liquidbounce.utils.network.MovePacketType
 import net.minecraft.client.player.LocalPlayer
+import net.minecraft.core.BlockPos
 import net.minecraft.network.protocol.game.ClientboundExplodePacket
+import net.minecraft.network.protocol.game.ClientboundPlayerPositionPacket
 import net.minecraft.network.protocol.game.ClientboundSetEntityMotionPacket
 import net.minecraft.network.protocol.game.ServerboundMovePlayerPacket
 import net.minecraft.network.protocol.game.ServerboundPlayerInputPacket
+import net.minecraft.world.entity.ai.attributes.Attributes
 import net.minecraft.world.entity.player.Input
 import net.minecraft.world.level.block.LiquidBlock
+import net.minecraft.world.phys.AABB
 import net.minecraft.world.phys.Vec3
 import net.minecraft.world.phys.shapes.Shapes
 import kotlin.jvm.optionals.getOrNull
@@ -96,6 +106,157 @@ internal fun resolveVanillaFlyElytraVerticalMotion(
 
 internal fun shouldSuppressVanillaFlyServerSneak(input: Input) = input.shift && !input.jump
 
+internal enum class VanillaFlyNoFallAction {
+    NONE,
+    GROUND_PACKET,
+    PACKET_JUMP,
+}
+
+internal object VanillaFlyNoFall {
+    private const val GROUND_PROBE_DEPTH = 10.0
+    private const val GROUND_PROBE_EPSILON = 1.0E-7
+    private const val PACKET_JUMP_Y_OFFSET = 1.0E-9
+    private const val SERVER_FALL_DISTANCE_MARGIN = 0.25
+
+    val packetType = MovePacketType.FULL
+
+    fun shouldRun(
+        enabled: Boolean,
+        fallDamagePossible: Boolean,
+        spearKillPacketRouteActive: Boolean,
+    ) = enabled && fallDamagePossible && !spearKillPacketRouteActive
+
+    fun shouldSendGroundPacket(
+        fallDistance: Double,
+        verticalMovement: Double,
+        safeFallDistance: Double,
+        tickCount: Int,
+    ) = tickCount > 20 && fallDistance - verticalMovement > safeFallDistance
+
+    fun shouldSendPacketJump(
+        onGround: Boolean,
+        fallDistance: Double,
+        safeFallDistance: Double,
+    ) = !onGround && fallDistance > safeFallDistance
+
+    fun maximumSafeServerFallDistance(safeFallDistance: Double) =
+        (safeFallDistance - SERVER_FALL_DISTANCE_MARGIN).coerceAtLeast(0.0)
+
+    fun resolveAction(
+        eligible: Boolean,
+        nearGround: Boolean,
+        groundPacketDue: Boolean,
+        packetJumpDue: Boolean,
+    ) = when {
+        !eligible -> VanillaFlyNoFallAction.NONE
+        nearGround && groundPacketDue -> VanillaFlyNoFallAction.GROUND_PACKET
+        !nearGround && packetJumpDue -> VanillaFlyNoFallAction.PACKET_JUMP
+        else -> VanillaFlyNoFallAction.NONE
+    }
+
+    fun groundProbeBox(playerBoundingBox: AABB) = AABB(
+        playerBoundingBox.minX,
+        playerBoundingBox.minY - GROUND_PROBE_DEPTH - GROUND_PROBE_EPSILON,
+        playerBoundingBox.minZ,
+        playerBoundingBox.maxX,
+        playerBoundingBox.minY,
+        playerBoundingBox.maxZ,
+    )
+
+    fun applyPacketJump(packet: ServerboundMovePlayerPacket) {
+        packet.y += PACKET_JUMP_Y_OFFSET
+    }
+
+    inline fun sendProtectedGroundPacket(
+        tracker: GroundPacketDeliveryTracker,
+        packet: ServerboundMovePlayerPacket,
+        send: (ServerboundMovePlayerPacket) -> Unit,
+    ) {
+        tracker.protect(packet)
+        try {
+            send(packet)
+        } finally {
+            tracker.discard(packet)
+        }
+    }
+
+    fun confirmGroundPacketDelivery(
+        tracker: GroundPacketDeliveryTracker,
+        packet: ServerboundMovePlayerPacket,
+        cancelled: Boolean,
+    ) = tracker.confirmFinalState(packet, cancelled)
+}
+
+/**
+ * Mirrors the server's last confirmed movement position and accumulated downward distance. A fast client-side
+ * descent can then be represented by several safe grounded packets without changing the requested endpoint.
+ */
+internal class VanillaFlyServerFallState {
+
+    var position: Vec3? = null
+        private set
+
+    var fallDistance = 0.0
+        private set
+
+    fun initialize(position: Vec3, fallDistance: Double) {
+        if (this.position != null || !position.isFinite || !fallDistance.isFinite()) {
+            return
+        }
+
+        this.position = position
+        this.fallDistance = maxOf(this.fallDistance, fallDistance.coerceAtLeast(0.0))
+    }
+
+    fun groundingPositions(target: Vec3, safeFallDistance: Double): List<Vec3> {
+        val start = position ?: return emptyList()
+        if (!target.isFinite || !safeFallDistance.isFinite()) {
+            return emptyList()
+        }
+
+        val totalDescent = start.y - target.y
+        val maximumSafeDescent = VanillaFlyNoFall.maximumSafeServerFallDistance(safeFallDistance)
+        if (totalDescent <= 0.0 || maximumSafeDescent <= 0.0) {
+            return emptyList()
+        }
+
+        val groundingPositions = mutableListOf<Vec3>()
+        var accumulatedDescent = 0.0
+        var currentFallDistance = fallDistance
+        while (currentFallDistance + totalDescent - accumulatedDescent > maximumSafeDescent) {
+            accumulatedDescent += (maximumSafeDescent - currentFallDistance).coerceAtLeast(0.0)
+            groundingPositions += start.lerp(target, accumulatedDescent / totalDescent)
+            currentFallDistance = 0.0
+        }
+
+        return groundingPositions
+    }
+
+    fun confirm(position: Vec3, onGround: Boolean) {
+        if (!position.isFinite) {
+            clear()
+            return
+        }
+
+        this.position?.let { previousPosition ->
+            fallDistance += (previousPosition.y - position.y).coerceAtLeast(0.0)
+        }
+        if (onGround) {
+            fallDistance = 0.0
+        }
+        this.position = position
+    }
+
+    fun invalidatePosition() {
+        position = null
+    }
+
+    fun clear() {
+        position = null
+        fallDistance = 0.0
+    }
+}
+
 internal inline fun applyVanillaFlyElytraVerticalMotion(
     event: PlayerMoveEvent,
     isFallFlying: Boolean,
@@ -121,6 +282,9 @@ internal object FlyVanilla : Mode("Vanilla") {
 
     private val bypassVanillaCheck by boolean("BypassVanillaCheck", true)
     private val bypassMode by enumChoice("BypassMode", VanillaFlyCheckBypassMode.PACKET)
+    private val noFall by boolean("NoFall", false)
+    private val noFallDeliveryTracker = GroundPacketDeliveryTracker()
+    private val noFallServerState = VanillaFlyServerFallState()
 
     object BaseSpeed : ValueGroup("BaseSpeed") {
         val horizontalSpeed by float("Horizontal", 0.44f, 0.1f..10f)
@@ -156,6 +320,85 @@ internal object FlyVanilla : Mode("Vanilla") {
             else -> glide.toDouble()
         }
 
+    override fun disable() {
+        noFallDeliveryTracker.clear()
+        noFallServerState.clear()
+        super.disable()
+    }
+
+    private val noFallEligible
+        get() = VanillaFlyNoFall.shouldRun(
+            enabled = noFall,
+            fallDamagePossible = !player.isCreative && !player.isSpectator &&
+                !player.abilities.invulnerable && !player.abilities.flying,
+            spearKillPacketRouteActive = ModuleSpearKill.usesPacketMovement,
+        )
+
+    private fun isNoFallGroundNearby(): Boolean {
+        if (player.onGround()) {
+            return true
+        }
+
+        val probeBox = VanillaFlyNoFall.groundProbeBox(player.boundingBox)
+        val minimum = BlockPos.containing(probeBox.minX, probeBox.minY, probeBox.minZ)
+        val maximum = BlockPos.containing(probeBox.maxX, probeBox.maxY, probeBox.maxZ)
+        if (!world.hasChunksAt(minimum, maximum)) {
+            return false
+        }
+
+        return world.getBlockCollisions(player, probeBox).anyNotEmpty()
+    }
+
+    private fun runNoFall() {
+        if (!noFallEligible) {
+            noFallDeliveryTracker.clear()
+            noFallServerState.clear()
+            return
+        }
+
+        noFallServerState.initialize(player.position(), player.fallDistance.toDouble())
+        val safeFallDistance = player.getAttributeValue(Attributes.SAFE_FALL_DISTANCE)
+        val action = VanillaFlyNoFall.resolveAction(
+            eligible = true,
+            nearGround = isNoFallGroundNearby(),
+            groundPacketDue = VanillaFlyNoFall.shouldSendGroundPacket(
+                fallDistance = player.fallDistance.toDouble(),
+                verticalMovement = player.deltaMovement.y,
+                safeFallDistance = safeFallDistance,
+                tickCount = player.tickCount,
+            ),
+            packetJumpDue = VanillaFlyNoFall.shouldSendPacketJump(
+                onGround = player.onGround(),
+                fallDistance = player.fallDistance.toDouble(),
+                safeFallDistance = safeFallDistance,
+            ),
+        )
+
+        when (action) {
+            VanillaFlyNoFallAction.NONE -> Unit
+            VanillaFlyNoFallAction.GROUND_PACKET -> sendNoFallGroundPacket()
+            VanillaFlyNoFallAction.PACKET_JUMP -> sendNoFallPacketJump()
+        }
+    }
+
+    private fun sendNoFallGroundPacket(position: Vec3? = null): Boolean {
+        val groundPosition = position ?: noFallServerState.position
+        val packet = VanillaFlyNoFall.packetType.generatePacket().apply {
+            groundPosition ?: return@apply
+            x = groundPosition.x
+            y = groundPosition.y
+            z = groundPosition.z
+        }
+        VanillaFlyNoFall.sendProtectedGroundPacket(noFallDeliveryTracker, packet) { network.send(it) }
+        return groundPosition == null ||
+            noFallServerState.position == groundPosition && noFallServerState.fallDistance == 0.0
+    }
+
+    private fun sendNoFallPacketJump() {
+        network.send(VanillaFlyNoFall.packetType.generatePacket().apply(VanillaFlyNoFall::applyPacketJump))
+        player.resetFallDistance()
+    }
+
     @Suppress("unused")
     private val tickHandler = tickHandler {
         player.deltaMovement = player.deltaMovement.withStrafe(speed = horizontalSpeed.toDouble())
@@ -167,6 +410,84 @@ internal object FlyVanilla : Mode("Vanilla") {
         ) {
             player.deltaMovement.y = -VANILLA_CHECK_BYPASS_Y_OFFSET
         }
+
+        runNoFall()
+    }
+
+    @Suppress("unused")
+    private val worldChangeHandler = handler<WorldChangeEvent> {
+        noFallDeliveryTracker.clear()
+        noFallServerState.clear()
+    }
+
+    @Suppress("unused")
+    private val noFallSafetyPacketHandler = handler<PacketEvent>(priority = SAFETY_FEATURE) { event ->
+        val packet = event.outgoingMovementPacket ?: return@handler
+        noFallDeliveryTracker.reassertGround(packet)
+    }
+
+    @Suppress("unused")
+    private val noFallSegmentationPacketHandler = handler<PacketEvent>(
+        priority = (READ_FINAL_STATE + 1).toShort(),
+    ) { event ->
+        val packet = event.outgoingMovementPacket ?: return@handler
+        if (event.isCancelled) {
+            return@handler
+        }
+        if (!noFallEligible) {
+            noFallServerState.clear()
+            return@handler
+        }
+        if (noFallDeliveryTracker.reassertGround(packet)) {
+            return@handler
+        }
+
+        noFallServerState.initialize(player.position(), player.fallDistance.toDouble())
+        val serverPosition = noFallServerState.position ?: return@handler
+        val target = Vec3(
+            packet.getX(serverPosition.x),
+            packet.getY(serverPosition.y),
+            packet.getZ(serverPosition.z),
+        )
+        noFallServerState.groundingPositions(
+            target = target,
+            safeFallDistance = player.getAttributeValue(Attributes.SAFE_FALL_DISTANCE),
+        ).forEach { groundingPosition ->
+            if (!sendNoFallGroundPacket(groundingPosition)) {
+                event.cancelEvent()
+                return@handler
+            }
+        }
+    }
+
+    @Suppress("unused")
+    private val noFallFinalPacketHandler = handler<PacketEvent>(priority = READ_FINAL_STATE) { event ->
+        if (event.origin == TransferOrigin.INCOMING &&
+            event.packet is ClientboundPlayerPositionPacket &&
+            !event.isCancelled
+        ) {
+            noFallDeliveryTracker.clear()
+            noFallServerState.invalidatePosition()
+            return@handler
+        }
+
+        val packet = event.outgoingMovementPacket ?: return@handler
+        if (VanillaFlyNoFall.confirmGroundPacketDelivery(noFallDeliveryTracker, packet, event.isCancelled)) {
+            player.resetFallDistance()
+        }
+        if (event.isCancelled || !noFallEligible) {
+            return@handler
+        }
+
+        val serverPosition = noFallServerState.position ?: return@handler
+        noFallServerState.confirm(
+            position = Vec3(
+                packet.getX(serverPosition.x),
+                packet.getY(serverPosition.y),
+                packet.getZ(serverPosition.z),
+            ),
+            onGround = packet.isOnGround,
+        )
     }
 
     @Suppress("unused")

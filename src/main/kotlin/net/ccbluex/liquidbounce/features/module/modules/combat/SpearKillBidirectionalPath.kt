@@ -165,6 +165,7 @@ private class BidirectionalAStarSearch<T>(
         var expansions = 0
         var expandForwardNext = true
         while (expansions < maxIterations && (forwardQueue.isNotEmpty() || backwardQueue.isNotEmpty())) {
+            if (Thread.currentThread().isInterrupted) return null
             discardStaleEntries(forwardQueue, forwardG)
             discardStaleEntries(backwardQueue, backwardG)
             if (bestPathIsProven()) break

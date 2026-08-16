@@ -82,20 +82,25 @@ class SpearKillRoutingPolicyTest {
     }
 
     @Test
-    fun `AStar waits when Direct is temporarily not ready`() {
+    fun `NetworkOptimized preserves the Direct first AStar fallback`() {
+        var directCalls = 0
         var aStarCalls = 0
 
         val result = startSpearKillPacketRoute(
-            mode = SpearKillRoutingMode.A_STAR,
-            startDirect = { SpearKillAttackStartResult.RETRY_LATER },
+            mode = SpearKillRoutingMode.NETWORK_OPTIMIZED,
+            startDirect = {
+                directCalls++
+                SpearKillAttackStartResult.BLOCKED
+            },
             startAStar = {
                 aStarCalls++
                 SpearKillAttackStartResult.STARTED
             },
         )
 
-        assertEquals(SpearKillAttackStartResult.RETRY_LATER, result)
-        assertEquals(0, aStarCalls)
+        assertEquals(SpearKillAttackStartResult.STARTED, result)
+        assertEquals(1, directCalls)
+        assertEquals(1, aStarCalls)
     }
 
     @Test
