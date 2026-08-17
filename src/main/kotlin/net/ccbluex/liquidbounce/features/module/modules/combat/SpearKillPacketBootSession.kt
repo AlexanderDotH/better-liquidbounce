@@ -310,7 +310,7 @@ internal class SpearKillPacketBootSession {
      * new outbound route without invalidating the exact return history.
      */
     val canStartChainedOutbound: Boolean
-        get() = physicalReturnEnabled && recovering && chainedOutboundWindowOpen &&
+        get() = recovering && chainedOutboundWindowOpen &&
             pendingOffset == null && committedOffset.lengthSqr() >= EPSILON
 
     val physicalReturnConfigured: Boolean

@@ -162,14 +162,37 @@ internal class SpearKillMovementConfiguration(eventListener: EventListener?) {
         name = "Instant",
         parent = parent,
     ) {
+        lateinit var safe: SpearKillInstantSafe
+            private set
+        lateinit var primed: SpearKillPrimedInstantConfiguration
+            private set
+
         val maxPackets by int(
             "MaxPackets",
             SPEAR_KILL_INSTANT_DEFAULT_MAX_PACKETS,
             SPEAR_KILL_INSTANT_MIN_MAX_PACKETS..SPEAR_KILL_INSTANT_MAX_MAX_PACKETS,
             "packets/tick",
         )
+        val strategy = modes("Strategy", 0) { strategyParent ->
+            arrayOf(
+                SpearKillInstantSafe(strategyParent).also { safe = it },
+                SpearKillPrimedInstantConfiguration(strategyParent).also { primed = it },
+            )
+        }
     }
 }
+
+internal sealed class SpearKillInstantStrategyChoice(
+    name: String,
+    final override val parent: ModeValueGroup<SpearKillInstantStrategyChoice>,
+) : Mode(name)
+
+internal class SpearKillInstantSafe(
+    parent: ModeValueGroup<SpearKillInstantStrategyChoice>,
+) : SpearKillInstantStrategyChoice(
+    name = "Safe",
+    parent = parent,
+)
 
 /** Matches vanilla's basic preconditions before SpearKill asks the server to start fall flying. */
 internal fun canStartSpearKillElytraFlight(

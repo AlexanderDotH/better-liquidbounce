@@ -51,6 +51,7 @@ import net.ccbluex.liquidbounce.features.command.commands.ingame.CommandRemoteVi
 import net.ccbluex.liquidbounce.features.command.commands.ingame.CommandResync
 import net.ccbluex.liquidbounce.features.command.commands.ingame.CommandSay
 import net.ccbluex.liquidbounce.features.command.commands.ingame.CommandServerInfo
+import net.ccbluex.liquidbounce.features.command.commands.ingame.CommandSpearHighSpeed
 import net.ccbluex.liquidbounce.features.command.commands.ingame.CommandTps
 import net.ccbluex.liquidbounce.features.command.commands.ingame.CommandUsername
 import net.ccbluex.liquidbounce.features.command.commands.ingame.creative.CommandItemEnchant
@@ -142,6 +143,7 @@ object CommandManager : Collection<Command> by commandSet {
             CommandPing,
             CommandRemoteView,
             CommandResync,
+            CommandSpearHighSpeed,
             CommandXRay,
             CommandBaseFinder,
             CommandSeedCracker,

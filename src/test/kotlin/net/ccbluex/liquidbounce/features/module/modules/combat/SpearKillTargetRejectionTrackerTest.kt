@@ -38,4 +38,18 @@ class SpearKillTargetRejectionTrackerTest {
 
         assertFalse(tracker.isRejected(target, currentTick = 100))
     }
+
+    @Test
+    fun `virtual route cleanup prunes stale entries without reopening an active correction cooldown`() {
+        val activeTarget = Any()
+        val expiredTarget = Any()
+        val tracker = SpearKillTargetRejectionTracker<Any>(retryDelayTicks = 20)
+        tracker.reject(activeTarget, currentTick = 100)
+        tracker.reject(expiredTarget, currentTick = 80)
+
+        tracker.clearExpired(currentTick = 103)
+
+        assertTrue(tracker.isRejected(activeTarget, currentTick = 103))
+        assertFalse(tracker.isRejected(expiredTarget, currentTick = 103))
+    }
 }

@@ -130,7 +130,7 @@ class ModuleSpearKillTest {
                     "Diagonal",
                     "LineOfSightShortcuts",
                 ),
-                "Instant" to listOf("MaxPackets"),
+                "Instant" to listOf("MaxPackets", "Strategy"),
             ),
             routing.modes.associate { it.name to it.inner.map { value -> value.name } },
         )

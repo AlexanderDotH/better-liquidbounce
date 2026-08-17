@@ -38,6 +38,12 @@ internal class SpearKillTargetRejectionTracker<T : Any>(
         return false
     }
 
+    /** Route teardown may discard stale identities, but must retain a live correction cooldown. */
+    fun clearExpired(currentTick: Int) {
+        val tick = currentTick.toLong()
+        rejectedUntilTick.entries.removeIf { (_, rejectedUntil) -> tick >= rejectedUntil }
+    }
+
     fun clear() {
         rejectedUntilTick.clear()
     }

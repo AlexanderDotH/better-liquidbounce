@@ -26,12 +26,34 @@ internal const val SPEAR_KILL_INSTANT_MIN_MAX_PACKETS = 2
 internal const val SPEAR_KILL_INSTANT_MAX_MAX_PACKETS = 512
 internal const val SPEAR_KILL_INSTANT_SERVER_EVALUATION_TICKS = SPEAR_KILL_PACKET_STRIKE_HOLD_TICKS
 
+/**
+ * KineticWeapon checks held spears every server use tick. The multi-tick Instant hold protects
+ * against client/server phase alignment; it is not extra travel time for target prediction.
+ */
+internal fun spearKillInstantAimPredictionTicks(serverEvaluationTicks: Int): Int {
+    require(serverEvaluationTicks >= 0) { "Server evaluation ticks must not be negative" }
+    return serverEvaluationTicks.coerceAtMost(1)
+}
+
 /** A complete direct round trip split into an immediate outbound and next-tick exact return. */
 internal data class SpearKillInstantPacketBurst(
     val sessionPath: List<Vec3>,
     val outboundSteps: Int,
     val packetCount: Int,
 )
+
+/** Complete Primed session budget, including one conservative NoFall packet per real movement. */
+internal data class SpearKillPrimedInstantSessionBudget(
+    val movementPackets: Int,
+    val primingPackets: Int,
+    val noFallPacketsReserved: Int,
+    val recoveryConfirmationPacketsReserved: Int,
+    val finalGroundingPacketReserved: Int,
+) {
+    val totalPackets: Int
+        get() = movementPackets + primingPackets + noFallPacketsReserved +
+            recoveryConfirmationPacketsReserved + finalGroundingPacketReserved
+}
 
 internal enum class SpearKillInstantChargeAction {
     READY,
@@ -101,6 +123,95 @@ internal fun buildSpearKillInstantPacketBurst(
         outboundSteps = outbound.size,
         packetCount = packetMovements.size,
     )
+}
+
+/**
+ * Builds the aggressive one-packet lunge without inspecting the corridor. Only the two endpoint
+ * hitboxes are admitted here; the terminal spear ray remains a separate mandatory check.
+ */
+internal fun buildSpearKillPrimedInstantPacketRoute(
+    origin: Vec3,
+    destination: Vec3,
+    isEndpointFree: (Vec3) -> Boolean,
+): SpearKillAStarPacketRoute? {
+    if (!origin.hasFiniteInstantCoordinates() || !destination.hasFiniteInstantCoordinates() ||
+        origin.distanceToSqr(destination) < SPEAR_KILL_INSTANT_EPSILON ||
+        !isEndpointFree(origin) || !isEndpointFree(destination)
+    ) {
+        return null
+    }
+
+    val movement = destination.subtract(origin)
+    return SpearKillAStarPacketRoute(
+        outboundMovements = listOf(movement),
+        roundTripMovements = listOf(movement, movement.scale(-1.0), Vec3.ZERO),
+    )
+}
+
+/** Live send-time gate: move probes need only a free endpoint; attacks also retain target and ray. */
+internal fun isSpearKillPrimedInstantStepAdmissible(
+    endpointFree: Boolean,
+    outboundStep: Boolean,
+    attackTargetPresent: Boolean,
+    targetValid: Boolean,
+    terminalRaytraceClear: Boolean,
+): Boolean = endpointFree && (
+    !outboundStep || !attackTargetPresent || targetValid && terminalRaytraceClear
+)
+
+/** All-or-nothing admission for outbound, exact inverse, NoFall extras, and final grounding. */
+internal fun calculateSpearKillPrimedInstantSessionBudget(
+    route: SpearKillAStarPacketRoute,
+    priming: SpearKillPrimedInstantPriming,
+    movementProfile: SpearKillPrimedInstantMovementProfile,
+    maxPackets: Int,
+): SpearKillPrimedInstantSessionBudget? = calculateSpearKillPrimedInstantMovementBudget(
+    movements = route.roundTripMovements,
+    priming = priming,
+    movementProfile = movementProfile,
+    maxPackets = maxPackets,
+)
+
+/** All-or-nothing admission for a replacement recovery route after a server correction. */
+internal fun calculateSpearKillPrimedInstantMovementBudget(
+    movements: List<Vec3>,
+    priming: SpearKillPrimedInstantPriming,
+    movementProfile: SpearKillPrimedInstantMovementProfile,
+    maxPackets: Int,
+    recoveryConfirmationPackets: Int = 0,
+): SpearKillPrimedInstantSessionBudget? {
+    if (recoveryConfirmationPackets < 0) return null
+    val realMovements = movements.filter { it.lengthSqr() >= SPEAR_KILL_INSTANT_EPSILON }
+    if (realMovements.isEmpty()) return null
+
+    var primingPackets = 0
+    for (movement in realMovements) {
+        val result = SpearKillPrimedInstantPlanner.plan(
+            SpearKillPrimedInstantPlanRequest(
+                requestedDistance = movement.length(),
+                expectedVelocitySquared = 0.0,
+                movementProfile = movementProfile,
+                priming = priming,
+                packetAccounting = SpearKillPrimedInstantPacketAccounting(
+                    ownedPreFinalPackets = 0,
+                    noFallPreFinalPackets = 1,
+                    reservedPacketsAfterFinal = 0,
+                    maxPackets = Int.MAX_VALUE,
+                ),
+                primingPacketType = SpearKillPrimedInstantPacketType.Position,
+            ),
+        ) as? SpearKillPrimedInstantPlanResult.Ready ?: return null
+        primingPackets += result.plan.dedicatedPrimingPackets
+    }
+
+    val budget = SpearKillPrimedInstantSessionBudget(
+        movementPackets = realMovements.size,
+        primingPackets = primingPackets,
+        noFallPacketsReserved = realMovements.size,
+        recoveryConfirmationPacketsReserved = recoveryConfirmationPackets,
+        finalGroundingPacketReserved = 1,
+    )
+    return budget.takeIf { it.totalPackets <= maxPackets }
 }
 
 /**

@@ -30,6 +30,14 @@ import org.junit.jupiter.api.Test
 class SpearKillInstantRouteTest {
 
     @Test
+    fun `Instant aims at the first server damage sample instead of the end of its hold`() {
+        assertEquals(0, spearKillInstantAimPredictionTicks(serverEvaluationTicks = 0))
+        assertEquals(1, spearKillInstantAimPredictionTicks(serverEvaluationTicks = 1))
+        assertEquals(1, spearKillInstantAimPredictionTicks(serverEvaluationTicks = 2))
+        assertEquals(1, spearKillInstantAimPredictionTicks(serverEvaluationTicks = 20))
+    }
+
+    @Test
     fun `Instant holds its terminal outbound across a full server damage window before returning`() {
         val outbound = listOf(
             Vec3(10.0, 0.0, 0.0),
@@ -197,6 +205,177 @@ class SpearKillInstantRouteTest {
         }
 
         assertEquals(listOf(Vec3(-6.0, 0.0, 0.0), Vec3(-8.0, 0.0, 0.0)), recovery)
+        assertEquals(Vec3.ZERO, session.committedOffset)
+    }
+
+    @Test
+    fun `Safe rejects a blocked corridor while Primed admits the same free endpoint once`() {
+        val origin = Vec3.ZERO
+        val destination = Vec3(40.0, 0.0, 0.0)
+        val blockedCorridor = SpearKillAStarSegmentValidator { _, _ -> false }
+
+        val safe = buildSpearKillAStarPacketRoute(
+            origin = origin,
+            outboundWaypoints = listOf(destination),
+            maxSpeed = 40.0,
+            segmentValidator = blockedCorridor,
+        )
+        val primed = requireNotNull(buildSpearKillPrimedInstantPacketRoute(
+            origin = origin,
+            destination = destination,
+            isEndpointFree = { true },
+        ))
+
+        assertNull(safe)
+        assertEquals(listOf(Vec3(40.0, 0.0, 0.0)), primed.outboundMovements)
+    }
+
+    @Test
+    fun `Primed refuses a blocked destination before constructing a partial burst`() {
+        val origin = Vec3.ZERO
+        val destination = Vec3(100.0, 0.0, 0.0)
+
+        val route = buildSpearKillPrimedInstantPacketRoute(
+            origin = origin,
+            destination = destination,
+            isEndpointFree = { it != destination },
+        )
+
+        assertNull(route)
+    }
+
+    @Test
+    fun `Primed attack revalidates target and terminal ray while a move probe needs only its endpoint`() {
+        assertFalse(isSpearKillPrimedInstantStepAdmissible(
+            endpointFree = true,
+            outboundStep = true,
+            attackTargetPresent = true,
+            targetValid = true,
+            terminalRaytraceClear = false,
+        ))
+        assertFalse(isSpearKillPrimedInstantStepAdmissible(
+            endpointFree = true,
+            outboundStep = true,
+            attackTargetPresent = true,
+            targetValid = false,
+            terminalRaytraceClear = true,
+        ))
+        assertTrue(isSpearKillPrimedInstantStepAdmissible(
+            endpointFree = true,
+            outboundStep = true,
+            attackTargetPresent = false,
+            targetValid = false,
+            terminalRaytraceClear = false,
+        ))
+        assertTrue(isSpearKillPrimedInstantStepAdmissible(
+            endpointFree = true,
+            outboundStep = false,
+            attackTargetPresent = true,
+            targetValid = false,
+            terminalRaytraceClear = false,
+        ))
+    }
+
+    @Test
+    fun `Primed route contains one lunge and its exact inverse only`() {
+        val movement = Vec3(75.0, -4.0, 3.0)
+        val route = requireNotNull(buildSpearKillPrimedInstantPacketRoute(
+            origin = Vec3.ZERO,
+            destination = movement,
+            isEndpointFree = { true },
+        ))
+
+        assertEquals(listOf(movement), route.outboundMovements)
+        assertEquals(listOf(movement, movement.scale(-1.0), Vec3.ZERO), route.roundTripMovements)
+    }
+
+    @Test
+    fun `Primed budget reserves both movements NoFall and final grounding before admission`() {
+        val route = requireNotNull(buildSpearKillPrimedInstantPacketRoute(
+            origin = Vec3.ZERO,
+            destination = Vec3(20.0, 0.0, 0.0),
+            isEndpointFree = { true },
+        ))
+
+        assertNull(calculateSpearKillPrimedInstantSessionBudget(
+            route = route,
+            priming = SpearKillPrimedInstantPriming.Auto,
+            movementProfile = SpearKillPrimedInstantMovementProfile.NORMAL,
+            maxPackets = 8,
+        ))
+        val budget = requireNotNull(calculateSpearKillPrimedInstantSessionBudget(
+            route = route,
+            priming = SpearKillPrimedInstantPriming.Auto,
+            movementProfile = SpearKillPrimedInstantMovementProfile.NORMAL,
+            maxPackets = 9,
+        ))
+        assertEquals(2, budget.movementPackets)
+        assertEquals(4, budget.primingPackets)
+        assertEquals(2, budget.noFallPacketsReserved)
+        assertEquals(0, budget.recoveryConfirmationPacketsReserved)
+        assertEquals(1, budget.finalGroundingPacketReserved)
+        assertEquals(9, budget.totalPackets)
+    }
+
+    @Test
+    fun `Primed replacement recovery is rejected before its first packet when remaining budget is too small`() {
+        val recovery = listOf(
+            Vec3(-20.0, 0.0, 0.0),
+            Vec3(-20.0, 0.0, 0.0),
+        )
+
+        assertNull(calculateSpearKillPrimedInstantMovementBudget(
+            movements = recovery,
+            priming = SpearKillPrimedInstantPriming.Auto,
+            movementProfile = SpearKillPrimedInstantMovementProfile.NORMAL,
+            maxPackets = 10,
+            recoveryConfirmationPackets = 2,
+        ))
+        val budget = requireNotNull(calculateSpearKillPrimedInstantMovementBudget(
+            movements = recovery,
+            priming = SpearKillPrimedInstantPriming.Auto,
+            movementProfile = SpearKillPrimedInstantMovementProfile.NORMAL,
+            maxPackets = 11,
+            recoveryConfirmationPackets = 2,
+        ))
+        assertEquals(2, budget.recoveryConfirmationPacketsReserved)
+        assertEquals(11, budget.totalPackets)
+    }
+
+    @Test
+    fun `virtual Instant can chain while retaining inverse history to its original origin`() {
+        val initialMovement = Vec3(20.0, 0.0, 0.0)
+        val chainedMovement = Vec3(15.0, 0.0, 0.0)
+        val session = SpearKillPacketBootSession()
+        startSpearKillInstantPacketSession(
+            session,
+            requireNotNull(buildSpearKillInstantPacketBurst(exactRoundTrip(listOf(initialMovement)), 2)),
+        )
+        assertNotNull(session.prepareNextStep())
+        session.confirmStep(delivered = true)
+        assertTrue(session.canStartChainedOutbound)
+        assertTrue(session.startChainedOutbound(
+            outboundMovements = listOf(chainedMovement),
+            strikeHoldTicks = SPEAR_KILL_PACKET_STRIKE_HOLD_TICKS,
+        ))
+
+        assertNotNull(session.prepareNextStep())
+        session.confirmStep(delivered = true)
+        repeat(SPEAR_KILL_PACKET_STRIKE_HOLD_TICKS) {
+            assertNull(session.prepareNextStep())
+        }
+        val recovery = mutableListOf<Vec3>()
+        while (session.active) {
+            session.prepareNextStep()?.let {
+                recovery += requireNotNull(session.pendingMovement)
+                session.confirmStep(delivered = true)
+            }
+        }
+
+        val expectedRecovery = listOf(chainedMovement.scale(-1.0), initialMovement.scale(-1.0))
+        assertTrue(expectedRecovery.zip(recovery).all { (expected, actual) ->
+            expected.distanceToSqr(actual) < 1.0E-12
+        })
         assertEquals(Vec3.ZERO, session.committedOffset)
     }
 
