@@ -26,26 +26,53 @@ internal enum class SpearKillRoutingMode(override val tag: String) : Tagged {
     DIRECT("Direct"),
     A_STAR("AStar"),
     NETWORK_OPTIMIZED("NetworkOptimized"),
+    INSTANT("Instant"),
 }
 
 internal fun SpearKillRoutingMode.directRouteLabel(): String = when (this) {
     SpearKillRoutingMode.DIRECT -> "Direct"
     SpearKillRoutingMode.A_STAR -> "AStar→Direct"
     SpearKillRoutingMode.NETWORK_OPTIMIZED -> "NetworkOptimized→Direct"
+    SpearKillRoutingMode.INSTANT -> "Instant"
 }
 
 internal fun SpearKillRoutingMode.aStarRouteLabel(): String = when (this) {
     SpearKillRoutingMode.DIRECT -> "Direct"
     SpearKillRoutingMode.A_STAR -> "AStar"
     SpearKillRoutingMode.NETWORK_OPTIMIZED -> "NetworkOptimized→AStar"
+    SpearKillRoutingMode.INSTANT -> "Instant"
 }
 
-/** Direct-style modes return as soon as the terminal packet is delivered; standalone A* retains its hold. */
+/** Instant and standalone A* retain a complete endpoint window for server-side kinetic damage. */
 internal fun spearKillStrikeHoldTicks(routingMode: SpearKillRoutingMode): Int = when (routingMode) {
     SpearKillRoutingMode.DIRECT,
     SpearKillRoutingMode.NETWORK_OPTIMIZED,
     -> 0
+    SpearKillRoutingMode.INSTANT -> SPEAR_KILL_INSTANT_SERVER_EVALUATION_TICKS
     SpearKillRoutingMode.A_STAR -> SPEAR_KILL_PACKET_STRIKE_HOLD_TICKS
+}
+
+/** Instant flushes outbound now and predicts damage at the end of its bounded evaluation window. */
+internal fun spearKillDirectRouteHitTicks(
+    routingMode: SpearKillRoutingMode,
+    outboundTickCount: Int,
+    stepWaitTicks: Int,
+    strikeHoldTicks: Int,
+): Int = if (routingMode == SpearKillRoutingMode.INSTANT) {
+    SPEAR_KILL_INSTANT_SERVER_EVALUATION_TICKS
+} else {
+    spearKillDirectPacketHitTicks(outboundTickCount, stepWaitTicks, strikeHoldTicks)
+}
+
+/** Keeps Instant's synchronous burst while ensuring no downward packet can cross the safe-fall window alone. */
+internal fun spearKillDirectRouteMaxVerticalStep(
+    routingMode: SpearKillRoutingMode,
+    maximumStepLimit: Double,
+    safeVerticalStep: Double,
+): Double = if (routingMode == SpearKillRoutingMode.INSTANT) {
+    minOf(maximumStepLimit, safeVerticalStep)
+} else {
+    maximumStepLimit
 }
 
 /**
@@ -57,7 +84,9 @@ internal fun shouldRouteSpearKillViaAStar(
     routingMode: SpearKillRoutingMode,
     directRouteAvailable: Boolean,
 ): Boolean = when (routingMode) {
-    SpearKillRoutingMode.DIRECT -> false
+    SpearKillRoutingMode.DIRECT,
+    SpearKillRoutingMode.INSTANT,
+    -> false
     SpearKillRoutingMode.A_STAR,
     SpearKillRoutingMode.NETWORK_OPTIMIZED,
     -> !directRouteAvailable

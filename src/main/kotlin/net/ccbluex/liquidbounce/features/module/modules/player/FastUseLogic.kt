@@ -61,7 +61,11 @@ internal fun shouldRefreshFastUseSpear(
     isUseKeyDown: Boolean,
     ticksUsingItem: Int,
     damageUseDuration: Int,
-): Boolean = isUseKeyDown && damageUseDuration > 0 && ticksUsingItem >= damageUseDuration - 1
+    spearKillControlsUse: Boolean = false,
+): Boolean = !spearKillControlsUse &&
+    isUseKeyDown &&
+    damageUseDuration > 0 &&
+    ticksUsingItem >= damageUseDuration - 1
 
 internal fun adjustedSpearAnimationTicks(@Suppress("UNUSED_PARAMETER") originalTicks: Float, delayTicks: Int): Float =
     delayTicks.toFloat()

@@ -40,22 +40,22 @@ class SpearKillVirtualFallSafetyTest {
     }
 
     @Test
-    fun `direction change grounds accumulated descent before continuing`() {
+    fun `horizontal continuation grounds accumulated descent but upward return does not`() {
         val state = SpearKillVirtualFallState()
         state.confirmMovement(Vec3(0.0, -2.0, 0.0))
 
         assertTrue(state.requiresGroundingBefore(Vec3(4.0, 0.0, 0.0), 3.0))
-        assertTrue(state.requiresGroundingBefore(Vec3(0.0, 2.0, 0.0), 3.0))
+        assertFalse(state.requiresGroundingBefore(Vec3(0.0, 2.0, 0.0), 3.0))
     }
 
     @Test
-    fun `upward delivery does not erase server side fall distance`() {
+    fun `upward delivery clears server side fall distance`() {
         val state = SpearKillVirtualFallState()
         state.confirmMovement(Vec3(0.0, -2.0, 0.0))
 
         state.confirmMovement(Vec3(0.0, 4.0, 0.0))
 
-        assertEquals(2.0, state.fallDistance)
+        assertEquals(0.0, state.fallDistance)
     }
 
     @Test

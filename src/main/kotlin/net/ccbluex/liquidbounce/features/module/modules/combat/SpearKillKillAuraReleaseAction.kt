@@ -24,19 +24,13 @@ internal enum class SpearKillKillAuraReleaseAction {
     RELEASE_INHERITED_USE,
     CANCEL_INHERITED_PREPARATION,
     CANCEL_INHERITED_ROUTE,
-    DEACTIVATE,
-    DEACTIVATE_AND_RETURN,
 }
 
 internal fun resolveSpearKillKillAuraReleaseAction(
-    spearKillEnabled: Boolean,
     killAuraOwnsAttempt: Boolean,
-    routeActive: Boolean,
     killAuraPreparationActive: Boolean,
     inheritedUseActive: Boolean,
 ): SpearKillKillAuraReleaseAction = when {
-    spearKillEnabled && routeActive -> SpearKillKillAuraReleaseAction.DEACTIVATE_AND_RETURN
-    spearKillEnabled -> SpearKillKillAuraReleaseAction.DEACTIVATE
     killAuraOwnsAttempt -> SpearKillKillAuraReleaseAction.CANCEL_INHERITED_ROUTE
     killAuraPreparationActive -> SpearKillKillAuraReleaseAction.CANCEL_INHERITED_PREPARATION
     inheritedUseActive -> SpearKillKillAuraReleaseAction.RELEASE_INHERITED_USE

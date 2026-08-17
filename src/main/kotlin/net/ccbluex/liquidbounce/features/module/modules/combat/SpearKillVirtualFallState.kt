@@ -31,8 +31,9 @@ internal class SpearKillVirtualFallState {
 
     fun confirmMovement(movement: Vec3) {
         require(movement.isFinite()) { "Movement must be finite" }
-        if (movement.y < 0.0) {
-            fallDistance -= movement.y
+        when {
+            movement.y > 0.0 -> reset()
+            movement.y < 0.0 -> fallDistance -= movement.y
         }
     }
 
@@ -41,10 +42,10 @@ internal class SpearKillVirtualFallState {
         require(safeFallDistance.isFinite()) { "Safe fall distance must be finite" }
 
         val safeDistance = max(safeFallDistance, 0.0)
-        return if (nextMovement.y < 0.0) {
-            fallDistance - nextMovement.y > safeDistance
-        } else {
-            fallDistance > 0.0
+        return when {
+            nextMovement.y > 0.0 -> false
+            nextMovement.y < 0.0 -> fallDistance - nextMovement.y > safeDistance
+            else -> fallDistance > 0.0
         }
     }
 

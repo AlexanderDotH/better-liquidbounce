@@ -47,6 +47,7 @@ private class ActiveSpearKillFallSafetySession(
     var awaitingFinalGrounding = false
     var finalGroundingConfirmed = false
     var lastConfirmedPacketGrounded = false
+    var stabilizationDeliveredForPendingMovement = false
 }
 
 /** Owns delivery-confirmed fall state for one fully preflighted Packet route. */
@@ -62,14 +63,6 @@ internal class SpearKillFallSafetyLifecycle {
 
     val confirmedFallDistance: Double
         get() = session?.confirmedFallState?.fallDistance ?: 0.0
-
-    /**
-     * Compatibility entry point for callers not yet providing a preflight. It deliberately leaves
-     * the lifecycle inactive so an unplanned route can never claim a fall-state reset.
-     */
-    fun begin() {
-        invalidate()
-    }
 
     fun begin(plan: SpearKillServerFallSafetyPlan) {
         session = ActiveSpearKillFallSafetySession(plan)
@@ -106,6 +99,34 @@ internal class SpearKillFallSafetyLifecycle {
         return sameMovement(step.movement, movement) && step.groundExactPacket
     }
 
+    /** Reuses Direct's delivered ground-spoof credit without consuming the pending route step. */
+    fun shouldStabilizePendingMovement(
+        movement: Vec3,
+        physicalFallDanger: Boolean,
+    ): Boolean {
+        val current = session ?: return false
+        val step = current.plan.steps.getOrNull(current.confirmedMovementCount) ?: return false
+        if (!sameMovement(step.movement, movement)) return false
+
+        return shouldStabilizeSpearKillVirtualFall(
+            groundingDelivered = current.stabilizationDeliveredForPendingMovement,
+            physicalFallDanger = physicalFallDanger,
+            state = current.confirmedFallState,
+            nextMovement = movement,
+            safeFallDistance = current.plan.safeFallDistance,
+        )
+    }
+
+    fun confirmStabilization(delivered: Boolean): Boolean {
+        val current = session ?: return false
+        val pendingStep = current.plan.steps.getOrNull(current.confirmedMovementCount)
+        if (!delivered || pendingStep == null) return false
+
+        current.confirmedFallState.confirmGrounded()
+        current.stabilizationDeliveredForPendingMovement = true
+        return true
+    }
+
     fun confirmGrounding(delivered: Boolean): Boolean {
         val current = session ?: return false
         if (!delivered) {
@@ -139,6 +160,7 @@ internal class SpearKillFallSafetyLifecycle {
         } else {
             current.confirmedFallState.confirmMovement(movement)
         }
+        current.stabilizationDeliveredForPendingMovement = false
         current.lastConfirmedPacketGrounded = exactPacketGrounded
         current.confirmedMovementCount++
         return true

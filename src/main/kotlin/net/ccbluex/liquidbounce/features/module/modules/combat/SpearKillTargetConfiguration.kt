@@ -55,8 +55,8 @@ internal fun requiresSpearKillAttackRequest(activationMode: SpearKillActivationM
 /**
  * Keeps one Manual click armed while the same spear-use hold is charging or refreshing.
  *
- * This deliberately does not latch HoldUse: that mode already owns continuous activation from the
- * held-use input and must not inherit a stale attack click.
+ * This deliberately does not latch HoldUse: that mode has its own one-launch-per-hold lifecycle and
+ * must not inherit a stale attack click.
  */
 internal fun nextSpearKillManualAttackRequestLatch(
     activationMode: SpearKillActivationMode,
@@ -91,7 +91,7 @@ internal fun shouldStartSpearKillAttempt(
     delayTicks: Int,
     damageUseDuration: Int,
 ): Boolean = !attackActive && activationSatisfied && hasTarget &&
-    ticksUsingItem > delayTicks && ticksUsingItem < damageUseDuration
+    damageUseDuration > delayTicks && ticksUsingItem > delayTicks
 
 /**
  * Candidate acquisition deliberately starts before charge and activation are complete. Otherwise

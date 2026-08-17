@@ -33,6 +33,20 @@ internal fun shouldRaiseSpearKillAnimation(
     isUsingSpear: Boolean,
 ): Boolean = spearKillRunning && holdingSpear && (attackPathActive || attackRequested || isUsingSpear)
 
+/**
+ * Prevents FastUse from restarting a spear that SpearKill is deliberately keeping raised.
+ * Automatic requests include FightBot use and KillAura's targetless pre-hold.
+ */
+internal fun shouldControlSpearKillUse(
+    spearKillRunning: Boolean,
+    attackPathActive: Boolean,
+    routePreparationActive: Boolean,
+    physicalUseRequested: Boolean,
+    automaticUseRequested: Boolean,
+): Boolean = spearKillRunning && (
+    attackPathActive || routePreparationActive || physicalUseRequested || automaticUseRequested
+    )
+
 /** Forces the first-person use pose whenever SpearKill wants the spear raised. */
 internal fun shouldAnimateSpearKillUseItem(
     shouldRaise: Boolean,
@@ -81,4 +95,29 @@ internal fun resolveSpearKillChargeDecision(
     ticksUsingItem > delayTicks -> SpearKillChargeDecision.READY
     isUsingSpear && useRequested -> SpearKillChargeDecision.WAIT_FOR_VANILLA
     else -> SpearKillChargeDecision.RESET
+}
+
+/**
+ * Keeps an owned pre-hold inside the finite kinetic damage window without stealing charge recovery
+ * from a Packet route that already has a launch-ready target.
+ */
+internal fun shouldRefreshSpearKillPrehold(
+    useRequested: Boolean,
+    launchCandidateReady: Boolean,
+    routeCanRecoverCharge: Boolean,
+    ticksUsingItem: Int,
+    delayTicks: Int,
+    damageUseDuration: Int,
+): Boolean {
+    if (!useRequested || ticksUsingItem < 0 || delayTicks < 0 || damageUseDuration <= delayTicks) {
+        return false
+    }
+    if (launchCandidateReady && routeCanRecoverCharge) return false
+
+    val refreshTick = if (launchCandidateReady) {
+        damageUseDuration.toLong()
+    } else {
+        maxOf(delayTicks.toLong() + 1L, damageUseDuration.toLong() - 1L)
+    }
+    return ticksUsingItem.toLong() >= refreshTick
 }

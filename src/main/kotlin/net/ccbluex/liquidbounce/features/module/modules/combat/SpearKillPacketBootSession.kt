@@ -120,6 +120,12 @@ internal fun applySpearKillPathHeading(packet: ServerboundMovePlayerPacket, head
 /** Keeps the final kinetic lunge intact instead of letting a camera packet reset its server-side speed. */
 internal fun shouldSuppressSpearKillStrikeHoldPacket(holdingStrike: Boolean): Boolean = holdingStrike
 
+/** Prevents the server from replacing the terminal lunge velocity with zero before damage is sampled. */
+internal fun shouldSuppressSpearKillKineticResetPacket(
+    holdingStrike: Boolean,
+    clientTickEndPacket: Boolean,
+): Boolean = holdingStrike && clientTickEndPacket
+
 /** Only the selected movement packet may carry a pending virtual step. */
 internal fun spearKillPacketVirtualOffset(
     carriesPendingStep: Boolean,

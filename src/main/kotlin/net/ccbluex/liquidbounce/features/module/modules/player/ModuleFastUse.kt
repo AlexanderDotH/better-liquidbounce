@@ -211,10 +211,11 @@ object ModuleFastUse : ClientModule("FastUse", ModuleCategories.PLAYER, aliases 
         }
 
         val kineticWeapon = player.useItem.get(DataComponents.KINETIC_WEAPON) ?: return@handler
-        if (!ModuleSpearKill.controlsSpearUse && shouldRefreshFastUseSpear(
+        if (shouldRefreshFastUseSpear(
                 isUseKeyDown = mc.options.keyUse.isDown,
                 ticksUsingItem = player.ticksUsingItem,
                 damageUseDuration = kineticWeapon.computeDamageUseDuration(),
+                spearKillControlsUse = ModuleSpearKill.controlsSpearUse,
             )
         ) {
             // Kinetic weapon conditions have a finite server-side duration. Restart the same hand

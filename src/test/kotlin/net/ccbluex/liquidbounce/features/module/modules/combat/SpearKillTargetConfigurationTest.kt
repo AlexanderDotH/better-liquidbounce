@@ -21,6 +21,8 @@ package net.ccbluex.liquidbounce.features.module.modules.combat
 
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
+import org.junit.jupiter.api.Assertions.assertNull
+import org.junit.jupiter.api.Assertions.assertSame
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 
@@ -102,13 +104,11 @@ class SpearKillTargetConfigurationTest {
     }
 
     @Test
-    fun `disabling KillAura deactivates SpearKill and returns its active route`() {
+    fun `disabling KillAura cancels only the route owned by KillAura`() {
         assertEquals(
-            SpearKillKillAuraReleaseAction.DEACTIVATE_AND_RETURN,
+            SpearKillKillAuraReleaseAction.CANCEL_INHERITED_ROUTE,
             resolveSpearKillKillAuraReleaseAction(
-                spearKillEnabled = true,
                 killAuraOwnsAttempt = true,
-                routeActive = true,
                 killAuraPreparationActive = false,
                 inheritedUseActive = true,
             ),
@@ -120,9 +120,7 @@ class SpearKillTargetConfigurationTest {
         assertEquals(
             SpearKillKillAuraReleaseAction.CANCEL_INHERITED_PREPARATION,
             resolveSpearKillKillAuraReleaseAction(
-                spearKillEnabled = false,
                 killAuraOwnsAttempt = false,
-                routeActive = false,
                 killAuraPreparationActive = true,
                 inheritedUseActive = true,
             ),
@@ -130,9 +128,7 @@ class SpearKillTargetConfigurationTest {
         assertEquals(
             SpearKillKillAuraReleaseAction.RELEASE_INHERITED_USE,
             resolveSpearKillKillAuraReleaseAction(
-                spearKillEnabled = false,
                 killAuraOwnsAttempt = false,
-                routeActive = false,
                 killAuraPreparationActive = false,
                 inheritedUseActive = true,
             ),
@@ -140,39 +136,21 @@ class SpearKillTargetConfigurationTest {
     }
 
     @Test
-    fun `disabling KillAura deactivates an unrelated SpearKill route instead of chaining targets`() {
+    fun `disabling KillAura leaves unrelated and idle SpearKill ownership untouched`() {
         assertEquals(
-            SpearKillKillAuraReleaseAction.DEACTIVATE_AND_RETURN,
+            SpearKillKillAuraReleaseAction.NONE,
             resolveSpearKillKillAuraReleaseAction(
-                spearKillEnabled = true,
                 killAuraOwnsAttempt = false,
-                routeActive = true,
                 killAuraPreparationActive = false,
                 inheritedUseActive = false,
             ),
         )
         assertEquals(
-            SpearKillKillAuraReleaseAction.DEACTIVATE_AND_RETURN,
+            SpearKillKillAuraReleaseAction.RELEASE_INHERITED_USE,
             resolveSpearKillKillAuraReleaseAction(
-                spearKillEnabled = true,
                 killAuraOwnsAttempt = false,
-                routeActive = true,
                 killAuraPreparationActive = false,
                 inheritedUseActive = true,
-            ),
-        )
-    }
-
-    @Test
-    fun `disabling KillAura deactivates idle SpearKill`() {
-        assertEquals(
-            SpearKillKillAuraReleaseAction.DEACTIVATE,
-            resolveSpearKillKillAuraReleaseAction(
-                spearKillEnabled = true,
-                killAuraOwnsAttempt = false,
-                routeActive = false,
-                killAuraPreparationActive = false,
-                inheritedUseActive = false,
             ),
         )
     }
@@ -231,8 +209,130 @@ class SpearKillTargetConfigurationTest {
 
         assertFalse(shouldStartSpearKillAttempt(false, holdUseSatisfied, true, 3, 3, 20))
         assertTrue(shouldStartSpearKillAttempt(false, holdUseSatisfied, true, 4, 3, 20))
-        assertFalse(shouldStartSpearKillAttempt(false, holdUseSatisfied, true, 20, 3, 20))
+        assertTrue(shouldStartSpearKillAttempt(false, holdUseSatisfied, true, 20, 3, 20))
+        assertFalse(shouldStartSpearKillAttempt(false, holdUseSatisfied, true, 4, 3, 3))
         assertFalse(shouldStartSpearKillAttempt(true, holdUseSatisfied, true, 4, 3, 20))
+    }
+
+    @Test
+    fun `HoldUse relaunches only when a different cursor target enters the held gesture`() {
+        val firstTarget = Any()
+        val secondTarget = Any()
+        val launchedTarget = nextSpearKillHoldUseLaunchTarget(
+            activationMode = SpearKillActivationMode.HoldUse,
+            holdingSpear = true,
+            useInputHeld = true,
+            currentTarget = null,
+            launchedTarget = firstTarget,
+            launchStarted = true,
+        )
+
+        assertSame(firstTarget, launchedTarget)
+        assertFalse(
+            isSpearKillLaunchActivationSatisfied(
+                activationMode = SpearKillActivationMode.HoldUse,
+                activationRequested = true,
+                previousLaunchTarget = launchedTarget,
+                launchTarget = firstTarget,
+                automaticRequest = false,
+            ),
+        )
+        assertNull(
+            selectSpearKillHoldUseLaunchTarget(
+                activationMode = SpearKillActivationMode.HoldUse,
+                useInputHeld = true,
+                automaticRequest = false,
+                previousLaunchTarget = launchedTarget,
+                cursorTarget = firstTarget,
+                configuredTarget = firstTarget,
+            ),
+        )
+
+        val retargeted = selectSpearKillHoldUseLaunchTarget(
+            activationMode = SpearKillActivationMode.HoldUse,
+            useInputHeld = true,
+            automaticRequest = false,
+            previousLaunchTarget = launchedTarget,
+            cursorTarget = secondTarget,
+            configuredTarget = firstTarget,
+        )
+        assertSame(secondTarget, retargeted)
+        assertTrue(
+            isSpearKillLaunchActivationSatisfied(
+                activationMode = SpearKillActivationMode.HoldUse,
+                activationRequested = true,
+                previousLaunchTarget = launchedTarget,
+                launchTarget = retargeted,
+                automaticRequest = false,
+            ),
+        )
+    }
+
+    @Test
+    fun `releasing physical spear use clears the HoldUse target identity`() {
+        val target = Any()
+        val launchedTarget = nextSpearKillHoldUseLaunchTarget(
+            activationMode = SpearKillActivationMode.HoldUse,
+            holdingSpear = true,
+            useInputHeld = true,
+            currentTarget = null,
+            launchedTarget = target,
+            launchStarted = true,
+        )
+        val releasedTarget = nextSpearKillHoldUseLaunchTarget(
+            activationMode = SpearKillActivationMode.HoldUse,
+            holdingSpear = true,
+            useInputHeld = false,
+            currentTarget = launchedTarget,
+            launchedTarget = null,
+            launchStarted = false,
+        )
+
+        assertNull(releasedTarget)
+        assertTrue(
+            isSpearKillLaunchActivationSatisfied(
+                activationMode = SpearKillActivationMode.HoldUse,
+                activationRequested = true,
+                previousLaunchTarget = releasedTarget,
+                launchTarget = target,
+                automaticRequest = false,
+            ),
+        )
+    }
+
+    @Test
+    fun `automatic spear ownership bypasses a consumed manual HoldUse launch`() {
+        val previousTarget = Any()
+        val automaticTarget = Any()
+        assertSame(
+            automaticTarget,
+            selectSpearKillHoldUseLaunchTarget(
+                activationMode = SpearKillActivationMode.HoldUse,
+                useInputHeld = true,
+                automaticRequest = true,
+                previousLaunchTarget = previousTarget,
+                cursorTarget = null,
+                configuredTarget = automaticTarget,
+            ),
+        )
+        assertTrue(
+            isSpearKillLaunchActivationSatisfied(
+                activationMode = SpearKillActivationMode.HoldUse,
+                activationRequested = true,
+                previousLaunchTarget = previousTarget,
+                launchTarget = previousTarget,
+                automaticRequest = true,
+            ),
+        )
+        assertTrue(
+            isSpearKillLaunchActivationSatisfied(
+                activationMode = SpearKillActivationMode.Manual,
+                activationRequested = true,
+                previousLaunchTarget = previousTarget,
+                launchTarget = previousTarget,
+                automaticRequest = false,
+            ),
+        )
     }
 
     @Test

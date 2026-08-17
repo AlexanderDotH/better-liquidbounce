@@ -172,7 +172,6 @@ private fun migrateSpearKillPacketConfig(packet: JsonObject): LegacySpearKillMov
     } else {
         legacyAStarValues
     }
-    val canonicalNetworkOptimizedValues = routingChoices.spearKillNetworkOptimizedChoiceValues()
     val renderPath = canonicalAStarValues.spearKillConfigValue("RenderPath")?.booleanValue()
         ?: legacyAStarValues.spearKillConfigValue("RenderPath")?.booleanValue()
 
@@ -197,7 +196,7 @@ private fun migrateSpearKillPacketConfig(packet: JsonObject): LegacySpearKillMov
                 "WaitTicks",
                 "RenderPath",
             ),
-            networkOptimizedValues = canonicalNetworkOptimizedValues,
+            sourceChoices = routingChoices,
         ),
     )
     packet.add("value", retainedValues)
@@ -221,7 +220,7 @@ private fun migrateSpearKillRenderPath(values: JsonArray, legacyRenderPath: Bool
 private fun spearKillRoutingValue(
     active: String,
     aStarValues: JsonArray,
-    networkOptimizedValues: JsonArray,
+    sourceChoices: JsonObject?,
 ) = JsonObject().apply {
     addProperty("name", "Routing")
     addProperty("active", active)
@@ -229,7 +228,11 @@ private fun spearKillRoutingValue(
     add("choices", JsonObject().apply {
         add("Direct", spearKillChoice("Direct"))
         add("AStar", spearKillChoice("AStar", aStarValues))
-        add("NetworkOptimized", spearKillChoice("NetworkOptimized", networkOptimizedValues))
+        add(
+            "NetworkOptimized",
+            spearKillChoice("NetworkOptimized", sourceChoices.spearKillNetworkOptimizedChoiceValues()),
+        )
+        add("Instant", spearKillChoice("Instant", sourceChoices.spearKillMovementChoiceValues("Instant")))
     })
 }
 
@@ -255,6 +258,7 @@ private fun canonicalSpearKillMovementMode(value: String?): String = when {
 }
 
 private fun canonicalSpearKillRoutingMode(value: String?): String = when {
+    value.equals("Instant", ignoreCase = true) -> "Instant"
     value.equals("AStar", ignoreCase = true) || value.equals("Adaptive", ignoreCase = true) -> "AStar"
     value.equals("NetworkOptimized", ignoreCase = true) ||
         value.equals("Network", ignoreCase = true) ||

@@ -85,6 +85,8 @@ internal class SpearKillMovementConfiguration(eventListener: EventListener?) {
             private set
         lateinit var networkOptimized: NetworkOptimized
             private set
+        lateinit var instant: Instant
+            private set
 
         val stepDistance by float(
             "StepDistance",
@@ -105,6 +107,7 @@ internal class SpearKillMovementConfiguration(eventListener: EventListener?) {
                 Direct(routingParent).also { direct = it },
                 AStar(routingParent).also { aStar = it },
                 NetworkOptimized(routingParent).also { networkOptimized = it },
+                Instant(routingParent).also { instant = it },
             )
         }
     }
@@ -153,6 +156,18 @@ internal class SpearKillMovementConfiguration(eventListener: EventListener?) {
         val maxCost by int("MaxCost", 250, 50..500)
         val diagonal by boolean("Diagonal", true)
         val lineOfSightShortcuts by boolean("LineOfSightShortcuts", true)
+    }
+
+    internal class Instant(parent: ModeValueGroup<SpearKillRoutingChoice>) : SpearKillRoutingChoice(
+        name = "Instant",
+        parent = parent,
+    ) {
+        val maxPackets by int(
+            "MaxPackets",
+            SPEAR_KILL_INSTANT_DEFAULT_MAX_PACKETS,
+            SPEAR_KILL_INSTANT_MIN_MAX_PACKETS..SPEAR_KILL_INSTANT_MAX_MAX_PACKETS,
+            "packets/tick",
+        )
     }
 }
 

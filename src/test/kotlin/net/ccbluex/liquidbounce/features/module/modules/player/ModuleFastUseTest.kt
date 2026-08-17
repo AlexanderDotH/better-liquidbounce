@@ -167,6 +167,18 @@ class ModuleFastUseTest {
     }
 
     @Test
+    fun `FastUse never refreshes a spear reserved by SpearKill prehold`() {
+        assertFalse(
+            shouldRefreshFastUseSpear(
+                spearKillControlsUse = true,
+                isUseKeyDown = true,
+                ticksUsingItem = 19,
+                damageUseDuration = 20,
+            ),
+        )
+    }
+
+    @Test
     fun `FastUse spear refresh requires a held use key`() {
         assertFalse(
             shouldRefreshFastUseSpear(

@@ -103,7 +103,7 @@ class ModuleSpearKillTest {
 
     @Test
     @Suppress("UNCHECKED_CAST", "LongMethod")
-    fun `Movement nests AStar controls under the Routing choice`() {
+    fun `Movement nests routing-specific controls under the Routing choice`() {
         val configuration = SpearKillMovementConfiguration(null)
         val movement = configuration.choice
 
@@ -130,6 +130,7 @@ class ModuleSpearKillTest {
                     "Diagonal",
                     "LineOfSightShortcuts",
                 ),
+                "Instant" to listOf("MaxPackets"),
             ),
             routing.modes.associate { it.name to it.inner.map { value -> value.name } },
         )
@@ -144,6 +145,9 @@ class ModuleSpearKillTest {
         val packetStepDelay = configuration.packet.inner.single {
             it.name == "StepDelay"
         } as RangedValue<Int>
+        val instantMaxPackets = configuration.packet.instant.inner.single {
+            it.name == "MaxPackets"
+        } as RangedValue<Int>
         assertEquals(10f, motionStepDistance.get())
         assertEquals(17.32f, packetStepDistance.get())
         assertEquals(500f, acceleration.get())
@@ -157,6 +161,8 @@ class ModuleSpearKillTest {
         assertEquals(0, packetStepDelay.get())
         assertEquals(0..4, packetStepDelay.range)
         assertEquals(listOf("WaitBeforeTeleport", "WaitTicks"), packetStepDelay.aliases)
+        assertEquals(128, instantMaxPackets.get())
+        assertEquals(2..512, instantMaxPackets.range)
 
         val serializedMovement = fileGson.toJsonTree(movement, ModeValueGroup::class.java).asJsonObject
         val serializedRouting = serializedMovement.getAsJsonObject("choices")
@@ -164,13 +170,15 @@ class ModuleSpearKillTest {
         val serializedAStar = serializedRouting.getAsJsonObject("choices").getAsJsonObject("AStar")
         val serializedNetworkOptimized = serializedRouting.getAsJsonObject("choices")
             .getAsJsonObject("NetworkOptimized")
+        val serializedInstant = serializedRouting.getAsJsonObject("choices")
+            .getAsJsonObject("Instant")
 
         assertEquals(
             "Direct",
             serializedRouting["active"].asString,
         )
         assertEquals(
-            setOf("Direct", "AStar", "NetworkOptimized"),
+            setOf("Direct", "AStar", "NetworkOptimized", "Instant"),
             serializedRouting.getAsJsonObject("choices").keySet(),
         )
         assertEquals(250, serializedAStar.settingValue("MaxCost").asInt)
@@ -182,6 +190,7 @@ class ModuleSpearKillTest {
         assertEquals(250, serializedNetworkOptimized.settingValue("MaxCost").asInt)
         assertTrue(serializedNetworkOptimized.settingValue("Diagonal").asBoolean)
         assertTrue(serializedNetworkOptimized.settingValue("LineOfSightShortcuts").asBoolean)
+        assertEquals(128, serializedInstant.settingValue("MaxPackets").asInt)
         assertEquals(
             10f,
             serializedMovement.getAsJsonObject("choices")
@@ -388,6 +397,70 @@ class ModuleSpearKillTest {
     }
 
     @Test
+    fun `idle prehold refreshes before expiry while a launch-ready packet route owns recovery`() {
+        assertFalse(shouldRefreshSpearKillPrehold(
+            useRequested = true,
+            launchCandidateReady = false,
+            routeCanRecoverCharge = true,
+            ticksUsingItem = 18,
+            delayTicks = 3,
+            damageUseDuration = 20,
+        ))
+        assertTrue(shouldRefreshSpearKillPrehold(
+            useRequested = true,
+            launchCandidateReady = false,
+            routeCanRecoverCharge = true,
+            ticksUsingItem = 19,
+            delayTicks = 3,
+            damageUseDuration = 20,
+        ))
+        assertFalse(shouldRefreshSpearKillPrehold(
+            useRequested = true,
+            launchCandidateReady = true,
+            routeCanRecoverCharge = true,
+            ticksUsingItem = 20,
+            delayTicks = 3,
+            damageUseDuration = 20,
+        ))
+        assertTrue(shouldRefreshSpearKillPrehold(
+            useRequested = true,
+            launchCandidateReady = true,
+            routeCanRecoverCharge = false,
+            ticksUsingItem = 20,
+            delayTicks = 3,
+            damageUseDuration = 20,
+        ))
+    }
+
+    @Test
+    fun `prehold refresh ignores inactive and invalid spear use`() {
+        assertFalse(shouldRefreshSpearKillPrehold(
+            useRequested = false,
+            launchCandidateReady = false,
+            routeCanRecoverCharge = true,
+            ticksUsingItem = 19,
+            delayTicks = 3,
+            damageUseDuration = 20,
+        ))
+        assertFalse(shouldRefreshSpearKillPrehold(
+            useRequested = true,
+            launchCandidateReady = false,
+            routeCanRecoverCharge = true,
+            ticksUsingItem = -1,
+            delayTicks = 3,
+            damageUseDuration = 20,
+        ))
+        assertFalse(shouldRefreshSpearKillPrehold(
+            useRequested = true,
+            launchCandidateReady = false,
+            routeCanRecoverCharge = true,
+            ticksUsingItem = 19,
+            delayTicks = -1,
+            damageUseDuration = 20,
+        ))
+    }
+
+    @Test
     fun `only a transient weapon state keeps route preparation active`() {
         assertTrue(SpearKillAttackStartResult.RETRY_LATER.keepsRoutePreparation)
         assertFalse(SpearKillAttackStartResult.STARTED.keepsRoutePreparation)
@@ -432,6 +505,31 @@ class ModuleSpearKillTest {
             attackPathActive = true,
             attackRequested = true,
             isUsingSpear = true,
+        ))
+    }
+
+    @Test
+    fun `manual hold and KillAura prehold reserve spear use from FastUse refresh`() {
+        assertTrue(shouldControlSpearKillUse(
+            spearKillRunning = true,
+            attackPathActive = false,
+            routePreparationActive = false,
+            physicalUseRequested = true,
+            automaticUseRequested = false,
+        ))
+        assertTrue(shouldControlSpearKillUse(
+            spearKillRunning = true,
+            attackPathActive = false,
+            routePreparationActive = false,
+            physicalUseRequested = false,
+            automaticUseRequested = true,
+        ))
+        assertFalse(shouldControlSpearKillUse(
+            spearKillRunning = false,
+            attackPathActive = false,
+            routePreparationActive = false,
+            physicalUseRequested = true,
+            automaticUseRequested = true,
         ))
     }
 
@@ -2996,9 +3094,21 @@ class ModuleSpearKillTest {
     }
 
     @Test
-    fun `every Packet strike hold suppresses ambient movement packets`() {
+    fun `every Packet strike hold suppresses ambient movement and tick end kinetic resets`() {
         assertTrue(shouldSuppressSpearKillStrikeHoldPacket(holdingStrike = true))
         assertFalse(shouldSuppressSpearKillStrikeHoldPacket(holdingStrike = false))
+        assertTrue(shouldSuppressSpearKillKineticResetPacket(
+            holdingStrike = true,
+            clientTickEndPacket = true,
+        ))
+        assertFalse(shouldSuppressSpearKillKineticResetPacket(
+            holdingStrike = false,
+            clientTickEndPacket = true,
+        ))
+        assertFalse(shouldSuppressSpearKillKineticResetPacket(
+            holdingStrike = true,
+            clientTickEndPacket = false,
+        ))
     }
 
     @Test

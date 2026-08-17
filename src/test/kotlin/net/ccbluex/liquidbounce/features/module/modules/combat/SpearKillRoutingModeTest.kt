@@ -54,18 +54,63 @@ class SpearKillRoutingModeTest {
     }
 
     @Test
-    fun `routing exposes Direct AStar and NetworkOptimized`() {
+    fun `routing exposes Direct AStar NetworkOptimized and Instant`() {
         assertEquals(
-            listOf("Direct", "AStar", "NetworkOptimized"),
+            listOf("Direct", "AStar", "NetworkOptimized", "Instant"),
             SpearKillRoutingMode.entries.map { it.tag },
         )
     }
 
     @Test
-    fun `Direct and NetworkOptimized return immediately while standalone AStar retains its hold`() {
+    fun `Instant retains a full server evaluation window while other direct modes return immediately`() {
         assertEquals(0, spearKillStrikeHoldTicks(SpearKillRoutingMode.DIRECT))
         assertEquals(SPEAR_KILL_PACKET_STRIKE_HOLD_TICKS, spearKillStrikeHoldTicks(SpearKillRoutingMode.A_STAR))
         assertEquals(0, spearKillStrikeHoldTicks(SpearKillRoutingMode.NETWORK_OPTIMIZED))
+        assertEquals(SPEAR_KILL_PACKET_STRIKE_HOLD_TICKS, spearKillStrikeHoldTicks(SpearKillRoutingMode.INSTANT))
+    }
+
+    @Test
+    fun `Instant predicts its terminal hit during the server evaluation tick`() {
+        assertEquals(
+            SPEAR_KILL_PACKET_STRIKE_HOLD_TICKS,
+            spearKillDirectRouteHitTicks(
+                routingMode = SpearKillRoutingMode.INSTANT,
+                outboundTickCount = 24,
+                stepWaitTicks = 4,
+                strikeHoldTicks = 1,
+            ),
+        )
+        assertEquals(
+            spearKillDirectPacketHitTicks(stepCount = 24, stepWaitTicks = 0, strikeHoldTicks = 0),
+            spearKillDirectRouteHitTicks(
+                routingMode = SpearKillRoutingMode.DIRECT,
+                outboundTickCount = 24,
+                stepWaitTicks = 0,
+                strikeHoldTicks = 0,
+            ),
+        )
+    }
+
+    @Test
+    fun `Instant alone applies the safe vertical packet cap to direct routes`() {
+        assertEquals(
+            2.95,
+            spearKillDirectRouteMaxVerticalStep(
+                routingMode = SpearKillRoutingMode.INSTANT,
+                maximumStepLimit = 500.0,
+                safeVerticalStep = 2.95,
+            ),
+            1.0E-9,
+        )
+        assertEquals(
+            500.0,
+            spearKillDirectRouteMaxVerticalStep(
+                routingMode = SpearKillRoutingMode.DIRECT,
+                maximumStepLimit = 500.0,
+                safeVerticalStep = 2.95,
+            ),
+            1.0E-9,
+        )
     }
 
     @Test

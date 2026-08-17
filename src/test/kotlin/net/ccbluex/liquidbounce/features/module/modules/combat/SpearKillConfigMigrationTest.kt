@@ -117,7 +117,7 @@ class SpearKillConfigMigrationTest {
         val routing = packetValues.getValue("Routing")
         assertEquals("AStar", routing["active"].asString)
         assertEquals(
-            setOf("Direct", "AStar", "NetworkOptimized"),
+            setOf("Direct", "AStar", "NetworkOptimized", "Instant"),
             routing.getAsJsonObject("choices").keySet(),
         )
         val aStar = routing.choice("AStar").valuesByName()
@@ -408,6 +408,52 @@ class SpearKillConfigMigrationTest {
         val networkOptimized = routing.choice("NetworkOptimized").valuesByName()
         assertEquals(8f, networkOptimized.getValue("MaxSpeed")["value"].asFloat)
         assertEquals(60, networkOptimized.getValue("SetbackBackoff")["value"].asInt)
+    }
+
+    @Test
+    fun `canonical Instant routing and packet cap survive migration`() {
+        val config = JsonParser.parseString(
+            """
+            {
+              "name": "SpearKill",
+              "value": [{
+                "name": "Movement",
+                "active": "Packet",
+                "value": [],
+                "choices": {
+                  "Motion": { "name": "Motion", "value": [] },
+                  "Packet": {
+                    "name": "Packet",
+                    "value": [{
+                      "name": "Routing",
+                      "active": "Instant",
+                      "value": [],
+                      "choices": {
+                        "Direct": { "name": "Direct", "value": [] },
+                        "AStar": { "name": "AStar", "value": [] },
+                        "NetworkOptimized": { "name": "NetworkOptimized", "value": [] },
+                        "Instant": {
+                          "name": "Instant",
+                          "value": [{ "name": "MaxPackets", "value": 192 }]
+                        }
+                      }
+                    }]
+                  }
+                }
+              }]
+            }
+            """.trimIndent(),
+        ).asJsonObject
+
+        migrateLegacySpearKillConfig(config)
+
+        val routing = config.valuesByName().getValue("Movement")
+            .choice("Packet").valuesByName().getValue("Routing")
+        assertEquals("Instant", routing["active"].asString)
+        assertEquals(
+            192,
+            routing.choice("Instant").valuesByName().getValue("MaxPackets")["value"].asInt,
+        )
     }
 
     private fun JsonObject.valuesByName(): Map<String, JsonObject> =

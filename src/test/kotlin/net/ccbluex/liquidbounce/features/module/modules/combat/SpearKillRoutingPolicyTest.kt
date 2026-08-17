@@ -38,6 +38,28 @@ class SpearKillRoutingPolicyTest {
     }
 
     @Test
+    fun `Instant invokes only the direct planner`() {
+        var directCalls = 0
+        var aStarCalls = 0
+
+        val result = startSpearKillPacketRoute(
+            mode = SpearKillRoutingMode.INSTANT,
+            startDirect = {
+                directCalls++
+                SpearKillAttackStartResult.BLOCKED
+            },
+            startAStar = {
+                aStarCalls++
+                SpearKillAttackStartResult.STARTED
+            },
+        )
+
+        assertEquals(SpearKillAttackStartResult.BLOCKED, result)
+        assertEquals(1, directCalls)
+        assertEquals(0, aStarCalls)
+    }
+
+    @Test
     fun `AStar uses Direct once when the route is clear`() {
         var directCalls = 0
         var aStarCalls = 0

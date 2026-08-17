@@ -40,6 +40,7 @@ internal fun buildSpearKillProfiledDirectAttackRoute(
     preferredDirection: Vec3,
     profile: SpearKillSpeedProfile,
     segmentValidator: SpearKillAStarSegmentValidator,
+    maxVerticalStep: Double = profile.maximumStepLimit,
     kineticRequirements: SpearKillKineticDamageRequirements? = null,
     targetMovement: Vec3 = Vec3.ZERO,
 ): SpearKillProfiledDirectAttackRoute? {
@@ -55,7 +56,7 @@ internal fun buildSpearKillProfiledDirectAttackRoute(
         direction = displacement,
         distance = displacement.length(),
         profile = profile,
-        maxVerticalStep = profile.maximumStepLimit,
+        maxVerticalStep = maxVerticalStep,
     ) ?: return null
     var position = origin
     for (movement in movements) {

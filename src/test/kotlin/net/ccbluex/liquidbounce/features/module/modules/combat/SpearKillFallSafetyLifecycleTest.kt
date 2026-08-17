@@ -82,6 +82,41 @@ class SpearKillFallSafetyLifecycleTest {
     }
 
     @Test
+    fun `cancelled nofall stabilization never grants a pending movement bypass`() {
+        val movement = Vec3(2.0, -2.0, 0.0)
+        val lifecycle = lifecycleFor(
+            outboundMovements = listOf(movement),
+            initialFallDistance = 2.0,
+        )
+
+        assertTrue(lifecycle.shouldStabilizePendingMovement(movement, physicalFallDanger = false))
+        assertFalse(lifecycle.confirmStabilization(delivered = false))
+        assertTrue(lifecycle.shouldStabilizePendingMovement(movement, physicalFallDanger = false))
+        assertEquals(0, lifecycle.confirmedMovementCount)
+    }
+
+    @Test
+    fun `delivered nofall stabilization credit survives a cancelled movement retry`() {
+        val movement = Vec3(2.0, -2.0, 0.0)
+        val lifecycle = lifecycleFor(
+            outboundMovements = listOf(movement),
+            initialFallDistance = 2.0,
+        )
+
+        assertTrue(lifecycle.confirmStabilization(delivered = true))
+        assertFalse(lifecycle.confirmMovement(movement, delivered = false))
+        assertFalse(lifecycle.shouldStabilizePendingMovement(movement, physicalFallDanger = true))
+
+        assertTrue(lifecycle.confirmMovement(movement, delivered = true))
+        assertFalse(lifecycle.shouldStabilizePendingMovement(
+            movement.scale(-1.0),
+            physicalFallDanger = false,
+        ))
+        assertTrue(lifecycle.confirmMovement(movement.scale(-1.0), delivered = true))
+        assertEquals(0.0, lifecycle.confirmedFallDistance, 1.0E-9)
+    }
+
+    @Test
     fun `finish first requests grounding and resets locally only after confirmation`() {
         val lifecycle = lifecycleFor(emptyList())
 
