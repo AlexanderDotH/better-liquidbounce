@@ -30,6 +30,7 @@ import net.ccbluex.liquidbounce.features.global.GlobalSettingsAutoTranslate
 import net.ccbluex.liquidbounce.features.module.ClientModule
 import net.ccbluex.liquidbounce.features.module.ModuleCategories
 import net.ccbluex.liquidbounce.interfaces.GuiMessageLineAddition
+import net.ccbluex.liquidbounce.render.engine.type.Color4b
 import net.ccbluex.liquidbounce.utils.client.MessageMetadata
 import net.ccbluex.liquidbounce.utils.client.chat
 import net.ccbluex.liquidbounce.utils.client.notification
@@ -81,6 +82,10 @@ object ModuleBetterChat : ClientModule("BetterChat", ModuleCategories.RENDER, al
 
     private val autoTranslate by multiEnumChoice<ChatReceiveEvent.ChatType>("AutoTranslate")
 
+    object NameHighlight : ToggleableValueGroup(this, "NameHighlight", true) {
+        val color by color("Color", Color4b(255, 196, 0, 68))
+    }
+
     object Copy : ToggleableValueGroup(this, "Copy", true) {
         private val notify by boolean("Notify", true)
         val highlight by boolean("Highlight", true)
@@ -127,6 +132,7 @@ object ModuleBetterChat : ClientModule("BetterChat", ModuleCategories.RENDER, al
         tree(AppendPrefix)
         tree(AppendSuffix)
         tree(AntiSpam)
+        tree(NameHighlight)
         tree(Copy)
     }
 
