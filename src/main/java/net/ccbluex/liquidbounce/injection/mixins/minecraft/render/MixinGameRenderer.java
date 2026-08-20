@@ -209,6 +209,7 @@ public abstract class MixinGameRenderer {
             ModuleTracers.INSTANCE.getRunning() ||
             ModuleBlockESP.INSTANCE.showTracers() ||
             (ModuleItemESP.INSTANCE.getRunning() && ModuleItemESP.INSTANCE.getShowTracers()) ||
+            (ModuleOrbESP.INSTANCE.getRunning() && ModuleOrbESP.INSTANCE.getShowTracers()) ||
             ModuleStorageESP.INSTANCE.showTracers()) {
 
             ci.cancel();

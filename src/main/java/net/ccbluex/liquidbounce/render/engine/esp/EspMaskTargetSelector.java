@@ -13,12 +13,15 @@ package net.ccbluex.liquidbounce.render.engine.esp;
 
 import net.ccbluex.liquidbounce.common.EspMaskLayer;
 import net.ccbluex.liquidbounce.common.EspMaskRequest;
+import net.ccbluex.liquidbounce.features.module.modules.render.ModuleItemESP;
+import net.ccbluex.liquidbounce.features.module.modules.render.ModuleOrbESP;
 import net.ccbluex.liquidbounce.features.module.modules.render.ModuleStorageESP;
 import net.ccbluex.liquidbounce.features.module.modules.render.esp.ModuleESP;
 import net.ccbluex.liquidbounce.features.module.modules.render.esp.modes.EspGlowMode;
 import net.ccbluex.liquidbounce.features.module.modules.render.esp.modes.EspOutlineMode;
 import net.ccbluex.liquidbounce.utils.combat.CombatExtensionsKt;
 import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.ExperienceOrb;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.level.block.entity.BlockEntity;
@@ -58,6 +61,20 @@ public final class EspMaskTargetSelector {
             } else if (EspOutlineMode.INSTANCE.getRunning() && EspOutlineMode.INSTANCE.shouldRender(livingEntity)) {
                 request = request.with(EspMaskLayer.PLAYER_OUTLINE, color);
             }
+        }
+
+        if (ModuleItemESP.ShaderEspMode.INSTANCE.getRunning() && ModuleItemESP.INSTANCE.shouldRender(entity)) {
+            request = request
+                .with(EspMaskLayer.PROTECTED_SURFACE, PROTECTED_SURFACE_COLOR)
+                .with(EspMaskLayer.ITEM_GLOW, ModuleItemESP.INSTANCE.getColor().argb());
+        }
+
+        if (entity instanceof ExperienceOrb
+            && ModuleOrbESP.GlowMode.INSTANCE.getRunning()
+            && ModuleOrbESP.INSTANCE.shouldRender(entity)) {
+            request = request
+                .with(EspMaskLayer.PROTECTED_SURFACE, PROTECTED_SURFACE_COLOR)
+                .with(EspMaskLayer.ORB_GLOW, ModuleOrbESP.INSTANCE.getColor().argb());
         }
 
         var category = ModuleStorageESP.categorize(entity);

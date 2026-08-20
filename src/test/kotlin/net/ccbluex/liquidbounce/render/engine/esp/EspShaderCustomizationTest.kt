@@ -20,6 +20,8 @@ package net.ccbluex.liquidbounce.render.engine.esp
 
 import net.ccbluex.liquidbounce.config.types.RangedValue
 import net.ccbluex.liquidbounce.config.types.group.ValueGroup
+import net.ccbluex.liquidbounce.features.module.modules.render.ModuleItemESP
+import net.ccbluex.liquidbounce.features.module.modules.render.ModuleOrbESP
 import net.ccbluex.liquidbounce.features.module.modules.render.esp.modes.EspGlowMode
 import net.ccbluex.liquidbounce.features.module.modules.render.esp.modes.EspOutlineMode
 import net.ccbluex.liquidbounce.test.MinecraftBootstrap
@@ -78,11 +80,31 @@ class EspShaderCustomizationTest {
         assertRange(EspOutlineMode, "Thickness", 0.5f, 4f, "px")
     }
 
+    @Test
+    fun `item and orb shader modes share the complete player glow contract`() {
+        MinecraftBootstrap.ensureInitialized()
+
+        val expected = listOf("Radius", "Softness", "Intensity", "CoreSize", "Opacity")
+        val preparedEntityModes = listOf(ModuleItemESP.ShaderEspMode, ModuleOrbESP.GlowMode)
+
+        preparedEntityModes.forEach { mode ->
+            assertEquals(expected, mode.inner.map { it.name })
+            assertRange(mode, "Radius", 4f, 24f, "px")
+            assertRange(mode, "Softness", 0.5f, 1.5f, "")
+            assertRange(mode, "Intensity", 0f, 2f, "")
+            assertRange(mode, "CoreSize", 0f, 3f, "px")
+            assertRange(mode, "Opacity", 0, 100, "%")
+        }
+
+        assertEquals(EspGlowStyle.DEFAULT, ModuleItemESP.ShaderEspMode.style)
+        assertEquals(EspGlowStyle.DEFAULT, ModuleOrbESP.GlowMode.style)
+    }
+
     private fun assertRange(
         values: net.ccbluex.liquidbounce.config.types.group.ValueGroup,
         name: String,
-        from: Float,
-        to: Float,
+        from: Any,
+        to: Any,
         suffix: String,
     ) {
         val value = values.inner.single { it.name == name } as RangedValue<*>

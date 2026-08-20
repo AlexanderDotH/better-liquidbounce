@@ -222,6 +222,7 @@ import net.ccbluex.liquidbounce.features.module.modules.render.ModuleNoBob
 import net.ccbluex.liquidbounce.features.module.modules.render.ModuleNoFov
 import net.ccbluex.liquidbounce.features.module.modules.render.ModuleNoHurtCam
 import net.ccbluex.liquidbounce.features.module.modules.render.ModuleNoSwing
+import net.ccbluex.liquidbounce.features.module.modules.render.ModuleOrbESP
 import net.ccbluex.liquidbounce.features.module.modules.render.ModuleParticles
 import net.ccbluex.liquidbounce.features.module.modules.render.ModuleProphuntESP
 import net.ccbluex.liquidbounce.features.module.modules.render.ModuleProtectionZones
@@ -659,6 +660,7 @@ object ModuleManager : EventListener, Collection<ClientModule> by modules {
             ModuleHud,
             ModuleHats,
             ModuleItemESP,
+            ModuleOrbESP,
             ModuleItemTags,
             ModuleJumpEffect,
             ModuleMobOwners,

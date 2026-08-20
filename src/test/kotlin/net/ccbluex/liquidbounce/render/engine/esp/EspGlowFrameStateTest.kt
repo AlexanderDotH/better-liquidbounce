@@ -10,6 +10,7 @@
  */
 package net.ccbluex.liquidbounce.render.engine.esp
 
+import net.ccbluex.liquidbounce.common.EspMaskLayer
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertTrue
@@ -98,6 +99,77 @@ class EspGlowFrameStateTest {
     }
 
     @Test
+    fun `item orb storage target and player keep independent frame styles`() {
+        val sources = EspGlowFrameSources()
+        val styles = linkedMapOf(
+            EspGlowSource.ITEM_ESP to glowStyle(radius = 6f, opacity = 0.2f),
+            EspGlowSource.ORB_ESP to glowStyle(radius = 9f, opacity = 0.4f),
+            EspGlowSource.STORAGE_ESP to glowStyle(radius = 12f, opacity = 0.6f),
+            EspGlowSource.TARGET_GLOW to glowStyle(radius = 18f, opacity = 0.8f),
+            EspGlowSource.PLAYER_ESP to glowStyle(radius = 24f, opacity = 1f),
+        )
+
+        styles.forEach { (source, style) ->
+            assertTrue(sources.prepareMask(source))
+            sources.contribute(source, style)
+        }
+
+        assertEquals(styles.keys.toList(), sources.activeSources)
+        assertEquals(styles.keys.toList(), sources.maskSources)
+        styles.forEach { (source, style) ->
+            assertEquals(style, sources.state(source).style)
+        }
+    }
+
+    @Test
+    fun `item and orb are independent protected owners before storage target and player`() {
+        val preparedOwners = listOf(
+            EspGlowSource.ITEM_ESP,
+            EspGlowSource.ORB_ESP,
+            EspGlowSource.STORAGE_ESP,
+            EspGlowSource.TARGET_GLOW,
+            EspGlowSource.PLAYER_ESP,
+        )
+
+        assertEquals(EspMaskLayer.ITEM_GLOW, EspGlowSource.ITEM_ESP.preparedLayer)
+        assertEquals(EspMaskLayer.ORB_GLOW, EspGlowSource.ORB_ESP.preparedLayer)
+        assertTrue(EspGlowSource.ITEM_ESP.useDepth)
+        assertTrue(EspGlowSource.ORB_ESP.useDepth)
+        assertTrue(EspGlowSource.ITEM_ESP.protectsSurface)
+        assertTrue(EspGlowSource.ORB_ESP.protectsSurface)
+        assertTrue(EspGlowSource.ITEM_ESP.ordinal < EspGlowSource.STORAGE_ESP.ordinal)
+        assertTrue(EspGlowSource.ORB_ESP.ordinal < EspGlowSource.STORAGE_ESP.ordinal)
+
+        assertEquals(
+            listOf(
+                EspGlowSource.ORB_ESP,
+                EspGlowSource.STORAGE_ESP,
+                EspGlowSource.TARGET_GLOW,
+                EspGlowSource.PLAYER_ESP,
+            ),
+            EspGlowProtectionPlan.exclusionSources(EspGlowSource.ITEM_ESP, preparedOwners),
+        )
+        assertEquals(
+            listOf(
+                EspGlowSource.ITEM_ESP,
+                EspGlowSource.STORAGE_ESP,
+                EspGlowSource.TARGET_GLOW,
+                EspGlowSource.PLAYER_ESP,
+            ),
+            EspGlowProtectionPlan.exclusionSources(EspGlowSource.ORB_ESP, preparedOwners),
+        )
+        assertEquals(
+            listOf(
+                EspGlowSource.ITEM_ESP,
+                EspGlowSource.ORB_ESP,
+                EspGlowSource.STORAGE_ESP,
+                EspGlowSource.TARGET_GLOW,
+            ),
+            EspGlowProtectionPlan.exclusionSources(EspGlowSource.PLAYER_ESP, preparedOwners),
+        )
+    }
+
+    @Test
     fun `Block ESP yields to BlockOverlay and nested model owners`() {
         val activeSources = listOf(
             EspGlowSource.BASE_FINDER,
@@ -163,4 +235,12 @@ class EspGlowFrameStateTest {
             ),
         )
     }
+
+    private fun glowStyle(radius: Float, opacity: Float) = EspGlowStyle(
+        radius = radius,
+        softness = 1f,
+        intensity = 1f,
+        coreSize = 1f,
+        opacity = opacity,
+    )
 }

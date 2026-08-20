@@ -25,13 +25,16 @@ import net.ccbluex.liquidbounce.common.EspMaskCaptureContext;
 import net.ccbluex.liquidbounce.common.EspMaskLayer;
 import net.ccbluex.liquidbounce.features.module.modules.render.ModuleChams;
 import net.ccbluex.liquidbounce.interfaces.SubmitNodeCollectionAddition;
+import net.ccbluex.liquidbounce.render.engine.esp.EspMaskVertexConsumer;
 import net.ccbluex.liquidbounce.utils.render.NametagSubmitContext;
 import net.ccbluex.liquidbounce.utils.render.PlayerModelNametagHook;
 import net.minecraft.client.model.Model;
+import net.minecraft.client.renderer.SubmitNodeCollector;
 import net.minecraft.client.renderer.SubmitNodeCollection;
 import net.minecraft.client.renderer.block.BlockModelRenderState;
 import net.minecraft.client.renderer.block.dispatch.BlockStateModelPart;
 import net.minecraft.client.renderer.feature.BlockModelFeatureRenderer;
+import net.minecraft.client.renderer.feature.CustomFeatureRenderer;
 import net.minecraft.client.renderer.feature.ItemFeatureRenderer;
 import net.minecraft.client.renderer.feature.ModelFeatureRenderer;
 import net.minecraft.client.renderer.feature.phase.FeatureRenderPhase;
@@ -154,6 +157,32 @@ public abstract class MixinSubmitNodeCollection implements SubmitNodeCollectionA
                 poseStack.last().copy(), displayContext, 15728880, OverlayTexture.NO_OVERLAY,
                 entry.getValue(), ItemStackRenderState.LayerRenderState.EMPTY_TINTS,
                 quads, ItemStackRenderState.FoilType.NONE
+            ));
+        }
+    }
+
+    @Inject(method = "submitCustomGeometry", at = @At("TAIL"))
+    private void captureEspCustomGeometry(
+        PoseStack poseStack,
+        RenderType renderType,
+        SubmitNodeCollector.CustomGeometryRenderer customGeometryRenderer,
+        CallbackInfo ci
+    ) {
+        var maskRenderType = liquid_bounce$getOutlineRenderType(renderType);
+        if (maskRenderType == null) {
+            return;
+        }
+
+        var request = EspMaskCaptureContext.current();
+        for (var entry : request.colors().entrySet()) {
+            int maskColor = entry.getValue();
+            liquid_bounce$getEspPhase(entry.getKey()).submit(new CustomFeatureRenderer.Submit(
+                poseStack.last().copy(),
+                maskRenderType,
+                (pose, vertexConsumer) -> customGeometryRenderer.render(
+                    pose,
+                    new EspMaskVertexConsumer(vertexConsumer, maskColor)
+                )
             ));
         }
     }

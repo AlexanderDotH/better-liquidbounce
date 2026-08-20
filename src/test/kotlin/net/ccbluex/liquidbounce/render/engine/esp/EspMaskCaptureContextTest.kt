@@ -66,6 +66,18 @@ class EspMaskCaptureContextTest {
     }
 
     @Test
+    fun `item and orb colors retain separate opaque mask ownership`() {
+        val request = EspMaskRequest.NONE
+            .with(EspMaskLayer.ITEM_GLOW, 0x0011_2233)
+            .with(EspMaskLayer.ORB_GLOW, 0x8055_6677.toInt())
+
+        assertEquals(0xFF11_2233.toInt(), request.color(EspMaskLayer.ITEM_GLOW))
+        assertEquals(0xFF55_6677.toInt(), request.color(EspMaskLayer.ORB_GLOW))
+        assertEquals(0, request.color(EspMaskLayer.STORAGE_GLOW))
+        assertEquals(2, request.colors().size)
+    }
+
+    @Test
     fun `transparent requests do not create a mask`() {
         assertSame(EspMaskRequest.NONE, EspMaskRequest.NONE.with(EspMaskLayer.PLAYER_GLOW, 0))
     }

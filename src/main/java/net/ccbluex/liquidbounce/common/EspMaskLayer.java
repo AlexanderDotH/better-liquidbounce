@@ -21,6 +21,8 @@ public enum EspMaskLayer {
     PROTECTED_SURFACE,
     PLAYER_GLOW,
     TARGET_GLOW,
+    ITEM_GLOW,
+    ORB_GLOW,
     STORAGE_GLOW,
     PLAYER_OUTLINE,
     STORAGE_OUTLINE

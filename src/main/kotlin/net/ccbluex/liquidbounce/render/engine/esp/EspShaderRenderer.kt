@@ -22,6 +22,8 @@ import net.ccbluex.liquidbounce.event.events.WorldRenderEvent
 import net.ccbluex.liquidbounce.event.handler
 import net.ccbluex.liquidbounce.features.module.MinecraftShortcuts
 import net.ccbluex.liquidbounce.features.module.modules.render.ModuleBlockESP
+import net.ccbluex.liquidbounce.features.module.modules.render.ModuleItemESP
+import net.ccbluex.liquidbounce.features.module.modules.render.ModuleOrbESP
 import net.ccbluex.liquidbounce.features.module.modules.render.ModuleStorageESP
 import net.ccbluex.liquidbounce.features.module.modules.render.esp.modes.EspGlowMode
 import net.ccbluex.liquidbounce.features.module.modules.render.esp.modes.EspOutlineMode
@@ -288,6 +290,22 @@ private class EspPreparedGlowCapturer(
                 mainTarget,
                 EspGlowSource.TARGET_GLOW,
                 EspShaderStyleResolver.resolveGlow(*targetGlowStyles.toTypedArray()),
+            )
+        }
+        if (ModuleItemESP.ShaderEspMode.running) {
+            capturePrepared(
+                bridge,
+                mainTarget,
+                EspGlowSource.ITEM_ESP,
+                ModuleItemESP.ShaderEspMode.style,
+            )
+        }
+        if (ModuleOrbESP.GlowMode.running) {
+            capturePrepared(
+                bridge,
+                mainTarget,
+                EspGlowSource.ORB_ESP,
+                ModuleOrbESP.GlowMode.style,
             )
         }
         captureStorage(bridge, mainTarget)

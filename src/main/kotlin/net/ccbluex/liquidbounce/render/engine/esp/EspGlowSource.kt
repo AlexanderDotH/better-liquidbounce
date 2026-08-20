@@ -25,6 +25,8 @@ internal enum class EspGlowSource(
     BLOCK_ESP_TRACERS("Block ESP Tracers", false),
     SPEAR_KILL_PATH("SpearKill Path", false),
     TRACERS("Tracers", false),
+    ITEM_ESP("Item ESP", true, EspMaskLayer.ITEM_GLOW, protectsSurface = true),
+    ORB_ESP("Orb ESP", true, EspMaskLayer.ORB_GLOW, protectsSurface = true),
     STORAGE_ESP("Storage ESP", true, EspMaskLayer.STORAGE_GLOW, protectsSurface = true),
     TARGET_GLOW("Target Glow", true, EspMaskLayer.TARGET_GLOW, protectsSurface = true),
     PLAYER_ESP("Player ESP", true, EspMaskLayer.PLAYER_GLOW, protectsSurface = true),
