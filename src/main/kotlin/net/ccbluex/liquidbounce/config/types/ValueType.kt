@@ -72,6 +72,10 @@ enum class ValueType(
     REGISTRY_MUTABLE_LIST,
     CURVE,
 
+    // Merchant automation
+    MERCHANT_TRADE_FILTERS,
+    MERCHANT_REACH,
+
     // Groups
     // todo: rename to VALUE_GROUP
     CONFIGURABLE,

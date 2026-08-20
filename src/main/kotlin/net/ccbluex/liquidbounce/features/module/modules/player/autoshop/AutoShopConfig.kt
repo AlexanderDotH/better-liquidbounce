@@ -28,6 +28,7 @@ import net.ccbluex.liquidbounce.features.module.modules.player.autoshop.serializ
 import net.ccbluex.liquidbounce.features.module.modules.player.autoshop.serializable.conditions.ItemConditionNode
 import net.ccbluex.liquidbounce.utils.client.logger
 import net.ccbluex.liquidbounce.utils.client.notification
+import net.minecraft.client.Minecraft
 import java.io.Reader
 
 object AutoShopConfig {
@@ -45,6 +46,10 @@ object AutoShopConfig {
      */
     fun loadAutoShopConfig(shopConfigPreset: ShopConfigPreset) : Boolean {
         val result = load(shopConfigPreset.reader())
+        if (Minecraft.getInstance() == null) {
+            return result
+        }
+
         val message = ModuleAutoShop.message(if (result) "reloadSuccess" else "loadError")
 
         notification(message, ModuleAutoShop.name,
@@ -58,14 +63,11 @@ object AutoShopConfig {
             reader.use { reader ->
                 val shopConfig = autoShopGson.fromJson(reader, ShopConfig::class.java)
 
-                // add items to AutoShop
-                ModuleAutoShop.onDisabled()
-                ModuleAutoShop.currentConfig = shopConfig
-                ModuleAutoShop.onEnabled()
+                AutoShopServerMode.installConfig(shopConfig)
             }
         }.onFailure {
             logger.error("Failed to load items for AutoShop.", it)
-            ModuleAutoShop.currentConfig = ShopConfig.Empty
+            AutoShopServerMode.installConfig(ShopConfig.Empty)
             return false
         }
 

@@ -23,6 +23,8 @@
     import RegistryListSetting from "../list/RegistryListSetting.svelte";
     import CurveSetting from "../CurveSetting.svelte";
     import RegistryMutableListSetting from "../list/RegistryMutableListSetting.svelte";
+    import MerchantTradeFiltersSetting from "../merchant/MerchantTradeFiltersSetting.svelte";
+    import MerchantReachSetting from "../merchant/MerchantReachSetting.svelte";
     import {shiftDescription} from "./shiftDescription";
     import {settingShiftDescription} from "./settingDescription";
     export let setting: ModuleSetting;
@@ -57,6 +59,10 @@
         <FloatSetting bind:setting={setting} on:change/>
     {:else if setting.valueType === "FLOAT_RANGE"}
         <FloatRangeSetting bind:setting={setting} on:change/>
+    {:else if setting.valueType === "MERCHANT_TRADE_FILTERS"}
+        <MerchantTradeFiltersSetting {path} bind:setting on:change/>
+    {:else if setting.valueType === "MERCHANT_REACH"}
+        <MerchantReachSetting bind:setting on:change/>
     {:else if setting.valueType === "CONFIGURABLE"}
         <ConfigurableSetting {path} bind:setting={setting} on:change/>
     {:else if setting.valueType === "COLOR"}

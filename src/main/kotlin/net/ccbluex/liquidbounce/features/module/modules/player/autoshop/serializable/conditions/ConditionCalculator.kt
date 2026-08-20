@@ -19,7 +19,7 @@
 package net.ccbluex.liquidbounce.features.module.modules.player.autoshop.serializable.conditions
 
 import it.unimi.dsi.fastutil.objects.Object2IntMap
-import net.ccbluex.liquidbounce.features.module.modules.player.autoshop.ModuleAutoShop
+import net.ccbluex.liquidbounce.features.module.modules.player.autoshop.AutoShopServerMode
 import net.ccbluex.liquidbounce.features.module.modules.player.autoshop.autoShopItemTier
 import net.ccbluex.liquidbounce.features.module.modules.player.autoshop.getAllTierItems
 import net.ccbluex.liquidbounce.features.module.modules.player.autoshop.hasBetterTierItem
@@ -68,7 +68,7 @@ class ConditionCalculator(
         }
 
         val currentTier = currentNode.id.autoShopItemTier()
-        val result = getAllTierItems(currentNode.id, ModuleAutoShop.currentConfig.itemsWithTiers ?: emptyMap())
+        val result = getAllTierItems(currentNode.id, AutoShopServerMode.currentConfig.itemsWithTiers ?: emptyMap())
             .filter { it.autoShopItemTier() >= currentTier }
             .any {
                 val itemAmount = items.getOrDefault(it, 0)

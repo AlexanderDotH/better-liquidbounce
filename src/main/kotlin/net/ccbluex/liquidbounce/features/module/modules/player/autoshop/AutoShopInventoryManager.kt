@@ -85,7 +85,7 @@ object AutoShopInventoryManager : EventListener {
 
             // adds data about tiered items
             // example: [sword:tier:1 = 1, bow:tier:2 = 1]
-            ModuleAutoShop.currentConfig.itemsWithTiers?.forEach {
+            AutoShopServerMode.currentConfig.itemsWithTiers?.forEach {
                 it.value.forEachIndexed { index, id ->
                     val tieredItemID = it.key + TIER_ID + (index + 1)
                     val tieredItemAmount = newItems.getOrDefault(id, 0)
@@ -159,6 +159,6 @@ object AutoShopInventoryManager : EventListener {
         pendingItems.clear()
     }
 
-    override fun parent() = ModuleAutoShop
+    override fun parent() = AutoShopServerMode
 
 }

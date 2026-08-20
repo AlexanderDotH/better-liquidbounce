@@ -83,6 +83,47 @@ test("module toggle and settings writes update only preview state", async () => 
     );
 });
 
+test("AutoShop fixture preserves Vanilla rules while its mode is inactive", async () => {
+    const state = createModernClickGuiPreviewState();
+    const settings = structuredClone(state.moduleSettings.AutoShop);
+    const mode = settings.value.find(setting => setting.name === "Mode");
+    const vanillaSettings = mode.choices.Vanilla.value;
+
+    assert.deepEqual(
+        vanillaSettings.map(setting => setting.name),
+        ["Trades", "Reach", "CPS", "Rotations"],
+    );
+    assert.deepEqual(
+        vanillaSettings.slice(0, 2).map(setting => setting.valueType),
+        ["MERCHANT_TRADE_FILTERS", "MERCHANT_REACH"],
+    );
+    assert.deepEqual(vanillaSettings[1].value, {range: 4.5, wallRange: 3});
+
+    vanillaSettings[0].value[0].outputs = ["minecraft:bookshelf"];
+    mode.active = "ServerShop";
+    const writeResponse = await routeModernClickGuiPreviewRequest(
+        state,
+        jsonRequest(
+            "http://preview.local/api/v1/client/modules/settings?name=AutoShop",
+            "PUT",
+            settings,
+        ),
+    );
+    const readResponse = await routeModernClickGuiPreviewRequest(
+        state,
+        new Request("http://preview.local/api/v1/client/modules/settings?name=AutoShop"),
+    );
+    const remounted = await readResponse.json();
+    const remountedMode = remounted.value.find(setting => setting.name === "Mode");
+
+    assert.equal(writeResponse.status, 204);
+    assert.equal(remountedMode.active, "ServerShop");
+    assert.deepEqual(
+        remountedMode.choices.Vanilla.value[0].value[0].outputs,
+        ["minecraft:bookshelf"],
+    );
+});
+
 test("global settings, typing, and persistent storage round-trip through the router", async () => {
     const state = createModernClickGuiPreviewState();
     const combat = state.globalSettings.value.find(setting => setting.name === "Combat");

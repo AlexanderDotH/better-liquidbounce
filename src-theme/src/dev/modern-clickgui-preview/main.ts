@@ -21,11 +21,9 @@ await insertPersistentData();
 const [
     {getModuleSettings, setModuleSettings},
     {createClickGuiThemeSession},
-    {default: ModernTabbedClickGui},
 ] = await Promise.all([
     import("../../integration/rest"),
     import("../../routes/clickgui/theme/clickGuiThemeState"),
-    import("../../routes/clickgui/themes/modern/ModernTabbedClickGui.svelte"),
 ]);
 
 const liveSession = createClickGuiThemeSession({
@@ -34,25 +32,33 @@ const liveSession = createClickGuiThemeSession({
 });
 await liveSession.load();
 
-const session = modernOnlySession(liveSession);
 const target = document.getElementById("preview-app");
 if (!target) {
     throw new Error("Modern ClickGUI preview target is missing.");
 }
 const previewTarget = target;
+const requestedTheme = new URLSearchParams(window.location.search).get("theme")?.toLowerCase();
 
-mount(ModernTabbedClickGui, {
-    target: previewTarget,
-    props: {
-        session,
-        nativeTextInput: true,
-    },
-});
+if (requestedTheme === "classic") {
+    const {default: TabbedClickGui} = await import("../../routes/clickgui/TabbedClickGui.svelte");
+    mount(TabbedClickGui, {target: previewTarget});
+} else {
+    const {default: ModernTabbedClickGui} = await import(
+        "../../routes/clickgui/themes/modern/ModernTabbedClickGui.svelte"
+    );
+    mount(ModernTabbedClickGui, {
+        target: previewTarget,
+        props: {
+            session: modernOnlySession(liveSession),
+            nativeTextInput: true,
+        },
+    });
 
-const themeOptionObserver = new MutationObserver(disableClassicPreviewOption);
-themeOptionObserver.observe(previewTarget, {childList: true, subtree: true});
-disableClassicPreviewOption();
-window.addEventListener("beforeunload", () => themeOptionObserver.disconnect(), {once: true});
+    const themeOptionObserver = new MutationObserver(disableClassicPreviewOption);
+    themeOptionObserver.observe(previewTarget, {childList: true, subtree: true});
+    disableClassicPreviewOption();
+    window.addEventListener("beforeunload", () => themeOptionObserver.disconnect(), {once: true});
+}
 
 const previewWindow = window as Window & {
     __LIQUIDBOUNCE_MODERN_PREVIEW__?: ModernClickGuiPreviewState;

@@ -16,16 +16,15 @@
  * You should have received a copy of the GNU General Public License
  * along with LiquidBounce. If not, see <https://www.gnu.org/licenses/>.
  */
-package net.ccbluex.liquidbounce.features.module.modules.player.autoshop.purchasemode
+package net.ccbluex.liquidbounce.features.module.modules.player.autoshop.vanilla.model
 
-import net.ccbluex.liquidbounce.config.types.group.Mode
-import net.ccbluex.liquidbounce.config.types.group.ModeValueGroup
-import net.ccbluex.liquidbounce.features.module.modules.player.autoshop.AutoShopServerMode
+import net.minecraft.world.item.Item
 
-object QuickPurchaseMode : Mode("Quick") {
-    override val parent: ModeValueGroup<*>
-        get() = AutoShopServerMode.purchaseMode
-
-    val delayMs by intRange("Delay", 50..70, 0..150, "ms")
-    val waitForItems by boolean("WaitForItems", true)
+data class MerchantTradeRule(
+    val inputA: Set<Item> = emptySet(),
+    val inputB: Set<Item> = emptySet(),
+    val outputs: Set<Item> = emptySet(),
+) {
+    val isActive: Boolean
+        get() = inputA.isNotEmpty() && outputs.isNotEmpty()
 }

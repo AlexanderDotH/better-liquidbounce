@@ -40,6 +40,8 @@ export type ModuleSetting =
     | FloatRangeSetting
     | IntSetting
     | IntRangeSetting
+    | MerchantTradeFiltersSetting
+    | MerchantReachSetting
     | ChoiceSetting
     | ChooseSetting
     | MultiChooseSetting
@@ -154,6 +156,29 @@ export interface IntSetting extends Setting<number> {
 
 export interface IntRangeSetting extends Setting<Range> {
     range: Range;
+    suffix: string;
+}
+
+export interface MerchantTradeFilter {
+    inputA: string[];
+    inputB: string[];
+    outputs: string[];
+}
+
+export interface MerchantTradeFiltersSetting extends Setting<MerchantTradeFilter[]> {
+    valueType: "MERCHANT_TRADE_FILTERS";
+    registry: string;
+}
+
+export interface MerchantReach {
+    range: number;
+    wallRange: number;
+}
+
+export interface MerchantReachSetting extends Setting<MerchantReach> {
+    valueType: "MERCHANT_REACH";
+    rangeBounds: Range;
+    wallRangeBounds: Range;
     suffix: string;
 }
 

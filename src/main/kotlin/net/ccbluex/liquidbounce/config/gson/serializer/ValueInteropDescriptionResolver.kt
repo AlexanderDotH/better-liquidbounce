@@ -292,6 +292,7 @@ internal object ValueInteropDescriptionResolver {
                     ValueType.CONFIGURABLE -> CONFIGURABLE
                     ValueType.TOGGLEABLE -> TOGGLEABLE
                     ValueType.CHOICE -> CHOICE
+                    ValueType.MERCHANT_TRADE_FILTERS, ValueType.MERCHANT_REACH -> MERCHANT
                     ValueType.INVALID -> GENERIC
                 }
             }

@@ -28,6 +28,7 @@ export function createModernClickGuiPreviewState(): ModernClickGuiPreviewState {
         modules.map(module => [module.name, createDefaultModuleSettings(module.name)]),
     );
     moduleSettings.KillAura = createComprehensiveModuleSettings();
+    moduleSettings.AutoShop = createAutoShopSettings();
     moduleSettings.ClickGUI = createClickGuiSettings();
 
     return {
@@ -239,6 +240,7 @@ function createPreviewModules(): ClickGuiModule[] {
         ["Speed", "Movement", true, ["BHop"]],
         ["Flight", "Movement", false, ["Fly"]],
         ["AutoArmor", "Player", true],
+        ["AutoShop", "Player", true, ["AutoTrade"]],
         ["InventoryCleaner", "Player", false, ["InvCleaner"]],
         ["Scaffold", "World", false, ["BlockFly"]],
         ["Nuker", "World", false],
@@ -271,6 +273,7 @@ function createPreviewModules(): ClickGuiModule[] {
 function previewDescription(name: string): string {
     const descriptions: Record<string, string> = {
         KillAura: "Automatically attacks nearby valid targets using configurable rotations.",
+        AutoShop: "Trades through server shops or nearby vanilla merchants using configured item filters.",
         Speed: "Improves movement speed with server-aware modes.",
         Scaffold: "Places blocks below the player while moving.",
         ESP: "Highlights entities through world geometry.",
@@ -313,6 +316,40 @@ function createDefaultModuleSettings(name: string): ConfigurableSetting {
         bindSetting("Bind", "key.keyboard.unknown"),
         booleanSetting("Hidden", false),
     ]);
+}
+
+function createAutoShopSettings(): ConfigurableSetting {
+    const serverShop = configurable("ServerShop", [
+        chooseSetting("Config", "HypixelBedWars", ["HypixelBedWars", "CubeCraft"]),
+        intRangeSetting("StartDelay", 1, 3, 0, 20),
+        choiceModes("PurchaseMode", "Normal", {
+            Normal: configurable("Normal", []),
+            Quick: configurable("Quick", []),
+        }),
+        intSetting("ExtraCategorySwitchDelay", 2, 0, 20, " ticks"),
+        booleanSetting("AutoClose", true),
+    ]);
+    const rotations = configurable("Rotations", [
+        choiceModes("AngleSmooth", "Linear", {
+            Linear: configurable("Linear", [floatSetting("TurnSpeed", 90, 10, 180, "°")]),
+            Sigmoid: configurable("Sigmoid", [floatSetting("Steepness", 8, 1, 20, "")]),
+        }),
+        chooseSetting("MovementCorrection", "Silent", ["None", "Silent", "Strict"]),
+        floatSetting("ResetThreshold", 2, 1, 180, "°"),
+        intSetting("TicksUntilReset", 5, 1, 30, " ticks"),
+    ]);
+    const vanilla = configurable("Vanilla", [
+        merchantTradeFiltersSetting(),
+        merchantReachSetting(),
+        intRangeSetting("CPS", 4, 8, 1, 20),
+        rotations,
+    ]);
+
+    return configurable("AutoShop", [
+        choiceModes("Mode", "Vanilla", {ServerShop: serverShop, Vanilla: vanilla}),
+        bindSetting("Bind", "key.keyboard.unknown"),
+        booleanSetting("Hidden", false),
+    ], "Expanded vanilla merchant-trading fixture with persistent nested settings.");
 }
 
 function createClickGuiSettings(): ConfigurableSetting {
@@ -481,6 +518,22 @@ function choiceSetting(name: string): ModuleSetting {
     };
 }
 
+function choiceModes(
+    name: string,
+    active: string,
+    choices: Record<string, ConfigurableSetting>,
+): ModuleSetting {
+    return {
+        name,
+        valueType: "CHOICE",
+        value: [],
+        active,
+        choices,
+        description: undefined,
+        key: `preview.${name}`,
+    };
+}
+
 function multiChooseSetting(
     name: string,
     value: string[],
@@ -554,8 +607,56 @@ function registryListSetting(
     };
 }
 
+function merchantTradeFiltersSetting(): ModuleSetting {
+    return {
+        name: "Trades",
+        valueType: "MERCHANT_TRADE_FILTERS",
+        value: [
+            {
+                inputA: ["minecraft:emerald"],
+                inputB: [],
+                outputs: ["minecraft:bread"],
+            },
+            {
+                inputA: ["minecraft:paper"],
+                inputB: ["minecraft:book"],
+                outputs: ["minecraft:enchanted_book"],
+            },
+        ],
+        registry: "item",
+        description: "Ordered item-only rules processed round-robin.",
+        key: "preview.AutoShop.Trades",
+    };
+}
+
+function merchantReachSetting(): ModuleSetting {
+    return {
+        name: "Reach",
+        valueType: "MERCHANT_REACH",
+        value: {range: 4.5, wallRange: 3},
+        rangeBounds: {from: 1, to: 6},
+        wallRangeBounds: {from: 0, to: 6},
+        suffix: "blocks",
+        description: "Uses the shorter wall range for merchants without line of sight.",
+        key: "preview.AutoShop.Reach",
+    };
+}
+
 function createInitialPersistentItems(): PersistentStorageItem[] {
     return [
+        {
+            key: "clickgui.panel.Player",
+            value: JSON.stringify({
+                left: 20,
+                top: 84,
+                expanded: true,
+                scrollTop: 0,
+                zIndex: 4,
+            }),
+        },
+        {key: "clickgui.AutoShop", value: "true"},
+        {key: "clickgui.AutoShop.Mode", value: "true"},
+        {key: "clickgui.AutoShop.Mode.Rotations", value: "true"},
         {
             key: "clickgui.modern.panel.v1.Combat",
             value: JSON.stringify({
@@ -566,12 +667,25 @@ function createInitialPersistentItems(): PersistentStorageItem[] {
                 zIndex: 3,
             }),
         },
+        {
+            key: "clickgui.modern.panel.v1.Player",
+            value: JSON.stringify({
+                left: 322,
+                top: 84,
+                expanded: true,
+                scrollTop: 0,
+                zIndex: 4,
+            }),
+        },
         {key: "clickgui.modern.module.v1.KillAura", value: "true"},
         {key: "clickgui.modern.module.v1.KillAura.AttackPattern", value: "true"},
         {key: "clickgui.modern.module.v1.KillAura.Targets", value: "true"},
         {key: "clickgui.modern.module.v1.KillAura.Rotations", value: "true"},
         {key: "clickgui.modern.module.v1.KillAura.Targeting", value: "true"},
         {key: "clickgui.modern.module.v1.KillAura.Blocks", value: "true"},
+        {key: "clickgui.modern.module.v1.AutoShop", value: "true"},
+        {key: "clickgui.modern.module.v1.AutoShop.Mode", value: "true"},
+        {key: "clickgui.modern.module.v1.AutoShop.Mode.Rotations", value: "true"},
     ];
 }
 
@@ -604,10 +718,34 @@ function createGameWindow() {
 
 function createRegistryItems() {
     return {
-        "minecraft:diamond_ore": {name: "Diamond Ore", icon: undefined},
-        "minecraft:ancient_debris": {name: "Ancient Debris", icon: undefined},
-        "minecraft:chest": {name: "Chest", icon: undefined},
-        "minecraft:obsidian": {name: "Obsidian", icon: undefined},
+        "minecraft:emerald": previewRegistryItem("Emerald", "#35c96f", "#c9ffe0"),
+        "minecraft:paper": previewRegistryItem("Paper", "#e8eadf", "#9ca49b"),
+        "minecraft:wheat": previewRegistryItem("Wheat", "#e0b84f", "#fff0a3"),
+        "minecraft:coal": previewRegistryItem("Coal", "#30343a", "#777e87"),
+        "minecraft:iron_ingot": previewRegistryItem("Iron Ingot", "#d8d8d2", "#ffffff"),
+        "minecraft:bread": previewRegistryItem("Bread", "#bd792f", "#f2c268"),
+        "minecraft:book": previewRegistryItem("Book", "#765036", "#ece3c1"),
+        "minecraft:bookshelf": previewRegistryItem("Bookshelf", "#9b6638", "#dfc386"),
+        "minecraft:enchanted_book": previewRegistryItem("Enchanted Book", "#8d4fb8", "#f5c4ff"),
+        "minecraft:diamond_ore": previewRegistryItem("Diamond Ore", "#68757b", "#50d6cf"),
+        "minecraft:ancient_debris": previewRegistryItem("Ancient Debris", "#68473f", "#a86c55"),
+        "minecraft:chest": previewRegistryItem("Chest", "#a86e31", "#e6b15c"),
+        "minecraft:obsidian": previewRegistryItem("Obsidian", "#241c35", "#765a92"),
+    };
+}
+
+function previewRegistryItem(name: string, primary: string, highlight: string) {
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" `
+        + `viewBox="0 0 16 16" shape-rendering="crispEdges">`
+        + `<rect x="2" y="2" width="12" height="12" fill="${primary}"/>`
+        + `<rect x="4" y="3" width="7" height="2" fill="${highlight}"/>`
+        + `<rect x="3" y="6" width="2" height="6" fill="${highlight}" opacity=".72"/>`
+        + `<rect x="6" y="11" width="7" height="2" fill="#000" opacity=".28"/>`
+        + `</svg>`;
+
+    return {
+        name,
+        icon: `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`,
     };
 }
 
