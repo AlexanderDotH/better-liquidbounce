@@ -24,6 +24,7 @@ package net.ccbluex.liquidbounce.features.module.modules.combat
 import net.ccbluex.liquidbounce.config.types.list.Tagged
 import kotlin.math.ceil
 import kotlin.math.max
+import kotlin.math.sqrt
 
 /** PlayerMove packet shape used to advance the same-tick server packet counter. */
 internal enum class SpearKillPrimedInstantPacketType(override val tag: String) : Tagged {
@@ -100,6 +101,18 @@ internal sealed interface SpearKillPrimedInstantPlanResult {
  * later reset the effective count to one for that handler invocation.
  */
 internal object SpearKillPrimedInstantPlanner {
+
+    /** Conservative upper bound for one auto-primed final movement in a fresh packet window. */
+    fun maximumAutoAcceptedDistance(
+        expectedVelocitySquared: Double,
+        movementProfile: SpearKillPrimedInstantMovementProfile,
+    ): Double? {
+        if (!expectedVelocitySquared.isFinite() || expectedVelocitySquared < 0.0) return null
+        val squaredLimit = expectedVelocitySquared +
+            movementProfile.squaredDistanceThreshold * MAX_SERVER_COUNTED_PACKETS
+        if (!squaredLimit.isFinite() || squaredLimit <= 0.0) return null
+        return Math.nextDown(sqrt(squaredLimit))
+    }
 
     fun plan(request: SpearKillPrimedInstantPlanRequest): SpearKillPrimedInstantPlanResult {
         invalidReason(request)?.let { return SpearKillPrimedInstantPlanResult.Blocked(it) }

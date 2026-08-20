@@ -152,6 +152,14 @@ internal class SpearKillFallDamagePacketTracker {
         packet.onGround = true
     }
 
+    /** Restores the owned ground bit after lower-priority packet objections changed it. */
+    fun reassertGround(packet: ServerboundMovePlayerPacket): Boolean {
+        if (!protectedPackets.containsKey(packet)) return false
+
+        packet.onGround = true
+        return true
+    }
+
     fun confirmFinalState(packet: ServerboundMovePlayerPacket, cancelled: Boolean): Boolean {
         if (protectedPackets.remove(packet) == null) return false
 
@@ -217,6 +225,10 @@ internal class SpearKillPacketBootSession {
 
     val pendingOutboundStep: Boolean
         get() = pendingOffset != null && pendingStepIsOutbound
+
+    /** True only for the final physical outbound movement before the strike hold begins. */
+    val pendingFinalOutboundStep: Boolean
+        get() = pendingOutboundStep && remainingOutboundSteps == 1
 
     val pendingMovement: Vec3?
         get() = pendingOffset?.subtract(committedOffset)

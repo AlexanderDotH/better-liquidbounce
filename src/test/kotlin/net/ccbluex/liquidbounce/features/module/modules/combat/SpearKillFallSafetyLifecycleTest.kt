@@ -19,6 +19,25 @@ import org.junit.jupiter.api.Test
 class SpearKillFallSafetyLifecycleTest {
 
     @Test
+    fun `Instant ground spoof resets server fall state without falsifying collision planning`() {
+        assertFalse(resolveSpearKillFallSafetyPacketGrounded(
+            packetGrounded = true,
+            instantGroundSpoof = true,
+            physicallyNearGround = false,
+        ))
+        assertTrue(resolveSpearKillFallSafetyPacketGrounded(
+            packetGrounded = true,
+            instantGroundSpoof = true,
+            physicallyNearGround = true,
+        ))
+        assertTrue(resolveSpearKillFallSafetyPacketGrounded(
+            packetGrounded = true,
+            instantGroundSpoof = false,
+            physicallyNearGround = false,
+        ))
+    }
+
+    @Test
     fun `airborne movement cannot satisfy a near-ground planned packet`() {
         val movement = Vec3(6.0, -10.0, 0.0)
         val plan = readyPlan(

@@ -388,7 +388,7 @@ class ModuleSpearKillTest {
         assertEquals(
             SpearKillChargeDecision.READY,
             resolveSpearKillChargeDecision(
-                ticksUsingItem = 4,
+                ticksUsingItem = 3,
                 delayTicks = 3,
                 isUsingSpear = true,
                 useRequested = true,
@@ -2133,12 +2133,34 @@ class ModuleSpearKillTest {
         tracker.protect(cancelledPacket)
 
         assertTrue(protectedPacket.onGround)
+        protectedPacket.onGround = false
+        assertFalse(tracker.reassertGround(unrelatedPacket))
+        assertTrue(tracker.reassertGround(protectedPacket))
+        assertTrue(protectedPacket.onGround)
         assertFalse(tracker.confirmFinalState(unrelatedPacket, cancelled = false))
         assertFalse(tracker.confirmFinalState(cancelledPacket, cancelled = true))
         assertTrue(tracker.confirmFinalState(protectedPacket, cancelled = false))
 
         tracker.protect(retryPacket)
         assertTrue(tracker.confirmFinalState(retryPacket, cancelled = false))
+    }
+
+    @Test
+    fun `owned recovery confirmation carries its explicit position and ground bit`() {
+        val position = Vec3(12.5, 72.25, -4.75)
+        val packet = createSpearKillPositionPacket(
+            position = position,
+            yaw = 37.0f,
+            pitch = -12.0f,
+            onGround = true,
+            horizontalCollision = false,
+        )
+
+        assertTrue(packet.hasPosition())
+        assertTrue(packet.onGround)
+        assertEquals(position.x, packet.getX(0.0))
+        assertEquals(position.y, packet.getY(0.0))
+        assertEquals(position.z, packet.getZ(0.0))
     }
 
     @Test

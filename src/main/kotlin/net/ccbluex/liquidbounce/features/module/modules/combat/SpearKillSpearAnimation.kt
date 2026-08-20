@@ -85,14 +85,14 @@ internal enum class SpearKillChargeDecision {
     READY,
 }
 
-/** Leaves undercharged spear use on vanilla packet cadence instead of manufacturing movement ticks. */
+/** KineticWeapon accepts equality at delayTicks; only earlier use remains on vanilla cadence. */
 internal fun resolveSpearKillChargeDecision(
     ticksUsingItem: Int,
     delayTicks: Int,
     isUsingSpear: Boolean,
     useRequested: Boolean,
 ): SpearKillChargeDecision = when {
-    ticksUsingItem > delayTicks -> SpearKillChargeDecision.READY
+    ticksUsingItem >= delayTicks -> SpearKillChargeDecision.READY
     isUsingSpear && useRequested -> SpearKillChargeDecision.WAIT_FOR_VANILLA
     else -> SpearKillChargeDecision.RESET
 }

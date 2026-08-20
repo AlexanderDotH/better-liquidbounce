@@ -91,7 +91,7 @@ internal fun shouldStartSpearKillAttempt(
     delayTicks: Int,
     damageUseDuration: Int,
 ): Boolean = !attackActive && activationSatisfied && hasTarget &&
-    damageUseDuration > delayTicks && ticksUsingItem > delayTicks
+    damageUseDuration >= delayTicks && ticksUsingItem >= delayTicks
 
 /**
  * Candidate acquisition deliberately starts before charge and activation are complete. Otherwise

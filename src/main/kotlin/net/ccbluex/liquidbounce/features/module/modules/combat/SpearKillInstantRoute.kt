@@ -25,14 +25,30 @@ internal const val SPEAR_KILL_INSTANT_DEFAULT_MAX_PACKETS = 128
 internal const val SPEAR_KILL_INSTANT_MIN_MAX_PACKETS = 2
 internal const val SPEAR_KILL_INSTANT_MAX_MAX_PACKETS = 512
 internal const val SPEAR_KILL_INSTANT_SERVER_EVALUATION_TICKS = SPEAR_KILL_PACKET_STRIKE_HOLD_TICKS
+internal const val SPEAR_KILL_INSTANT_DAMAGE_SAMPLE_TICKS = 1
+
+/** Instant owns the wire-level ground bit; other routes retain collision-derived ground state. */
+internal fun resolveSpearKillOwnedPacketGrounded(
+    routingMode: SpearKillRoutingMode,
+    physicallyNearGround: Boolean,
+): Boolean = routingMode == SpearKillRoutingMode.INSTANT || physicallyNearGround
+
+/** Includes the correction/ack window where the route session may already have been cleared. */
+internal fun shouldProtectSpearKillInstantGround(
+    routingMode: SpearKillRoutingMode,
+    ownsMovementWindow: Boolean,
+): Boolean = routingMode == SpearKillRoutingMode.INSTANT && ownsMovementWindow
 
 /**
- * KineticWeapon checks held spears every server use tick. The multi-tick Instant hold protects
- * against client/server phase alignment; it is not extra travel time for target prediction.
+ * KineticWeapon checks held spears every server use tick. Instant retains the first complete
+ * evaluation boundary; it is not extra travel time for target prediction.
  */
-internal fun spearKillInstantAimPredictionTicks(serverEvaluationTicks: Int): Int {
+internal fun spearKillInstantAimPredictionTicks(
+    serverEvaluationTicks: Int,
+    paced: Boolean = false,
+): Int {
     require(serverEvaluationTicks >= 0) { "Server evaluation ticks must not be negative" }
-    return serverEvaluationTicks.coerceAtMost(1)
+    return if (paced) serverEvaluationTicks else serverEvaluationTicks.coerceAtMost(1)
 }
 
 /** A complete direct round trip split into an immediate outbound and next-tick exact return. */
@@ -75,7 +91,7 @@ internal fun resolveSpearKillInstantChargeAction(
         return SpearKillInstantChargeAction.INVALID
     }
 
-    val freshHitTick = delayTicks.toLong() + 1L + hitTicks.toLong()
+    val freshHitTick = delayTicks.toLong() + hitTicks.toLong()
     if (freshHitTick > damageUseDuration.toLong()) return SpearKillInstantChargeAction.INVALID
 
     val currentHitTick = ticksUsingItem.toLong() + hitTicks.toLong()
@@ -152,11 +168,12 @@ internal fun buildSpearKillPrimedInstantPacketRoute(
 internal fun isSpearKillPrimedInstantStepAdmissible(
     endpointFree: Boolean,
     outboundStep: Boolean,
+    terminalOutboundStep: Boolean,
     attackTargetPresent: Boolean,
     targetValid: Boolean,
     terminalRaytraceClear: Boolean,
 ): Boolean = endpointFree && (
-    !outboundStep || !attackTargetPresent || targetValid && terminalRaytraceClear
+    !outboundStep || !attackTargetPresent || targetValid && (!terminalOutboundStep || terminalRaytraceClear)
 )
 
 /** All-or-nothing admission for outbound, exact inverse, NoFall extras, and final grounding. */
@@ -216,9 +233,9 @@ internal fun calculateSpearKillPrimedInstantMovementBudget(
 
 /**
  * Starts a zero-cadence session whose outbound is flushed immediately, then held at the terminal
- * position across a complete server evaluation window before its exact inverse packet-only return
- * is eligible. Two client movement boundaries prevent an unlucky client/server phase alignment
- * from returning before the server has sampled the terminal kinetic movement.
+ * position across two client movement boundaries before its exact inverse packet-only return is
+ * eligible. The first server damage sample stays at one tick; the extra boundary prevents an
+ * unlucky client/server phase alignment from returning before the server sampled the lunge.
  * The local player stays at the origin; the shared fall lifecycle inserts Direct-style NoFall
  * stabilization packets when the server-visible descent would otherwise become unsafe.
  */

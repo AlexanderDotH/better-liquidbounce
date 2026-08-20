@@ -194,6 +194,72 @@ class SpearKillPrimedInstantPlannerTest {
     }
 
     @Test
+    fun `same tick burst validates cumulative acceleration and defers before packet six`() {
+        val first = planSpearKillPrimedBurstStep(
+            windowOrigin = Vec3.ZERO,
+            currentPosition = Vec3.ZERO,
+            movement = Vec3(3.0, 0.0, 0.0),
+            expectedVelocitySquared = 0.0,
+            movementProfile = SpearKillPrimedInstantMovementProfile.NORMAL,
+            priming = SpearKillPrimedInstantPriming.Auto,
+            packetAccounting = SpearKillPrimedInstantPacketAccounting(0, 0, 0, 512),
+            primingPacketType = SpearKillPrimedInstantPacketType.Position,
+        )
+        val firstPlan = assertInstanceOf(
+            SpearKillPrimedBurstStepResult.Send::class.java,
+            first,
+        ).plan
+        assertEquals(1, firstPlan.finalPacketOrdinal)
+
+        val second = planSpearKillPrimedBurstStep(
+            windowOrigin = Vec3.ZERO,
+            currentPosition = Vec3(3.0, 0.0, 0.0),
+            movement = Vec3(17.0, 0.0, 0.0),
+            expectedVelocitySquared = 0.0,
+            movementProfile = SpearKillPrimedInstantMovementProfile.NORMAL,
+            priming = SpearKillPrimedInstantPriming.Auto,
+            packetAccounting = SpearKillPrimedInstantPacketAccounting(1, 0, 0, 512),
+            primingPacketType = SpearKillPrimedInstantPacketType.Position,
+        )
+        val secondPlan = assertInstanceOf(
+            SpearKillPrimedBurstStepResult.Send::class.java,
+            second,
+        ).plan
+        assertEquals(20.0, secondPlan.requestedDistance, 1.0E-12)
+        assertEquals(4, secondPlan.finalPacketOrdinal)
+
+        val third = planSpearKillPrimedBurstStep(
+            windowOrigin = Vec3.ZERO,
+            currentPosition = Vec3(20.0, 0.0, 0.0),
+            movement = Vec3(5.0, 0.0, 0.0),
+            expectedVelocitySquared = 0.0,
+            movementProfile = SpearKillPrimedInstantMovementProfile.NORMAL,
+            priming = SpearKillPrimedInstantPriming.Auto,
+            packetAccounting = SpearKillPrimedInstantPacketAccounting(4, 0, 0, 512),
+            primingPacketType = SpearKillPrimedInstantPacketType.Position,
+        )
+        assertInstanceOf(SpearKillPrimedBurstStepResult.Defer::class.java, third)
+    }
+
+    @Test
+    fun `burst tick estimator packs compatible acceleration packets into one client tick`() {
+        val movements = listOf(
+            Vec3(3.0, 0.0, 0.0),
+            Vec3(17.0, 0.0, 0.0),
+            Vec3(17.0, 0.0, 0.0),
+        )
+
+        assertEquals(
+            2,
+            calculateSpearKillPrimedBurstTickCount(
+                movements = movements,
+                expectedVelocitySquared = 0.0,
+                movementProfile = SpearKillPrimedInstantMovementProfile.NORMAL,
+            ),
+        )
+    }
+
+    @Test
     fun `packet budget reserves the complete return before admitting any burst`() {
         val accounting = SpearKillPrimedInstantPacketAccounting(
             ownedPreFinalPackets = 0,

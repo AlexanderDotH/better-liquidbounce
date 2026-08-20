@@ -207,10 +207,10 @@ class SpearKillTargetConfigurationTest {
             useKeyDown = true,
         )
 
-        assertFalse(shouldStartSpearKillAttempt(false, holdUseSatisfied, true, 3, 3, 20))
-        assertTrue(shouldStartSpearKillAttempt(false, holdUseSatisfied, true, 4, 3, 20))
+        assertFalse(shouldStartSpearKillAttempt(false, holdUseSatisfied, true, 2, 3, 20))
+        assertTrue(shouldStartSpearKillAttempt(false, holdUseSatisfied, true, 3, 3, 20))
         assertTrue(shouldStartSpearKillAttempt(false, holdUseSatisfied, true, 20, 3, 20))
-        assertFalse(shouldStartSpearKillAttempt(false, holdUseSatisfied, true, 4, 3, 3))
+        assertTrue(shouldStartSpearKillAttempt(false, holdUseSatisfied, true, 3, 3, 3))
         assertFalse(shouldStartSpearKillAttempt(true, holdUseSatisfied, true, 4, 3, 20))
     }
 

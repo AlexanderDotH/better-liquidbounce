@@ -20,6 +20,8 @@
 package net.ccbluex.liquidbounce.features.module.modules.combat
 
 import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertFalse
+import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 
 class SpearKillRoutingModeTest {
@@ -62,7 +64,7 @@ class SpearKillRoutingModeTest {
     }
 
     @Test
-    fun `Instant retains a full server evaluation window while other direct modes return immediately`() {
+    fun `Instant retains two server boundaries while other direct modes return immediately`() {
         assertEquals(0, spearKillStrikeHoldTicks(SpearKillRoutingMode.DIRECT))
         assertEquals(SPEAR_KILL_PACKET_STRIKE_HOLD_TICKS, spearKillStrikeHoldTicks(SpearKillRoutingMode.A_STAR))
         assertEquals(0, spearKillStrikeHoldTicks(SpearKillRoutingMode.NETWORK_OPTIMIZED))
@@ -72,12 +74,22 @@ class SpearKillRoutingModeTest {
     @Test
     fun `Instant predicts its terminal hit during the server evaluation tick`() {
         assertEquals(
-            SPEAR_KILL_PACKET_STRIKE_HOLD_TICKS,
+            1,
             spearKillDirectRouteHitTicks(
                 routingMode = SpearKillRoutingMode.INSTANT,
                 outboundTickCount = 24,
                 stepWaitTicks = 4,
-                strikeHoldTicks = 1,
+                strikeHoldTicks = SPEAR_KILL_PACKET_STRIKE_HOLD_TICKS,
+            ),
+        )
+        assertEquals(
+            24,
+            spearKillDirectRouteHitTicks(
+                routingMode = SpearKillRoutingMode.INSTANT,
+                outboundTickCount = 24,
+                stepWaitTicks = 4,
+                strikeHoldTicks = SPEAR_KILL_PACKET_STRIKE_HOLD_TICKS,
+                pacedInstant = true,
             ),
         )
         assertEquals(
@@ -111,6 +123,13 @@ class SpearKillRoutingModeTest {
             ),
             1.0E-9,
         )
+    }
+
+    @Test
+    fun `paced Primed keeps tracking a moving target while same tick Instant does not`() {
+        assertFalse(shouldTrackSpearKillPacketTarget(SpearKillRoutingMode.INSTANT, pacedInstant = false))
+        assertTrue(shouldTrackSpearKillPacketTarget(SpearKillRoutingMode.INSTANT, pacedInstant = true))
+        assertTrue(shouldTrackSpearKillPacketTarget(SpearKillRoutingMode.DIRECT, pacedInstant = false))
     }
 
     @Test

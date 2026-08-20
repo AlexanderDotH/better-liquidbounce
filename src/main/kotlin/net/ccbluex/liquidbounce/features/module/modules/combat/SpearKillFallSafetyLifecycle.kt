@@ -37,6 +37,16 @@ internal enum class SpearKillFallSafetyPendingStepGate {
     BLOCKED,
 }
 
+/**
+ * Instant's airborne ground bit resets Vanilla fall state but is not collision evidence. Keeping
+ * those concepts separate preserves the preflighted route plan while the wire packet stays safe.
+ */
+internal fun resolveSpearKillFallSafetyPacketGrounded(
+    packetGrounded: Boolean,
+    instantGroundSpoof: Boolean,
+    physicallyNearGround: Boolean,
+): Boolean = if (instantGroundSpoof) physicallyNearGround else packetGrounded
+
 private class ActiveSpearKillFallSafetySession(
     val plan: SpearKillServerFallSafetyPlan,
 ) {

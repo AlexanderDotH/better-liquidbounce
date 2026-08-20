@@ -52,14 +52,19 @@ internal fun spearKillStrikeHoldTicks(routingMode: SpearKillRoutingMode): Int = 
     SpearKillRoutingMode.A_STAR -> SPEAR_KILL_PACKET_STRIKE_HOLD_TICKS
 }
 
-/** Instant flushes outbound now and predicts damage at the end of its bounded evaluation window. */
+/** Instant flushes outbound now and predicts damage at its first server sample, before return. */
 internal fun spearKillDirectRouteHitTicks(
     routingMode: SpearKillRoutingMode,
     outboundTickCount: Int,
     stepWaitTicks: Int,
     strikeHoldTicks: Int,
+    pacedInstant: Boolean = false,
 ): Int = if (routingMode == SpearKillRoutingMode.INSTANT) {
-    SPEAR_KILL_INSTANT_SERVER_EVALUATION_TICKS
+    if (pacedInstant) {
+        outboundTickCount.coerceAtLeast(SPEAR_KILL_INSTANT_DAMAGE_SAMPLE_TICKS)
+    } else {
+        SPEAR_KILL_INSTANT_DAMAGE_SAMPLE_TICKS
+    }
 } else {
     spearKillDirectPacketHitTicks(outboundTickCount, stepWaitTicks, strikeHoldTicks)
 }
@@ -74,6 +79,12 @@ internal fun spearKillDirectRouteMaxVerticalStep(
 } else {
     maximumStepLimit
 }
+
+/** Same-tick Instant cannot replan; paced Primed can safely replace its untouched outbound tail. */
+internal fun shouldTrackSpearKillPacketTarget(
+    routingMode: SpearKillRoutingMode,
+    pacedInstant: Boolean,
+): Boolean = routingMode != SpearKillRoutingMode.INSTANT || pacedInstant
 
 /**
  * Chooses whether this attack should use A* after direct-route preflight.

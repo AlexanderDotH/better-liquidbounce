@@ -14,6 +14,23 @@ import net.minecraft.network.protocol.game.ServerboundMovePlayerPacket
 import net.minecraft.world.phys.Vec3
 
 @Suppress("LongParameterList")
+internal fun createSpearKillPositionPacket(
+    position: Vec3,
+    yaw: Float,
+    pitch: Float,
+    onGround: Boolean,
+    horizontalCollision: Boolean,
+): ServerboundMovePlayerPacket.PosRot = ServerboundMovePlayerPacket.PosRot(
+    position.x,
+    position.y,
+    position.z,
+    yaw,
+    pitch,
+    onGround,
+    horizontalCollision,
+)
+
+@Suppress("LongParameterList")
 internal fun createSpearKillPrimingPacket(
     type: SpearKillPrimedInstantPacketType,
     position: Vec3,
