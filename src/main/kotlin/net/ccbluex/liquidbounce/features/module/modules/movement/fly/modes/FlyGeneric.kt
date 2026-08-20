@@ -28,6 +28,7 @@ import net.ccbluex.liquidbounce.config.types.group.ValueGroup
 import net.ccbluex.liquidbounce.config.types.list.Tagged
 import net.ccbluex.liquidbounce.event.EventState
 import net.ccbluex.liquidbounce.event.events.BlockShapeEvent
+import net.ccbluex.liquidbounce.event.events.DisconnectEvent
 import net.ccbluex.liquidbounce.event.events.GameTickEvent
 import net.ccbluex.liquidbounce.event.events.PacketEvent
 import net.ccbluex.liquidbounce.event.events.PlayerJumpEvent
@@ -94,7 +95,9 @@ internal fun shouldSendVanillaFlyPacketBypass(
     tickCount: Int,
     configuredMode: VanillaFlyCheckBypassMode,
     isFallFlying: Boolean,
-) = eventState == EventState.POST &&
+    movementSuspended: Boolean = false,
+) = !movementSuspended &&
+    eventState == EventState.POST &&
     shouldRunVanillaFlyCheckBypass(enabled, tickCount) &&
     resolveVanillaFlyCheckBypassMode(configuredMode, isFallFlying) == VanillaFlyCheckBypassMode.PACKET
 
@@ -276,7 +279,27 @@ internal inline fun applyVanillaFlyElytraVerticalMotion(
     setVelocityY(resolvedMotion)
 }
 
-internal object FlyVanilla : Mode("Vanilla") {
+private class VanillaFlyBaseSpeed(speedRange: ClosedFloatingPointRange<Float>) : ValueGroup("BaseSpeed") {
+    val horizontalSpeed by float("Horizontal", 0.44f, speedRange)
+    val verticalSpeed by float("Vertical", 0.44f, speedRange)
+}
+
+private class VanillaFlySprintSpeed(
+    parent: Mode,
+    speedRange: ClosedFloatingPointRange<Float>,
+) : ToggleableValueGroup(parent, "SprintSpeed", true) {
+    val horizontalSpeed by float("Horizontal", 1f, speedRange)
+    val verticalSpeed by float("Vertical", 1f, speedRange)
+}
+
+/**
+ * Runtime shared by ordinary Vanilla Fly and packet-sequenced Fly. Subclasses may change how a
+ * collision-resolved movement is transmitted, but local movement and Vanilla safety behavior stay identical.
+ */
+internal abstract class VanillaFlyMode(
+    name: String,
+    speedRange: ClosedFloatingPointRange<Float>,
+) : Mode(name) {
 
     private val glide by float("Glide", 0.0f, -1f..1f)
 
@@ -285,35 +308,29 @@ internal object FlyVanilla : Mode("Vanilla") {
     private val noFall by boolean("NoFall", false)
     private val noFallDeliveryTracker = GroundPacketDeliveryTracker()
     private val noFallServerState = VanillaFlyServerFallState()
+    private var deliveredMovementPacketsThisTick = 0
 
-    object BaseSpeed : ValueGroup("BaseSpeed") {
-        val horizontalSpeed by float("Horizontal", 0.44f, 0.1f..10f)
-        val verticalSpeed by float("Vertical", 0.44f, 0.1f..10f)
-    }
-
-    object SprintSpeed : ToggleableValueGroup(this, "SprintSpeed", true) {
-        val horizontalSpeed by float("Horizontal", 1f, 0.1f..10f)
-        val verticalSpeed by float("Vertical", 1f, 0.1f..10f)
-    }
+    private val baseSpeed = VanillaFlyBaseSpeed(speedRange)
+    private val sprintSpeed = VanillaFlySprintSpeed(this, speedRange)
 
     init {
-        tree(BaseSpeed)
-        tree(SprintSpeed)
+        tree(baseSpeed)
+        tree(sprintSpeed)
     }
 
     override val parent: ModeValueGroup<*>
         get() = ModuleFly.modes
 
     private val useSprintSpeed
-        get() = mc.options.keySprint.isDown && SprintSpeed.enabled
+        get() = mc.options.keySprint.isDown && sprintSpeed.enabled
 
     private val horizontalSpeed
-        get() = if (useSprintSpeed) SprintSpeed.horizontalSpeed else BaseSpeed.horizontalSpeed
+        get() = if (useSprintSpeed) sprintSpeed.horizontalSpeed else baseSpeed.horizontalSpeed
 
     private val verticalSpeed
-        get() = if (useSprintSpeed) SprintSpeed.verticalSpeed else BaseSpeed.verticalSpeed
+        get() = if (useSprintSpeed) sprintSpeed.verticalSpeed else baseSpeed.verticalSpeed
 
-    private val requestedVerticalMotion
+    protected val requestedVerticalMotion
         get() = when {
             mc.options.keyJump.isDown && !mc.options.keyShift.isDown -> verticalSpeed.toDouble()
             mc.options.keyShift.isDown && !mc.options.keyJump.isDown -> -verticalSpeed.toDouble()
@@ -321,9 +338,55 @@ internal object FlyVanilla : Mode("Vanilla") {
         }
 
     override fun disable() {
+        clearVanillaFlyRuntime()
+        onVanillaFlyRuntimeReset()
+        super.disable()
+    }
+
+    protected open val movementSuspended: Boolean
+        get() = false
+
+    protected open fun onVanillaFlyRuntimeReset() = Unit
+
+    protected open fun onVanillaFlyMovementSuspended() = Unit
+
+    protected val existingDeliveredMovementPacketCount: Int
+        get() = deliveredMovementPacketsThisTick
+
+    protected fun isTrackedNoFallGroundPacket(packet: ServerboundMovePlayerPacket) =
+        noFallDeliveryTracker.reassertGround(packet)
+
+    protected fun forecastNoFallPacketCount(target: Vec3): Int {
+        if (!noFallEligible) {
+            return 0
+        }
+
+        noFallServerState.initialize(player.position(), player.fallDistance.toDouble())
+        return noFallServerState.groundingPositions(
+            target = target,
+            safeFallDistance = player.getAttributeValue(Attributes.SAFE_FALL_DISTANCE),
+        ).size
+    }
+
+    protected fun forecastPostBypassPacketCount(): Int = if (
+        shouldSendVanillaFlyPacketBypass(
+            eventState = EventState.POST,
+            enabled = bypassVanillaCheck,
+            tickCount = player.tickCount,
+            configuredMode = bypassMode,
+            isFallFlying = player.isFallFlying,
+            movementSuspended = movementSuspended,
+        )
+    ) {
+        1
+    } else {
+        0
+    }
+
+    protected fun clearVanillaFlyRuntime() {
         noFallDeliveryTracker.clear()
         noFallServerState.clear()
-        super.disable()
+        deliveredMovementPacketsThisTick = 0
     }
 
     private val noFallEligible
@@ -401,6 +464,15 @@ internal object FlyVanilla : Mode("Vanilla") {
 
     @Suppress("unused")
     private val tickHandler = tickHandler {
+        deliveredMovementPacketsThisTick = 0
+        if (movementSuspended) {
+            player.deltaMovement = Vec3.ZERO
+            noFallDeliveryTracker.clear()
+            noFallServerState.clear()
+            onVanillaFlyMovementSuspended()
+            return@tickHandler
+        }
+
         player.deltaMovement = player.deltaMovement.withStrafe(speed = horizontalSpeed.toDouble())
         player.deltaMovement.y = requestedVerticalMotion
 
@@ -416,8 +488,14 @@ internal object FlyVanilla : Mode("Vanilla") {
 
     @Suppress("unused")
     private val worldChangeHandler = handler<WorldChangeEvent> {
-        noFallDeliveryTracker.clear()
-        noFallServerState.clear()
+        clearVanillaFlyRuntime()
+        onVanillaFlyRuntimeReset()
+    }
+
+    @Suppress("unused")
+    private val disconnectHandler = handler<DisconnectEvent> {
+        clearVanillaFlyRuntime()
+        onVanillaFlyRuntimeReset()
     }
 
     @Suppress("unused")
@@ -475,6 +553,9 @@ internal object FlyVanilla : Mode("Vanilla") {
         if (VanillaFlyNoFall.confirmGroundPacketDelivery(noFallDeliveryTracker, packet, event.isCancelled)) {
             player.resetFallDistance()
         }
+        if (!event.isCancelled) {
+            deliveredMovementPacketsThisTick++
+        }
         if (event.isCancelled || !noFallEligible) {
             return@handler
         }
@@ -498,6 +579,7 @@ internal object FlyVanilla : Mode("Vanilla") {
                 tickCount = player.tickCount,
                 configuredMode = bypassMode,
                 isFallFlying = player.isFallFlying,
+                movementSuspended = movementSuspended,
             )
         ) {
             return@handler
@@ -510,6 +592,9 @@ internal object FlyVanilla : Mode("Vanilla") {
 
     @Suppress("unused")
     private val moveHandler = handler<PlayerMoveEvent>(priority = SAFETY_FEATURE) { event ->
+        if (movementSuspended) {
+            return@handler
+        }
         applyVanillaFlyElytraVerticalMotion(
             event = event,
             isFallFlying = player.isFallFlying,
@@ -519,7 +604,7 @@ internal object FlyVanilla : Mode("Vanilla") {
 
     @Suppress("unused")
     private val inputPacketHandler = handler<PacketEvent> { event ->
-        if (event.origin != TransferOrigin.OUTGOING) return@handler
+        if (movementSuspended || event.origin != TransferOrigin.OUTGOING) return@handler
 
         val packet = event.packet as? ServerboundPlayerInputPacket ?: return@handler
         if (shouldSuppressVanillaFlyServerSneak(packet.rawInput)) {
@@ -528,6 +613,8 @@ internal object FlyVanilla : Mode("Vanilla") {
     }
 
 }
+
+internal object FlyVanilla : VanillaFlyMode("Vanilla", 0.1f..10f)
 
 private data class FlightAbilitiesSnapshot(
     val mayfly: Boolean,

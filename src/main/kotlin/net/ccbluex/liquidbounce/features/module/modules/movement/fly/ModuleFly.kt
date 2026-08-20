@@ -29,6 +29,7 @@ import net.ccbluex.liquidbounce.features.module.modules.movement.fly.modes.FlyCr
 import net.ccbluex.liquidbounce.features.module.modules.movement.fly.modes.FlyEnderpearl
 import net.ccbluex.liquidbounce.features.module.modules.movement.fly.modes.FlyExplosion
 import net.ccbluex.liquidbounce.features.module.modules.movement.fly.modes.FlyJetpack
+import net.ccbluex.liquidbounce.features.module.modules.movement.fly.modes.FlyPacket
 import net.ccbluex.liquidbounce.features.module.modules.movement.fly.modes.FlyVanilla
 import net.ccbluex.liquidbounce.features.module.modules.movement.fly.modes.fireball.FlyFireball
 import net.ccbluex.liquidbounce.features.module.modules.movement.fly.modes.grim.FlyGrim2373Jan15
@@ -73,6 +74,7 @@ object ModuleFly : ClientModule("Fly", ModuleCategories.MOVEMENT, aliases = list
         "Mode", FlyVanilla, arrayOf(
             // Generic fly modes
             FlyVanilla,
+            FlyPacket,
             FlyCreative,
             FlyJetpack,
             FlyEnderpearl,
