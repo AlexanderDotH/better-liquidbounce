@@ -5,6 +5,8 @@
     import ExpandArrow from "./common/ExpandArrow.svelte";
     import {setItem} from "../../../integration/persistent_storage";
     import {convertToSpacedString, spaceSeperatedNames} from "../../../theme/theme_config";
+    import {shiftDescription} from "./common/shiftDescription";
+    import {preferredSettingDescription} from "./common/settingDescription";
 
     export let setting: ModuleSetting;
     export let path: string;
@@ -36,7 +38,12 @@
 
 <div class="setting">
     <!-- svelte-ignore a11y-no-static-element-interactions -->
-    <div class="head" class:expanded on:contextmenu|preventDefault={toggleExpanded}>
+    <div
+            class="head"
+            class:expanded
+            use:shiftDescription={{getText: () => preferredSettingDescription(cSetting)}}
+            on:contextmenu|preventDefault={toggleExpanded}
+    >
         <div class="title">{$spaceSeperatedNames ? convertToSpacedString(setting.name) : setting.name}</div>
         {#if !hideExpandControl}
             <ExpandArrow bind:expanded />

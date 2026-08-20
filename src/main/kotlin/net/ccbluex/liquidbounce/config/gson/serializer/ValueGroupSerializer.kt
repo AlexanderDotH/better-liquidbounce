@@ -93,22 +93,24 @@ class ValueGroupSerializer(
     ) = JsonObject().apply {
         addProperty("name", src.name)
         try {
+            val values = src.inner.filter { includeNotAnOption || !it.notAnOption }
+                .filter { includePrivate || checkIfInclude(it) }
+            val serializedValues = context.serialize(values).asJsonArray
 
-            add(
-                "value",
-                context.serialize(
-                    src.inner.filter { includeNotAnOption || !it.notAnOption }
-                        .filter {
-                            includePrivate || checkIfInclude(it)
-                        }
-                )
-            )
+            if (withValueType) {
+                values.zip(serializedValues).forEach { (value, serializedValue) ->
+                    serializedValue.takeIf { it.isJsonObject }?.asJsonObject?.addInteropMetadata(value)
+                }
+            }
+
+            add("value", serializedValues)
         } catch (e: Exception) {
             logger.error("failed to serialize config for ${src.name}")
             throw e
         }
         if (withValueType) {
             add("valueType", context.serialize(src.valueType))
+            addInteropMetadata(src)
         }
     }
 

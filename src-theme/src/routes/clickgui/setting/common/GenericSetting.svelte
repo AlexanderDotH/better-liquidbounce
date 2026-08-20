@@ -23,12 +23,18 @@
     import RegistryListSetting from "../list/RegistryListSetting.svelte";
     import CurveSetting from "../CurveSetting.svelte";
     import RegistryMutableListSetting from "../list/RegistryMutableListSetting.svelte";
+    import {shiftDescription} from "./shiftDescription";
+    import {settingShiftDescription} from "./settingDescription";
     export let setting: ModuleSetting;
     export let path: string;
 </script>
 
 
-<div in:slide={{duration: 200, axis: "y"}} out:slide={{duration: 200, axis: "y"}}>
+<div
+        use:shiftDescription={{getText: () => settingShiftDescription(setting)}}
+        in:slide={{duration: 200, axis: "y"}}
+        out:slide={{duration: 200, axis: "y"}}
+>
     {#if setting.valueType === "BOOLEAN"}
         <BooleanSetting bind:setting={setting} on:change/>
     {:else if setting.valueType === "ACTION"}

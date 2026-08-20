@@ -6,6 +6,8 @@
     import Switch from "./common/Switch.svelte";
     import {setItem} from "../../../integration/persistent_storage";
     import {convertToSpacedString, spaceSeperatedNames} from "../../../theme/theme_config";
+    import {shiftDescription} from "./common/shiftDescription";
+    import {preferredSettingDescription} from "./common/settingDescription";
 
     export let setting: ModuleSetting;
     export let path: string;
@@ -45,6 +47,7 @@
             class="head"
             class:expand={nestedSettings.length > 0}
             class:expanded={expanded && nestedSettings.length > 0}
+            use:shiftDescription={{getText: () => preferredSettingDescription(cSetting)}}
             on:contextmenu|preventDefault={toggleExpanded}
     >
         <slot
