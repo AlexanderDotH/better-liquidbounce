@@ -16,7 +16,6 @@ import net.ccbluex.liquidbounce.features.module.modules.misc.ModuleBetterTab
 import net.ccbluex.liquidbounce.render.engine.type.Color4b
 import net.ccbluex.liquidbounce.test.MinecraftBootstrap
 import org.junit.jupiter.api.Assertions.assertEquals
-import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.BeforeAll
 import org.junit.jupiter.api.Test
@@ -25,7 +24,7 @@ import java.io.InputStreamReader
 class ModuleBetterTabConfigurationTest {
 
     @Test
-    fun `LiquidBounce player lookup is appended as an opt-in colored group`() {
+    fun `LiquidBounce chat marker is appended as an enabled colored group`() {
         val groups = ModuleBetterTab.inner.filterIsInstance<ToggleableValueGroup>()
         val lookup = groups.single { it.name == "LiquidBouncePlayers" }
 
@@ -33,7 +32,7 @@ class ModuleBetterTabConfigurationTest {
             listOf("Highlight", "AccurateLatency", "PlayerHider", "LiquidBouncePlayers"),
             groups.map { it.name },
         )
-        assertFalse(lookup.enabled)
+        assertTrue(lookup.enabled)
         assertEquals(listOf("Enabled", "Color"), lookup.inner.map { it.name })
         assertEquals(Color4b.LIQUID_BOUNCE, lookup.inner.single { it.name == "Color" }.get())
     }
@@ -48,8 +47,8 @@ class ModuleBetterTabConfigurationTest {
             "liquidbounce.module.betterTab.liquidBouncePlayers.extendedDescription"
         ].asString
 
-        assertTrue(description.contains("UUID"), description)
-        assertTrue(description.contains("no server address", ignoreCase = true), description)
+        assertTrue(description.contains("received LiquidChat messages", ignoreCase = true), description)
+        assertTrue(description.contains("RAM", ignoreCase = true), description)
     }
 
     private companion object {

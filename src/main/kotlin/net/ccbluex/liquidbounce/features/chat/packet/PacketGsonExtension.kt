@@ -25,6 +25,7 @@ import com.google.gson.JsonObject
 import com.google.gson.JsonParseException
 import com.google.gson.JsonSerializationContext
 import com.google.gson.JsonSerializer
+import net.ccbluex.liquidbounce.config.gson.publicGson
 import net.ccbluex.liquidbounce.config.gson.util.jsonObject
 import java.lang.reflect.Type
 
@@ -121,7 +122,7 @@ class PacketDeserializer : JsonDeserializer<AxochatPacket> {
 
         if (!packetObject.has("c")) packetObject.add("c", EMPTY_JSON_OBJECT)
 
-        return requireNotNull(context).deserialize(packetObject.get("c"), packetRegistry[packetName])
+        return publicGson.fromJson(packetObject.get("c"), packetRegistry[packetName])
 
     }
 
