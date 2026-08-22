@@ -28,6 +28,8 @@ import java.lang.reflect.Type
 
 class ModeValueGroupSerializer private constructor(
     private val withValueType: Boolean,
+    private val includePrivate: Boolean,
+    private val includeNotAnOption: Boolean
 ) : JsonSerializer<ModeValueGroup<Mode>> {
 
     override fun serialize(
@@ -37,18 +39,27 @@ class ModeValueGroupSerializer private constructor(
 
         obj.addProperty("name", src.name)
         obj.addProperty("active", src.activeMode.tag)
-        obj.add("value", context.serialize(src.inner))
+        obj.add(
+            "value",
+            context.serialize(
+                src.inner
+                    .filter { includeNotAnOption || !it.notAnOption }
+                    .filter { includePrivate || it.checkIfInclude() }
+            )
+        )
 
         val choices = JsonObject()
 
         for (choice in src.modes) {
-            val serializedChoice = context.serialize(choice).asJsonObject
+            if (includePrivate || choice.checkIfInclude()) {
+                val serializedChoice = context.serialize(choice).asJsonObject
 
-            if (withValueType) {
-                serializedChoice.addInteropMetadata(choice)
+                if (withValueType) {
+                    serializedChoice.addInteropMetadata(choice)
+                }
+
+                choices.add(choice.name, serializedChoice)
             }
-
-            choices.add(choice.name, serializedChoice)
         }
 
         obj.add("choices", choices)
@@ -72,10 +83,19 @@ class ModeValueGroupSerializer private constructor(
 
     companion object {
         @JvmField
-        val INTEROP_SERIALIZER = ModeValueGroupSerializer(withValueType = true)
+        val INTEROP_SERIALIZER = ModeValueGroupSerializer(
+            withValueType = true, includePrivate = true, includeNotAnOption = false
+        )
 
         @JvmField
-        val FILE_SERIALIZER = ModeValueGroupSerializer(withValueType = false)
+        val FILE_SERIALIZER = ModeValueGroupSerializer(
+            withValueType = false, includePrivate = true, includeNotAnOption = true
+        )
+
+        @JvmField
+        val PUBLIC_CONFIG_SERIALIZER = ModeValueGroupSerializer(
+            withValueType = false, includePrivate = false, includeNotAnOption = true
+        )
     }
 
 }

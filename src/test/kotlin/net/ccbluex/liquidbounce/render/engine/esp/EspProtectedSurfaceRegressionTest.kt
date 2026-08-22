@@ -103,5 +103,28 @@ class EspProtectedSurfaceRegressionTest {
         assertFalse(compositeHook.contains("doEntityOutline"))
     }
 
+    @Test
+    fun `merged renderer keeps fork ESP and player-model hooks alongside upstream render hooks`() {
+        val gameRenderer = readSource(
+            "src/main/java/net/ccbluex/liquidbounce/injection/mixins/minecraft/render/MixinGameRenderer.java"
+        )
+        val levelRenderer = readSource(
+            "src/main/java/net/ccbluex/liquidbounce/injection/mixins/minecraft/render/MixinLevelRenderer.java"
+        )
+        val livingRenderer = readSource(
+            "src/main/java/net/ccbluex/liquidbounce/injection/mixins/minecraft/render/entity/" +
+                "MixinLivingEntityRenderer.java"
+        )
+
+        val beginFrame = gameRenderer.indexOf("EspShaderRenderer.beginFrame()")
+        val gameRenderEvent = gameRenderer.indexOf("EventManager.INSTANCE.callEvent(GameRenderEvent.INSTANCE)")
+        assertTrue(beginFrame >= 0)
+        assertTrue(gameRenderEvent > beginFrame)
+        assertTrue(levelRenderer.contains("EspShaderRenderer.capture(preparedFrame)"))
+        assertTrue(levelRenderer.contains("method = \"addAlwaysOnTopPass\""))
+        assertTrue(livingRenderer.contains("PlayerModelDelayHook.applyDelayedTransform"))
+        assertTrue(livingRenderer.contains("ModuleAntiBlind.canRender(DoRender.INVISIBLE_ENTITIES)"))
+    }
+
     private fun readSource(path: String): String = Files.readString(Path.of(path))
 }

@@ -19,6 +19,7 @@
 
 package net.ccbluex.liquidbounce.integration.screen
 
+import com.mojang.blaze3d.platform.InputConstants
 import net.ccbluex.liquidbounce.event.EventListener
 import net.ccbluex.liquidbounce.event.EventManager
 import net.ccbluex.liquidbounce.event.events.BrowserReadyEvent
@@ -45,6 +46,7 @@ import net.ccbluex.liquidbounce.integration.interop.ClientInteropServer
 import net.ccbluex.liquidbounce.integration.screen.impl.CustomSharedMinecraftScreen
 import net.ccbluex.liquidbounce.integration.screen.impl.CustomStandaloneMinecraftScreen
 import net.ccbluex.liquidbounce.integration.screen.impl.InternetExplorerScreen
+import net.ccbluex.liquidbounce.integration.screen.impl.MicrosoftLoginScreen
 import net.ccbluex.liquidbounce.integration.task.TaskProgressScreen
 import net.ccbluex.liquidbounce.integration.theme.Theme
 import net.ccbluex.liquidbounce.integration.theme.ThemeManager
@@ -284,7 +286,7 @@ object ScreenManager : EventListener {
         }
 
         // F12 to toggle GPU acceleration
-        if (event.action == GLFW.GLFW_PRESS && keyCode == GLFW.GLFW_KEY_F12) {
+        if (event.isPressed && keyCode == InputConstants.KEY_F12) {
             val backend = BrowserBackendManager.backend ?: return@handler
             if (!backend.accelerationFlags.isSupported) {
                 logger.warn("GPU acceleration is not supported by the current browser backend.")
@@ -379,5 +381,6 @@ object ScreenManager : EventListener {
     fun isClientScreen(screen: Screen?) = screen is CustomSharedMinecraftScreen
         || screen is CustomStandaloneMinecraftScreen
         || screen is InternetExplorerScreen
+        || screen is MicrosoftLoginScreen
 
 }

@@ -137,7 +137,7 @@ public abstract class MixinMinecraft {
     /**
      * Entry point
      */
-    @Inject(method = "<init>", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/Minecraft;resizeGui()V"))
+    @Inject(method = "<init>(Lnet/minecraft/client/main/GameConfig;)V", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/Minecraft;resizeGui()V"))
     private void startClient(CallbackInfo callback) {
         EventManager.INSTANCE.callEvent(ClientStartEvent.INSTANCE);
     }
@@ -151,7 +151,7 @@ public abstract class MixinMinecraft {
         EventManager.INSTANCE.callEvent(ClientShutdownEvent.INSTANCE);
     }
 
-    @Inject(method = "<init>", at = @At(value = "FIELD",
+    @Inject(method = "<init>(Lnet/minecraft/client/main/GameConfig;)V", at = @At(value = "FIELD",
         target = "Lnet/minecraft/client/Minecraft;profileKeyPairManager:Lnet/minecraft/client/multiplayer/ProfileKeyPairManager;",
         ordinal = 0, shift = At.Shift.AFTER, opcode = Opcodes.PUTFIELD))
     private void onSessionInit(CallbackInfo callback) {

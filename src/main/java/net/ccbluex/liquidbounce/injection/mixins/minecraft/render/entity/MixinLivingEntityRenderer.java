@@ -44,6 +44,7 @@ import net.minecraft.client.renderer.entity.state.LivingEntityRenderState;
 import net.minecraft.client.renderer.feature.ModelFeatureRenderer;
 import net.minecraft.client.renderer.rendertype.RenderType;
 import net.minecraft.client.renderer.rendertype.RenderTypes;
+import net.minecraft.client.renderer.state.level.CameraRenderState;
 import net.minecraft.client.renderer.texture.TextureAtlasSprite;
 import net.minecraft.resources.Identifier;
 import net.minecraft.util.Mth;
@@ -211,5 +212,13 @@ public abstract class MixinLivingEntityRenderer<T extends LivingEntity, S extend
     )
     private void hookDelayPlayerModel(LivingEntity entity, S state, float tickDelta, CallbackInfo ci) {
         PlayerModelDelayHook.applyDelayedTransform(entity, state);
+    }
+
+    // AntiBlind
+    @Inject(method = "submit", at = @At("HEAD"), cancellable = true)
+    private void hideInvisibleEntities(S state, PoseStack poseStack, SubmitNodeCollector submitNodeCollector, CameraRenderState camera, CallbackInfo ci) {
+        if (state.isInvisible && !ModuleAntiBlind.canRender(DoRender.INVISIBLE_ENTITIES)) {
+            ci.cancel();
+        }
     }
 }

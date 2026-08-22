@@ -27,9 +27,10 @@ import com.mojang.math.Axis;
 import net.ccbluex.liquidbounce.features.module.modules.combat.ModuleSpearKill;
 import net.ccbluex.liquidbounce.features.module.modules.combat.ModuleSwordBlock;
 import net.ccbluex.liquidbounce.features.module.modules.player.ModuleFastUse;
-import net.ccbluex.liquidbounce.features.module.modules.render.ModuleAnimations;
-import net.ccbluex.liquidbounce.features.module.modules.render.ModuleAnimationsKt;
+import net.ccbluex.liquidbounce.features.module.modules.render.animations.ModuleAnimations;
+import net.ccbluex.liquidbounce.features.module.modules.render.animations.ModuleAnimationsKt;
 import net.ccbluex.liquidbounce.features.module.modules.render.ModuleSilentHotbar;
+import net.ccbluex.liquidbounce.features.module.modules.render.animations.SwingAnimations;
 import net.ccbluex.liquidbounce.utils.client.SilentHotbar;
 import net.ccbluex.liquidbounce.utils.item.ItemCategorizationsKt;
 import net.ccbluex.liquidbounce.utils.render.FirstPersonShieldTint;
@@ -40,6 +41,7 @@ import net.minecraft.client.renderer.SubmitNodeCollector;
 import net.minecraft.client.renderer.item.ItemStackRenderState;
 import net.minecraft.core.component.DataComponents;
 import net.minecraft.world.InteractionHand;
+import net.minecraft.world.entity.HumanoidArm;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.item.ItemDisplayContext;
 import net.minecraft.world.item.ItemStack;
@@ -49,10 +51,7 @@ import org.spongepowered.asm.mixin.Final;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.Unique;
-import org.spongepowered.asm.mixin.injection.At;
-import org.spongepowered.asm.mixin.injection.Inject;
-import org.spongepowered.asm.mixin.injection.ModifyArg;
-import org.spongepowered.asm.mixin.injection.Slice;
+import org.spongepowered.asm.mixin.injection.*;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
@@ -83,6 +82,34 @@ public abstract class MixinItemInHandRenderer {
         }
 
         original.call(instance, poseStack, submitNodeCollector, lightCoords, overlayCoords, outlineColor);
+    }
+
+    @Inject(
+        method = "swingArm",
+        at = @At("HEAD"),
+        cancellable = true
+    )
+    private void cancelVanillaSwing(
+        float attack,
+        PoseStack poseStack,
+        int invert,
+        HumanoidArm arm,
+        CallbackInfo ci
+    ) {
+        AbstractClientPlayer player = Minecraft.getInstance().player;
+
+        if (player == null || !ModuleAnimations.INSTANCE.getRunning() || !SwingAnimations.INSTANCE.getEnabled() || ModuleSwordBlock.shouldAnimateSwordBlock(player)) {
+            return;
+        }
+
+        SwingAnimations.INSTANCE.onRenderItem(
+            player,
+            InteractionHand.MAIN_HAND,
+            attack,
+            poseStack
+        );
+
+        ci.cancel();
     }
 
     @Inject(method = "submitArmWithItem", at = @At(value = "INVOKE", target = "Lcom/mojang/blaze3d/vertex/PoseStack;pushPose()V", shift = At.Shift.AFTER))
@@ -258,7 +285,6 @@ public abstract class MixinItemInHandRenderer {
         if (ModuleSwordBlock.shouldAnimateSwordBlock(player)) {
             return 7200;
         }
-
         return original;
     }
 

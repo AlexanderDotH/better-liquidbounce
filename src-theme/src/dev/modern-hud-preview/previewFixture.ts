@@ -369,7 +369,10 @@ function createComponents(
             itemAlignment: "Right",
             order: "Descending",
         },
-        Notifications: positioned("Right", 20, "Bottom", 188),
+        Notifications: {
+            ...positioned("Right", 20, "Bottom", 188),
+            severities: ["INFO", "SUCCESS", "ERROR", "ENABLED", "DISABLED"],
+        },
         Hotbar: positioned("CenterTranslated", 0, "Bottom", 18),
         Scoreboard: {
             ...positioned("Right", 20, "Top", 270),

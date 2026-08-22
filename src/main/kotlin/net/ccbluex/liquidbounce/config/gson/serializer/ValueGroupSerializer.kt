@@ -22,11 +22,8 @@ package net.ccbluex.liquidbounce.config.gson.serializer
 import com.google.gson.JsonObject
 import com.google.gson.JsonSerializationContext
 import com.google.gson.JsonSerializer
-import net.ccbluex.liquidbounce.config.types.Value
 import net.ccbluex.liquidbounce.config.types.group.ModeValueGroup
 import net.ccbluex.liquidbounce.config.types.group.ValueGroup
-import net.ccbluex.liquidbounce.features.module.ClientModule
-import net.ccbluex.liquidbounce.features.module.ModuleCategories
 import net.ccbluex.liquidbounce.utils.client.logger
 import net.ccbluex.liquidbounce.utils.text.toLowerCamelCase
 import net.ccbluex.liquidbounce.utils.render.Alignment
@@ -94,7 +91,7 @@ class ValueGroupSerializer(
         addProperty("name", src.name)
         try {
             val values = src.inner.filter { includeNotAnOption || !it.notAnOption }
-                .filter { includePrivate || checkIfInclude(it) }
+                .filter { includePrivate || it.checkIfInclude() }
             val serializedValues = context.serialize(values).asJsonArray
 
             if (withValueType) {
@@ -112,32 +109,6 @@ class ValueGroupSerializer(
             add("valueType", context.serialize(src.valueType))
             addInteropMetadata(src)
         }
-    }
-
-    /**
-     * Checks if value should be included in public config
-     */
-    private fun checkIfInclude(value: Value<*>): Boolean {
-        /**
-         * Do not include values that are not supposed to be shared
-         * with other users
-         */
-        if (value.doNotInclude.asBoolean) {
-            return false
-        }
-
-        // Might check if value is module
-        if (value is ClientModule) {
-            /**
-             * Do not include modules that are heavily user-personalised
-             */
-            if (value.category == ModuleCategories.RENDER || value.category == ModuleCategories.FUN) {
-                return false
-            }
-        }
-
-        // Otherwise include value
-        return true
     }
 
 }

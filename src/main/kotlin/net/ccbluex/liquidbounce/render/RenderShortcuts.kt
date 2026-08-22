@@ -136,7 +136,7 @@ internal inline fun RenderTarget.drawGenericBlockESP(
  */
 inline fun WorldRenderEnvironment.drawCustomMeshTextured(
     sampler0: AbstractTexture,
-    pipeline: RenderPipeline = ClientRenderPipelines.TexQuads,
+    pipeline: RenderPipeline = ClientRenderPipelines.texQuads(noDepthTest = true),
     uniforms: Map<String, GpuBufferSlice> = emptyMap(),
     drawer: VertexConsumer.(PoseStack.Pose) -> Unit,
 ) = drawCustomMesh(
@@ -296,26 +296,101 @@ fun WorldRenderEnvironment.drawTexQuad(
     }
 }
 
+
 fun WorldRenderEnvironment.drawSquareTexture(
     sampler0: AbstractTexture,
     size: Float,
     argb: Int,
-) = drawCustomMeshTextured(sampler0) { matrix ->
-    addVertex(matrix, 0.0f, -size, 0.0f)
+    anchor: AnchorPoint = AnchorPoint.TOP_LEFT,
+    noDepthTest: Boolean = false,
+) = drawCustomMeshTextured(sampler0, pipeline = ClientRenderPipelines.texQuads(noDepthTest) ) { matrix ->
+    val minX = size * anchor.xFactor
+    val maxX = minX + size
+    val minY = size * anchor.yFactor
+    val maxY = minY + size
+
+    addVertex(matrix, minX, maxY, 0.0f)
         .setUv(0.0f, 0.0f)
         .setColor(argb)
 
-    addVertex(matrix, -size, -size, 0.0f)
+    addVertex(matrix, minX, minY, 0.0f)
         .setUv(0.0f, 1.0f)
         .setColor(argb)
 
-    addVertex(matrix, -size, 0.0f, 0.0f)
+    addVertex(matrix, maxX, minY, 0.0f)
         .setUv(1.0f, 1.0f)
         .setColor(argb)
 
-    addVertex(matrix, 0.0f, 0.0f, 0.0f)
+    addVertex(matrix, maxX, maxY, 0.0f)
         .setUv(1.0f, 0.0f)
         .setColor(argb)
+
+}
+
+fun WorldRenderEnvironment.drawSquareTextureGradient(
+    sampler0: AbstractTexture,
+    outerRadius: Float,
+    innerRadius: Float,
+    outerColor: Color4b,
+    innerColor: Color4b,
+    anchor: AnchorPoint = AnchorPoint.TOP_LEFT,
+    subdivisions: Int = 16,
+    startOffset: Float = 0.5f,
+    noDepthTest: Boolean = true,
+) {
+    if (outerRadius <= 0f || (outerColor.isTransparent && innerColor.isTransparent)) {
+        return
+    }
+
+    val size = outerRadius * 2f
+    val minX = size * anchor.xFactor
+    val minY = size * anchor.yFactor
+
+    val step = size / subdivisions
+    val centerX = minX + outerRadius
+    val centerY = minY + outerRadius
+
+    val baseRatio = (innerRadius / outerRadius).coerceIn(0f, 1f)
+    val effectiveRatio = maxOf(baseRatio, startOffset.coerceIn(0f, 0.99f))
+
+    fun getColorForPos(x: Float, y: Float): Int {
+        val dx = x - centerX
+        val dy = y - centerY
+        val distRatio = (kotlin.math.sqrt(dx * dx + dy * dy) / outerRadius).coerceIn(0f, 1f)
+
+        val t = when (distRatio <= effectiveRatio) {
+            true -> 0.0
+            else -> ((distRatio - effectiveRatio) / (1.0 - effectiveRatio)).coerceIn(0.0, 1.0)
+        }
+
+        return innerColor.interpolateTo(outerColor, t).argb
+    }
+
+    drawCustomMeshTextured(sampler0, ClientRenderPipelines.texQuads(noDepthTest)) { matrix ->
+        for (row in 0 until subdivisions) {
+            for (col in 0 until subdivisions) {
+                val x1 = minX + col * step
+                val x2 = x1 + step
+                val y1 = minY + row * step
+                val y2 = y1 + step
+
+                val u1 = col.toFloat() / subdivisions
+                val u2 = (col + 1).toFloat() / subdivisions
+                val v1 = row.toFloat() / subdivisions
+                val v2 = (row + 1).toFloat() / subdivisions
+
+                val c11 = getColorForPos(x1, y1)
+                val c12 = getColorForPos(x1, y2)
+                val c22 = getColorForPos(x2, y2)
+                val c21 = getColorForPos(x2, y1)
+
+                addVertex(matrix, x1, y2, 0.0f).setUv(u1, v2).setColor(c12)
+                addVertex(matrix, x1, y1, 0.0f).setUv(u1, v1).setColor(c11)
+                addVertex(matrix, x2, y1, 0.0f).setUv(u2, v1).setColor(c21)
+                addVertex(matrix, x2, y2, 0.0f).setUv(u2, v2).setColor(c22)
+            }
+        }
+    }
 }
 
 @JvmOverloads
@@ -428,11 +503,12 @@ fun WorldRenderEnvironment.drawPlane(
     sizeX: Float,
     sizeZ: Float,
     fillColor: Color4b? = Color4b.TRANSPARENT,
-    outlineColor: Color4b? = Color4b.TRANSPARENT
+    outlineColor: Color4b? = Color4b.TRANSPARENT,
+    noDepthTest: Boolean = true
 ) {
     if (fillColor != null && !fillColor.isTransparent) {
         val argb = fillColor.argb
-        drawCustomMesh(ClientRenderPipelines.quads(noDepthTest = true)) { matrix ->
+        drawCustomMesh(ClientRenderPipelines.quads(noDepthTest = noDepthTest)) { matrix ->
             addVertex(matrix, 0f, 0f, 0f).setColor(argb)
             addVertex(matrix, 0f, 0f, sizeZ).setColor(argb)
             addVertex(matrix, sizeX, 0f, sizeZ).setColor(argb)
@@ -442,7 +518,7 @@ fun WorldRenderEnvironment.drawPlane(
 
     if (outlineColor != null && !outlineColor.isTransparent) {
         val argb = outlineColor.argb
-        drawCustomMesh(ClientRenderPipelines.lines(noDepthTest = true)) { matrix ->
+        drawCustomMesh(ClientRenderPipelines.lines(noDepthTest = noDepthTest)) { matrix ->
             addVertex(matrix, 0f, 0f, 0f).setColor(argb)
             addVertex(matrix, 0f, 0f, sizeZ).setColor(argb)
 
@@ -625,4 +701,11 @@ fun WorldRenderEnvironment.drawGradientSides(
         addVertex(pose, box.minX, height, box.minZ).setColor(topColor)
         addVertex(pose, box.minX, 0.0, box.minZ).setColor(baseColor)
     }
+}
+
+@Suppress("unused")
+enum class AnchorPoint(val xFactor: Float, val yFactor: Float) {
+    TOP_LEFT(-1.0f, 0.0f),    TOP_CENTER(-0.5f, 0.0f),    TOP_RIGHT(0.0f, 0.0f),
+    CENTER_LEFT(-1.0f, -0.5f), CENTER(-0.5f, -0.5f),      CENTER_RIGHT(0.0f, -0.5f),
+    BOTTOM_LEFT(-1.0f, -1.0f), BOTTOM_CENTER(-0.5f, -1.0f), BOTTOM_RIGHT(0.0f, -1.0f)
 }

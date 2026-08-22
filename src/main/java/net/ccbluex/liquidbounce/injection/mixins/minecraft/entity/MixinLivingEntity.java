@@ -28,7 +28,7 @@ import net.ccbluex.liquidbounce.event.events.PlayerJumpEvent;
 import net.ccbluex.liquidbounce.features.module.modules.combat.elytratarget.ModuleElytraTarget;
 import net.ccbluex.liquidbounce.features.module.modules.movement.*;
 import net.ccbluex.liquidbounce.features.module.modules.render.DoRender;
-import net.ccbluex.liquidbounce.features.module.modules.render.ModuleAnimations;
+import net.ccbluex.liquidbounce.features.module.modules.render.animations.ModuleAnimations;
 import net.ccbluex.liquidbounce.features.module.modules.render.ModuleAntiBlind;
 import net.ccbluex.liquidbounce.features.module.modules.render.hitfx.ModuleHitFX;
 import net.ccbluex.liquidbounce.features.module.modules.world.scaffold.ModuleScaffold;
@@ -270,7 +270,7 @@ public abstract class MixinLivingEntity extends MixinEntity implements LivingEnt
     @Unique
     private boolean previousElytra = false;
 
-    @Inject(method = "updateFallFlying", at = @At("TAIL"))
+    @Inject(method = "aiStep", at = @At("TAIL"))
     public void recastIfLanded(CallbackInfo callbackInfo) {
         if (!liquid_bounce$isClientPlayer()) {
             return;

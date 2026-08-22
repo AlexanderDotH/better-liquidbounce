@@ -43,6 +43,10 @@ interface HudScoreboardSettings {
     replaceWith: string;
 }
 
+interface HudNotificationsSettings {
+    severities: import("../../integration/events").NotificationSeverity[];
+}
+
 interface HudTextSettings {
     text: string;
     container?: "Plain" | "Pill";

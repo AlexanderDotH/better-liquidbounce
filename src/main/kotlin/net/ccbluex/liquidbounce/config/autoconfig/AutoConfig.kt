@@ -24,8 +24,8 @@ import net.ccbluex.liquidbounce.api.models.client.AutoSettings
 import net.ccbluex.liquidbounce.api.services.client.ClientApi
 import net.ccbluex.liquidbounce.api.types.enums.AutoSettingsStatusType
 import net.ccbluex.liquidbounce.api.types.enums.AutoSettingsType
-import net.ccbluex.liquidbounce.authlib.utils.obj
-import net.ccbluex.liquidbounce.authlib.utils.string
+import net.ccbluex.liquidbounce.config.gson.util.obj
+import net.ccbluex.liquidbounce.config.gson.util.string
 import net.ccbluex.liquidbounce.config.ConfigSystem
 import net.ccbluex.liquidbounce.config.ConfigSystem.deserializeValueGroup
 import net.ccbluex.liquidbounce.config.gson.publicGson
@@ -34,6 +34,7 @@ import net.ccbluex.liquidbounce.config.types.group.ValueGroup
 import net.ccbluex.liquidbounce.event.events.NotificationEvent
 import net.ccbluex.liquidbounce.features.module.ModuleManager
 import net.ccbluex.liquidbounce.features.module.modules.combat.migrateLegacyFightBotConfig
+import net.ccbluex.liquidbounce.features.module.modules.combat.migrateLegacyMaceKillConfig
 import net.ccbluex.liquidbounce.features.module.modules.render.ModuleClickGui
 import net.ccbluex.liquidbounce.features.spoofer.SpooferManager
 import net.ccbluex.liquidbounce.utils.client.MessageMetadata
@@ -276,9 +277,7 @@ object AutoConfig {
         autoSettingsType: AutoSettingsType = AutoSettingsType.RAGE,
         statusType: AutoSettingsStatusType = AutoSettingsStatusType.BYPASSING
     ): JsonObject {
-        this.includeConfiguration = includeConfiguration
-
-        try {
+        return withAutoConfigInclusion(includeConfiguration) {
             // Store the config
             val moduleTree = ConfigSystem.serializeValueGroup(ModuleManager.modulesConfig, publicGson)
             val spooferTree = ConfigSystem.serializeValueGroup(SpooferManager, publicGson)
@@ -317,9 +316,7 @@ object AutoConfig {
             jsonObject.add("type", publicGson.toJsonTree(autoSettingsType))
             jsonObject.add("status", publicGson.toJsonTree(statusType))
 
-            return jsonObject
-        } finally {
-            this.includeConfiguration = IncludeConfiguration.DEFAULT
+            jsonObject
         }
     }
 
@@ -330,7 +327,7 @@ object AutoConfig {
         jsonObject: JsonObject,
         modules: Collection<ValueGroup> = emptyList()
     ) {
-        migrateLegacyFightBotConfig(jsonObject)
+        prepareModuleConfigForLoad(jsonObject)
 
         // Deserialize full module configurable
         if (modules.isEmpty()) {
@@ -351,4 +348,21 @@ object AutoConfig {
         }
     }
 
+}
+
+internal fun prepareModuleConfigForLoad(jsonObject: JsonObject) {
+    migrateLegacyFightBotConfig(jsonObject)
+    migrateLegacyMaceKillConfig(jsonObject)
+}
+
+internal fun <T> withAutoConfigInclusion(
+    configuration: IncludeConfiguration,
+    block: () -> T,
+): T {
+    AutoConfig.includeConfiguration = configuration
+    return try {
+        block()
+    } finally {
+        AutoConfig.includeConfiguration = IncludeConfiguration.DEFAULT
+    }
 }

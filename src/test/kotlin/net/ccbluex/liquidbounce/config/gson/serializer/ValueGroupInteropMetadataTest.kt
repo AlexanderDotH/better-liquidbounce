@@ -14,6 +14,7 @@ import com.google.gson.JsonObject
 import com.google.gson.JsonParser
 import net.ccbluex.liquidbounce.config.gson.fileGson
 import net.ccbluex.liquidbounce.config.gson.interopGson
+import net.ccbluex.liquidbounce.config.gson.publicGson
 import net.ccbluex.liquidbounce.config.types.Value
 import net.ccbluex.liquidbounce.config.types.group.Mode
 import net.ccbluex.liquidbounce.config.types.group.ModeValueGroup
@@ -93,6 +94,40 @@ class ValueGroupInteropMetadataTest {
         assertEquals(TRANSLATION_KEY, serializedMode["key"].asString)
         assertEquals("Short setting description", serializedMode["description"].asString)
         assertTrue(serializedMode["extendedDescription"].asString.isNotBlank())
+    }
+
+    @Test
+    fun `file interop and public serializers retain their visibility matrix`() {
+        val settings = ValueGroup("Settings")
+        settings.boolean("Ordinary", true)
+        settings.boolean("Private", true).doNotIncludeAlways()
+        settings.boolean("NotAnOption", true).notAnOption()
+
+        fun names(gson: com.google.gson.Gson) = gson.toJsonTree(settings).asJsonObject
+            .getAsJsonArray("value")
+            .map { it.asJsonObject["name"].asString }
+
+        assertEquals(listOf("Ordinary", "Private", "NotAnOption"), names(fileGson))
+        assertEquals(listOf("Ordinary", "Private"), names(interopGson))
+        assertEquals(listOf("Ordinary", "NotAnOption"), names(publicGson))
+    }
+
+    @Test
+    fun `player interop exposes its registry while file JSON stays persistence-only`() {
+        val settings = ValueGroup("Settings")
+        settings.player("Player", "Alex").withTranslationKey()
+
+        val interop = interopGson.toJsonTree(settings).asJsonObject
+            .getAsJsonArray("value").single().asJsonObject
+        val file = fileGson.toJsonTree(settings).asJsonObject
+            .getAsJsonArray("value").single().asJsonObject
+
+        assertEquals("PLAYER", interop["valueType"].asString)
+        assertEquals("world_players", interop["registry"].asString)
+        assertTrue(interop.has("description"))
+        assertFalse(file.has("valueType"))
+        assertFalse(file.has("registry"))
+        assertFalse(file.has("description"))
     }
 
     @Test

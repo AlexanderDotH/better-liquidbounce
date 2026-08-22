@@ -118,7 +118,7 @@
                 {:else if c.name === "TabGui"}
                     <TabGui variant={presentation}/>
                 {:else if c.name === "Notifications"}
-                    <Notifications variant={presentation}/>
+                    <Notifications settings={c.settings} variant={presentation}/>
                 {:else if c.name === "TargetHud"}
                     <TargetHud {presentation}/>
                 {:else if c.name === "BlockCounter"}

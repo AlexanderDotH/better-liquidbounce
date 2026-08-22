@@ -105,7 +105,6 @@ class CefBrowserBackend : BrowserBackend, EventListener {
                 throw JcefIsntCompatible()
             }
 
-            resourceManager.ensureNativeLibrariesPatched()
             HashValidator.validateFolder(resourceManager.commitDirectory)
 
             if (resourceManager.requiresDownload()) {
@@ -280,13 +279,16 @@ class CefBrowserBackend : BrowserBackend, EventListener {
         }
     }
 
+    override val supportsIncognito = true
+
     override fun createBrowser(
         url: String,
         position: BrowserViewport,
         settings: BrowserSettings,
         priority: Short,
+        incognito: Boolean,
         inputAcceptor: InputAcceptor?
-    ) = CefBrowser(this, url, position, settings, priority, inputAcceptor)
+    ) = CefBrowser(this, url, position, settings, priority, incognito, inputAcceptor)
 
     internal fun registerBrowser(browser: CefBrowser) {
         addBrowser(browser)

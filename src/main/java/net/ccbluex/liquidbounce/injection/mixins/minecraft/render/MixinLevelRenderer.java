@@ -21,12 +21,17 @@ package net.ccbluex.liquidbounce.injection.mixins.minecraft.render;
 import com.llamalad7.mixinextras.injector.ModifyExpressionValue;
 import com.llamalad7.mixinextras.injector.v2.WrapWithCondition;
 import com.llamalad7.mixinextras.sugar.Local;
+import com.mojang.blaze3d.buffers.GpuBufferSlice;
+import com.mojang.blaze3d.framegraph.FrameGraphBuilder;
+import com.mojang.blaze3d.framegraph.FramePass;
 import com.mojang.blaze3d.pipeline.RenderTarget;
 import com.mojang.blaze3d.vertex.PoseStack;
+import net.ccbluex.liquidbounce.LiquidBounce;
 import net.ccbluex.liquidbounce.event.EventManager;
 import net.ccbluex.liquidbounce.event.events.DrawOutlinesEvent;
 import net.ccbluex.liquidbounce.event.events.WorldFeatureSubmitEvent;
 import net.ccbluex.liquidbounce.features.module.modules.render.*;
+import net.ccbluex.liquidbounce.features.module.modules.render.customambience.ModuleCustomAmbience;
 import net.ccbluex.liquidbounce.render.engine.esp.EspShaderRenderer;
 import net.ccbluex.liquidbounce.utils.collection.Pools;
 import net.minecraft.client.Minecraft;
@@ -49,6 +54,7 @@ import org.spongepowered.asm.mixin.injection.ModifyArg;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 import java.util.List;
+import java.util.Locale;
 
 @Mixin(LevelRenderer.class)
 public abstract class MixinLevelRenderer {
@@ -72,11 +78,16 @@ public abstract class MixinLevelRenderer {
         )
     )
     private void hookWorldFeatureSubmit(CallbackInfo ci, @Local(argsOnly = true, name = "modelViewMatrix") Matrix4fc modelViewMatrix) {
+        var poseStack = Pools.MatStack.borrow();
+
         EventManager.INSTANCE.callEvent(new WorldFeatureSubmitEvent(
+            poseStack,
             Minecraft.getInstance().gameRenderer.mainCamera(),
             this.submitNodeStorage,
             modelViewMatrix
         ));
+
+        Pools.MatStack.recycle(poseStack);
     }
 
     // TODO: removed because of vanilla changes
@@ -148,9 +159,16 @@ public abstract class MixinLevelRenderer {
         ModuleChams.INSTANCE.beginFrameIfNeeded();
     }
 
-    @Inject(method = "lambda$addMainPass$0", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/renderer/feature/FeatureRenderDispatcher$PreparedFrame;executeTranslucentAfterTerrain()V", shift = At.Shift.AFTER))
-    private void blitChams(CallbackInfo ci) {
-        ModuleChams.INSTANCE.compositeIfNeeded(Minecraft.getInstance().gameRenderer.mainRenderTarget());
+    @Inject(method = "addAlwaysOnTopPass", at = @At("HEAD"))
+    private void scheduleChamsComposite(
+        FrameGraphBuilder frame,
+        FeatureRenderDispatcher.PreparedFrame featureFrame,
+        GpuBufferSlice fog,
+        CallbackInfo ci
+    ) {
+        FramePass pass = frame.addPass((LiquidBounce.CLIENT_NAME + ' ' + ModuleChams.INSTANCE.getName()).toLowerCase(Locale.ROOT));
+        pass.disableCulling();
+        pass.executes(() -> ModuleChams.INSTANCE.compositeIfNeeded(Minecraft.getInstance().gameRenderer.mainRenderTarget()));
     }
 
     @ModifyExpressionValue(

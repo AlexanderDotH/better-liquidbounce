@@ -4,17 +4,19 @@
     import {listen} from "../../../../integration/ws";
     import {fly} from "svelte/transition";
     import Notification from "./Notification.svelte";
-    import type {NotificationEvent} from "../../../../integration/events";
+    import type {NotificationEvent, NotificationSeverity} from "../../../../integration/events";
     import {hudMotionDuration, prefersReducedMotion} from "../../motion/hudMotion";
+    import {notificationSeverityEnabled} from "./notificationModel";
 
     interface TNotification {
         id: number;
         title: string;
-        severity: string;
+        severity: NotificationSeverity;
         message: string;
     }
 
     export let variant: "classic" | "modern" = "classic";
+    export let settings: Partial<HudNotificationsSettings> = {};
 
     let notifications: TNotification[] = [];
     let nextNotificationId = 1;
@@ -50,7 +52,11 @@
         expiryTimers.set(id, window.setTimeout(() => removeNotification(id), 3000));
     }
 
-    function addNotification(title: string, message: string, severity: string) {
+    function addNotification(title: string, message: string, severity: NotificationSeverity) {
+        if (!notificationSeverityEnabled(settings, severity)) {
+            return;
+        }
+
         const existingNotification = isModuleToggle(severity)
             ? notifications.find((notification) =>
                 isModuleToggle(notification.severity) && notification.message === message)

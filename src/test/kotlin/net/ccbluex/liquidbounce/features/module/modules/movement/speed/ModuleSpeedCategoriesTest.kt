@@ -33,6 +33,7 @@ class ModuleSpeedCategoriesTest {
         val speedModeGroups = ModuleSpeed.collectValuesRecursively()
             .filterIsInstance<ModeValueGroup<*>>()
             .filter { it.name == "Mode" }
+            .toList()
 
         assertEquals(3, speedModeGroups.size)
         assertTrue(speedModeGroups.all { it.categories.isNotEmpty() })

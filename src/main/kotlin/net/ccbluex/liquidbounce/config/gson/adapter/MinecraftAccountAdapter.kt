@@ -26,11 +26,11 @@ import com.google.gson.JsonObject
 import com.google.gson.JsonSerializationContext
 import com.google.gson.JsonSerializer
 import net.ccbluex.liquidbounce.LiquidBounce.logger
-import net.ccbluex.liquidbounce.authlib.account.AlteningAccount
-import net.ccbluex.liquidbounce.authlib.account.CrackedAccount
-import net.ccbluex.liquidbounce.authlib.account.MinecraftAccount
-import net.ccbluex.liquidbounce.authlib.compat.GameProfile
+import net.ccbluex.liquidbounce.features.account.AlteningAccount
 import net.ccbluex.liquidbounce.features.account.AccountServerAccessRegistry
+import net.ccbluex.liquidbounce.features.account.CrackedAccount
+import net.ccbluex.liquidbounce.features.account.MinecraftAccount
+import net.ccbluex.liquidbounce.features.account.pendingAlteningAccount
 import java.lang.reflect.Type
 
 object MinecraftAccountAdapter : JsonSerializer<MinecraftAccount>, JsonDeserializer<MinecraftAccount> {
@@ -45,7 +45,7 @@ object MinecraftAccountAdapter : JsonSerializer<MinecraftAccount>, JsonDeseriali
             add(WORKING_SERVERS, context.serialize(AccountServerAccessRegistry.list(src)))
             if (src is AlteningAccount && src.accountToken.isNotBlank()) {
                 addProperty(ALTENING_ACCOUNT_TOKEN, src.accountToken)
-                addProperty(ALTENING_ACCOUNT_PENDING, src.profile?.uuid == null)
+                addProperty(ALTENING_ACCOUNT_PENDING, src.profile == null)
             }
         }
 
@@ -61,7 +61,7 @@ object MinecraftAccountAdapter : JsonSerializer<MinecraftAccount>, JsonDeseriali
         account.restoreWorkingServers(jsonObject)
         account
     } catch (e: Exception) {
-        logger.error("Failed to deserialize MinecraftAccount from JSON.", e)
+        logger.error("Failed to deserialize MinecraftAccount (${e::class.simpleName}).")
         CrackedAccount("Error${json.hashCode()}")
     }
 
@@ -72,11 +72,8 @@ object MinecraftAccountAdapter : JsonSerializer<MinecraftAccount>, JsonDeseriali
         val accountToken = json.requireString(ALTENING_ACCOUNT_TOKEN)
         val username = json.requireString("name")
 
-        return AlteningAccount(accountToken).apply {
-            profile = GameProfile(username, null)
-            if (json["favorite"]?.asBoolean == true) {
-                favorite()
-            }
+        return pendingAlteningAccount(accountToken, username).apply {
+            favorite = json["favorite"]?.asBoolean == true
         }
     }
 

@@ -42,7 +42,7 @@ class SpeedSentinelHopConfigTest {
     private inline fun <reified T : Mode> assertBoostSlider(expectedDefault: Float) {
         MinecraftBootstrap.ensureInitialized()
 
-        val modes = ModuleSpeed.collectValueGroupsRecursively().filterIsInstance<T>()
+        val modes = ModuleSpeed.collectValueGroupsRecursively().filterIsInstance<T>().toList()
         assertEquals(3, modes.size)
 
         for (mode in modes) {

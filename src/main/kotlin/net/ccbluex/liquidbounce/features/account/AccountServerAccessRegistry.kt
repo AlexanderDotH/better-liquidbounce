@@ -18,7 +18,6 @@
  */
 package net.ccbluex.liquidbounce.features.account
 
-import net.ccbluex.liquidbounce.authlib.account.MinecraftAccount
 import java.util.WeakHashMap
 
 internal object AccountServerAccessRegistry {

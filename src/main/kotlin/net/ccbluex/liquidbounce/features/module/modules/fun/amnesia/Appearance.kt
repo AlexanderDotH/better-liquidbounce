@@ -27,8 +27,7 @@ import net.ccbluex.liquidbounce.LiquidBounce
 import net.ccbluex.liquidbounce.api.core.HttpClient
 import net.ccbluex.liquidbounce.api.core.HttpMethod
 import net.ccbluex.liquidbounce.api.core.ioScope
-import net.ccbluex.liquidbounce.authlib.utils.generateOfflinePlayerUuid
-import net.ccbluex.liquidbounce.authlib.yggdrasil.GameProfileRepository
+import net.ccbluex.liquidbounce.api.thirdparty.lookupUuidByName
 import net.ccbluex.liquidbounce.config.types.group.ToggleableValueGroup
 import net.ccbluex.liquidbounce.features.module.modules.`fun`.ModuleAmnesia
 import net.ccbluex.liquidbounce.utils.client.mc
@@ -38,6 +37,7 @@ import net.ccbluex.liquidbounce.utils.render.registerTexture
 import net.ccbluex.liquidbounce.utils.text.asPlainText
 import net.minecraft.client.multiplayer.PlayerInfo
 import net.minecraft.core.ClientAsset
+import net.minecraft.core.UUIDUtil
 import net.minecraft.network.chat.Component
 import net.minecraft.resources.Identifier
 import net.minecraft.world.entity.player.PlayerModelType
@@ -147,8 +147,8 @@ object Appearance : ToggleableValueGroup(ModuleAmnesia, "Appearance", false) {
     }
 
     private suspend fun resolveSkinProfile(name: String): ResolvedSkinProfile = withContext(Dispatchers.IO) {
-        val uuid = GameProfileRepository.Default.fetchUuidByUsername(name)
-            ?: generateOfflinePlayerUuid(name)
+        val uuid = runCatching { lookupUuidByName(name) }.getOrNull()
+            ?: UUIDUtil.createOfflineProfile(name).id
         val profile = mc.services.sessionService.fetchProfile(uuid, false)
         val gameProfile = profile?.profile ?: GameProfile(uuid, name)
         val skinTexture = profile?.let {

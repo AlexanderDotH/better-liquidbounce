@@ -19,8 +19,6 @@
 package net.ccbluex.liquidbounce.features.account
 
 import net.ccbluex.liquidbounce.api.thirdparty.TheAlteningGeneratedAccount
-import net.ccbluex.liquidbounce.authlib.account.AlteningAccount
-import net.ccbluex.liquidbounce.authlib.compat.GameProfile
 
 private const val PENDING_ALTENING_ACCOUNT_NAME = "TheAltening"
 
@@ -30,7 +28,8 @@ internal fun createPendingAlteningAccount(generatedAccount: TheAlteningGenerated
         ?.takeIf { it.isNotEmpty() }
         ?: PENDING_ALTENING_ACCOUNT_NAME
 
-    return AlteningAccount(generatedAccount.token).apply {
-        profile = GameProfile(username, null)
-    }
+    return pendingAlteningAccount(generatedAccount.token, username)
 }
+
+internal fun pendingAlteningAccount(accountToken: String, username: String) =
+    AlteningAccount.pending(accountToken, username)

@@ -18,6 +18,7 @@
  */
 package net.ccbluex.liquidbounce.integration.backend.backends.cef
 
+import com.mojang.blaze3d.platform.InputConstants
 import net.ccbluex.liquidbounce.features.module.MinecraftShortcuts
 import net.ccbluex.liquidbounce.integration.backend.BrowserTexture
 import net.ccbluex.liquidbounce.integration.backend.browser.Browser
@@ -33,11 +34,11 @@ import net.ccbluex.liquidbounce.mcef.MCEF
 import net.ccbluex.liquidbounce.mcef.cef.MCEFBrowser
 import net.ccbluex.liquidbounce.mcef.cef.MCEFBrowserSettings
 import net.ccbluex.liquidbounce.utils.client.clientLogger
+import org.cef.browser.CefRequestContext
 import net.minecraft.client.input.InputQuirks
 import org.apache.logging.log4j.Logger
 import org.joml.component1
 import org.joml.component2
-import org.lwjgl.glfw.GLFW
 
 @Suppress("TooManyFunctions")
 class CefBrowser(
@@ -46,12 +47,23 @@ class CefBrowser(
     viewport: BrowserViewport,
     val settings: BrowserSettings,
     override var priority: Short = 0,
+    override val isIncognito: Boolean = false,
     inputAcceptor: InputAcceptor? = null
 ) : Browser, InputHandler, MinecraftShortcuts {
 
     internal val browserApi: MCEFBrowser
     private val logger: Logger
     private var lastPaintSizeMismatch: Pair<Int, Int>? = null
+
+    /**
+     * Request context of an incognito browser, disposed along with it.
+     *
+     * A context created this way has no cache path, so CEF keeps its cookies, local storage and cache
+     * in memory and throws all of it away with the context. The global context, which every other
+     * browser shares, persists them to disk instead.
+     */
+    private val requestContext: CefRequestContext? =
+        if (isIncognito) CefRequestContext.createContext(null) else null
 
     init {
         require(url.isNotEmpty()) { "URL cannot be empty." }
@@ -69,7 +81,8 @@ class CefBrowser(
             MCEFBrowserSettings(
                 settings.currentFps,
                 GlobalBrowserSettings.accelerated?.get() == true
-            )
+            ),
+            requestContext
         ).apply {
             addOnPaintListener {
                 comparePaintWithViewpoint(it.width, it.height)
@@ -201,6 +214,9 @@ class CefBrowser(
         inputListener?.close()
         backend.removeBrowser(this)
         browserApi.close()
+
+        // Only after the browser is gone, since the context outlives nothing else.
+        requestContext?.dispose()
     }
 
     override fun update(width: Int, height: Int) {
@@ -219,6 +235,7 @@ class CefBrowser(
         "hash='${browserApi.hashCode()}', " +
         "id='${browserApi.identifier}', " +
         "url='$url', " +
+        "incognito=$isIncognito, " +
         "visible=$visible, " +
         "priority=$priority" +
         ")"
@@ -267,28 +284,28 @@ class CefBrowser(
 
     // TODO: Temporary fix. Should be removed after fix in JCEF
     private fun handleClipboardShortcut(keyCode: Int, modifiers: Int): Boolean {
-        val shortcutPressed = if (InputQuirks.REPLACE_CTRL_KEY_WITH_CMD_KEY) {
-            modifiers and GLFW.GLFW_MOD_SUPER != 0
+        val shortcutModifier = if (InputQuirks.REPLACE_CTRL_KEY_WITH_CMD_KEY) {
+            InputConstants.MOD_SUPER
         } else {
-            modifiers and GLFW.GLFW_MOD_CONTROL != 0
+            InputConstants.MOD_CONTROL
         }
 
-        if (shortcutPressed) {
+        if (modifiers and shortcutModifier != 0) {
             val frame = browserApi.focusedFrame
             return when (keyCode) {
-                GLFW.GLFW_KEY_C -> {
+                InputConstants.KEY_C -> {
                     frame.copy()
                     true
                 }
-                GLFW.GLFW_KEY_V -> {
+                InputConstants.KEY_V -> {
                     frame.paste()
                     true
                 }
-                GLFW.GLFW_KEY_X -> {
+                InputConstants.KEY_X -> {
                     frame.cut()
                     true
                 }
-                GLFW.GLFW_KEY_A -> {
+                InputConstants.KEY_A -> {
                     frame.selectAll()
                     true
                 }
@@ -296,7 +313,7 @@ class CefBrowser(
             }
         }
 
-        if (keyCode == GLFW.GLFW_KEY_INSERT && modifiers and GLFW.GLFW_MOD_SHIFT != 0) {
+        if (keyCode == InputConstants.KEY_INSERT && modifiers and InputConstants.MOD_SHIFT != 0) {
             browserApi.focusedFrame.paste()
             return true
         }

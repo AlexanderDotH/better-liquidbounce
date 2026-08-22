@@ -18,6 +18,7 @@
  */
 package net.ccbluex.liquidbounce.features.module.modules.misc.betterchat
 
+import com.mojang.blaze3d.platform.InputConstants
 import net.ccbluex.liquidbounce.config.types.group.ToggleableValueGroup
 import net.ccbluex.liquidbounce.config.types.list.Tagged
 import net.ccbluex.liquidbounce.event.events.ChatReceiveEvent
@@ -40,7 +41,6 @@ import net.ccbluex.liquidbounce.utils.collection.Pools
 import net.minecraft.client.gui.screens.DeathScreen
 import net.minecraft.client.multiplayer.chat.GuiMessage
 import net.minecraft.util.FormattedCharSink
-import org.lwjgl.glfw.GLFW
 
 /**
  * BetterChat Module
@@ -103,10 +103,9 @@ object ModuleBetterChat : ClientModule("BetterChat", ModuleCategories.RENDER, al
                 }
             }
 
-            if (isAnyPressed(
-                    GLFW.GLFW_KEY_LEFT_SHIFT,
-                    GLFW.GLFW_KEY_RIGHT_SHIFT
-                ) && button == GLFW.GLFW_MOUSE_BUTTON_1
+            if ((InputConstants.isKeyDown(mc.window, InputConstants.KEY_LSHIFT)
+                    || InputConstants.isKeyDown(mc.window, InputConstants.KEY_RSHIFT))
+                && button == InputConstants.MOUSE_BUTTON_LEFT
             ) {
                 mc.keyboardHandler.clipboard = content
 
@@ -117,15 +116,11 @@ object ModuleBetterChat : ClientModule("BetterChat", ModuleCategories.RENDER, al
                         NotificationEvent.Severity.SUCCESS
                     )
                 }
-            } else if (button == GLFW.GLFW_MOUSE_BUTTON_2) {
+            } else if (button == InputConstants.MOUSE_BUTTON_RIGHT) {
                 mc.openChat(content)
             }
         }
 
-        private fun isAnyPressed(vararg keys: Int): Boolean =
-            keys.any {
-                GLFW.glfwGetKey(mc.window.handle(), it) == GLFW.GLFW_PRESS
-            }
     }
 
     init {

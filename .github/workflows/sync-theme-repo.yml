@@ -10,6 +10,7 @@ on:
 
 jobs:
   sync-theme:
+    if: github.repository == 'CCBlueX/LiquidBounce'
     runs-on: ubuntu-latest
     
     steps:

@@ -18,7 +18,9 @@
  */
 package net.ccbluex.liquidbounce.config.types.group
 
+import net.ccbluex.liquidbounce.config.ConfigSystem
 import net.ccbluex.liquidbounce.config.gson.accessibleInteropGson
+import net.ccbluex.liquidbounce.config.gson.fileGson
 import net.ccbluex.liquidbounce.event.EventListener
 import net.ccbluex.liquidbounce.test.MinecraftBootstrap
 import org.junit.jupiter.api.Assertions.assertEquals
@@ -54,9 +56,46 @@ class ModeValueGroupTest {
         )
     }
 
+    @Test
+    fun `file round trip restores active mode and inactive mode values without reordering`() {
+        MinecraftBootstrap.ensureInitialized()
+
+        lateinit var first: ConfigMode
+        lateinit var second: ConfigMode
+        val root = ValueGroup("Root")
+        val group = ModeValueGroup<Mode>(object : EventListener {}, "Mode", { 0 }) { parent ->
+            arrayOf(
+                ConfigMode("First", parent).also { first = it },
+                ConfigMode("Second", parent).also { second = it },
+            )
+        }
+        root.tree(group)
+        first.amountValue.set(11)
+        second.amountValue.set(22)
+        group.setByString("Second")
+        val serialized = ConfigSystem.serializeValueGroup(root, fileGson)
+
+        first.amountValue.set(1)
+        second.amountValue.set(2)
+        group.setByString("First")
+        ConfigSystem.deserializeValueGroup(root, serialized)
+
+        assertEquals("Second", group.activeMode.name)
+        assertEquals(listOf("First", "Second"), group.modes.map(Mode::name))
+        assertEquals(11, first.amountValue.get())
+        assertEquals(22, second.amountValue.get())
+    }
+
     private class TestMode(
         name: String,
         override val parent: ModeValueGroup<*>,
     ) : Mode(name)
+
+    private class ConfigMode(
+        name: String,
+        override val parent: ModeValueGroup<*>,
+    ) : Mode(name) {
+        val amountValue = int("Amount", 0, 0..100)
+    }
 
 }

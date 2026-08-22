@@ -20,8 +20,6 @@ package net.ccbluex.liquidbounce.features.account
 
 import com.google.gson.GsonBuilder
 import net.ccbluex.liquidbounce.api.thirdparty.TheAlteningGeneratedAccount
-import net.ccbluex.liquidbounce.authlib.account.AlteningAccount
-import net.ccbluex.liquidbounce.authlib.account.MinecraftAccount
 import net.ccbluex.liquidbounce.config.gson.adapter.MinecraftAccountAdapter
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertNull
@@ -40,27 +38,25 @@ class PendingAlteningAccountTest {
     @Test
     fun `generated token creates unresolved account without authentication`() {
         val account = createPendingAlteningAccount(generatedAccount())
-        val profile = assertNotNull(account.profile)
 
         assertEquals("generated-token", account.accountToken)
-        assertEquals("Example**", profile.username)
-        assertNull(profile.uuid)
+        assertEquals("Example**", account.username)
+        assertNull(account.profile)
     }
 
     @Test
     fun `pending account survives persistence round trip`() {
         val account = createPendingAlteningAccount(generatedAccount()).apply {
-            favorite()
+            favorite = true
         }
 
         val json = gson.toJson(account, MinecraftAccount::class.java)
         val restored = assertIs<AlteningAccount>(gson.fromJson(json, MinecraftAccount::class.java))
-        val profile = assertNotNull(restored.profile)
 
         assertTrue(restored.favorite)
         assertEquals("generated-token", restored.accountToken)
-        assertEquals("Example**", profile.username)
-        assertNull(profile.uuid)
+        assertEquals("Example**", restored.username)
+        assertNull(restored.profile)
     }
 
     @Test
@@ -87,8 +83,8 @@ class PendingAlteningAccountTest {
         assertTrue(restored.favorite)
         assertEquals("generator-token", restored.accountToken)
         assertEquals("access-token", restored.accessToken)
-        assertEquals("ExistingAlt", profile.username)
-        assertEquals(UUID.fromString("00000000-0000-0000-0000-000000000001"), profile.uuid)
+        assertEquals("ExistingAlt", profile.name)
+        assertEquals(UUID.fromString("00000000-0000-0000-0000-000000000001"), profile.id)
     }
 
     private fun generatedAccount() = TheAlteningGeneratedAccount(

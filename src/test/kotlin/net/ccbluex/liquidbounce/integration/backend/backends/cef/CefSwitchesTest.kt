@@ -23,6 +23,8 @@ import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
+import java.nio.file.Files
+import java.nio.file.Path
 
 class CefSwitchesTest {
 
@@ -105,6 +107,24 @@ class CefSwitchesTest {
         )
 
         assertFalse(disabled)
+    }
+
+    @Test
+    fun `incognito browsers use and dispose an isolated request context`() {
+        val browser = Files.readString(
+            Path.of("src/main/kotlin/net/ccbluex/liquidbounce/integration/backend/backends/cef/CefBrowser.kt")
+        )
+        val backend = Files.readString(
+            Path.of(
+                "src/main/kotlin/net/ccbluex/liquidbounce/integration/backend/backends/cef/" +
+                    "CefBrowserBackend.kt"
+            )
+        )
+
+        assertTrue(backend.contains("override val supportsIncognito = true"))
+        assertTrue(browser.contains("if (isIncognito) CefRequestContext.createContext(null) else null"))
+        assertTrue(browser.contains("requestContext?.dispose()"))
+        assertTrue(browser.contains("backend.registerBrowser(this)"))
     }
 
 }

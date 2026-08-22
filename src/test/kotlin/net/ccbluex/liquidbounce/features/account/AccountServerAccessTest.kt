@@ -19,8 +19,6 @@
 package net.ccbluex.liquidbounce.features.account
 
 import com.google.gson.GsonBuilder
-import net.ccbluex.liquidbounce.authlib.account.CrackedAccount
-import net.ccbluex.liquidbounce.authlib.account.MinecraftAccount
 import net.ccbluex.liquidbounce.config.gson.adapter.MinecraftAccountAdapter
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse

@@ -11,12 +11,35 @@
 package net.ccbluex.liquidbounce.features.module.modules.combat
 
 import com.google.gson.JsonParser
+import net.ccbluex.liquidbounce.config.autoconfig.prepareModuleConfigForLoad
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.Test
 
 class MaceKillConfigMigrationTest {
+
+    @Test
+    fun `selected module load applies the MaceKill migration before deserialization`() {
+        val root = JsonParser.parseString(
+            """
+            {"name":"modules","value":[{"name":"MaceKill","value":[{
+              "name":"Movement","active":"Packet","value":[],"choices":{"Packet":{
+                "name":"Packet","value":[{"name":"Routing","active":"ClipReach","value":[],
+                "choices":{"Direct":{"name":"Direct","value":[]},"ClipReach":{"name":"ClipReach","value":[]}}}]
+              }}
+            }]}]}
+            """.trimIndent(),
+        ).asJsonObject
+
+        prepareModuleConfigForLoad(root)
+
+        val routing = root.getAsJsonArray("value").single().asJsonObject
+            .getAsJsonArray("value").single().asJsonObject
+            .getAsJsonObject("choices").getAsJsonObject("Packet")
+            .getAsJsonArray("value").single().asJsonObject
+        assertEquals("Instant", routing["active"].asString)
+    }
 
     @Test
     fun `legacy ClipReach becomes experimental Instant and removes retired settings`() {

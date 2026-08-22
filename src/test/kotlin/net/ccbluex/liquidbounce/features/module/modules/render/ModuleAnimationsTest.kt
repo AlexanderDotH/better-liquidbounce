@@ -18,12 +18,21 @@
  */
 package net.ccbluex.liquidbounce.features.module.modules.render
 
+import net.ccbluex.liquidbounce.features.module.modules.render.animations.ModuleAnimations
+import net.ccbluex.liquidbounce.features.module.modules.render.animations.SwingAnimations
+import net.ccbluex.liquidbounce.features.module.modules.render.animations.shouldApplyOffHandTransform
+import net.ccbluex.liquidbounce.test.MinecraftBootstrap
 import net.minecraft.world.InteractionHand
+import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
+import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 class ModuleAnimationsTest {
+
+    @BeforeEach
+    fun bootstrap() = MinecraftBootstrap.ensureInitialized()
 
     @Test
     fun `enabled off-hand transforms only select off-hand render calls`() {
@@ -41,5 +50,15 @@ class ModuleAnimationsTest {
     @Test
     fun `enabled off-hand transform remains available to a two-handed map render`() {
         assertTrue(shouldApplyOffHandTransform(InteractionHand.MAIN_HAND, isInBothHands = true, offHandRunning = true))
+    }
+
+    @Test
+    fun `fork blocking modes remain first while upstream modes and Swing Animations are additive`() {
+        assertEquals(
+            listOf("1.7", "Pushdown", "Sigma", "Exhibition", "Avatar", "Dortware"),
+            ModuleAnimations.blockAnimationChoice.modes.map { it.name },
+        )
+        assertEquals("1.7", ModuleAnimations.blockAnimationChoice.activeMode.name)
+        assertFalse(SwingAnimations.enabled)
     }
 }

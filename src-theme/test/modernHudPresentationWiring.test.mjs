@@ -15,7 +15,7 @@ test("HUD derives one live presentation value for shared Modern variants", () =>
     );
     assert.match(hud, /<ArrayList settings=\{c\.settings\} variant=\{presentation\}\s*\/>/);
     assert.match(hud, /<TabGui variant=\{presentation\}\s*\/>/);
-    assert.match(hud, /<Notifications variant=\{presentation\}\s*\/>/);
+    assert.match(hud, /<Notifications settings=\{c\.settings\} variant=\{presentation\}\s*\/>/);
     assert.match(hud, /<TargetHud \{presentation\}\s*\/>/);
 });
 

@@ -27,14 +27,6 @@ import net.ccbluex.liquidbounce.api.thirdparty.TheAlteningApi
 import net.ccbluex.liquidbounce.api.thirdparty.TheAlteningApiException
 import net.ccbluex.liquidbounce.api.thirdparty.TheAlteningGenerationResult
 import net.ccbluex.liquidbounce.api.thirdparty.toGenerationResult
-import net.ccbluex.liquidbounce.authlib.Authlib
-import net.ccbluex.liquidbounce.authlib.account.AlteningAccount
-import net.ccbluex.liquidbounce.authlib.account.CrackedAccount
-import net.ccbluex.liquidbounce.authlib.account.MicrosoftAccount
-import net.ccbluex.liquidbounce.authlib.account.MinecraftAccount
-import net.ccbluex.liquidbounce.authlib.account.SessionAccount
-import net.ccbluex.liquidbounce.authlib.bantracker.Ban
-import net.ccbluex.liquidbounce.authlib.yggdrasil.clientIdentifier
 import net.ccbluex.liquidbounce.config.ConfigSystem
 import net.ccbluex.liquidbounce.config.types.Config
 import net.ccbluex.liquidbounce.config.types.ValueType
@@ -44,16 +36,19 @@ import net.ccbluex.liquidbounce.event.events.AccountManagerAdditionResultEvent
 import net.ccbluex.liquidbounce.event.events.AccountManagerLoginResultEvent
 import net.ccbluex.liquidbounce.event.events.AccountManagerRemovalResultEvent
 import net.ccbluex.liquidbounce.event.events.SessionEvent
+import net.ccbluex.liquidbounce.injection.mixins.realms.MixinRealmsAvailabilityAccessor
+import net.ccbluex.liquidbounce.injection.mixins.realms.MixinRealmsClientAccessor
+import net.ccbluex.liquidbounce.integration.backend.BrowserBackendManager
+import net.ccbluex.liquidbounce.integration.screen.impl.MicrosoftLoginScreen
 import net.ccbluex.liquidbounce.utils.client.logger
 import net.ccbluex.liquidbounce.utils.client.mc
 import net.ccbluex.liquidbounce.utils.client.with
 import net.minecraft.client.multiplayer.ProfileKeyPairManager
-import okhttp3.OkHttpClient
 import java.io.InterruptedIOException
 import java.net.Proxy
-import java.util.Optional
+import java.util.concurrent.CountDownLatch
 import java.util.concurrent.atomic.AtomicBoolean
-import java.util.concurrent.TimeUnit
+import kotlin.concurrent.thread
 
 @Suppress("TooManyFunctions")
 object AccountManager : Config("Accounts"), EventListener {
@@ -65,11 +60,8 @@ object AccountManager : Config("Accounts"), EventListener {
     private val loggingIn = AtomicBoolean(false)
 
     private const val THE_ALTENING_GENERATE_TIMEOUT_MS = 12_000L
-    private const val GENERATED_ALTENING_ACCOUNT_AUTH_TIMEOUT_SECONDS = 8L
     private const val GENERATED_ALTENING_ACCOUNT_RESOLVE_TIMEOUT_MESSAGE =
         "TheAltening authentication server is not responding. Try again later."
-
-    private val authlibClientLock = Any()
 
     init {
         ConfigSystem.root(this)
@@ -104,14 +96,8 @@ object AccountManager : Config("Accounts"), EventListener {
     }
 
     fun loginDirectAccount(account: MinecraftAccount) = try {
-        logger.info("Start logging in with username '${account.profile?.username}'")
-        val (compatSession, service) = loginAccountSession(account)
-        val session = SessionWithService(
-            compatSession.username, compatSession.uuid, compatSession.token,
-            Optional.empty(),
-            Optional.of(clientIdentifier),
-            AccountService.getService(account)
-        )
+        logger.info("Start logging in with username '${account.username}'")
+        val (session, service) = account.login()
 
         val profileKeys = runCatching {
             // In this case the environment doesn't matter, as it is only used for the profile key
@@ -129,9 +115,10 @@ object AccountManager : Config("Accounts"), EventListener {
             service.createProfileRepository(),
         )
         mc.profileKeyPairManager = profileKeys
+        invalidateRealms()
 
         EventManager.callEvent(SessionEvent(session))
-        EventManager.callEvent(AccountManagerLoginResultEvent(username = account.profile?.username))
+        EventManager.callEvent(AccountManagerLoginResultEvent(username = account.username))
         true
     } catch (e: Exception) {
         logger.error("Failed to login into account", e)
@@ -140,7 +127,7 @@ object AccountManager : Config("Accounts"), EventListener {
     }
 
     /**
-     * Cracked account. This can only be used to join cracked servers and not premium servers.
+     * Cannot join premium servers.
      */
     fun newCrackedAccount(username: String, online: Boolean = false) {
         if (username.isEmpty()) {
@@ -153,16 +140,13 @@ object AccountManager : Config("Accounts"), EventListener {
             return
         }
 
-        // Check if account already exists
-        if (accounts.any { it.profile?.username.equals(username, true) }) {
+        if (accounts.any { it.username.equals(username, true) }) {
             EventManager.callEvent(AccountManagerAdditionResultEvent(error = "Account already exists!"))
             return
         }
 
-        // Create new cracked account
         accounts += CrackedAccount(username, online).also { it.refresh() }
 
-        // Store configurable
         ConfigSystem.store(this@AccountManager)
 
         EventManager.callEvent(AccountManagerAdditionResultEvent(username = username))
@@ -196,100 +180,156 @@ object AccountManager : Config("Accounts"), EventListener {
     }
 
     /**
-     * Cache microsoft login server
+     * Re-triggering the device code flow while one is running re-shows this URL instead of asking
+     * Microsoft for a new code.
      */
-    private var activeUrl: String? = null
+    private var activeDeviceCodeUrl: String? = null
 
-    fun newMicrosoftAccount(url: (String) -> Unit) {
-        // Prevents you from starting multiple login attempts
-        val activeUrl = activeUrl
-        if (activeUrl != null) {
-            url(activeUrl)
+    /**
+     * Guards the WebView and credentials flows only - the device code flow uses [activeDeviceCodeUrl].
+     */
+    private val microsoftLoginInProgress = AtomicBoolean(false)
+
+    /**
+     * Blocks only until the verification URL is known and hands it to [url]; the account itself is created
+     * once the user signs in elsewhere, surfaced via [AccountManagerAdditionResultEvent].
+     */
+    fun newMicrosoftAccountViaDeviceCode(url: (String) -> Unit) {
+        val existingUrl = activeDeviceCodeUrl
+        if (existingUrl != null) {
+            url(existingUrl)
             return
         }
 
-        runCatching {
-            newMicrosoftAccount(url = {
-                this.activeUrl = it
+        val urlReady = CountDownLatch(1)
 
-                url(it)
-            }, success = { account ->
-                val profile = account.profile
-                if (profile == null) {
-                    logger.error("Failed to get profile")
-                    EventManager.callEvent(AccountManagerAdditionResultEvent(error = "Failed to get profile"))
-                    return@newMicrosoftAccount
+        thread(name = "microsoft-account-device-code", isDaemon = true) {
+            runCatching {
+                MicrosoftAccount.buildFromDeviceCode(onDeviceCode = { code ->
+                    activeDeviceCodeUrl = code.directVerificationUri
+                    url(code.directVerificationUri)
+                    urlReady.countDown()
+                })
+            }.onSuccess { account ->
+                activeDeviceCodeUrl = null
+                handleNewMicrosoftAccount(account)
+            }.onFailure {
+                activeDeviceCodeUrl = null
+                logger.error("Failed to create new account", it)
+                EventManager.callEvent(AccountManagerAdditionResultEvent(error = it.message ?: "Unknown error"))
+            }
+
+            // In case buildFromDeviceCode failed before ever reaching the onDeviceCode callback
+            urlReady.countDown()
+        }
+
+        urlReady.await()
+    }
+
+    /**
+     * Runs asynchronously; the result is surfaced via [AccountManagerAdditionResultEvent].
+     */
+    fun newMicrosoftAccountViaWebView() {
+        if (!microsoftLoginInProgress.compareAndSet(false, true)) {
+            EventManager.callEvent(
+                AccountManagerAdditionResultEvent(error = "A Microsoft sign-in is already in progress!")
+            )
+            return
+        }
+
+        // The login has to run in a browser we control, both to read the redirect back and to keep the
+        // Microsoft session out of the client's cookie store.
+        if (BrowserBackendManager.backend?.takeIf { it.isInitialized && it.supportsIncognito } == null) {
+            microsoftLoginInProgress.set(false)
+            EventManager.callEvent(
+                AccountManagerAdditionResultEvent(error = "The browser is not available, use another sign-in method")
+            )
+            return
+        }
+
+        thread(name = "microsoft-account-webview", isDaemon = true) {
+            try {
+                runCatching {
+                    MicrosoftAccount.buildFromWebView(
+                        onOpen = { service ->
+                            val url = service.authenticationUrl.toString()
+                            mc.execute {
+                                mc.gui.setScreen(MicrosoftLoginScreen(url, service, mc.gui.screen()))
+                            }
+                        },
+                        onClose = {
+                            mc.execute { (mc.gui.screen() as? MicrosoftLoginScreen)?.onClose() }
+                        },
+                    )
+                }.onSuccess {
+                    handleNewMicrosoftAccount(it)
+                }.onFailure {
+                    logger.error("Failed to create new account", it)
+                    EventManager.callEvent(AccountManagerAdditionResultEvent(error = it.message ?: "Unknown error"))
                 }
-
-                EventManager.callEvent(AccountManagerAdditionResultEvent(username = profile.username))
-                this.activeUrl = null
-            }, error = { errorString ->
-                logger.error("Failed to create new account: $errorString")
-
-                EventManager.callEvent(AccountManagerAdditionResultEvent(error = errorString))
-                this.activeUrl = null
-            })
-        }.onFailure {
-            logger.error("Failed to create new account", it)
-
-            EventManager.callEvent(AccountManagerAdditionResultEvent(error = it.message ?: "Unknown error"))
-            this.activeUrl = null
+            } finally {
+                microsoftLoginInProgress.set(false)
+            }
         }
     }
 
     /**
-     * Create a new Microsoft Account using the OAuth2 flow which opens a browser window to authenticate the user
+     * Does not support accounts with two-factor authentication enabled. Runs asynchronously; the result is
+     * surfaced via [AccountManagerAdditionResultEvent].
      */
-    private fun newMicrosoftAccount(url: (String) -> Unit, success: (account: MicrosoftAccount) -> Unit,
-                                    error: (error: String) -> Unit) {
-        MicrosoftAccount.buildFromOpenBrowser(object : MicrosoftAccount.OAuthHandler {
+    fun newMicrosoftAccountViaCredentials(email: String, password: String) {
+        if (email.isEmpty() || password.isEmpty()) {
+            EventManager.callEvent(AccountManagerAdditionResultEvent(error = "Email and password are required!"))
+            return
+        }
 
-            /**
-             * Called when the user has cancelled the authentication process or the thread has been interrupted
-             */
-            override fun authError(error: String) {
-                // Oh no, something went wrong. Callback with error.
-                logger.error("Failed to login: $error")
-                error(error)
-            }
+        if (!microsoftLoginInProgress.compareAndSet(false, true)) {
+            EventManager.callEvent(
+                AccountManagerAdditionResultEvent(error = "A Microsoft sign-in is already in progress!")
+            )
+            return
+        }
 
-            /**
-             * Called when the user has completed authentication
-             */
-            override fun authResult(account: MicrosoftAccount) {
-                // Yay, it worked! Callback with account.
-                logger.info("Logged in as new account ${account.profile?.username}")
-
-                val existingAccount = accounts.find {
-                    it.type == account.type && it.profile?.username == account.profile?.username
-                }
-
-                if (existingAccount != null) {
-                    // Replace existing account
-                    accounts[accounts.indexOf(existingAccount)] = account
-                } else {
-                    // Add account to list of accounts
-                    accounts += account
-                }
-
+        thread(name = "microsoft-account-credentials", isDaemon = true) {
+            try {
                 runCatching {
-                    success(account)
+                    MicrosoftAccount.buildFromCredentials(email, password)
+                }.onSuccess {
+                    handleNewMicrosoftAccount(it)
                 }.onFailure {
-                    logger.error("Internal error", it)
+                    logger.error("Failed to create new account", it)
+                    EventManager.callEvent(AccountManagerAdditionResultEvent(error = it.message ?: "Unknown error"))
                 }
-
-                // Store configurable
-                ConfigSystem.store(this@AccountManager)
+            } finally {
+                microsoftLoginInProgress.set(false)
             }
+        }
+    }
 
-            /**
-             * Called when the server has prepared the user for authentication
-             */
-            override fun openUrl(url: String) {
-                url(url)
-            }
+    private fun handleNewMicrosoftAccount(account: MicrosoftAccount) {
+        val profile = account.profile
+        if (profile == null) {
+            logger.error("Failed to get profile")
+            EventManager.callEvent(AccountManagerAdditionResultEvent(error = "Failed to get profile"))
+            return
+        }
 
-        })
+        logger.info("Logged in as new account ${account.username}")
+
+        val existingAccount = accounts.find {
+            it.service == account.service && it.username == account.username
+        }
+
+        if (existingAccount != null) {
+            transferAccountMetadata(existingAccount, account)
+            accounts[accounts.indexOf(existingAccount)] = account
+        } else {
+            accounts += account
+        }
+
+        ConfigSystem.store(this@AccountManager)
+
+        EventManager.callEvent(AccountManagerAdditionResultEvent(username = profile.name))
     }
 
     fun newAlteningAccount(accountToken: String) = runCatching {
@@ -301,10 +341,9 @@ object AccountManager : Config("Accounts"), EventListener {
                 return@runCatching
             }
 
-            EventManager.callEvent(AccountManagerAdditionResultEvent(username = profile.username))
+            EventManager.callEvent(AccountManagerAdditionResultEvent(username = profile.name))
         }
 
-        // Store configurable
         ConfigSystem.store(this@AccountManager)
     }.onFailure {
         logger.error("Failed to login into altening account (for add-process)", it)
@@ -317,7 +356,7 @@ object AccountManager : Config("Accounts"), EventListener {
                 TheAlteningApi.generate(apiToken)
             }
             val account = createPendingAlteningAccount(generatedAccount)
-            val username = checkNotNull(account.profile).username
+            val username = account.username
 
             accounts += account
             ConfigSystem.store(this@AccountManager)
@@ -333,35 +372,6 @@ object AccountManager : Config("Accounts"), EventListener {
         } catch (exception: Exception) {
             logger.error("Failed to generate altening account", exception)
             generationError(exception.generationErrorMessage())
-        }
-    }
-
-    private fun loginAccountSession(account: MinecraftAccount) =
-        if (account is AlteningAccount && account.profile?.uuid == null) {
-            synchronized(authlibClientLock) {
-                withTemporaryAuthlibClient(buildGeneratedAlteningAccountAuthClient()) {
-                    account.login()
-                }
-            }
-        } else {
-            account.login()
-        }
-
-    private fun buildGeneratedAlteningAccountAuthClient(): OkHttpClient = Authlib.client.newBuilder()
-        .connectTimeout(GENERATED_ALTENING_ACCOUNT_AUTH_TIMEOUT_SECONDS, TimeUnit.SECONDS)
-        .readTimeout(GENERATED_ALTENING_ACCOUNT_AUTH_TIMEOUT_SECONDS, TimeUnit.SECONDS)
-        .writeTimeout(GENERATED_ALTENING_ACCOUNT_AUTH_TIMEOUT_SECONDS, TimeUnit.SECONDS)
-        .callTimeout(GENERATED_ALTENING_ACCOUNT_AUTH_TIMEOUT_SECONDS, TimeUnit.SECONDS)
-        .build()
-
-    private inline fun <T> withTemporaryAuthlibClient(client: OkHttpClient, block: () -> T): T {
-        val previousClient = Authlib.client
-        Authlib.client = client
-
-        return try {
-            block()
-        } finally {
-            Authlib.client = previousClient
         }
     }
 
@@ -387,6 +397,7 @@ object AccountManager : Config("Accounts"), EventListener {
             initialSession.sessionService ?: mc.services.sessionService
         )
         mc.profileKeyPairManager = initialSession.profileKeys
+        invalidateRealms()
 
         EventManager.callEvent(SessionEvent(mc.user))
         EventManager.callEvent(AccountManagerLoginResultEvent(username = mc.user.name))
@@ -415,18 +426,27 @@ object AccountManager : Config("Accounts"), EventListener {
     }
 
     private fun currentAccount(): MinecraftAccount? =
-        accounts.firstOrNull { it.profile?.uuid == mc.user.profileId }
-            ?: accounts.firstOrNull { it.profile?.username.equals(mc.user.name, ignoreCase = true) }
+        accounts.firstOrNull { it.profile?.id == mc.user.profileId }
+            ?: accounts.firstOrNull { it.profile?.name.equals(mc.user.name, ignoreCase = true) }
 
+    /**
+     * Realms builds its client from the session that was active at the time, keeps it in a static field
+     * and never compares it against the current one, and it never retries an availability check that
+     * failed with an authentication error. Both caches have to be dropped by hand.
+     */
+    private fun invalidateRealms() {
+        MixinRealmsClientAccessor.setRealmsClientInstance(null)
+        MixinRealmsAvailabilityAccessor.setFuture(null)
+    }
     fun favoriteAccount(id: Int) {
         val account = accounts.getOrNull(id) ?: error("Account not found!")
-        account.favorite()
+        account.favorite = true
         ConfigSystem.store(this@AccountManager)
     }
 
     fun unfavoriteAccount(id: Int) {
         val account = accounts.getOrNull(id) ?: error("Account not found!")
-        account.unfavorite()
+        account.favorite = false
         ConfigSystem.store(this@AccountManager)
     }
 
@@ -449,7 +469,7 @@ object AccountManager : Config("Accounts"), EventListener {
 
     fun removeAccount(id: Int): MinecraftAccount {
         val account = accounts.removeAt(id).apply { ConfigSystem.store(this@AccountManager) }
-        EventManager.callEvent(AccountManagerRemovalResultEvent(account.profile?.username))
+        EventManager.callEvent(AccountManagerRemovalResultEvent(account.username))
         return account
     }
 
@@ -463,7 +483,6 @@ object AccountManager : Config("Accounts"), EventListener {
             if (token.startsWith("M.")) {
                 MicrosoftAccount.buildFromRefreshToken(token)
             } else {
-                // Create a new cracked account
                 SessionAccount(token).apply {
                     refresh()
                 }
@@ -480,16 +499,20 @@ object AccountManager : Config("Accounts"), EventListener {
             return
         }
 
-        // Check if an account already exists
-        if (accounts.any { it.profile?.username.equals(profile.username, true) }) {
+        if (accounts.any { it.username.equals(account.username, true) }) {
             EventManager.callEvent(AccountManagerAdditionResultEvent(error = "Account already exists!"))
             return
         }
 
-        // Store configurable
         accounts += account
         ConfigSystem.store(this@AccountManager)
-        EventManager.callEvent(AccountManagerAdditionResultEvent(username = profile.username))
+        EventManager.callEvent(AccountManagerAdditionResultEvent(username = profile.name))
     }
 
+}
+
+internal fun transferAccountMetadata(from: MinecraftAccount, to: MinecraftAccount) {
+    to.favorite = from.favorite
+    to.bans.putAll(from.bans)
+    AccountServerAccessRegistry.restore(to, AccountServerAccessRegistry.list(from))
 }
