@@ -123,7 +123,7 @@ class KillAuraSpearKillRouteTest {
     }
 
     @Test
-    fun `non SpearKill routes leave KillAura subsystems enabled`() {
+    fun `ordinary and SuperHit routes leave KillAura subsystems enabled`() {
         listOf(
             KillAuraAttackRoute.NORMAL,
             KillAuraAttackRoute.SUPER_HIT,
@@ -169,5 +169,42 @@ class KillAuraSpearKillRouteTest {
             hasTrackedTarget = false,
             trackedTargetUsesSpearKill = false,
         ))
+    }
+
+    @Test
+    fun `released SpearKill selection reacquires without displacing an owned route`() {
+        val invalidTarget = KillAuraSpearTargetSelectionSnapshot(
+            selectionEvaluated = true,
+            trackedTargetPresent = true,
+            trackedTargetValid = false,
+            trackedTargetUsesSpearKill = false,
+            trackedTargetOwnedByAnotherRoute = false,
+            spearKillRouteActive = false,
+        )
+        assertTrue(invalidTarget.shouldReacquire)
+        assertTrue(invalidTarget.copy(trackedTargetValid = true).shouldReacquire)
+        assertTrue(invalidTarget.copy(
+            selectionEvaluated = false,
+            trackedTargetPresent = false,
+        ).shouldReacquire)
+
+        listOf(
+            invalidTarget.copy(
+                trackedTargetPresent = false,
+            ),
+            invalidTarget.copy(
+                trackedTargetValid = true,
+                trackedTargetUsesSpearKill = true,
+            ),
+            invalidTarget.copy(
+                trackedTargetValid = true,
+                trackedTargetOwnedByAnotherRoute = true,
+            ),
+            invalidTarget.copy(
+                spearKillRouteActive = true,
+            ),
+        ).forEach { snapshot ->
+            assertFalse(snapshot.shouldReacquire)
+        }
     }
 }

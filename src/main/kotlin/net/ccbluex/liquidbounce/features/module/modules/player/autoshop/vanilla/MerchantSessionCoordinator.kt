@@ -71,7 +71,8 @@ internal class MerchantSessionCoordinator(
 
     fun claimMerchantScreen(containerId: Int, tick: Int): Boolean {
         val opening = state as? MerchantSessionState.Opening ?: return false
-        if (opening.expectedContainerId != containerId || hasExpired(opening.sinceTick, tick, openTimeoutTicks)) {
+        val expectedContainerMismatch = opening.expectedContainerId?.let { it != containerId } == true
+        if (expectedContainerMismatch || hasExpired(opening.sinceTick, tick, openTimeoutTicks)) {
             return false
         }
 

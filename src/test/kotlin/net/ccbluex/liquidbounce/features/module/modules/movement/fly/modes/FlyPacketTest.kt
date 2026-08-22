@@ -96,25 +96,25 @@ class FlyPacketTest {
 
     @Test
     fun `zero resolved movement does not create a packet plan`() {
-        assertFalse(PacketFlyRuntimePolicy.shouldPlan(Vec3.ZERO, spearKillOwnsPacketRoute = false))
+        assertFalse(PacketFlyRuntimePolicy.shouldPlan(Vec3.ZERO, remoteKillOwnsPacketRoute = false))
     }
 
     @Test
-    fun `spear kill ownership suspends physical packet fly movement`() {
+    fun `remote kill ownership suspends physical packet fly movement`() {
         val collisionResolvedMovement = Vec3(12.0, -3.0, 4.0)
 
         assertEquals(
             Vec3.ZERO,
             PacketFlyRuntimePolicy.resolvePhysicalMovement(
                 collisionResolvedMovement,
-                spearKillOwnsPacketRoute = true,
+                remoteKillOwnsPacketRoute = true,
             ),
         )
-        assertFalse(PacketFlyRuntimePolicy.shouldPlan(collisionResolvedMovement, spearKillOwnsPacketRoute = true))
+        assertFalse(PacketFlyRuntimePolicy.shouldPlan(collisionResolvedMovement, remoteKillOwnsPacketRoute = true))
     }
 
     @Test
-    fun `spear kill ownership also suppresses the shared POST anti kick packet`() {
+    fun `remote kill ownership also suppresses the shared POST anti kick packet`() {
         assertFalse(shouldSendVanillaFlyPacketBypass(
             eventState = EventState.POST,
             enabled = true,
@@ -126,17 +126,17 @@ class FlyPacketTest {
     }
 
     @Test
-    fun `packet fly keeps collision resolved movement physical when spear kill is idle`() {
+    fun `packet fly keeps collision resolved movement physical when remote kill is idle`() {
         val collisionResolvedMovement = Vec3(12.0, -3.0, 4.0)
 
         assertEquals(
             collisionResolvedMovement,
             PacketFlyRuntimePolicy.resolvePhysicalMovement(
                 collisionResolvedMovement,
-                spearKillOwnsPacketRoute = false,
+                remoteKillOwnsPacketRoute = false,
             ),
         )
-        assertTrue(PacketFlyRuntimePolicy.shouldPlan(collisionResolvedMovement, spearKillOwnsPacketRoute = false))
+        assertTrue(PacketFlyRuntimePolicy.shouldPlan(collisionResolvedMovement, remoteKillOwnsPacketRoute = false))
     }
 
     @Test

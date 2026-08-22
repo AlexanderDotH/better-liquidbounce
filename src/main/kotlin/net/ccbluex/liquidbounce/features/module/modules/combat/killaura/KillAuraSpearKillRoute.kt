@@ -23,9 +23,53 @@ import net.ccbluex.liquidbounce.utils.aiming.data.Rotation
 import net.minecraft.world.phys.AABB
 import net.minecraft.world.phys.Vec3
 
+/** The remote weapon that already owns the player's hands for this selection tick. */
+internal enum class KillAuraRemoteWeapon {
+    NONE,
+    MACE,
+    SPEAR,
+}
+
 /**
  * Selects an attack route without coupling the arbitration to any module singleton.
+ *
+ * MaceKill requires an already held mainhand mace. Its module/runtime availability is deliberately
+ * insufficient on its own so KillAura can never turn a hotbar candidate into silent weapon intent.
+ * SpearKill's established fallback ordering remains unchanged.
  */
+internal fun selectKillAuraRemoteKillRoute(
+    delegateKillAuraAttacks: Boolean,
+    normalAttackPossible: Boolean,
+    heldRemoteWeapon: KillAuraRemoteWeapon,
+    maceKillAvailable: Boolean,
+    maceKillTargetPossible: Boolean,
+    spearKillAvailable: Boolean,
+    spearKillTargetPossible: Boolean,
+    superHitAvailable: Boolean,
+    superHitTargetPossible: Boolean,
+): KillAuraAttackRoute = when {
+    !delegateKillAuraAttacks -> if (normalAttackPossible) KillAuraAttackRoute.NORMAL else KillAuraAttackRoute.NONE
+    heldRemoteWeapon == KillAuraRemoteWeapon.MACE && maceKillAvailable && maceKillTargetPossible ->
+        KillAuraAttackRoute.MACE_KILL
+    normalAttackPossible -> KillAuraAttackRoute.NORMAL
+    heldRemoteWeapon == KillAuraRemoteWeapon.SPEAR && spearKillAvailable && spearKillTargetPossible ->
+        KillAuraAttackRoute.SPEAR_KILL
+    spearKillAvailable && spearKillTargetPossible -> KillAuraAttackRoute.SPEAR_KILL
+    superHitAvailable && superHitTargetPossible -> KillAuraAttackRoute.SUPER_HIT
+    else -> KillAuraAttackRoute.NONE
+}
+
+/** Resolves the only delegated route that launches synchronously from KillAura. */
+internal fun resolveKillAuraMaceLaunch(
+    selectedRoute: KillAuraAttackRoute,
+    launchMaceKill: () -> Boolean,
+    fallbackRoute: () -> KillAuraAttackRoute,
+): KillAuraAttackRoute {
+    if (selectedRoute != KillAuraAttackRoute.MACE_KILL) return selectedRoute
+    return if (launchMaceKill()) selectedRoute else fallbackRoute()
+}
+
+/** Preserves the SpearKill-only selection contract for existing callers and tests. */
 internal fun selectKillAuraSpearKillRoute(
     delegateKillAuraAttacks: Boolean,
     normalAttackPossible: Boolean,
@@ -33,16 +77,20 @@ internal fun selectKillAuraSpearKillRoute(
     spearKillTargetPossible: Boolean,
     superHitAvailable: Boolean,
     superHitTargetPossible: Boolean,
-): KillAuraAttackRoute = when {
-    normalAttackPossible -> KillAuraAttackRoute.NORMAL
-    !delegateKillAuraAttacks -> KillAuraAttackRoute.NONE
-    spearKillRunning && spearKillTargetPossible -> KillAuraAttackRoute.SPEAR_KILL
-    superHitAvailable && superHitTargetPossible -> KillAuraAttackRoute.SUPER_HIT
-    else -> KillAuraAttackRoute.NONE
-}
+): KillAuraAttackRoute = selectKillAuraRemoteKillRoute(
+    delegateKillAuraAttacks = delegateKillAuraAttacks,
+    normalAttackPossible = normalAttackPossible,
+    heldRemoteWeapon = KillAuraRemoteWeapon.SPEAR,
+    maceKillAvailable = false,
+    maceKillTargetPossible = false,
+    spearKillAvailable = spearKillRunning,
+    spearKillTargetPossible = spearKillTargetPossible,
+    superHitAvailable = superHitAvailable,
+    superHitTargetPossible = superHitTargetPossible,
+)
 
 /**
- * States which KillAura subsystems must stand down while SpearKill owns an attempt.
+ * States which KillAura subsystems must stand down while a remote-kill route owns an attempt.
  */
 internal enum class KillAuraSpearKillSuppressionPolicy(
     val suppressClicker: Boolean,
@@ -50,15 +98,17 @@ internal enum class KillAuraSpearKillSuppressionPolicy(
     val suppressAutoWeapon: Boolean,
 ) {
     ALLOW_KILL_AURA(false, false, false),
+    SUPPRESS_FOR_MACE_KILL(true, true, true),
     SUPPRESS_FOR_SPEAR_KILL(true, true, true),
 }
 
 /**
- * Applies exclusive SpearKill ownership only to the SpearKill route.
+ * Applies exclusive ownership only to remote-kill routes.
  */
-internal fun selectKillAuraSpearKillSuppressionPolicy(
+internal fun selectKillAuraRemoteKillSuppressionPolicy(
     route: KillAuraAttackRoute,
 ): KillAuraSpearKillSuppressionPolicy = when (route) {
+    KillAuraAttackRoute.MACE_KILL -> KillAuraSpearKillSuppressionPolicy.SUPPRESS_FOR_MACE_KILL
     KillAuraAttackRoute.SPEAR_KILL -> KillAuraSpearKillSuppressionPolicy.SUPPRESS_FOR_SPEAR_KILL
     KillAuraAttackRoute.NORMAL,
     KillAuraAttackRoute.SUPER_HIT,
@@ -66,7 +116,29 @@ internal fun selectKillAuraSpearKillSuppressionPolicy(
     -> KillAuraSpearKillSuppressionPolicy.ALLOW_KILL_AURA
 }
 
-/** Keeps every ordinary-melee candidate ahead of distant SpearKill/SuperHit candidates. */
+/** Preserves the existing SpearKill-named compatibility boundary. */
+internal fun selectKillAuraSpearKillSuppressionPolicy(
+    route: KillAuraAttackRoute,
+): KillAuraSpearKillSuppressionPolicy = selectKillAuraRemoteKillSuppressionPolicy(route)
+
+/**
+ * Resolves subsystem ownership without making mere MaceKill target eligibility suppress
+ * AutoWeapon. SpearKill's established precharge reservation remains unchanged.
+ */
+internal fun selectKillAuraSuppressionRoute(
+    maceKillOwnsAttempt: Boolean,
+    maceFightBotReservation: Boolean,
+    spearKillOwnsAttempt: Boolean,
+    spearFightBotReservation: Boolean,
+    distantSpearKillTarget: Boolean,
+): KillAuraAttackRoute = when {
+    maceKillOwnsAttempt || maceFightBotReservation -> KillAuraAttackRoute.MACE_KILL
+    spearKillOwnsAttempt || spearFightBotReservation || distantSpearKillTarget ->
+        KillAuraAttackRoute.SPEAR_KILL
+    else -> KillAuraAttackRoute.NONE
+}
+
+/** Keeps every ordinary-melee candidate ahead of distant remote-kill/SuperHit candidates. */
 internal fun killAuraAttackRoutePriority(
     squaredDistance: Double,
     squaredNormalRange: Double,
@@ -74,9 +146,9 @@ internal fun killAuraAttackRoutePriority(
 
 /** Delegated movement modules own their attack orientation; KillAura must not continuously aim for them. */
 internal fun shouldUseKillAuraAimPipeline(
-    distantSpearKillTarget: Boolean,
+    delegatedRemoteKillTarget: Boolean,
     delegatedSuperHitTarget: Boolean,
-): Boolean = !distantSpearKillTarget && !delegatedSuperHitTarget
+): Boolean = !delegatedRemoteKillTarget && !delegatedSuperHitTarget
 
 /** A cheap, deterministic rotation used only when dispatching a delegated SuperHit attack. */
 internal fun calculateKillAuraDelegatedAttackRotation(eyes: Vec3, targetBox: AABB): Rotation =
@@ -95,3 +167,27 @@ internal fun shouldPrechargeKillAuraSpear(
     trackedTargetUsesSpearKill: Boolean,
 ): Boolean = acquisitionAvailable && targetSelectionEvaluated &&
     (!hasTrackedTarget || trackedTargetUsesSpearKill)
+
+/**
+ * Snapshot used to decide whether SpearKill may ask KillAura to evaluate its candidates again.
+ * An already owned normal/delegated route remains authoritative, and committed SpearKill movement
+ * keeps its immutable target. Only an unevaluated, invalid, or now-unrouteable handoff is refreshed.
+ */
+internal data class KillAuraSpearTargetSelectionSnapshot(
+    val selectionEvaluated: Boolean,
+    val trackedTargetPresent: Boolean,
+    val trackedTargetValid: Boolean,
+    val trackedTargetUsesSpearKill: Boolean,
+    val trackedTargetOwnedByAnotherRoute: Boolean,
+    val spearKillRouteActive: Boolean,
+)
+
+internal val KillAuraSpearTargetSelectionSnapshot.shouldReacquire: Boolean
+    get() = when {
+        spearKillRouteActive -> false
+        !selectionEvaluated -> true
+        !trackedTargetPresent -> false
+        !trackedTargetValid -> true
+        trackedTargetUsesSpearKill || trackedTargetOwnedByAnotherRoute -> false
+        else -> true
+    }

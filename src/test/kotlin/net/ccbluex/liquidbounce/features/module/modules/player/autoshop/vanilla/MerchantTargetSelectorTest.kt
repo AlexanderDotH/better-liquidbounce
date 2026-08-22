@@ -25,6 +25,75 @@ import org.junit.jupiter.api.Test
 class MerchantTargetSelectorTest {
 
     @Test
+    fun `reachable selector stops after the nearest valid merchant`() {
+        val reachChecks = mutableListOf<Int>()
+        val candidates = listOf(
+            candidate(id = 3, distance = 3.0),
+            candidate(id = 1, distance = 1.0),
+            candidate(id = 2, distance = 2.0),
+        )
+
+        val selected = MerchantTargetSelector.selectReachable(
+            candidates,
+            range = 4.5f,
+            canRetry = { true },
+        ) { merchant ->
+            reachChecks += merchant
+            true
+        }
+
+        assertEquals(1, selected?.entityId)
+        assertEquals(listOf(1), reachChecks)
+    }
+
+    @Test
+    fun `reachable selector checks the next merchant only when the nearest is unreachable`() {
+        val reachChecks = mutableListOf<Int>()
+        val candidates = listOf(
+            candidate(id = 1, distance = 1.0),
+            candidate(id = 2, distance = 2.0),
+            candidate(id = 3, distance = 3.0),
+        )
+
+        val selected = MerchantTargetSelector.selectReachable(
+            candidates,
+            range = 4.5f,
+            canRetry = { true },
+        ) { merchant ->
+            reachChecks += merchant
+            merchant != 1
+        }
+
+        assertEquals(2, selected?.entityId)
+        assertEquals(listOf(1, 2), reachChecks)
+    }
+
+    @Test
+    fun `reachable selector never raytraces state range or cooldown rejects`() {
+        val reachChecks = mutableListOf<Int>()
+        val candidates = listOf(
+            candidate(id = 1, distance = 1.0, alive = false),
+            candidate(id = 2, distance = 1.1, adult = false),
+            candidate(id = 3, distance = 1.2, sleeping = true),
+            candidate(id = 4, distance = 4.6),
+            candidate(id = 5, distance = 2.0),
+            candidate(id = 6, distance = 2.5),
+        )
+
+        val selected = MerchantTargetSelector.selectReachable(
+            candidates,
+            range = 4.5f,
+            canRetry = { it != 5 },
+        ) { merchant ->
+            reachChecks += merchant
+            true
+        }
+
+        assertEquals(6, selected?.entityId)
+        assertEquals(listOf(6), reachChecks)
+    }
+
+    @Test
     fun `visible merchant uses normal range while occluded merchant uses wall range`() {
         val candidates = listOf(
             candidate(id = 1, distance = 4.4, visible = true),

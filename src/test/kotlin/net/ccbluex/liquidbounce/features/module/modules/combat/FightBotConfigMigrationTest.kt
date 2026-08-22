@@ -36,6 +36,8 @@ class FightBotConfigMigrationTest {
         assertTrue(fightBot.setting("OpponentRange")["value"].asFloat == 4.5f)
         assertEquals(62f, fightBot.setting("DangerousYaw")["value"].asFloat)
         assertFalse(fightBot.setting("RunawayOnCooldown")["value"].asBoolean)
+        assertEquals("Off", fightBot.setting("MaceAutomation")["value"].asString)
+        assertFalse(fightBot.values().any { it["name"].asString == "SpearAutomation" })
 
         val leader = fightBot.values().single { it["name"].asString == "Leader" }
         assertTrue(leader.setting("Enabled")["value"].asBoolean)
@@ -62,6 +64,7 @@ class FightBotConfigMigrationTest {
 
         val modules = root.getAsJsonArray("value").map { it.asJsonObject }
         assertSame(explicit, modules.single { it["name"].asString == "FightBot" })
+        assertEquals("Off", explicit.setting("MaceAutomation")["value"].asString)
         val killAura = modules.single { it["name"].asString == "KillAura" }
         assertFalse(killAura.values().any { it["name"].asString == "FightBot" })
     }
@@ -85,6 +88,54 @@ class FightBotConfigMigrationTest {
             .single { it["name"].asString == "FightBot" }
         val target = fightBot.values().single { it["name"].asString == "Target" }
         assertEquals("Nearest", target.setting("Mode")["value"].asString)
+    }
+
+    @Test
+    fun `explicit MaceAutomation and SpearAutomation values are preserved`() {
+        val root = JsonParser.parseString(
+            """
+            {
+              "name": "modules",
+              "value": [
+                {
+                  "name": "FightBot",
+                  "value": [
+                    {"name": "MaceAutomation", "value": "HeldOrHotbar"},
+                    {"name": "SpearAutomation", "value": "HeldSpear"}
+                  ]
+                }
+              ]
+            }
+            """.trimIndent(),
+        ).asJsonObject
+
+        migrateLegacyFightBotConfig(root)
+        val firstSerialization = root.deepCopy()
+        migrateLegacyFightBotConfig(root)
+
+        assertEquals(firstSerialization, root)
+        val fightBot = root.getAsJsonArray("value").single().asJsonObject
+        assertEquals("HeldOrHotbar", fightBot.setting("MaceAutomation")["value"].asString)
+        assertEquals("HeldSpear", fightBot.setting("SpearAutomation")["value"].asString)
+    }
+
+    @Test
+    fun `standalone existing FightBot gains disabled MaceAutomation when KillAura is absent`() {
+        val root = JsonParser.parseString(
+            """
+            {
+              "name": "modules",
+              "value": [
+                {"name": "FightBot", "value": [{"name": "OpponentRange", "value": 8.0}]}
+              ]
+            }
+            """.trimIndent(),
+        ).asJsonObject
+
+        migrateLegacyFightBotConfig(root)
+
+        val fightBot = root.getAsJsonArray("value").single().asJsonObject
+        assertEquals("Off", fightBot.setting("MaceAutomation")["value"].asString)
     }
 
     private fun legacyRoot(): JsonObject = JsonParser.parseString(

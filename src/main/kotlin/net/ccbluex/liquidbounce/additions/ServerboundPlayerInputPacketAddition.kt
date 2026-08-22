@@ -27,9 +27,12 @@ import net.minecraft.world.entity.player.Input
 fun resolveServerboundPlayerInputSneak(rawSneak: Boolean, suppressSneak: Boolean, forceSneak: Boolean) =
     (rawSneak && !suppressSneak) || forceSneak
 
+fun resolveServerboundPlayerInputJump(rawJump: Boolean, suppressJump: Boolean) = rawJump && !suppressJump
+
 interface ServerboundPlayerInputPacketAddition {
     var `liquidBounce$forceSneak`: Boolean
     var `liquidBounce$suppressSneak`: Boolean
+    var `liquidBounce$suppressJump`: Boolean
     var `liquidBounce$forceSprint`: Boolean
 
     fun `liquidBounce$getRawInput`(): Input
@@ -52,6 +55,13 @@ inline var ServerboundPlayerInputPacket.suppressSneak: Boolean
     get() = (this as ServerboundPlayerInputPacketAddition).`liquidBounce$suppressSneak`
     set(value) {
         (this as ServerboundPlayerInputPacketAddition).`liquidBounce$suppressSneak` = value
+    }
+
+/** Removes physical jumping from this packet immediately before serialization. */
+inline var ServerboundPlayerInputPacket.suppressJump: Boolean
+    get() = (this as ServerboundPlayerInputPacketAddition).`liquidBounce$suppressJump`
+    set(value) {
+        (this as ServerboundPlayerInputPacketAddition).`liquidBounce$suppressJump` = value
     }
 
 inline var ServerboundPlayerInputPacket.forceSprint: Boolean

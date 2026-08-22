@@ -33,6 +33,12 @@ internal enum class FightBotSpearAutomation(override val tag: String) : Tagged {
     HeldOrHotbar("HeldOrHotbar"),
 }
 
+internal enum class FightBotMaceAutomation(override val tag: String) : Tagged {
+    Off("Off"),
+    HeldMace("HeldMace"),
+    HeldOrHotbar("HeldOrHotbar"),
+}
+
 internal sealed interface FightBotTargetHandoff {
     data object Inactive : FightBotTargetHandoff
     data object Idle : FightBotTargetHandoff
@@ -206,3 +212,83 @@ internal fun shouldStopFightBotSpearUse(
     isSameHand: Boolean,
     isUsingSpear: Boolean,
 ): Boolean = startedUse && isUsingItem && isSameHand && isUsingSpear
+
+internal enum class MaceKillFightBotState {
+    Unavailable,
+    Ready,
+    RouteActive,
+    Rejected,
+}
+
+internal val MaceKillFightBotState.reservesKillAuraSubsystems: Boolean
+    get() = this == MaceKillFightBotState.Ready || this == MaceKillFightBotState.RouteActive
+
+internal val MaceKillFightBotState.retainsRejectedTarget: Boolean
+    get() = this == MaceKillFightBotState.Rejected
+
+internal sealed interface FightBotMaceUseSource {
+    data object MainHand : FightBotMaceUseSource
+    data class Hotbar(val slot: Int) : FightBotMaceUseSource
+}
+
+internal fun selectFightBotMaceUseSource(
+    automation: FightBotMaceAutomation,
+    mainHandMace: Boolean,
+    selectedHotbarSlot: Int,
+    hotbarMaceSlots: Iterable<Int>,
+): FightBotMaceUseSource? {
+    if (automation == FightBotMaceAutomation.Off) return null
+    if (mainHandMace) return FightBotMaceUseSource.MainHand
+    if (automation == FightBotMaceAutomation.HeldMace) return null
+
+    return hotbarMaceSlots.minByOrNull { abs(it - selectedHotbarSlot) }
+        ?.let(FightBotMaceUseSource::Hotbar)
+}
+
+internal enum class FightBotRemoteWeapon {
+    Mace,
+    Spear,
+}
+
+internal fun <T> selectFightBotRouteTarget(maceRouteTarget: T?, spearRouteTarget: T?): T? =
+    maceRouteTarget ?: spearRouteTarget
+
+/** Retains an owned route, then prefers held weapons, with Mace winning only the hotbar tie. */
+internal fun selectFightBotRemoteWeapon(
+    maceSource: FightBotMaceUseSource?,
+    spearSource: FightBotSpearUseSource?,
+    maceRouteActive: Boolean = false,
+    spearRouteActive: Boolean = false,
+): FightBotRemoteWeapon? = when {
+    maceRouteActive -> FightBotRemoteWeapon.Mace
+    spearRouteActive -> FightBotRemoteWeapon.Spear
+    maceSource == FightBotMaceUseSource.MainHand -> FightBotRemoteWeapon.Mace
+    spearSource == FightBotSpearUseSource.MainHand || spearSource == FightBotSpearUseSource.Offhand ->
+        FightBotRemoteWeapon.Spear
+    maceSource is FightBotMaceUseSource.Hotbar -> FightBotRemoteWeapon.Mace
+    spearSource is FightBotSpearUseSource.Hotbar -> FightBotRemoteWeapon.Spear
+    else -> null
+}
+
+internal enum class MaceKillFightBotTerminal {
+    Completion,
+    Rejection,
+    TargetLoss,
+    Disable,
+    Death,
+    Disconnect,
+    WorldChange,
+}
+
+internal data class MaceKillFightBotCleanup(
+    val terminal: MaceKillFightBotTerminal,
+    val resetSilentSlot: Boolean,
+)
+
+internal fun fightBotMaceCleanup(
+    terminal: MaceKillFightBotTerminal,
+    source: FightBotMaceUseSource?,
+) = MaceKillFightBotCleanup(
+    terminal = terminal,
+    resetSilentSlot = source is FightBotMaceUseSource.Hotbar,
+)

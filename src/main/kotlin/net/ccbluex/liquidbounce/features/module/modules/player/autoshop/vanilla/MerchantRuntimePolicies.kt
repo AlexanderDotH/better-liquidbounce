@@ -18,6 +18,8 @@
  */
 package net.ccbluex.liquidbounce.features.module.modules.player.autoshop.vanilla
 
+import net.ccbluex.liquidbounce.features.module.modules.player.autoshop.vanilla.model.MerchantPlanningStep
+
 internal object MerchantAcquisitionPolicy {
     fun canAcquire(
         tick: Int,
@@ -26,7 +28,66 @@ internal object MerchantAcquisitionPolicy {
         inventoryMenuActive: Boolean,
         safeHandAvailable: Boolean,
         hasActiveRule: Boolean,
-    ): Boolean = tick >= suppressedUntilTick && !guiOpen && inventoryMenuActive && safeHandAvailable && hasActiveRule
+        interactionInputActive: Boolean,
+    ): Boolean = tick >= suppressedUntilTick && !guiOpen && inventoryMenuActive && safeHandAvailable &&
+        hasActiveRule && !interactionInputActive
+}
+
+internal object MerchantTradeCadencePolicy {
+    fun shouldWaitForCps(step: MerchantPlanningStep, cpsReady: Boolean): Boolean =
+        step is MerchantPlanningStep.Attempt && !cpsReady
+}
+
+internal class MerchantPlanningStepCache {
+    private var cachedStep: MerchantPlanningStep? = null
+
+    fun getOrPlan(plan: () -> MerchantPlanningStep): MerchantPlanningStep =
+        cachedStep ?: plan().also { cachedStep = it }
+
+    fun invalidate() {
+        cachedStep = null
+    }
+}
+
+internal class MerchantAbandonedOpeningGuard(private val timeoutTicks: Int) {
+    private var expiresAtTick = Int.MIN_VALUE
+
+    fun remember(wasOpening: Boolean, tick: Int) {
+        if (wasOpening) {
+            expiresAtTick = tick + timeoutTicks
+        }
+    }
+
+    fun consumeMerchantScreen(tick: Int): Boolean {
+        if (expiresAtTick == Int.MIN_VALUE || tick >= expiresAtTick) {
+            expiresAtTick = Int.MIN_VALUE
+            return false
+        }
+
+        expiresAtTick = Int.MIN_VALUE
+        return true
+    }
+
+    fun reset() {
+        expiresAtTick = Int.MIN_VALUE
+    }
+}
+
+internal class MerchantTradeFeedbackGate {
+    private var purchaseNotified = false
+
+    fun shouldNotifyPurchase(): Boolean {
+        if (purchaseNotified) {
+            return false
+        }
+
+        purchaseNotified = true
+        return true
+    }
+
+    fun reset() {
+        purchaseNotified = false
+    }
 }
 
 internal object MerchantRotationGate {
@@ -51,6 +112,7 @@ internal enum class MerchantSessionEndCause {
     TIMEOUT,
     UNEXPECTED_GUI,
     TRADE_BLOCKED,
+    USER_INTERACTION,
     SERVER_CLOSE,
     DISABLE_OR_MODE_SWITCH,
     WORLD_CHANGE,

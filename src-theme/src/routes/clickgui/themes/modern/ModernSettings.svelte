@@ -594,15 +594,19 @@
   }
 
   .settings-grid {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    align-items: start;
-    gap: 12px;
+    column-count: 2;
+    column-gap: 12px;
+    column-fill: balance;
   }
 
   .setting-card {
+    break-inside: avoid;
+    display: inline-block;
     min-width: 0;
+    width: 100%;
+    margin-bottom: 12px;
     padding: 8px 13px 11px;
+    vertical-align: top;
     background: rgba(255, 255, 255, 0.022);
     border: 1px solid rgba(255, 255, 255, 0.065);
     border-radius: 10px;
@@ -726,9 +730,12 @@
       left: 10px;
     }
 
-    .theme-options,
-    .settings-grid {
+    .theme-options {
       grid-template-columns: 1fr;
+    }
+
+    .settings-grid {
+      column-count: 1;
     }
   }
 

@@ -46,6 +46,7 @@ import net.ccbluex.liquidbounce.features.command.commands.client.marketplace.Com
 import net.ccbluex.liquidbounce.features.command.commands.deeplearn.CommandModels
 import net.ccbluex.liquidbounce.features.command.commands.ingame.CommandCenter
 import net.ccbluex.liquidbounce.features.command.commands.ingame.CommandCoordinates
+import net.ccbluex.liquidbounce.features.command.commands.ingame.CommandMaceClip
 import net.ccbluex.liquidbounce.features.command.commands.ingame.CommandPing
 import net.ccbluex.liquidbounce.features.command.commands.ingame.CommandRemoteView
 import net.ccbluex.liquidbounce.features.command.commands.ingame.CommandResync
@@ -68,7 +69,6 @@ import net.ccbluex.liquidbounce.features.command.commands.module.CommandSeedCrac
 import net.ccbluex.liquidbounce.features.command.commands.module.CommandXRay
 import net.ccbluex.liquidbounce.features.command.commands.module.teleport.CommandPlayerTeleport
 import net.ccbluex.liquidbounce.features.command.commands.module.teleport.CommandTeleport
-import net.ccbluex.liquidbounce.features.command.commands.module.teleport.CommandVClip
 import net.ccbluex.liquidbounce.features.command.commands.translate.CommandAutoTranslate
 import net.ccbluex.liquidbounce.features.command.commands.translate.CommandTranslate
 import net.ccbluex.liquidbounce.features.misc.HideAppearance
@@ -143,6 +143,7 @@ object CommandManager : Collection<Command> by commandSet {
             CommandPing,
             CommandRemoteView,
             CommandResync,
+            CommandMaceClip,
             CommandSpearHighSpeed,
             CommandXRay,
             CommandBaseFinder,
@@ -163,7 +164,6 @@ object CommandManager : Collection<Command> by commandSet {
             CommandItemEnchant,
             CommandUsername,
             CommandCoordinates,
-            CommandVClip,
             CommandTeleport,
             CommandPlayerTeleport,
             CommandTps,

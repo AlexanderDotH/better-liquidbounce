@@ -28,6 +28,8 @@ import net.ccbluex.liquidbounce.config.types.list.Tagged
 import net.ccbluex.liquidbounce.event.EventManager
 import net.ccbluex.liquidbounce.event.events.AttackEntityEvent
 import net.ccbluex.liquidbounce.features.global.GlobalSettingsTarget
+import net.ccbluex.liquidbounce.features.module.modules.combat.MaceKillAttackHook
+import net.ccbluex.liquidbounce.features.module.modules.combat.MaceKillAttackResult
 import net.ccbluex.liquidbounce.features.module.modules.combat.criticals.ModuleCriticals
 import net.ccbluex.liquidbounce.features.module.modules.render.ModuleFreeCam
 import net.ccbluex.liquidbounce.features.module.modules.render.ModuleFreeLook
@@ -242,6 +244,21 @@ inline fun ClientLevel.getEntitiesBoxInRange(
  */
 @Suppress("CognitiveComplexMethod")
 fun attackEntity(entity: Entity, swing: SwingMode, keepSprint: Boolean = false) {
+    attackEntityWithResult(entity, swing, keepSprint)
+}
+
+/**
+ * Executes [attackEntity] and reports whether its accepted-attack preparation was applied.
+ *
+ * [MaceKillAttackResult.REJECTED] also covers an invalid or cancelled attack, so callers that own
+ * a remote route never mark an attack as committed when no attack packet was sent.
+ */
+@Suppress("CognitiveComplexMethod")
+fun attackEntityWithResult(
+    entity: Entity,
+    swing: SwingMode,
+    keepSprint: Boolean = false,
+): MaceKillAttackResult {
     val itemStack = player.getItemInHand(InteractionHand.MAIN_HAND)
     val piercingWeapon = itemStack.get(DataComponents.PIERCING_WEAPON)
 
@@ -250,21 +267,25 @@ fun attackEntity(entity: Entity, swing: SwingMode, keepSprint: Boolean = false) 
     if (piercingWeapon != null && !interaction.isSpectator) {
         interaction.piercingAttack(piercingWeapon)
         swing.swing(InteractionHand.MAIN_HAND)
-        return
+        return MaceKillAttackResult.NOT_APPLIED
     }
 
     if (!entity.canBeAttackedWithVanillaPacket()
         || EventManager.callEvent(AttackEntityEvent(entity, keepSprint)).isCancelled) {
-        return
+        return MaceKillAttackResult.REJECTED
     }
 
-    with(player) {
+    return with(player) {
         // Swing before attacking (on 1.8)
         if (isOlderThanOrEqual1_8) {
             swing.swing(InteractionHand.MAIN_HAND)
         }
 
         interaction.ensureHasSentCarriedItem()
+        val acceptedAttackResult = MaceKillAttackHook.commit(this, entity)
+        if (!acceptedAttackResult.allowsAttack) {
+            return@with acceptedAttackResult
+        }
         network.send(ServerboundAttackPacket(entity.id))
 
         if (keepSprint) {
@@ -308,5 +329,7 @@ fun attackEntity(entity: Entity, swing: SwingMode, keepSprint: Boolean = false) 
         if (!isOlderThanOrEqual1_8) {
             swing.swing(InteractionHand.MAIN_HAND)
         }
+
+        acceptedAttackResult
     }
 }

@@ -46,6 +46,9 @@ public abstract class MixinServerboundPlayerInputPacket implements ServerboundPl
     private boolean liquidBounce$suppressSneak = false;
 
     @Unique
+    private boolean liquidBounce$suppressJump = false;
+
+    @Unique
     private boolean liquidBounce$forceSprint = false;
 
     @Override
@@ -69,6 +72,16 @@ public abstract class MixinServerboundPlayerInputPacket implements ServerboundPl
     }
 
     @Override
+    public void setLiquidBounce$suppressJump(boolean b) {
+        this.liquidBounce$suppressJump = b;
+    }
+
+    @Override
+    public boolean getLiquidBounce$suppressJump() {
+        return this.liquidBounce$suppressJump;
+    }
+
+    @Override
     public void setLiquidBounce$forceSprint(boolean b) {
         this.liquidBounce$forceSprint = b;
     }
@@ -84,6 +97,10 @@ public abstract class MixinServerboundPlayerInputPacket implements ServerboundPl
 
     @ModifyReturnValue(method = "input", at = @At("RETURN"))
     private Input applyForcedInput(Input original) {
+        boolean jump = ServerboundPlayerInputPacketAdditionKt.resolveServerboundPlayerInputJump(
+            original.jump(),
+            this.liquidBounce$suppressJump
+        );
         boolean shift = ServerboundPlayerInputPacketAdditionKt.resolveServerboundPlayerInputSneak(
             original.shift(),
             this.liquidBounce$suppressSneak,
@@ -91,13 +108,13 @@ public abstract class MixinServerboundPlayerInputPacket implements ServerboundPl
         );
         boolean sprint = original.sprint() || this.liquidBounce$forceSprint;
 
-        if (shift != original.shift() || sprint != original.sprint()) {
+        if (jump != original.jump() || shift != original.shift() || sprint != original.sprint()) {
             return new Input(
                 original.forward(),
                 original.backward(),
                 original.left(),
                 original.right(),
-                original.jump(),
+                jump,
                 shift,
                 sprint
             );

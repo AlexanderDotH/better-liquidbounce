@@ -25,15 +25,19 @@ test("HUD motion preference is shared and releases its media-query listener", ()
     assert.match(motion, /reducedMotion \? 0/);
 });
 
-test("ArrayList has an explicit default-Classic presentation and finite adaptive motion", () => {
+test("ArrayList has stable sorted insertion and finite horizontal motion", () => {
     const arrayList = read("elements/ArrayList.svelte");
+    const arrayListModel = read("elements/arrayListModel.ts");
 
-    assert.match(arrayList, /export let variant:\s*"classic" \| "modern" = "classic"/);
+    assert.match(arrayList, /export let variant:\s*ArrayListVariant = "classic"/);
     assert.doesNotMatch(arrayList, /hudThemeSession/);
     assert.match(arrayList, /hudMotionDuration\(variant,\s*\$prefersReducedMotion\)/);
-    assert.match(arrayList, /animate:flip=\{\{ duration: motionDuration \}\}/);
+    assert.doesNotMatch(arrayList, /animate:flip/);
+    assert.doesNotMatch(arrayList, /from "svelte\/animate"/);
     assert.match(arrayList, /transition:fly=\{\{ x: motionOffset, duration: motionDuration \}\}/);
-    assert.match(arrayList, /motionOffset = variant === "modern" \? 18 : 50/);
+    assert.match(arrayList, /motionOffset = getArrayListMotionOffset\(variant,\s*cSettings\.itemAlignment\)/);
+    assert.match(arrayListModel, /const magnitude = variant === "modern" \? 18 : 50/);
+    assert.match(arrayListModel, /itemAlignment === "Left" \? -magnitude : magnitude/);
     assert.match(arrayList, /variant !== previousVariant/);
 });
 

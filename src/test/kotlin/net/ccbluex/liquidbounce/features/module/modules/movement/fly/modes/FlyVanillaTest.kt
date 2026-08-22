@@ -107,7 +107,7 @@ class FlyVanillaTest {
             VanillaFlyNoFall.shouldRun(
                 enabled = false,
                 fallDamagePossible = true,
-                spearKillPacketRouteActive = false,
+                remoteKillPacketRouteActive = false,
             )
         )
     }
@@ -118,25 +118,25 @@ class FlyVanillaTest {
             VanillaFlyNoFall.shouldRun(
                 enabled = true,
                 fallDamagePossible = true,
-                spearKillPacketRouteActive = false,
+                remoteKillPacketRouteActive = false,
             )
         )
         assertFalse(
             VanillaFlyNoFall.shouldRun(
                 enabled = true,
                 fallDamagePossible = false,
-                spearKillPacketRouteActive = false,
+                remoteKillPacketRouteActive = false,
             )
         )
     }
 
     @Test
-    fun `spear kill packet route retains exclusive fall protection ownership`() {
+    fun `remote kill packet route retains exclusive fall protection ownership`() {
         assertFalse(
             VanillaFlyNoFall.shouldRun(
                 enabled = true,
                 fallDamagePossible = true,
-                spearKillPacketRouteActive = true,
+                remoteKillPacketRouteActive = true,
             )
         )
     }

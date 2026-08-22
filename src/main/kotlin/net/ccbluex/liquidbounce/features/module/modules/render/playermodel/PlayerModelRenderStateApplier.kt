@@ -136,8 +136,7 @@ object PlayerModelRenderStateApplier {
             snapshot.previousWalkAnimationSpeed,
             snapshot.walkAnimationSpeed,
         )
-        val sprintScale = if (snapshot.input.sprint()) 1.25f else 1f
-        state.walkAnimationSpeed = (speed * sprintScale).coerceAtMost(1f)
+        state.walkAnimationSpeed = speed
         state.walkAnimationPos = snapshot.walkAnimationPosition -
             snapshot.walkAnimationSpeed * (1f - partialTicks)
     }

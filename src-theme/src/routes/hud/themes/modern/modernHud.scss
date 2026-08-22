@@ -75,6 +75,10 @@
     background-color var(--modern-hud-motion) var(--modern-hud-easing);
 }
 
+.hud-theme--modern :global([data-component="ArrayList"] .module.has-visible-tag) {
+  padding-right: 5px;
+}
+
 .hud-theme--modern :global([data-component="ArrayList"] .tag) {
   display: inline-flex;
   align-items: center;

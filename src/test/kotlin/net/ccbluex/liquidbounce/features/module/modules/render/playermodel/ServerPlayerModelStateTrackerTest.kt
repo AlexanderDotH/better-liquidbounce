@@ -19,6 +19,7 @@
 
 package net.ccbluex.liquidbounce.features.module.modules.render.playermodel
 
+import net.ccbluex.liquidbounce.test.MinecraftBootstrap
 import net.ccbluex.liquidbounce.test.assertVec3Equals
 import net.minecraft.core.BlockPos
 import net.minecraft.core.Direction
@@ -39,6 +40,12 @@ import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 
 class ServerPlayerModelStateTrackerTest {
+
+    companion object {
+        init {
+            MinecraftBootstrap.ensureInitialized()
+        }
+    }
 
     @AfterEach
     fun resetTracker() {
@@ -94,43 +101,7 @@ class ServerPlayerModelStateTrackerTest {
     }
 
     @Test
-    fun `render snapshot settles the final landing after a tick without position`() {
-        ServerPlayerModelStateTracker.onGameTick()
-        ServerPlayerModelStateTracker.onPacketSent(
-            ServerboundMovePlayerPacket.PosRot(0.0, 64.0, 0.0, 0f, 0f, true, false),
-            nowNanos = 1L,
-        )
-        ServerPlayerModelStateTracker.onGameTick()
-        ServerPlayerModelStateTracker.onPacketSent(
-            ServerboundMovePlayerPacket.Pos(0.0, 64.42, 0.0, false, false),
-            nowNanos = 50_000_001L,
-        )
-        ServerPlayerModelStateTracker.onGameTick()
-        ServerPlayerModelStateTracker.onPacketSent(
-            ServerboundMovePlayerPacket.Pos(0.0, 64.0, 0.0, true, false),
-            nowNanos = 100_000_001L,
-        )
-
-        val landing = ServerPlayerModelStateTracker.snapshotForRender(
-            nowNanos = 100_000_002L,
-            swingDurationTicks = 6,
-        )
-        assertVec3Equals(Vec3(0.0, 64.42, 0.0), landing.previousPosition!!, 0.0)
-
-        ServerPlayerModelStateTracker.onGameTick()
-        val settled = ServerPlayerModelStateTracker.snapshotForRender(
-            nowNanos = 150_000_002L,
-            swingDurationTicks = 6,
-        )
-
-        assertVec3Equals(Vec3(0.0, 64.0, 0.0), settled.previousPosition!!, 0.0)
-        assertVec3Equals(Vec3(0.0, 64.0, 0.0), settled.position!!, 0.0)
-        assertEquals(0f, settled.previousWalkAnimationSpeed)
-        assertEquals(0f, settled.walkAnimationSpeed)
-    }
-
-    @Test
-    fun `movement resumes from the settled idle position and walk state`() {
+    fun `walk animation accelerates once per tick with vanilla smoothing`() {
         ServerPlayerModelStateTracker.onGameTick()
         ServerPlayerModelStateTracker.onPacketSent(
             ServerboundMovePlayerPacket.PosRot(0.0, 64.0, 0.0, 0f, 0f, true, false),
@@ -141,27 +112,137 @@ class ServerPlayerModelStateTrackerTest {
             ServerboundMovePlayerPacket.Pos(0.2, 64.0, 0.0, true, false),
             nowNanos = 50_000_001L,
         )
-        assertTrue(ServerPlayerModelStateTracker.snapshot.walkAnimationSpeed > 0f)
 
-        ServerPlayerModelStateTracker.onGameTick()
-        val settled = ServerPlayerModelStateTracker.snapshotForRender(
-            nowNanos = 100_000_002L,
-            swingDurationTicks = 6,
-        )
-        assertEquals(0f, settled.previousWalkAnimationSpeed)
-        assertEquals(0f, settled.walkAnimationSpeed)
+        val firstMovementTick = ServerPlayerModelStateTracker.snapshot
+        assertEquals(0f, firstMovementTick.previousWalkAnimationSpeed, 0.0001f)
+        assertEquals(0.32f, firstMovementTick.walkAnimationSpeed, 0.0001f)
+        assertEquals(0.32f, firstMovementTick.walkAnimationPosition, 0.0001f)
 
         ServerPlayerModelStateTracker.onGameTick()
         ServerPlayerModelStateTracker.onPacketSent(
-            ServerboundMovePlayerPacket.Pos(0.35, 64.0, 0.0, true, false),
-            nowNanos = 150_000_001L,
+            ServerboundMovePlayerPacket.Pos(0.4, 64.0, 0.0, true, false),
+            nowNanos = 100_000_001L,
+        )
+
+        val secondMovementTick = ServerPlayerModelStateTracker.snapshot
+        assertEquals(0.32f, secondMovementTick.previousWalkAnimationSpeed, 0.0001f)
+        assertEquals(0.512f, secondMovementTick.walkAnimationSpeed, 0.0001f)
+        assertEquals(0.832f, secondMovementTick.walkAnimationPosition, 0.0001f)
+    }
+
+    @Test
+    fun `render snapshot settles landing position while walk animation decays`() {
+        ServerPlayerModelStateTracker.onGameTick()
+        ServerPlayerModelStateTracker.onPacketSent(
+            ServerboundMovePlayerPacket.PosRot(0.0, 64.0, 0.0, 0f, 0f, true, false),
+            nowNanos = 1L,
+        )
+        ServerPlayerModelStateTracker.onGameTick()
+        ServerPlayerModelStateTracker.onPacketSent(
+            ServerboundMovePlayerPacket.Pos(0.2, 64.42, 0.0, false, false),
+            nowNanos = 50_000_001L,
+        )
+        ServerPlayerModelStateTracker.onGameTick()
+        ServerPlayerModelStateTracker.onPacketSent(
+            ServerboundMovePlayerPacket.Pos(0.4, 64.0, 0.0, true, false),
+            nowNanos = 100_000_001L,
+        )
+
+        val landing = ServerPlayerModelStateTracker.snapshotForRender(
+            nowNanos = 100_000_002L,
+            swingDurationTicks = 6,
+        )
+        assertVec3Equals(Vec3(0.2, 64.42, 0.0), landing.previousPosition!!, 0.0)
+        assertEquals(0.512f, landing.walkAnimationSpeed, 0.0001f)
+        assertEquals(0.832f, landing.walkAnimationPosition, 0.0001f)
+
+        ServerPlayerModelStateTracker.onGameTick()
+        val settled = ServerPlayerModelStateTracker.snapshotForRender(
+            nowNanos = 150_000_002L,
+            swingDurationTicks = 6,
+        )
+
+        assertVec3Equals(Vec3(0.4, 64.0, 0.0), settled.previousPosition!!, 0.0)
+        assertVec3Equals(Vec3(0.4, 64.0, 0.0), settled.position!!, 0.0)
+        assertEquals(0.512f, settled.previousWalkAnimationSpeed, 0.0001f)
+        assertEquals(0.3072f, settled.walkAnimationSpeed, 0.0001f)
+        assertEquals(1.1392f, settled.walkAnimationPosition, 0.0001f)
+
+        ServerPlayerModelStateTracker.onGameTick()
+        val secondIdleTick = ServerPlayerModelStateTracker.snapshotForRender(
+            nowNanos = 200_000_002L,
+            swingDurationTicks = 6,
+        )
+        assertEquals(0.3072f, secondIdleTick.previousWalkAnimationSpeed, 0.0001f)
+        assertEquals(0.18432f, secondIdleTick.walkAnimationSpeed, 0.0001f)
+        assertEquals(1.32352f, secondIdleTick.walkAnimationPosition, 0.0001f)
+    }
+
+    @Test
+    fun `movement resumes after idle without resetting walk phase`() {
+        ServerPlayerModelStateTracker.onGameTick()
+        ServerPlayerModelStateTracker.onPacketSent(
+            ServerboundMovePlayerPacket.PosRot(0.0, 64.0, 0.0, 0f, 0f, true, false),
+            nowNanos = 1L,
+        )
+        ServerPlayerModelStateTracker.onGameTick()
+        ServerPlayerModelStateTracker.onPacketSent(
+            ServerboundMovePlayerPacket.Pos(0.2, 64.0, 0.0, true, false),
+            nowNanos = 50_000_001L,
+        )
+        assertEquals(0.32f, ServerPlayerModelStateTracker.snapshot.walkAnimationSpeed, 0.0001f)
+
+        ServerPlayerModelStateTracker.onGameTick()
+        val firstIdleTick = ServerPlayerModelStateTracker.snapshotForRender(
+            nowNanos = 100_000_002L,
+            swingDurationTicks = 6,
+        )
+        assertEquals(0.192f, firstIdleTick.walkAnimationSpeed, 0.0001f)
+        assertEquals(0.512f, firstIdleTick.walkAnimationPosition, 0.0001f)
+
+        ServerPlayerModelStateTracker.onGameTick()
+        val secondIdleTick = ServerPlayerModelStateTracker.snapshotForRender(
+            nowNanos = 150_000_002L,
+            swingDurationTicks = 6,
+        )
+        assertEquals(0.1152f, secondIdleTick.walkAnimationSpeed, 0.0001f)
+        assertEquals(0.6272f, secondIdleTick.walkAnimationPosition, 0.0001f)
+
+        ServerPlayerModelStateTracker.onGameTick()
+        ServerPlayerModelStateTracker.onPacketSent(
+            ServerboundMovePlayerPacket.Pos(0.4, 64.0, 0.0, true, false),
+            nowNanos = 200_000_001L,
         )
 
         val resumed = ServerPlayerModelStateTracker.snapshot
         assertVec3Equals(Vec3(0.2, 64.0, 0.0), resumed.previousPosition!!, 0.0)
-        assertVec3Equals(Vec3(0.35, 64.0, 0.0), resumed.position!!, 0.0)
-        assertEquals(0f, resumed.previousWalkAnimationSpeed)
-        assertTrue(resumed.walkAnimationSpeed > 0f)
+        assertVec3Equals(Vec3(0.4, 64.0, 0.0), resumed.position!!, 0.0)
+        assertEquals(0.1152f, resumed.previousWalkAnimationSpeed, 0.0001f)
+        assertEquals(0.38912f, resumed.walkAnimationSpeed, 0.0001f)
+        assertEquals(1.01632f, resumed.walkAnimationPosition, 0.0001f)
+    }
+
+    @Test
+    fun `multiple position packets in one tick advance walk animation once`() {
+        ServerPlayerModelStateTracker.onGameTick()
+        ServerPlayerModelStateTracker.onPacketSent(
+            ServerboundMovePlayerPacket.PosRot(0.0, 64.0, 0.0, 0f, 0f, true, false),
+            nowNanos = 1L,
+        )
+        ServerPlayerModelStateTracker.onGameTick()
+        ServerPlayerModelStateTracker.onPacketSent(
+            ServerboundMovePlayerPacket.Pos(0.1, 64.0, 0.0, true, false),
+            nowNanos = 50_000_001L,
+        )
+        ServerPlayerModelStateTracker.onPacketSent(
+            ServerboundMovePlayerPacket.Pos(0.2, 64.0, 0.0, true, false),
+            nowNanos = 50_000_002L,
+        )
+
+        val snapshot = ServerPlayerModelStateTracker.snapshot
+        assertEquals(0f, snapshot.previousWalkAnimationSpeed, 0.0001f)
+        assertEquals(0.32f, snapshot.walkAnimationSpeed, 0.0001f)
+        assertEquals(0.32f, snapshot.walkAnimationPosition, 0.0001f)
     }
 
     @Test
@@ -177,20 +258,47 @@ class ServerPlayerModelStateTrackerTest {
     }
 
     @Test
-    fun `correction replaces position and rotation without interpolation`() {
+    fun `correction and reset clear interpolation and tick local walk animation`() {
+        ServerPlayerModelStateTracker.onGameTick()
         ServerPlayerModelStateTracker.onPacketSent(
             ServerboundMovePlayerPacket.PosRot(1.0, 2.0, 3.0, 40f, 10f, true, false),
             nowNanos = 1L,
         )
+        ServerPlayerModelStateTracker.onGameTick()
+        ServerPlayerModelStateTracker.onPacketSent(
+            ServerboundMovePlayerPacket.Pos(1.1, 2.0, 3.0, true, false),
+            nowNanos = 50_000_001L,
+        )
+        ServerPlayerModelStateTracker.onPacketSent(
+            ServerboundMovePlayerPacket.Pos(1.2, 2.0, 3.0, true, false),
+            nowNanos = 50_000_002L,
+        )
+        val phaseBeforeCorrection = ServerPlayerModelStateTracker.snapshot.walkAnimationPosition
+        assertEquals(0.32f, phaseBeforeCorrection, 0.0001f)
 
-        ServerPlayerModelStateTracker.correct(Vec3(20.0, 30.0, 40.0), 170f, -25f, nowNanos = 2L)
+        ServerPlayerModelStateTracker.correct(Vec3(20.0, 30.0, 40.0), 170f, -25f, nowNanos = 50_000_003L)
 
-        val snapshot = ServerPlayerModelStateTracker.snapshot
-        assertEquals(snapshot.position, snapshot.previousPosition)
-        assertEquals(snapshot.rotation, snapshot.previousRotation)
-        assertVec3Equals(Vec3(20.0, 30.0, 40.0), snapshot.position!!, 0.0)
-        assertEquals(170f, snapshot.rotation!!.yRot)
-        assertEquals(0f, snapshot.walkAnimationSpeed)
+        val corrected = ServerPlayerModelStateTracker.snapshot
+        assertEquals(corrected.position, corrected.previousPosition)
+        assertEquals(corrected.rotation, corrected.previousRotation)
+        assertVec3Equals(Vec3(20.0, 30.0, 40.0), corrected.position!!, 0.0)
+        assertEquals(170f, corrected.rotation!!.yRot)
+        assertEquals(0f, corrected.previousWalkAnimationSpeed, 0.0001f)
+        assertEquals(0f, corrected.walkAnimationSpeed, 0.0001f)
+        assertEquals(phaseBeforeCorrection, corrected.walkAnimationPosition, 0.0001f)
+
+        ServerPlayerModelStateTracker.onPacketSent(
+            ServerboundMovePlayerPacket.Pos(20.1, 30.0, 40.0, true, false),
+            nowNanos = 50_000_004L,
+        )
+
+        val afterCorrection = ServerPlayerModelStateTracker.snapshot
+        assertEquals(0f, afterCorrection.previousWalkAnimationSpeed, 0.0001f)
+        assertEquals(0.16f, afterCorrection.walkAnimationSpeed, 0.0001f)
+        assertEquals(0.48f, afterCorrection.walkAnimationPosition, 0.0001f)
+
+        ServerPlayerModelStateTracker.reset()
+        assertEquals(ServerPlayerModelSnapshot.EMPTY, ServerPlayerModelStateTracker.snapshot)
     }
 
     @Test
@@ -236,6 +344,33 @@ class ServerPlayerModelStateTrackerTest {
         ServerPlayerModelStateTracker.onPacketSent(ServerboundSetCarriedItemPacket(7), nowNanos = 2L)
 
         assertNull(ServerPlayerModelStateTracker.snapshot.activeUseHand)
+    }
+
+    @Test
+    fun `repeated block breaking packets restart swing only after vanilla half duration`() {
+        ServerPlayerModelStateTracker.onPacketSent(
+            ServerboundSwingPacket(InteractionHand.MAIN_HAND),
+            nowNanos = 1L,
+        )
+        ServerPlayerModelStateTracker.snapshotForRender(nowNanos = 1L, swingDurationTicks = 6)
+
+        ServerPlayerModelStateTracker.onPacketSent(
+            ServerboundSwingPacket(InteractionHand.MAIN_HAND),
+            nowNanos = 50_000_001L,
+        )
+        assertEquals(1L, ServerPlayerModelStateTracker.snapshot.swingStartedAtNanos)
+
+        ServerPlayerModelStateTracker.onPacketSent(
+            ServerboundSwingPacket(InteractionHand.MAIN_HAND),
+            nowNanos = 100_000_001L,
+        )
+        assertEquals(1L, ServerPlayerModelStateTracker.snapshot.swingStartedAtNanos)
+
+        ServerPlayerModelStateTracker.onPacketSent(
+            ServerboundSwingPacket(InteractionHand.MAIN_HAND),
+            nowNanos = 150_000_001L,
+        )
+        assertEquals(150_000_001L, ServerPlayerModelStateTracker.snapshot.swingStartedAtNanos)
     }
 
     @Test

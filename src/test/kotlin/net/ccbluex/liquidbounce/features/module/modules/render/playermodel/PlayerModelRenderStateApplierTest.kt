@@ -64,19 +64,25 @@ class PlayerModelRenderStateApplierTest {
     }
 
     @Test
-    fun `movement uses current transmitted speed for vanilla walk phase`() {
-        val state = AvatarRenderState()
-        val snapshot = ServerPlayerModelSnapshot(
-            input = Input(false, false, false, false, false, false, true),
+    fun `movement interpolates vanilla walk speed and phase independently of sprint input`() {
+        val walkingState = AvatarRenderState()
+        val sprintingState = AvatarRenderState()
+        val walkingSnapshot = ServerPlayerModelSnapshot(
             previousWalkAnimationSpeed = 0.2f,
             walkAnimationSpeed = 0.6f,
             walkAnimationPosition = 5f,
         )
+        val sprintingSnapshot = walkingSnapshot.copy(
+            input = Input(false, false, false, false, false, false, true),
+        )
 
-        PlayerModelRenderStateApplier.applyMovement(state, snapshot, partialTicks = 0.5f)
+        PlayerModelRenderStateApplier.applyMovement(walkingState, walkingSnapshot, partialTicks = 0.5f)
+        PlayerModelRenderStateApplier.applyMovement(sprintingState, sprintingSnapshot, partialTicks = 0.5f)
 
-        assertEquals(0.5f, state.walkAnimationSpeed, 0.0001f)
-        assertEquals(4.7f, state.walkAnimationPos, 0.0001f)
+        assertEquals(0.4f, walkingState.walkAnimationSpeed, 0.0001f)
+        assertEquals(4.7f, walkingState.walkAnimationPos, 0.0001f)
+        assertEquals(walkingState.walkAnimationSpeed, sprintingState.walkAnimationSpeed, 0.0001f)
+        assertEquals(walkingState.walkAnimationPos, sprintingState.walkAnimationPos, 0.0001f)
     }
 
     @Test

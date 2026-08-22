@@ -18,11 +18,50 @@
  */
 package net.ccbluex.liquidbounce.features.module.modules.player.autoshop.vanilla
 
+import net.ccbluex.liquidbounce.features.module.modules.player.autoshop.vanilla.model.MerchantPlanningStep
+import net.ccbluex.liquidbounce.features.module.modules.player.autoshop.vanilla.model.MerchantRoundRobinPass
+import net.ccbluex.liquidbounce.features.module.modules.player.autoshop.vanilla.model.MerchantTradeAttempt
+import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
+import org.junit.jupiter.api.Assertions.assertSame
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 
 class MerchantRuntimePolicyTest {
+
+    @Test
+    fun `planning step is computed once while waiting for cps`() {
+        val cache = MerchantPlanningStepCache()
+        val expected = MerchantPlanningStep.PassComplete(anySuccess = false)
+        var planningCalls = 0
+
+        repeat(5) {
+            val actual = cache.getOrPlan {
+                planningCalls++
+                expected
+            }
+
+            assertSame(expected, actual)
+        }
+
+        assertEquals(1, planningCalls)
+    }
+
+    @Test
+    fun `invalidating planning step recomputes current merchant state`() {
+        val cache = MerchantPlanningStepCache()
+        var planningCalls = 0
+        val plan = {
+            planningCalls++
+            MerchantPlanningStep.PassComplete(anySuccess = false)
+        }
+
+        cache.getOrPlan(plan)
+        cache.invalidate()
+        cache.getOrPlan(plan)
+
+        assertEquals(2, planningCalls)
+    }
 
     @Test
     fun `acquisition requires a clear gui and the normal inventory menu`() {
@@ -33,6 +72,7 @@ class MerchantRuntimePolicyTest {
             inventoryMenuActive: Boolean = true,
             safeHandAvailable: Boolean = true,
             hasActiveRule: Boolean = true,
+            interactionInputActive: Boolean = false,
         ) = MerchantAcquisitionPolicy.canAcquire(
             tick,
             suppressedUntilTick,
@@ -40,6 +80,7 @@ class MerchantRuntimePolicyTest {
             inventoryMenuActive,
             safeHandAvailable,
             hasActiveRule,
+            interactionInputActive,
         )
 
         assertTrue(canAcquire())
@@ -48,6 +89,51 @@ class MerchantRuntimePolicyTest {
         assertFalse(canAcquire(inventoryMenuActive = false))
         assertFalse(canAcquire(safeHandAvailable = false))
         assertFalse(canAcquire(hasActiveRule = false))
+        assertFalse(canAcquire(interactionInputActive = true))
+    }
+
+    @Test
+    fun `pass completion never waits for another cps action`() {
+        val attempt = MerchantPlanningStep.Attempt(
+            MerchantTradeAttempt(ruleIndex = 0, offerIndex = 0),
+            MerchantRoundRobinPass.start(ruleCount = 1),
+        )
+        val complete = MerchantPlanningStep.PassComplete(anySuccess = false)
+
+        assertTrue(MerchantTradeCadencePolicy.shouldWaitForCps(attempt, cpsReady = false))
+        assertFalse(MerchantTradeCadencePolicy.shouldWaitForCps(attempt, cpsReady = true))
+        assertFalse(MerchantTradeCadencePolicy.shouldWaitForCps(complete, cpsReady = false))
+    }
+
+    @Test
+    fun `only an abandoned automatic opening hides the next merchant screen`() {
+        val guard = MerchantAbandonedOpeningGuard(timeoutTicks = 20)
+
+        guard.remember(wasOpening = false, tick = 100)
+        assertFalse(guard.consumeMerchantScreen(tick = 101))
+
+        guard.remember(wasOpening = true, tick = 100)
+        assertTrue(guard.consumeMerchantScreen(tick = 119))
+        assertFalse(guard.consumeMerchantScreen(tick = 119))
+    }
+
+    @Test
+    fun `abandoned automatic opening expires after its server response timeout`() {
+        val guard = MerchantAbandonedOpeningGuard(timeoutTicks = 20)
+        guard.remember(wasOpening = true, tick = 100)
+
+        assertFalse(guard.consumeMerchantScreen(tick = 120))
+    }
+
+    @Test
+    fun `purchase notification is emitted once per merchant session`() {
+        val gate = MerchantTradeFeedbackGate()
+
+        assertTrue(gate.shouldNotifyPurchase())
+        assertFalse(gate.shouldNotifyPurchase())
+
+        gate.reset()
+        assertTrue(gate.shouldNotifyPurchase())
     }
 
     @Test
@@ -81,6 +167,7 @@ class MerchantRuntimePolicyTest {
             MerchantSessionEndCause.TIMEOUT,
             MerchantSessionEndCause.UNEXPECTED_GUI,
             MerchantSessionEndCause.TRADE_BLOCKED,
+            MerchantSessionEndCause.USER_INTERACTION,
         ).forEach { cause ->
             val decision = MerchantCleanupPolicy.forCause(cause)
             assertTrue(decision.closeOwnedMenu)

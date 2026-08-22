@@ -40,7 +40,7 @@ import net.ccbluex.liquidbounce.event.handler
 import net.ccbluex.liquidbounce.event.sequenceHandler
 import net.ccbluex.liquidbounce.event.tickHandler
 import net.ccbluex.liquidbounce.event.waitTicks
-import net.ccbluex.liquidbounce.features.module.modules.combat.ModuleSpearKill
+import net.ccbluex.liquidbounce.features.module.modules.combat.RemoteKillMovementOwnership
 import net.ccbluex.liquidbounce.features.module.modules.movement.fly.ModuleFly
 import net.ccbluex.liquidbounce.features.module.modules.player.nofall.modes.GroundPacketDeliveryTracker
 import net.ccbluex.liquidbounce.features.module.modules.player.nofall.modes.outgoingMovementPacket
@@ -126,8 +126,8 @@ internal object VanillaFlyNoFall {
     fun shouldRun(
         enabled: Boolean,
         fallDamagePossible: Boolean,
-        spearKillPacketRouteActive: Boolean,
-    ) = enabled && fallDamagePossible && !spearKillPacketRouteActive
+        remoteKillPacketRouteActive: Boolean,
+    ) = enabled && fallDamagePossible && !remoteKillPacketRouteActive
 
     fun shouldSendGroundPacket(
         fallDistance: Double,
@@ -394,7 +394,7 @@ internal abstract class VanillaFlyMode(
             enabled = noFall,
             fallDamagePossible = !player.isCreative && !player.isSpectator &&
                 !player.abilities.invulnerable && !player.abilities.flying,
-            spearKillPacketRouteActive = ModuleSpearKill.usesPacketMovement,
+            remoteKillPacketRouteActive = RemoteKillMovementOwnership.active,
         )
 
     private fun isNoFallGroundNearby(): Boolean {

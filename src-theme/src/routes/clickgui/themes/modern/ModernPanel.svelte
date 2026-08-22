@@ -56,7 +56,13 @@
     }: Props = $props();
 
     const storageKey = $derived(modernPanelStateKey(category));
-    let panelState = $state<ModernPanelState>(loadPanelState());
+    const loadedPanelState = loadPanelState();
+    const initialViewport = readLogicalViewport();
+    let panelState = $state<ModernPanelState>(loadedPanelState);
+    let viewport = $state<LogicalViewport>(initialViewport);
+    let visiblePanelPosition = $state<ModernPanelPosition>(
+        clampModernPanelPosition(loadedPanelState, initialViewport),
+    );
     let modulesElement: HTMLElement;
     let dragCaptureTarget: HTMLElement | null = null;
     let activePointerId: number | null = null;
@@ -70,17 +76,15 @@
     let observedResetVersion: number | null = null;
     let moving = $state(false);
     let resetting = $state(false);
-    let viewport = $state<LogicalViewport>(readLogicalViewport());
     let maximumModulesHeight = $derived(Math.max(
         0,
         viewport.height
-        - panelState.top
+        - visiblePanelPosition.top
         - MODERN_PANEL_HEADER_HEIGHT
         - MODERN_PANEL_CANVAS_PADDING,
     ));
 
     updateMaximumZIndex();
-    clampPanelPosition();
 
     $effect(() => {
         const currentScaleFactor = $scaleFactor;
@@ -184,6 +188,7 @@
 
         resetting = true;
         panelState = {...nextInitialState};
+        syncVisiblePanelPosition();
         updateMaximumZIndex();
         resetAnimationTimeout = window.setTimeout(() => {
             resetAnimationTimeout = null;
@@ -225,8 +230,8 @@
 
         activePointerId = event.pointerId;
         dragOffset = {
-            left: logicalPointer.left - panelState.left,
-            top: logicalPointer.top - panelState.top,
+            left: logicalPointer.left - visiblePanelPosition.left,
+            top: logicalPointer.top - visiblePanelPosition.top,
         };
         dragCaptureTarget = event.currentTarget as HTMLElement;
         dragCaptureTarget.setPointerCapture(event.pointerId);
@@ -348,25 +353,21 @@
 
     function handleWindowResize(): void {
         viewport = readLogicalViewport();
-        const previousLeft = panelState.left;
-        const previousTop = panelState.top;
-        clampPanelPosition();
-
-        if (previousLeft !== panelState.left || previousTop !== panelState.top) {
-            savePanelState();
-        }
+        syncVisiblePanelPosition();
     }
 
-    function clampPanelPosition(): void {
-        setPanelPosition(clampModernPanelPosition(
+    function syncVisiblePanelPosition(): void {
+        visiblePanelPosition = clampModernPanelPosition(
             panelState,
             viewport,
-        ));
+        );
     }
 
     function setPanelPosition(position: ModernPanelPosition): void {
         panelState.left = position.left;
         panelState.top = position.top;
+        visiblePanelPosition.left = position.left;
+        visiblePanelPosition.top = position.top;
     }
 
     function toLogicalPosition(clientX: number, clientY: number): ModernPanelPosition {
@@ -409,8 +410,8 @@
         class:resetting
         class:expanded={panelState.expanded}
         aria-label="{category} modules"
-        style:left="{panelState.left}px"
-        style:top="{panelState.top}px"
+        style:left="{visiblePanelPosition.left}px"
+        style:top="{visiblePanelPosition.top}px"
         style:z-index={panelState.zIndex}
         style:--modern-panel-width="{MODERN_PANEL_WIDTH}px"
         style:--modern-panel-header-height="{MODERN_PANEL_HEADER_HEIGHT}px"

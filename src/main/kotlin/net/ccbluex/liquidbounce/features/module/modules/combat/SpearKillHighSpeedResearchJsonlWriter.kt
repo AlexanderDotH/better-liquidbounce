@@ -37,6 +37,11 @@ internal class SpearKillHighSpeedResearchJsonlWriter private constructor(
 
     @Synchronized
     fun write(entry: SpearKillHighSpeedResearchEntry) {
+        writeJson(entry)
+    }
+
+    @Synchronized
+    internal fun writeJson(entry: Any) {
         if (closed) {
             return
         }

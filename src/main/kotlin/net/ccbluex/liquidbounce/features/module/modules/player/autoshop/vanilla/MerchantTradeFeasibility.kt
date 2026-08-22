@@ -22,33 +22,50 @@ import net.minecraft.world.item.ItemStack
 import net.minecraft.world.item.trading.ItemCost
 import net.minecraft.world.item.trading.MerchantOffer
 
+internal enum class MerchantTradeFeasibilityResult {
+    EXECUTABLE,
+    UNAVAILABLE,
+    INSUFFICIENT_RESOURCES,
+    OUTPUT_FULL,
+}
+
 internal object MerchantTradeFeasibility {
 
     fun canExecute(
         offer: MerchantOffer,
         inventory: List<ItemStack>,
         paymentStacks: List<ItemStack> = emptyList(),
-    ): Boolean {
+    ): Boolean = evaluate(offer, inventory, paymentStacks) == MerchantTradeFeasibilityResult.EXECUTABLE
+
+    fun evaluate(
+        offer: MerchantOffer,
+        inventory: List<ItemStack>,
+        paymentStacks: List<ItemStack> = emptyList(),
+    ): MerchantTradeFeasibilityResult {
         if (offer.isOutOfStock || offer.result.isEmpty) {
-            return false
+            return MerchantTradeFeasibilityResult.UNAVAILABLE
         }
 
         val remaining = inventory.mapTo(ArrayList(inventory.size), ItemStack::copy)
         if (paymentStacks.any { !remaining.insert(it.copy()) }) {
-            return false
+            return MerchantTradeFeasibilityResult.OUTPUT_FULL
         }
 
         val reservedPaymentSources = BooleanArray(remaining.size)
         if (remaining.pullPayment(offer.itemCostA, reservedPaymentSources).count < offer.costA.count) {
-            return false
+            return MerchantTradeFeasibilityResult.INSUFFICIENT_RESOURCES
         }
 
         val costB = offer.itemCostB.orElse(null)
         if (costB != null && remaining.pullPayment(costB, reservedPaymentSources).count < costB.count()) {
-            return false
+            return MerchantTradeFeasibilityResult.INSUFFICIENT_RESOURCES
         }
 
-        return remaining.capacityFor(offer.result) >= offer.result.count
+        return if (remaining.capacityFor(offer.result) >= offer.result.count) {
+            MerchantTradeFeasibilityResult.EXECUTABLE
+        } else {
+            MerchantTradeFeasibilityResult.OUTPUT_FULL
+        }
     }
 
     private fun MutableList<ItemStack>.insert(source: ItemStack): Boolean {

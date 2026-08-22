@@ -23,6 +23,7 @@ import net.ccbluex.liquidbounce.config.types.group.ModeValueGroup
 import net.ccbluex.liquidbounce.config.types.list.Tagged
 import net.ccbluex.liquidbounce.event.events.AttackEntityEvent
 import net.ccbluex.liquidbounce.event.handler
+import net.ccbluex.liquidbounce.features.module.modules.combat.RemoteKillMovementOwnership
 import net.ccbluex.liquidbounce.features.module.modules.combat.criticals.ModuleCriticals
 import net.ccbluex.liquidbounce.features.module.modules.combat.criticals.ModuleCriticals.VisualsValueGroup.showCriticals
 import net.ccbluex.liquidbounce.features.module.modules.combat.criticals.ModuleCriticals.canDoCriticalHit
@@ -43,7 +44,7 @@ object CriticalsPacket : Mode("Packet") {
 
     @Suppress("unused")
     private val attackHandler = handler<AttackEntityEvent> { event ->
-        if (event.entity !is LivingEntity) {
+        if (!shouldRunPacketCriticals(RemoteKillMovementOwnership.active) || event.entity !is LivingEntity) {
             return@handler
         }
 
@@ -125,3 +126,7 @@ object CriticalsPacket : Mode("Packet") {
         BLOCKSMC("BlocksMC"),
     }
 }
+
+/** Remote-kill movement already owns the exact pre-attack packet sequence. */
+internal fun shouldRunPacketCriticals(remoteKillOwnsMovement: Boolean): Boolean =
+    !remoteKillOwnsMovement

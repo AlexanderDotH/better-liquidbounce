@@ -74,12 +74,14 @@
   }
 
   .text {
+    max-width: 300px;
     font-size: 12px;
     padding: 10px;
     color: var(--clickgui-text-color);
+    white-space: normal;
+    overflow-wrap: anywhere;
 
     &.extended {
-      max-width: 300px;
       white-space: pre-wrap;
     }
   }

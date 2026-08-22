@@ -16,9 +16,11 @@
  * You should have received a copy of the GNU General Public License
  * along with LiquidBounce. If not, see <https://www.gnu.org/licenses/>.
  */
+@file:Suppress("TooManyFunctions")
 
 package net.ccbluex.liquidbounce.features.module.modules.combat
 
+import net.minecraft.world.entity.LivingEntity
 import net.minecraft.world.phys.Vec3
 
 internal const val SPEAR_KILL_INSTANT_DEFAULT_MAX_PACKETS = 128
@@ -26,6 +28,22 @@ internal const val SPEAR_KILL_INSTANT_MIN_MAX_PACKETS = 2
 internal const val SPEAR_KILL_INSTANT_MAX_MAX_PACKETS = 512
 internal const val SPEAR_KILL_INSTANT_SERVER_EVALUATION_TICKS = SPEAR_KILL_PACKET_STRIKE_HOLD_TICKS
 internal const val SPEAR_KILL_INSTANT_DAMAGE_SAMPLE_TICKS = 1
+
+internal enum class SpearKillInstantRejectedStepAction {
+    TERMINATE_OUTBOUND,
+    REPLAN_RETURN,
+    PAUSE,
+}
+
+/** A rejected inverse step must leave the stale route immediately instead of holding it airborne. */
+internal fun resolveSpearKillInstantRejectedStepAction(
+    outboundStep: Boolean,
+    recovering: Boolean,
+): SpearKillInstantRejectedStepAction = when {
+    !outboundStep -> SpearKillInstantRejectedStepAction.REPLAN_RETURN
+    !recovering -> SpearKillInstantRejectedStepAction.TERMINATE_OUTBOUND
+    else -> SpearKillInstantRejectedStepAction.PAUSE
+}
 
 /** Instant owns the wire-level ground bit; other routes retain collision-derived ground state. */
 internal fun resolveSpearKillOwnedPacketGrounded(
@@ -242,17 +260,41 @@ internal fun calculateSpearKillPrimedInstantMovementBudget(
 internal fun startSpearKillInstantPacketSession(
     session: SpearKillPacketBootSession,
     burst: SpearKillInstantPacketBurst,
+    origin: Vec3 = Vec3.ZERO,
 ) {
-    session.start(
-        path = burst.sessionPath,
-        outboundSteps = burst.outboundSteps,
+    session.start(remoteSpearKillInstantRouteRequest(origin, burst))
+}
+
+/** Launches Instant through the shared target and lifecycle ownership coordinator. */
+internal fun startSpearKillInstantPacketSession(
+    engine: RemoteKillRouteEngine<LivingEntity>,
+    target: LivingEntity,
+    origin: Vec3,
+    burst: SpearKillInstantPacketBurst,
+) {
+    engine.start(target, remoteSpearKillInstantRouteRequest(origin, burst))
+}
+
+private fun remoteSpearKillInstantRouteRequest(
+    origin: Vec3,
+    burst: SpearKillInstantPacketBurst,
+): RemoteKillRouteRequest {
+    val outboundMovements = burst.sessionPath.take(burst.outboundSteps)
+    return RemoteKillRouteRequest(
+        origin = origin,
+        outboundMovements = outboundMovements,
         strikeHoldTicks = SPEAR_KILL_INSTANT_SERVER_EVALUATION_TICKS,
         stepWaitTicks = 0,
+        physicalReturn = false,
         preStrikeHoldTicks = 0,
         terminalSuffixSteps = 1,
         terminalBurstSteps = 0,
         requireTerminalAuthorization = false,
-    )
+    ).also {
+        require(it.roundTripMovements == burst.sessionPath) {
+            "Instant SpearKill must retain its exact inverse return"
+        }
+    }
 }
 
 private fun Vec3.hasFiniteInstantCoordinates(): Boolean = x.isFinite() && y.isFinite() && z.isFinite()

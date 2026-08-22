@@ -31,10 +31,10 @@ import com.mojang.blaze3d.vertex.VertexFormat
 import net.ccbluex.liquidbounce.LiquidBounce
 import net.ccbluex.liquidbounce.render.engine.type.Color4b
 import net.ccbluex.liquidbounce.utils.client.gpuDevice
+import net.minecraft.client.renderer.DynamicUniforms
 import net.minecraft.client.renderer.texture.AbstractTexture
 import org.joml.Matrix4f
 import org.joml.Vector3f
-import org.joml.Vector4f
 import org.joml.Vector4fc
 import java.util.Optional
 import java.util.OptionalDouble
@@ -108,9 +108,24 @@ fun RenderPass.bindAndDraw(
     )
 }
 
-private val COLOR_MODULATOR = Vector4f(1f)
 private val VECTOR3F_0 = Vector3f()
 private val TEXTURE_MATRIX = Matrix4f()
+
+/**
+ * Minecraft keeps the last [DynamicUniforms.Transform] for value-based GPU-slice reuse.
+ * Every component therefore has to be a stable snapshot instead of a shared mutable scratch value.
+ */
+internal fun snapshotDynamicTransform(
+    modelView: Matrix4f,
+    colorModulator: Color4b = Color4b.WHITE,
+    modelOffset: Vector3f = VECTOR3F_0,
+    textureMatrix: Matrix4f = TEXTURE_MATRIX,
+) = DynamicUniforms.Transform(
+    Matrix4f(modelView),
+    colorModulator.toVector4f(),
+    Vector3f(modelOffset),
+    Matrix4f(textureMatrix),
+)
 
 @JvmOverloads
 fun getDynamicTransformsUniform(
@@ -118,13 +133,12 @@ fun getDynamicTransformsUniform(
     colorModulator: Color4b = Color4b.WHITE,
     modelOffset: Vector3f? = null,
 ): GpuBufferSlice {
-    val slice = RenderSystem.getDynamicUniforms()
-        .writeTransform(
-            modelView ?: RenderSystem.getModelViewMatrixCopy(),
-            colorModulator.toVector4f(COLOR_MODULATOR),
-            modelOffset ?: VECTOR3F_0,
-            TEXTURE_MATRIX,
-        )
+    val transform = snapshotDynamicTransform(
+        modelView ?: RenderSystem.getModelViewMatrixCopy(),
+        colorModulator,
+        modelOffset ?: VECTOR3F_0,
+    )
+    val slice = RenderSystem.getDynamicUniforms().writeTransform(transform)
 
     return slice
 }

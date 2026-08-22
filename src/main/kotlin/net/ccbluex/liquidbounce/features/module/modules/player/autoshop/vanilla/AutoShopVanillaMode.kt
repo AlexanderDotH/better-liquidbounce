@@ -22,6 +22,7 @@ import net.ccbluex.liquidbounce.config.types.group.Mode
 import net.ccbluex.liquidbounce.config.types.group.ModeValueGroup
 import net.ccbluex.liquidbounce.event.events.DisconnectEvent
 import net.ccbluex.liquidbounce.event.events.GameTickEvent
+import net.ccbluex.liquidbounce.event.events.NotificationEvent
 import net.ccbluex.liquidbounce.event.events.PacketEvent
 import net.ccbluex.liquidbounce.event.events.RotationUpdateEvent
 import net.ccbluex.liquidbounce.event.events.ScreenEvent
@@ -29,12 +30,13 @@ import net.ccbluex.liquidbounce.event.events.TransferOrigin
 import net.ccbluex.liquidbounce.event.events.WorldChangeEvent
 import net.ccbluex.liquidbounce.event.handler
 import net.ccbluex.liquidbounce.features.module.modules.player.autoshop.ModuleAutoShop
+import net.ccbluex.liquidbounce.features.module.modules.player.autoshop.vanilla.model.MerchantOfferMatcher
 import net.ccbluex.liquidbounce.features.module.modules.player.autoshop.vanilla.model.MerchantPlanningStep
-import net.ccbluex.liquidbounce.features.module.modules.player.autoshop.vanilla.model.MerchantReach
 import net.ccbluex.liquidbounce.features.module.modules.player.autoshop.vanilla.model.MerchantReachValue
 import net.ccbluex.liquidbounce.features.module.modules.player.autoshop.vanilla.model.MerchantRoundRobinPass
 import net.ccbluex.liquidbounce.features.module.modules.player.autoshop.vanilla.model.MerchantRoundRobinPlanner
 import net.ccbluex.liquidbounce.features.module.modules.player.autoshop.vanilla.model.MerchantTradeFiltersValue
+import net.ccbluex.liquidbounce.features.module.modules.player.autoshop.vanilla.model.MerchantTradeRule
 import net.ccbluex.liquidbounce.utils.aiming.PostRotationExecutor
 import net.ccbluex.liquidbounce.utils.aiming.RotationManager
 import net.ccbluex.liquidbounce.utils.aiming.RotationsValueGroup
@@ -42,19 +44,25 @@ import net.ccbluex.liquidbounce.utils.aiming.data.RotationWithVector
 import net.ccbluex.liquidbounce.utils.aiming.utils.raytraceBox
 import net.ccbluex.liquidbounce.utils.block.SwingMode
 import net.ccbluex.liquidbounce.utils.client.RestrictedSingleUseAction
+import net.ccbluex.liquidbounce.utils.client.notification
 import net.ccbluex.liquidbounce.utils.entity.interactEntity
+import net.ccbluex.liquidbounce.utils.input.InputTracker.isPressedOnAny
 import net.ccbluex.liquidbounce.utils.kotlin.EventPriorityConvention.FIRST_PRIORITY
 import net.ccbluex.liquidbounce.utils.kotlin.Priority
 import net.minecraft.client.gui.screens.inventory.MerchantScreen
 import net.minecraft.network.protocol.game.ClientboundContainerClosePacket
+import net.minecraft.network.protocol.game.ClientboundMerchantOffersPacket
 import net.minecraft.network.protocol.game.ClientboundOpenScreenPacket
 import net.minecraft.network.protocol.game.ServerboundInteractPacket
 import net.minecraft.network.protocol.game.ServerboundSelectTradePacket
+import net.minecraft.network.protocol.game.ServerboundUseItemOnPacket
+import net.minecraft.network.protocol.game.ServerboundUseItemPacket
 import net.minecraft.world.InteractionHand
 import net.minecraft.world.inventory.ContainerInput
 import net.minecraft.world.inventory.MenuType
 import net.minecraft.world.inventory.MerchantMenu
 import net.minecraft.world.entity.npc.villager.AbstractVillager
+import net.minecraft.world.item.ItemStack
 import net.minecraft.world.item.trading.MerchantOffer
 import net.minecraft.world.item.Items
 import net.minecraft.world.item.SpawnEggItem
@@ -70,6 +78,11 @@ object AutoShopVanillaMode : Mode("Vanilla") {
 
     private val session = MerchantSessionCoordinator()
     private val cpsGate = MerchantCpsGate()
+    private val abandonedOpeningGuard = MerchantAbandonedOpeningGuard(
+        MerchantSessionCoordinator.DEFAULT_TIMEOUT_TICKS,
+    )
+    private val feedbackGate = MerchantTradeFeedbackGate()
+    private val planningStepCache = MerchantPlanningStepCache()
 
     private var roundRobinPass: MerchantRoundRobinPass? = null
     private var ownedMenu: MerchantMenu? = null
@@ -83,23 +96,32 @@ object AutoShopVanillaMode : Mode("Vanilla") {
     private val rotationHandler = handler<RotationUpdateEvent> {
         val localPlayer = mc.player ?: return@handler
         val currentTick = localPlayer.tickCount
+        if (yieldToUserInteraction(currentTick)) {
+            return@handler
+        }
+
         val target = when (val current = session.state) {
             MerchantSessionState.Idle -> acquireTarget(currentTick)
             is MerchantSessionState.Rotating -> merchant(current.targetId)
             else -> null
         } ?: return@handler
 
-        if (!isEligible(target, reach.get())) {
+        val spot = eligibleRotationSpot(target)
+        if (spot == null) {
             finishSession(MerchantSessionEndCause.TARGET_LOST, currentTick)
             return@handler
         }
 
-        requestInteractionRotation(target)
+        requestInteractionRotation(target, spot)
     }
 
     @Suppress("unused")
     private val gameTickHandler = handler<GameTickEvent> {
         val localPlayer = mc.player ?: return@handler
+        if (yieldToUserInteraction(localPlayer.tickCount)) {
+            return@handler
+        }
+
         val current = session.state
         if (current === MerchantSessionState.Idle) {
             return@handler
@@ -123,6 +145,11 @@ object AutoShopVanillaMode : Mode("Vanilla") {
     @Suppress("unused")
     private val screenHandler = handler<ScreenEvent>(priority = FIRST_PRIORITY) { event ->
         val screen = event.screen
+        if (screen is MerchantScreen && discardAbandonedMerchantScreen(screen)) {
+            event.cancelEvent()
+            return@handler
+        }
+
         if (screen is MerchantScreen && claimOwnedScreen(screen)) {
             event.cancelEvent()
             return@handler
@@ -137,7 +164,10 @@ object AutoShopVanillaMode : Mode("Vanilla") {
     private val packetHandler = handler<PacketEvent>(priority = FIRST_PRIORITY) { event ->
         when (val packet = event.packet) {
             is ServerboundInteractPacket -> handleInteractionPacket(event.origin, packet)
+            is ServerboundUseItemOnPacket,
+            is ServerboundUseItemPacket -> handleUserInteractionPacket(event.origin)
             is ClientboundOpenScreenPacket -> handleOpenScreenPacket(event.origin, packet)
+            is ClientboundMerchantOffersPacket -> handleMerchantOffersPacket(event.origin, packet)
             is ClientboundContainerClosePacket -> handleServerClose(event.origin, packet)
         }
     }
@@ -165,6 +195,7 @@ object AutoShopVanillaMode : Mode("Vanilla") {
             inventoryMenuActive = localPlayer.containerMenu === localPlayer.inventoryMenu,
             safeHandAvailable = safeInteractionHand() != null,
             hasActiveRule = tradeFilters.get().any { it.isActive },
+            interactionInputActive = interactionInputActive(),
         )
         if (!canAcquire) {
             return null
@@ -172,46 +203,38 @@ object AutoShopVanillaMode : Mode("Vanilla") {
 
         val level = mc.level ?: return null
         val reachSetting = reach.get()
-        val candidates = level.entitiesForRendering().mapNotNull { entity ->
-            val merchant = entity as? AbstractVillager ?: return@mapNotNull null
-            val visible = raytraceBox(
-                eyes = localPlayer.eyePosition,
-                box = merchant.boundingBox,
-                range = reachSetting.range.toDouble(),
-                wallsRange = 0.0,
-            ) != null
-            val eligible = raytraceBox(
-                eyes = localPlayer.eyePosition,
-                box = merchant.boundingBox,
-                range = reachSetting.range.toDouble(),
-                wallsRange = reachSetting.wallRange.toDouble(),
-            ) != null
-            if (!eligible) {
-                return@mapNotNull null
-            }
-
+        val candidates = level.getEntitiesOfClass(
+            AbstractVillager::class.java,
+            localPlayer.boundingBox.inflate(reachSetting.range.toDouble()),
+        ).map { merchant ->
             MerchantTargetCandidate(
                 entity = merchant,
                 entityId = merchant.id,
                 boxedDistance = sqrt(merchant.boundingBox.distanceToSqr(localPlayer.eyePosition)),
-                visible = visible,
+                visible = false,
                 alive = merchant.isAlive && !merchant.isRemoved,
                 adult = !merchant.isBaby,
                 sleeping = merchant.isSleeping,
             )
         }
 
-        val selected = MerchantTargetSelector.select(
+        val selected = MerchantTargetSelector.selectReachable(
             candidates,
             reachSetting.range,
-            reachSetting.wallRange,
-        ) { session.canRetry(it, tick) } ?: return null
+            canRetry = { session.canRetry(it, tick) },
+        ) { merchant ->
+            raytraceBox(
+                eyes = localPlayer.eyePosition,
+                box = merchant.boundingBox,
+                range = reachSetting.range.toDouble(),
+                wallsRange = reachSetting.wallRange.toDouble(),
+            ) != null
+        } ?: return null
 
         return selected.entity.takeIf { session.tryLock(selected.entityId, tick) }
     }
 
-    private fun requestInteractionRotation(target: AbstractVillager) {
-        val spot = rotationSpot(target) ?: return
+    private fun requestInteractionRotation(target: AbstractVillager, spot: RotationWithVector) {
         val targetId = target.id
         val whenReached = RestrictedSingleUseAction(
             { canOpenAfterRotation(targetId) },
@@ -231,6 +254,10 @@ object AutoShopVanillaMode : Mode("Vanilla") {
     }
 
     private fun canOpenAfterRotation(targetId: Int): Boolean {
+        if (interactionInputActive()) {
+            return false
+        }
+
         val target = merchant(targetId) ?: return false
         val spot = rotationSpot(target) ?: return false
         val angleDifference = RotationManager.serverRotation.directionAngleTo(spot.rotation)
@@ -245,14 +272,18 @@ object AutoShopVanillaMode : Mode("Vanilla") {
 
     private fun openMerchant(targetId: Int) {
         val localPlayer = mc.player ?: return
+        if (yieldToUserInteraction(localPlayer.tickCount)) {
+            return
+        }
+
         val target = merchant(targetId)
             ?: return finishSession(MerchantSessionEndCause.TARGET_LOST, localPlayer.tickCount)
-        if (mc.gui.screen() != null || !isEligible(target, reach.get())) {
+        val spot = eligibleRotationSpot(target)
+        if (mc.gui.screen() != null || spot == null) {
             finishSession(MerchantSessionEndCause.TARGET_LOST, localPlayer.tickCount)
             return
         }
 
-        val spot = rotationSpot(target) ?: return
         if (RotationManager.serverRotation.directionAngleTo(spot.rotation) > AIM_THRESHOLD) {
             return
         }
@@ -282,7 +313,7 @@ object AutoShopVanillaMode : Mode("Vanilla") {
     }
 
     private fun handleInteractionPacket(origin: TransferOrigin, packet: ServerboundInteractPacket) {
-        if (origin != TransferOrigin.OUTGOING || session.state !is MerchantSessionState.Opening) {
+        if (origin != TransferOrigin.OUTGOING) {
             return
         }
 
@@ -290,7 +321,13 @@ object AutoShopVanillaMode : Mode("Vanilla") {
             return
         }
 
-        abortPendingForUserInteraction()
+        prioritizeUserInteraction()
+    }
+
+    private fun handleUserInteractionPacket(origin: TransferOrigin) {
+        if (origin == TransferOrigin.OUTGOING) {
+            prioritizeUserInteraction()
+        }
     }
 
     private fun handleOpenScreenPacket(origin: TransferOrigin, packet: ClientboundOpenScreenPacket) {
@@ -307,7 +344,7 @@ object AutoShopVanillaMode : Mode("Vanilla") {
             if (packet.type == MenuType.MERCHANT) {
                 session.expectMerchantContainer(packet.containerId, tick)
             } else {
-                abortPendingForUserInteraction()
+                prioritizeUserInteraction(tick)
             }
         }
     }
@@ -324,10 +361,55 @@ object AutoShopVanillaMode : Mode("Vanilla") {
         }
     }
 
-    private fun abortPendingForUserInteraction() {
-        val tick = mc.player?.tickCount ?: 0
-        suppressAcquisitionUntilTick = tick + MerchantSessionCoordinator.DEFAULT_TIMEOUT_TICKS
-        finishSession(MerchantSessionEndCause.TRADE_BLOCKED, tick)
+    private fun handleMerchantOffersPacket(origin: TransferOrigin, packet: ClientboundMerchantOffersPacket) {
+        if (origin != TransferOrigin.INCOMING) {
+            return
+        }
+
+        mc.execute {
+            if (session.isOwnedContainer(packet.containerId)) {
+                planningStepCache.invalidate()
+            }
+        }
+    }
+
+    private fun prioritizeUserInteraction(tick: Int = mc.player?.tickCount ?: 0) {
+        val wasOpening = session.state is MerchantSessionState.Opening
+        abandonedOpeningGuard.remember(wasOpening, tick)
+        val graceTicks = if (wasOpening) {
+            MerchantSessionCoordinator.DEFAULT_TIMEOUT_TICKS
+        } else {
+            USER_INTERACTION_GRACE_TICKS
+        }
+        suppressAcquisitionUntilTick = maxOf(suppressAcquisitionUntilTick, tick + graceTicks)
+        if (session.state !== MerchantSessionState.Idle) {
+            finishSession(MerchantSessionEndCause.USER_INTERACTION, tick)
+        }
+    }
+
+    private fun yieldToUserInteraction(tick: Int): Boolean {
+        if (!interactionInputActive()) {
+            return false
+        }
+
+        prioritizeUserInteraction(tick)
+        return true
+    }
+
+    private fun interactionInputActive(): Boolean =
+        mc.options.keyUse.isPressedOnAny ||
+            mc.options.keyAttack.isPressedOnAny ||
+            mc.options.keyPickItem.isPressedOnAny
+
+    private fun discardAbandonedMerchantScreen(screen: MerchantScreen): Boolean {
+        val localPlayer = mc.player ?: return false
+        if (localPlayer.containerMenu !== screen.menu ||
+            !abandonedOpeningGuard.consumeMerchantScreen(localPlayer.tickCount)) {
+            return false
+        }
+
+        localPlayer.closeContainer()
+        return true
     }
 
     private fun claimOwnedScreen(screen: MerchantScreen): Boolean {
@@ -352,6 +434,7 @@ object AutoShopVanillaMode : Mode("Vanilla") {
         if (session.markOffersReady(menu.containerId, tick)) {
             roundRobinPass = MerchantRoundRobinPass.start(tradeFilters.get().size)
             cpsGate.reset()
+            planningStepCache.invalidate()
         }
     }
 
@@ -365,15 +448,27 @@ object AutoShopVanillaMode : Mode("Vanilla") {
         }
 
         val pass = roundRobinPass ?: MerchantRoundRobinPass.start(rules.size).also { roundRobinPass = it }
-        if (!cpsGate.canAttempt(tick)) {
+        val step = planningStepCache.getOrPlan {
+            MerchantRoundRobinPlanner.next(pass, rules, menu.offers) { canExecute(menu, it) }
+        }
+        if (MerchantTradeCadencePolicy.shouldWaitForCps(step, cpsGate.canAttempt(tick))) {
             return
         }
+        planningStepCache.invalidate()
 
-        when (val step = MerchantRoundRobinPlanner.next(pass, rules, menu.offers) { canExecute(menu, it) }) {
+        when (step) {
             is MerchantPlanningStep.Attempt -> {
+                if (!isCurrentAttemptExecutable(menu, rules, step)) {
+                    return
+                }
+
+                val output = menu.offers.getOrNull(step.trade.offerIndex)?.result?.copy()
                 val successful = executeSingleTrade(menu, step.trade.offerIndex)
                 roundRobinPass = step.recordOutcome(successful)
                 cpsGate.recordAttempt(tick, cps)
+                if (successful && output != null) {
+                    notifyPurchase(output)
+                }
                 if (!menu.carried.isEmpty) {
                     finishSession(MerchantSessionEndCause.TRADE_BLOCKED, tick)
                 }
@@ -382,10 +477,21 @@ object AutoShopVanillaMode : Mode("Vanilla") {
                 if (step.anySuccess) {
                     roundRobinPass = MerchantRoundRobinPass.start(rules.size)
                 } else {
+                    notifyInsufficientResources(menu, rules)
                     finishSession(MerchantSessionEndCause.TRADE_BLOCKED, tick)
                 }
             }
         }
+    }
+
+    private fun isCurrentAttemptExecutable(
+        menu: MerchantMenu,
+        rules: List<MerchantTradeRule>,
+        step: MerchantPlanningStep.Attempt,
+    ): Boolean {
+        val rule = rules.getOrNull(step.trade.ruleIndex) ?: return false
+        val offer = menu.offers.getOrNull(step.trade.offerIndex) ?: return false
+        return MerchantOfferMatcher.matches(rule, offer) && canExecute(menu, offer)
     }
 
     private fun canExecute(menu: MerchantMenu, offer: MerchantOffer): Boolean {
@@ -398,6 +504,44 @@ object AutoShopVanillaMode : Mode("Vanilla") {
         val payments = menu.slots.subList(PAYMENT_START, PAYMENT_END)
             .map { it.item }
         return MerchantTradeFeasibility.canExecute(offer, inventory, payments)
+    }
+
+    private fun notifyPurchase(result: ItemStack) {
+        if (!feedbackGate.shouldNotifyPurchase()) {
+            return
+        }
+
+        notification(
+            title = "AutoShop",
+            message = "Bought ${result.count} × ${result.hoverName.string}",
+            severity = NotificationEvent.Severity.SUCCESS,
+        )
+    }
+
+    private fun notifyInsufficientResources(
+        menu: MerchantMenu,
+        rules: List<MerchantTradeRule>,
+    ) {
+        val inventory = menu.slots.subList(PLAYER_INVENTORY_START, PLAYER_INVENTORY_END).map { it.item }
+        val payments = menu.slots.subList(PAYMENT_START, PAYMENT_END).map { it.item }
+        val cannotPay = rules.any { rule ->
+            menu.offers.any { offer ->
+                MerchantOfferMatcher.matches(rule, offer) && MerchantTradeFeasibility.evaluate(
+                    offer,
+                    inventory,
+                    payments,
+                ) == MerchantTradeFeasibilityResult.INSUFFICIENT_RESOURCES
+            }
+        }
+        if (!cannotPay) {
+            return
+        }
+
+        notification(
+            title = "AutoShop",
+            message = "Not enough resources to pay for the configured trade",
+            severity = NotificationEvent.Severity.ERROR,
+        )
     }
 
     private fun executeSingleTrade(menu: MerchantMenu, offerIndex: Int): Boolean {
@@ -439,21 +583,15 @@ object AutoShopVanillaMode : Mode("Vanilla") {
 
     private fun lockedTargetIsValid(): Boolean {
         val target = session.targetId?.let(::merchant) ?: return false
-        return isEligible(target, reach.get())
+        return eligibleRotationSpot(target) != null
     }
 
-    private fun isEligible(target: AbstractVillager, reach: MerchantReach): Boolean {
-        val localPlayer = mc.player ?: return false
+    private fun eligibleRotationSpot(target: AbstractVillager): RotationWithVector? {
         if (!target.isAlive || target.isRemoved || target.isBaby || target.isSleeping) {
-            return false
+            return null
         }
 
-        return raytraceBox(
-            eyes = localPlayer.eyePosition,
-            box = target.boundingBox,
-            range = reach.range.toDouble(),
-            wallsRange = reach.wallRange.toDouble(),
-        ) != null
+        return rotationSpot(target)
     }
 
     private fun rotationSpot(target: AbstractVillager): RotationWithVector? {
@@ -496,13 +634,16 @@ object AutoShopVanillaMode : Mode("Vanilla") {
         val menuToClose = ownedMenu
         ownedMenu = null
         roundRobinPass = null
+        planningStepCache.invalidate()
         cpsGate.reset()
+        feedbackGate.reset()
         sendingOwnedInteraction = false
 
         if (decision.rememberRetry) {
             session.finish(tick)
         } else {
             session.resetAll()
+            abandonedOpeningGuard.reset()
             suppressAcquisitionUntilTick = Int.MIN_VALUE
         }
 
@@ -513,6 +654,7 @@ object AutoShopVanillaMode : Mode("Vanilla") {
     }
 
     private const val AIM_THRESHOLD = 2f
+    private const val USER_INTERACTION_GRACE_TICKS = 2
     private const val PAYMENT_START = 0
     private const val PAYMENT_END = 2
     private const val RESULT_SLOT = 2

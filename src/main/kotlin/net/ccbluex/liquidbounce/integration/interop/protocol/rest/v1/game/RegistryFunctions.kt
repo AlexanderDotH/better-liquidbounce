@@ -44,6 +44,7 @@ import net.minecraft.core.DefaultedRegistry
 import net.minecraft.core.Registry
 import net.minecraft.core.registries.BuiltInRegistries
 import net.minecraft.core.registries.Registries
+import net.minecraft.network.chat.Component
 import net.minecraft.network.protocol.PacketFlow
 import net.minecraft.resources.Identifier
 import net.minecraft.tags.TagKey
@@ -199,6 +200,16 @@ private inline fun <T : Any> Registry<T>.buildOutput(
 @JvmRecord
 private data class RegistryItemOutput(val name: String, val icon: String?)
 
+internal fun localizedItemRegistryName(
+    identifier: Identifier,
+    translationKey: String?,
+    translate: (String) -> String = { Component.translatable(it).string },
+): String {
+    val fallback = identifier.toName()
+    val key = translationKey ?: return fallback
+    return translate(key).takeUnless { it.isBlank() || it == key } ?: fallback
+}
+
 // GET /api/v1/client/registry/{name}
 private fun Route.getRegistry() = get {
     fun itemIconUrl(id: Identifier) =
@@ -219,7 +230,7 @@ private fun Route.getRegistry() = get {
 
         "items", "item" -> {
             BuiltInRegistries.ITEM.buildOutput(
-                name = { id, item -> item.descriptionId ?: id.toString() },
+                name = { id, item -> localizedItemRegistryName(id, item.descriptionId) },
                 iconUrl = ::itemIconUrl,
             )
         }

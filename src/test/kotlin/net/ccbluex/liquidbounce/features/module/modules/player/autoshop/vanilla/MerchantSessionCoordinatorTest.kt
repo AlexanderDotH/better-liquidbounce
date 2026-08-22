@@ -49,6 +49,17 @@ class MerchantSessionCoordinatorTest {
     }
 
     @Test
+    fun `owned merchant screen can arrive before its open packet is correlated`() {
+        val coordinator = MerchantSessionCoordinator()
+
+        assertTrue(coordinator.tryLock(targetId = 41, tick = 10))
+        assertTrue(coordinator.markInteractionSent(targetId = 41, tick = 12))
+
+        assertTrue(coordinator.claimMerchantScreen(containerId = 7, tick = 13))
+        assertEquals(MerchantSessionState.AwaitingOffers(41, 7, 13), coordinator.state)
+    }
+
+    @Test
     fun `a locked session rejects another merchant target`() {
         val coordinator = MerchantSessionCoordinator()
 

@@ -21,6 +21,8 @@ package net.ccbluex.liquidbounce.injection.mixins.minecraft.network;
 import com.llamalad7.mixinextras.injector.ModifyExpressionValue;
 import net.ccbluex.liquidbounce.event.EventManager;
 import net.ccbluex.liquidbounce.event.events.*;
+import net.ccbluex.liquidbounce.features.module.modules.combat.MaceKillAttackHook;
+import net.ccbluex.liquidbounce.features.module.modules.combat.MaceKillAttackResult;
 import net.ccbluex.liquidbounce.features.module.modules.combat.aimbot.ModuleAutoBow;
 import net.ccbluex.liquidbounce.features.module.modules.combat.crystalaura.trigger.triggers.ClientBlockBreakTrigger;
 import net.ccbluex.liquidbounce.utils.client.SilentHotbar;
@@ -48,6 +50,24 @@ public abstract class MixinMultiPlayerGameMode {
     private void hookAttack(Player player, Entity target, CallbackInfo callbackInfo) {
         var event = EventManager.INSTANCE.callEvent(new AttackEntityEvent(target));
         if (event.isCancelled()) {
+            callbackInfo.cancel();
+        }
+    }
+
+    /**
+     * Apply attack preparation only after the selected item has been synchronized and before the attack packet is sent.
+     */
+    @Inject(
+        method = "attack",
+        at = @At(
+            value = "INVOKE",
+            target = "Lnet/minecraft/client/multiplayer/MultiPlayerGameMode;ensureHasSentCarriedItem()V",
+            shift = At.Shift.AFTER
+        ),
+        cancellable = true
+    )
+    private void hookAcceptedAttack(Player player, Entity target, CallbackInfo callbackInfo) {
+        if (MaceKillAttackHook.commit(player, target) == MaceKillAttackResult.REJECTED) {
             callbackInfo.cancel();
         }
     }

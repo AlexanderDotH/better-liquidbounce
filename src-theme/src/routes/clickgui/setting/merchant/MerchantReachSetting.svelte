@@ -156,7 +156,7 @@
 
 <style lang="scss">
     .setting {
-        min-height: var(--clickgui-merchant-reach-min-height, 72px);
+        min-height: var(--clickgui-merchant-reach-min-height, 112px);
         padding: var(--clickgui-slider-setting-padding, 7px 0 2px 0);
         color: var(--clickgui-text-color);
         font-size: var(--clickgui-control-font-size, 12px);
@@ -182,8 +182,8 @@
 
     .reach-controls {
         display: grid;
-        grid-template-columns: repeat(2, minmax(0, 1fr));
-        gap: var(--clickgui-merchant-reach-gap, 10px);
+        grid-template-columns: minmax(0, 1fr);
+        gap: var(--clickgui-merchant-reach-gap, 12px);
         margin-top: var(--clickgui-merchant-reach-top-gap, 6px);
     }
 

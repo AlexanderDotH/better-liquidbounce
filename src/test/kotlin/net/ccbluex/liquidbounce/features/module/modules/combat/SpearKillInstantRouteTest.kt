@@ -237,6 +237,22 @@ class SpearKillInstantRouteTest {
     }
 
     @Test
+    fun `Instant replans a rejected return immediately instead of stalling airborne`() {
+        assertEquals(
+            SpearKillInstantRejectedStepAction.REPLAN_RETURN,
+            resolveSpearKillInstantRejectedStepAction(outboundStep = false, recovering = true),
+        )
+        assertEquals(
+            SpearKillInstantRejectedStepAction.TERMINATE_OUTBOUND,
+            resolveSpearKillInstantRejectedStepAction(outboundStep = true, recovering = false),
+        )
+        assertEquals(
+            SpearKillInstantRejectedStepAction.PAUSE,
+            resolveSpearKillInstantRejectedStepAction(outboundStep = true, recovering = true),
+        )
+    }
+
+    @Test
     fun `Safe rejects a blocked corridor while Primed admits the same free endpoint once`() {
         val origin = Vec3.ZERO
         val destination = Vec3(40.0, 0.0, 0.0)

@@ -1,111 +1,152 @@
 <script lang="ts">
-    import {onMount, tick} from "svelte";
+    import {onMount} from "svelte";
+    import {fly} from "svelte/transition";
     import type {Module} from "../../../integration/types";
+    import type {ModuleToggleEvent} from "../../../integration/events";
     import {getModules} from "../../../integration/rest";
     import {listen} from "../../../integration/ws";
     import {getTextWidth} from "../../../integration/text_measurement";
-    import {flip} from "svelte/animate";
-    import {fly} from "svelte/transition";
     import {convertToSpacedString, spaceSeperatedNames} from "../../../theme/theme_config";
     import {hudMotionDuration, prefersReducedMotion} from "../motion/hudMotion";
+    import {
+        areArrayListEntriesRenderEquivalent,
+        buildArrayListEntries,
+        getArrayListMotionOffset,
+        LatestArrayListModuleLoader,
+        type ArrayListEntry,
+        type ArrayListVariant,
+    } from "./arrayListModel";
 
     export let settings: { [name: string]: any };
-    export let variant: "classic" | "modern" = "classic";
+    export let variant: ArrayListVariant = "classic";
 
     let cSettings = settings as HudArrayListSettings;
-    const CLASSIC_FONT = "500 14px Inter";
-    const MODERN_NAME_FONT = "550 12px Inter";
-    const MODERN_TAG_FONT = "600 10px Inter";
-    const MODERN_TAG_GAP_PX = 6;
-    const MODERN_TAG_HORIZONTAL_PADDING_PX = 12;
+    const moduleLoader = new LatestArrayListModuleLoader(getModules);
 
-    let enabledModules: Module[] = [];
+    let moduleSnapshot: Module[] = [];
+    let enabledModules: ArrayListEntry[] = [];
+    let useSpacedNames = false;
     let motionDuration = 200;
     let motionOffset = 50;
     let previousVariant = variant;
 
     $: motionDuration = hudMotionDuration(variant, $prefersReducedMotion);
-    $: motionOffset = variant === "modern" ? 18 : 50;
+    $: motionOffset = getArrayListMotionOffset(variant, cSettings.itemAlignment);
 
-    function measureModuleWidth(module: Module, formattedName: string): number {
-        const visibleTag = cSettings.showTags ? module.tag : null;
+    function renderModuleSnapshot() {
+        const formatName = useSpacedNames
+            ? convertToSpacedString
+            : (name: string) => name;
 
-        if (variant !== "modern") {
-            const fullName = visibleTag
-                ? `${formattedName} ${visibleTag}`
-                : formattedName;
-            return getTextWidth(fullName, CLASSIC_FONT);
+        const nextEntries = buildArrayListEntries(
+            moduleSnapshot,
+            cSettings,
+            variant,
+            formatName,
+            getTextWidth,
+        );
+
+        if (areArrayListEntriesRenderEquivalent(enabledModules, nextEntries)) {
+            return;
         }
 
-        const nameWidth = getTextWidth(formattedName, MODERN_NAME_FONT);
-        if (!visibleTag) {
-            return nameWidth;
-        }
-
-        return nameWidth
-            + MODERN_TAG_GAP_PX + MODERN_TAG_HORIZONTAL_PADDING_PX
-            + getTextWidth(visibleTag, MODERN_TAG_FONT);
+        enabledModules = nextEntries;
     }
 
-    async function updateEnabledModules() {
-        const modules = await getModules();
-        const visibleModules = modules.filter(m => m.enabled && !m.hidden);
+    async function refreshModuleSnapshot() {
+        try {
+            const modules = await moduleLoader.loadLatest();
+            if (modules === null) {
+                return;
+            }
 
-        const modulesWithWidths = visibleModules.map(module => {
-            const formattedName = $spaceSeperatedNames ? convertToSpacedString(module.name) : module.name;
+            moduleSnapshot = modules;
+            renderModuleSnapshot();
+        } catch (error) {
+            console.error("[ArrayList] Failed to refresh modules", error);
+        }
+    }
 
+    function handleModuleToggle(event: ModuleToggleEvent) {
+        let moduleFound = false;
+        const updatedModules = moduleSnapshot.map(module => {
+            if (module.name !== event.moduleName) {
+                return module;
+            }
+
+            moduleFound = true;
             return {
                 ...module,
-                width: measureModuleWidth(module, formattedName)
+                enabled: event.enabled,
+                hidden: event.hidden,
             };
         });
 
-        modulesWithWidths.sort((a, b) => cSettings.order === "Ascending" ? a.width - b.width : b.width - a.width);
+        if (!moduleFound) {
+            void refreshModuleSnapshot();
+            return;
+        }
 
-        enabledModules = modulesWithWidths;
-        await tick();
+        moduleLoader.invalidate();
+        moduleSnapshot = updatedModules;
+        renderModuleSnapshot();
     }
 
     $: if (cSettings !== settings) {
         cSettings = settings as HudArrayListSettings;
-        void updateEnabledModules();
+        renderModuleSnapshot();
     }
 
     onMount(() => {
-        const unsubscribe = spaceSeperatedNames.subscribe(() => {
-            void updateEnabledModules();
+        let fontCallbackActive = true;
+        const unsubscribe = spaceSeperatedNames.subscribe((enabled) => {
+            useSpacedNames = enabled;
+            renderModuleSnapshot();
         });
 
-        return unsubscribe;
+        void document.fonts.ready.then(() => {
+            if (!fontCallbackActive) {
+                return;
+            }
+            renderModuleSnapshot();
+        });
+
+        void refreshModuleSnapshot();
+
+        return () => {
+            unsubscribe();
+            fontCallbackActive = false;
+            moduleLoader.invalidate();
+        };
     });
 
-    listen("moduleToggle", async () => {
-        await updateEnabledModules();
+    listen("moduleToggle", handleModuleToggle);
+
+    listen("refreshArrayList", () => {
+        void refreshModuleSnapshot();
     });
 
-    listen("refreshArrayList", async () => {
-        await updateEnabledModules();
+    listen("socketReady", () => {
+        void refreshModuleSnapshot();
     });
 
     $: if (variant !== previousVariant) {
         previousVariant = variant;
-        void updateEnabledModules();
+        renderModuleSnapshot();
     }
 </script>
 
 <div class="arraylist">
-    {#each enabledModules as {name, tag} (name)}
+    {#each enabledModules as {name, displayName, visibleTag} (name)}
         <div
                 class="module"
+                class:has-visible-tag={visibleTag !== null}
                 style={cSettings.itemAlignment === "Left" ? "margin-right: auto;" : "margin-left: auto;"}
-                animate:flip={{ duration: motionDuration }}
                 transition:fly={{ x: motionOffset, duration: motionDuration }}
         >
-            <span class="module-name">
-                {$spaceSeperatedNames ? convertToSpacedString(name) : name}
-            </span>
-            {#if tag && cSettings.showTags}
-                <span class="tag">{tag}</span>
+            <span class="module-name">{displayName}</span>
+            {#if visibleTag !== null}
+                <span class="tag">{visibleTag}</span>
             {/if}
         </div>
     {/each}

@@ -24,7 +24,8 @@ import net.ccbluex.liquidbounce.event.events.PacketEvent
 import net.ccbluex.liquidbounce.event.events.WorldChangeEvent
 import net.ccbluex.liquidbounce.event.handler
 import net.ccbluex.liquidbounce.event.tickHandler
-import net.ccbluex.liquidbounce.features.module.modules.combat.ModuleSpearKill
+import net.ccbluex.liquidbounce.features.module.modules.combat.ModuleMaceKill
+import net.ccbluex.liquidbounce.features.module.modules.combat.RemoteKillMovementOwnership
 import net.ccbluex.liquidbounce.utils.kotlin.EventPriorityConvention.READ_FINAL_STATE
 import net.ccbluex.liquidbounce.utils.kotlin.EventPriorityConvention.SAFETY_FEATURE
 import net.ccbluex.liquidbounce.utils.network.MovePacketType
@@ -45,7 +46,14 @@ internal object NoFallPacket : NoFallMode("Packet") {
     }
 
     val repeatable = tickHandler {
-        if (!filter.activeMode.isActive || !shouldSendNoFallPacketDuringSpearKill(ModuleSpearKill.usesPacketMovement)) {
+        val remoteMovementOwned = RemoteKillMovementOwnership.active
+        val exclusiveRoutePacketsActive = when (RemoteKillMovementOwnership.currentOwner) {
+            "MaceKill" -> ModuleMaceKill.suppressesNoFallPackets
+            else -> remoteMovementOwned
+        }
+        if (!filter.activeMode.isActive ||
+            !shouldSendNoFallPacketDuringRemoteKill(remoteMovementOwned, exclusiveRoutePacketsActive)
+        ) {
             return@tickHandler
         }
 
@@ -112,6 +120,15 @@ internal object NoFallPacket : NoFallMode("Packet") {
     }
 }
 
-/** A SpearKill packet route owns its virtual movement stream, so NoFall must not inject a second one. */
+/** A remote-kill route owns its virtual movement stream, so NoFall must not inject a second one. */
+internal fun shouldSendNoFallPacketDuringRemoteKill(remoteKillPacketRouteActive: Boolean): Boolean =
+    !remoteKillPacketRouteActive
+
+internal fun shouldSendNoFallPacketDuringRemoteKill(
+    remoteKillMovementOwned: Boolean,
+    exclusiveRoutePacketsActive: Boolean,
+): Boolean = !remoteKillMovementOwned || !exclusiveRoutePacketsActive
+
+/** Compatibility boundary for existing SpearKill-focused tests and callers. */
 internal fun shouldSendNoFallPacketDuringSpearKill(spearKillPacketRouteActive: Boolean): Boolean =
-    !spearKillPacketRouteActive
+    shouldSendNoFallPacketDuringRemoteKill(spearKillPacketRouteActive)

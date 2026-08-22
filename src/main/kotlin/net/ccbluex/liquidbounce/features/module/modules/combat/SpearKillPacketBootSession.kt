@@ -175,8 +175,8 @@ internal class SpearKillFallDamagePacketTracker {
  * Tracks SpearKill's packet displacement and confirmed physical return positions.
  * A movement is removed only after the corresponding packet passed the packet pipeline.
  */
-@Suppress("TooManyFunctions", "LongParameterList")
-internal class SpearKillPacketBootSession {
+@Suppress("TooManyFunctions", "LongParameterList", "LargeClass")
+internal class SpearKillPacketBootSession : RemoteKillRouteSession {
 
     private val movements = ArrayDeque<Vec3>()
     private val committedMovements = ArrayDeque<Vec3>()
@@ -206,31 +206,31 @@ internal class SpearKillPacketBootSession {
     var terminalAimLockComplete: Boolean = false
         private set
 
-    var committedOffset: Vec3 = Vec3.ZERO
+    override var committedOffset: Vec3 = Vec3.ZERO
         private set
 
-    var recovering: Boolean = false
+    override var recovering: Boolean = false
         private set
 
-    val active: Boolean
+    override val active: Boolean
         get() = movements.isNotEmpty() || pendingOffset != null || remainingStrikeHoldTicks > 0 ||
             remainingPreStrikeHoldTicks > 0 || remainingStepWaitTicks > 0 ||
             pendingPhysicalPositionOffset != null
 
-    val virtualOffset: Vec3
+    override val virtualOffset: Vec3
         get() = pendingOffset ?: committedOffset
 
-    val requiresDelivery: Boolean
+    override val requiresDelivery: Boolean
         get() = pendingOffset != null
 
-    val pendingOutboundStep: Boolean
+    override val pendingOutboundStep: Boolean
         get() = pendingOffset != null && pendingStepIsOutbound
 
     /** True only for the final physical outbound movement before the strike hold begins. */
     val pendingFinalOutboundStep: Boolean
         get() = pendingOutboundStep && remainingOutboundSteps == 1
 
-    val pendingMovement: Vec3?
+    override val pendingMovement: Vec3?
         get() = pendingOffset?.subtract(committedOffset)
 
     val pendingTerminalBurstStart: Boolean
@@ -328,6 +328,33 @@ internal class SpearKillPacketBootSession {
     val physicalReturnConfigured: Boolean
         get() = physicalReturnEnabled
 
+    override fun start(request: RemoteKillRouteRequest) {
+        if (request.physicalReturn) {
+            startPhysicalReturn(
+                path = request.roundTripMovements,
+                outboundSteps = request.outboundMovements.size,
+                strikeHoldTicks = request.strikeHoldTicks,
+                stepWaitTicks = request.stepWaitTicks,
+                preStrikeHoldTicks = request.preStrikeHoldTicks,
+                terminalSuffixSteps = request.terminalSuffixSteps,
+                terminalBurstSteps = request.terminalBurstSteps,
+                requireTerminalAuthorization = request.requireTerminalAuthorization,
+            )
+            return
+        }
+
+        start(
+            path = request.roundTripMovements,
+            outboundSteps = request.outboundMovements.size,
+            strikeHoldTicks = request.strikeHoldTicks,
+            stepWaitTicks = request.stepWaitTicks,
+            preStrikeHoldTicks = request.preStrikeHoldTicks,
+            terminalSuffixSteps = request.terminalSuffixSteps,
+            terminalBurstSteps = request.terminalBurstSteps,
+            requireTerminalAuthorization = request.requireTerminalAuthorization,
+        )
+    }
+
     fun start(
         path: List<Vec3>,
         outboundSteps: Int = 0,
@@ -381,6 +408,7 @@ internal class SpearKillPacketBootSession {
         terminalSuffixSteps: Int = 1,
         terminalBurstSteps: Int = 0,
         requireTerminalAuthorization: Boolean = false,
+        completeReturnMovements: List<Vec3>? = null,
     ): Boolean {
         if (!canReplaceRemainingOutbound) return false
         return installReplacementOutbound(
@@ -390,6 +418,7 @@ internal class SpearKillPacketBootSession {
             terminalSuffixSteps = terminalSuffixSteps,
             terminalBurstSteps = terminalBurstSteps,
             requireTerminalAuthorization = requireTerminalAuthorization,
+            completeReturnMovements = completeReturnMovements,
         )
     }
 
@@ -410,6 +439,7 @@ internal class SpearKillPacketBootSession {
             terminalSuffixSteps = terminalSuffixSteps,
             terminalBurstSteps = terminalBurstSteps,
             requireTerminalAuthorization = requireTerminalAuthorization,
+            completeReturnMovements = null,
         )
     }
 
@@ -420,6 +450,7 @@ internal class SpearKillPacketBootSession {
         terminalSuffixSteps: Int,
         terminalBurstSteps: Int,
         requireTerminalAuthorization: Boolean,
+        completeReturnMovements: List<Vec3>?,
     ): Boolean {
         if (strikeHoldTicks < 0 ||
             preStrikeHoldTicks !in 0..SPEAR_KILL_PACKET_MAX_PRE_STRIKE_HOLD_TICKS
@@ -429,15 +460,15 @@ internal class SpearKillPacketBootSession {
         if (terminalSuffixSteps < 1 || terminalSuffixSteps > outboundMovements.size) return false
         if (!hasValidTerminalBurst(terminalBurstSteps, terminalSuffixSteps)) return false
         if (requireTerminalAuthorization && preStrikeHoldTicks < 1) return false
-        if (outboundMovements.isEmpty() ||
-            outboundMovements.any { !it.isFinite() || it.lengthSqr() < EPSILON }
-        ) {
-            return false
-        }
+        if (!hasValidReplacementMovements(outboundMovements, completeReturnMovements)) return false
         movements.clear()
         movements.addAll(outboundMovements)
-        outboundMovements.asReversed().forEach { movements += it.scale(-1.0) }
-        committedMovements.asReversed().forEach { movements += it.scale(-1.0) }
+        if (completeReturnMovements == null) {
+            outboundMovements.asReversed().forEach { movements += it.scale(-1.0) }
+            committedMovements.asReversed().forEach { movements += it.scale(-1.0) }
+        } else {
+            movements.addAll(completeReturnMovements)
+        }
         movements += Vec3.ZERO
         remainingOutboundSteps = outboundMovements.size
         remainingStrikeHoldTicks = 0
@@ -459,6 +490,21 @@ internal class SpearKillPacketBootSession {
         recovering = false
         return true
     }
+
+    private fun hasValidReplacementMovements(
+        outboundMovements: List<Vec3>,
+        completeReturnMovements: List<Vec3>?,
+    ): Boolean {
+        if (outboundMovements.isEmpty() || outboundMovements.any(::isInvalidMovement)) return false
+        if (completeReturnMovements == null) return true
+        if (completeReturnMovements.isEmpty() || completeReturnMovements.any(::isInvalidMovement)) return false
+
+        val finalOffset = (outboundMovements + completeReturnMovements).fold(committedOffset, Vec3::add)
+        return finalOffset.lengthSqr() < EPSILON
+    }
+
+    private fun isInvalidMovement(movement: Vec3): Boolean =
+        !movement.isFinite() || movement.lengthSqr() < EPSILON
 
     private fun startInternal(
         path: List<Vec3>,
@@ -490,7 +536,9 @@ internal class SpearKillPacketBootSession {
         require(terminalBurstSteps == 0 || outboundSteps > 0) {
             "Terminal burst requires outbound movement"
         }
-        require(stepWaitTicks in 0..SPEAR_KILL_MAX_WAIT_TICKS) { "Step wait duration is outside the configured range" }
+        require(stepWaitTicks in 0..REMOTE_KILL_ROUTE_MAX_STEP_WAIT_TICKS) {
+            "Step wait duration is outside the shared route range"
+        }
         require(outboundSteps <= path.count { it.lengthSqr() >= EPSILON }) {
             "Outbound step count must not exceed movement count"
         }
@@ -517,7 +565,7 @@ internal class SpearKillPacketBootSession {
         recovering = false
     }
 
-    fun prepareNextStep(): Vec3? {
+    override fun prepareNextStep(): Vec3? {
         pendingOffset?.let { return it }
         holdingStrikeThisTick = false
         holdingPreStrikeThisTick = false
@@ -567,7 +615,7 @@ internal class SpearKillPacketBootSession {
         }
     }
 
-    fun confirmStep(delivered: Boolean) {
+    override fun confirmStep(delivered: Boolean) {
         val pending = pendingOffset ?: return
         if (!delivered) {
             pendingOffset = null
@@ -663,7 +711,7 @@ internal class SpearKillPacketBootSession {
         recovering = true
     }
 
-    fun beginExactReturn() {
+    override fun beginExactReturn() {
         chainedOutboundWindowOpen = false
         if (recovering) return
 
@@ -702,7 +750,7 @@ internal class SpearKillPacketBootSession {
      * Returns the exact inverse of confirmed movement when [authoritativeOffset] still describes
      * this session. Unlike a synthesized straight return, this retraces the collision-safe route.
      */
-    fun exactRecoveryMovementsFrom(authoritativeOffset: Vec3): List<Vec3>? {
+    override fun exactRecoveryMovementsFrom(authoritativeOffset: Vec3): List<Vec3>? {
         if (!authoritativeOffset.isFinite() ||
             authoritativeOffset.distanceToSqr(committedOffset) >= EPSILON
         ) {
@@ -731,10 +779,10 @@ internal class SpearKillPacketBootSession {
     }
 
     /** Starts a packet-only recovery before any physical-position fallback is allowed. */
-    fun beginPacketExactRecoveryFrom(
+    override fun beginPacketExactRecoveryFrom(
         authoritativeOffset: Vec3,
         recoveryMovements: List<Vec3>,
-        stepWaitTicks: Int = 0,
+        stepWaitTicks: Int,
     ) {
         beginExactRecoveryFrom(
             authoritativeOffset,
@@ -759,8 +807,8 @@ internal class SpearKillPacketBootSession {
         }
         val recoveredOffset = recoveryMovements.fold(authoritativeOffset, Vec3::add)
         require(recoveredOffset.lengthSqr() < EPSILON) { "Exact recovery must end at the session origin" }
-        require(stepWaitTicks in 0..SPEAR_KILL_MAX_WAIT_TICKS) {
-            "Exact recovery wait duration is outside the configured range"
+        require(stepWaitTicks in 0..REMOTE_KILL_ROUTE_MAX_STEP_WAIT_TICKS) {
+            "Exact recovery wait duration is outside the shared route range"
         }
 
         clear()
@@ -792,7 +840,7 @@ internal class SpearKillPacketBootSession {
         beginRecovery(maxSpeed)
     }
 
-    fun clear() {
+    override fun clear() {
         movements.clear()
         committedMovements.clear()
         pendingOffset = null
@@ -1041,10 +1089,12 @@ object SpearKillSetbackHook {
     @JvmStatic
     fun beforeCorrection(packet: ClientboundPlayerPositionPacket, player: Player) {
         ModuleSpearKill.preparePacketSetback(packet, player)
+        RemoteKillSetbackRegistry.beforeCorrection(packet, player)
     }
 
     @JvmStatic
     fun afterCorrection(packet: ClientboundPlayerPositionPacket, player: Player) {
         ModuleSpearKill.finishPacketSetback(packet, player)
+        RemoteKillSetbackRegistry.afterCorrection(packet, player)
     }
 }

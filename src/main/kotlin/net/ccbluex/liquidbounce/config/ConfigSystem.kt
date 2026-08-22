@@ -30,6 +30,7 @@ import net.ccbluex.liquidbounce.config.types.group.ModeValueGroup
 import net.ccbluex.liquidbounce.config.types.group.ValueGroup
 import net.ccbluex.liquidbounce.features.module.ModuleManager
 import net.ccbluex.liquidbounce.features.module.modules.combat.migrateLegacyFightBotConfig
+import net.ccbluex.liquidbounce.features.module.modules.combat.migrateLegacyMaceKillConfig
 import net.ccbluex.liquidbounce.features.module.modules.combat.killaura.ModuleKillAura
 import net.ccbluex.liquidbounce.utils.client.clientLogger
 import net.ccbluex.liquidbounce.utils.client.mc
@@ -49,39 +50,44 @@ object ConfigSystem {
 
     private val logger = clientLogger("ConfigSystem")
 
-    var isFirstLaunch: Boolean = false
-        private set
+    private var firstLaunch = false
+
+    val isFirstLaunch: Boolean
+        get() {
+            rootFolder
+            return firstLaunch
+        }
 
     // Config directory folder
-    val rootFolder = File(
-        mc.gameDirectory, LiquidBounce.CLIENT_NAME
-    ).apply {
-        // Check if there is already a config folder and if not create new folder
-        // (mkdirs not needed - .minecraft should always exist)
-        if (!exists()) {
-            isFirstLaunch = true
-            mkdir()
+    val rootFolder by lazy {
+        File(mc.gameDirectory, LiquidBounce.CLIENT_NAME).apply {
+            // Check if there is already a config folder and if not create new folder
+            // (mkdirs not needed - .minecraft should always exist)
+            if (!exists()) {
+                firstLaunch = true
+                mkdir()
+            }
         }
     }
 
     // User config directory folder
-    val userConfigsFolder = File(
-        rootFolder, "configs"
-    ).apply {
-        // Check if there is already a config folder and if not create new folder
-        // (mkdirs not needed - .minecraft should always exist)
-        if (!exists()) {
-            mkdir()
+    val userConfigsFolder by lazy {
+        File(rootFolder, "configs").apply {
+            // Check if there is already a config folder and if not create new folder
+            // (mkdirs not needed - .minecraft should always exist)
+            if (!exists()) {
+                mkdir()
+            }
         }
     }
 
-    internal val backupFolder = File(
-        rootFolder, "backups"
-    ).apply {
-        // Check if there is already a config folder and if not create new folder
-        // (mkdirs not needed - .minecraft should always exist)
-        if (!exists()) {
-            mkdir()
+    internal val backupFolder by lazy {
+        File(rootFolder, "backups").apply {
+            // Check if there is already a config folder and if not create new folder
+            // (mkdirs not needed - .minecraft should always exist)
+            if (!exists()) {
+                mkdir()
+            }
         }
     }
 
@@ -264,6 +270,7 @@ object ConfigSystem {
 
         if (valueGroup === ModuleManager.modulesConfig) {
             migrateLegacyFightBotConfig(jsonObject)
+            migrateLegacyMaceKillConfig(jsonObject)
         }
 
         // Check if the name is the same as the config name

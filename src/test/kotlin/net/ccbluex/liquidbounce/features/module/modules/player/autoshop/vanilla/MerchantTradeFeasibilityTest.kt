@@ -28,6 +28,7 @@ import net.minecraft.world.item.ItemStack
 import net.minecraft.world.item.Items
 import net.minecraft.world.item.trading.ItemCost
 import net.minecraft.world.item.trading.MerchantOffer
+import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.BeforeAll
@@ -44,6 +45,10 @@ class MerchantTradeFeasibilityTest {
         val offer = offer(costA = cost(Items.EMERALD, 4), result = stack(Items.BREAD))
 
         assertFalse(MerchantTradeFeasibility.canExecute(offer, listOf(stack(Items.EMERALD, 3))))
+        assertEquals(
+            MerchantTradeFeasibilityResult.INSUFFICIENT_RESOURCES,
+            MerchantTradeFeasibility.evaluate(offer, listOf(stack(Items.EMERALD, 3))),
+        )
     }
 
     @Test
@@ -70,6 +75,10 @@ class MerchantTradeFeasibilityTest {
         inventory[0] = stack(Items.EMERALD, 2)
 
         assertFalse(MerchantTradeFeasibility.canExecute(offer, inventory))
+        assertEquals(
+            MerchantTradeFeasibilityResult.OUTPUT_FULL,
+            MerchantTradeFeasibility.evaluate(offer, inventory),
+        )
     }
 
     @Test
@@ -79,6 +88,10 @@ class MerchantTradeFeasibilityTest {
         inventory[0] = stack(Items.EMERALD)
 
         assertTrue(MerchantTradeFeasibility.canExecute(offer, inventory))
+        assertEquals(
+            MerchantTradeFeasibilityResult.EXECUTABLE,
+            MerchantTradeFeasibility.evaluate(offer, inventory),
+        )
     }
 
     @Test

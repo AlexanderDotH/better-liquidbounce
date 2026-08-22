@@ -1,0 +1,15 @@
+name: MaceKillLabObserver
+version: 0.1.0
+main: net.ccbluex.liquidbounce.lab.macekill.MaceKillLabObserverPlugin
+description: Source-only observer for the controlled LiquidBounce MaceKill ClipReach lab
+api-version: '26.2'
+author: CCBlueX
+commands:
+  macekilllab:
+    description: Controls the disposable MaceKill ClipReach observer lab
+    usage: /macekilllab <arm|mark|status|cleanup>
+    permission: macekilllab.control
+permissions:
+  macekilllab.control:
+    description: Allows mutation of the disposable MaceKill lab world
+    default: op

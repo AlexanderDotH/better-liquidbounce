@@ -30,6 +30,17 @@ internal data class MerchantTargetCandidate<T>(
 
 internal object MerchantTargetSelector {
 
+    fun <T> selectReachable(
+        candidates: Iterable<MerchantTargetCandidate<T>>,
+        range: Float,
+        canRetry: (Int) -> Boolean,
+        isReachable: (T) -> Boolean,
+    ): MerchantTargetCandidate<T>? = candidates.asSequence()
+        .filter { it.alive && it.adult && !it.sleeping && canRetry(it.entityId) }
+        .filter { it.boxedDistance <= range }
+        .sortedBy(MerchantTargetCandidate<T>::boxedDistance)
+        .firstOrNull { isReachable(it.entity) }
+
     fun <T> select(
         candidates: Iterable<MerchantTargetCandidate<T>>,
         range: Float,

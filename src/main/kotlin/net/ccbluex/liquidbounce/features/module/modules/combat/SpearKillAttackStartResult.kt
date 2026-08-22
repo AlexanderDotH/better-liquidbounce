@@ -16,9 +16,11 @@
  * You should have received a copy of the GNU General Public License
  * along with LiquidBounce. If not, see <https://www.gnu.org/licenses/>.
  */
+@file:Suppress("TooManyFunctions")
 
 package net.ccbluex.liquidbounce.features.module.modules.combat
 
+import net.minecraft.world.entity.LivingEntity
 import net.minecraft.world.phys.Vec3
 
 internal enum class SpearKillAttackStartResult {
@@ -132,17 +134,52 @@ internal fun startSpearKillDirectPacketSession(
     route: SpearKillAStarPacketRoute,
     stepWaitTicks: Int,
     strikeHoldTicks: Int = SPEAR_KILL_PACKET_STRIKE_HOLD_TICKS,
+    origin: Vec3 = Vec3.ZERO,
 ) {
-    session.startPhysicalReturn(
-        path = route.roundTripMovements,
-        outboundSteps = route.outboundMovements.size,
-        strikeHoldTicks = strikeHoldTicks,
+    session.start(remoteSpearKillDirectRouteRequest(
+        origin = origin,
+        route = route,
         stepWaitTicks = stepWaitTicks,
-        preStrikeHoldTicks = SPEAR_KILL_PACKET_MAX_PRE_STRIKE_HOLD_TICKS,
-        terminalSuffixSteps = route.terminalBurstSteps.coerceAtLeast(1),
-        terminalBurstSteps = route.terminalBurstSteps,
-        requireTerminalAuthorization = true,
-    )
+        strikeHoldTicks = strikeHoldTicks,
+    ))
+}
+
+/** Launches the same historical SpearKill session through the shared ownership coordinator. */
+internal fun startSpearKillDirectPacketSession(
+    engine: RemoteKillRouteEngine<LivingEntity>,
+    target: LivingEntity,
+    origin: Vec3,
+    route: SpearKillAStarPacketRoute,
+    stepWaitTicks: Int,
+    strikeHoldTicks: Int = SPEAR_KILL_PACKET_STRIKE_HOLD_TICKS,
+) {
+    engine.start(target, remoteSpearKillDirectRouteRequest(
+        origin = origin,
+        route = route,
+        stepWaitTicks = stepWaitTicks,
+        strikeHoldTicks = strikeHoldTicks,
+    ))
+}
+
+private fun remoteSpearKillDirectRouteRequest(
+    origin: Vec3,
+    route: SpearKillAStarPacketRoute,
+    stepWaitTicks: Int,
+    strikeHoldTicks: Int,
+): RemoteKillRouteRequest = RemoteKillRouteRequest(
+    origin = origin,
+    outboundMovements = route.outboundMovements,
+    strikeHoldTicks = strikeHoldTicks,
+    stepWaitTicks = stepWaitTicks,
+    physicalReturn = true,
+    preStrikeHoldTicks = SPEAR_KILL_PACKET_MAX_PRE_STRIKE_HOLD_TICKS,
+    terminalSuffixSteps = route.terminalBurstSteps.coerceAtLeast(1),
+    terminalBurstSteps = route.terminalBurstSteps,
+    requireTerminalAuthorization = true,
+).also {
+    require(it.roundTripMovements == route.roundTripMovements) {
+        "SpearKill route must retain its exact inverse return"
+    }
 }
 
 internal fun hasSpearKillDirectPacketDamageWindow(

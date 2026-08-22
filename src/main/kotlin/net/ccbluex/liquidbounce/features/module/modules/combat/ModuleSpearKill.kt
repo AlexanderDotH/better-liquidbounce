@@ -169,6 +169,12 @@ object ModuleSpearKill : ClientModule("SpearKill", ModuleCategories.COMBAT, alia
     private val attackMovements = ArrayDeque<Vec3>()
     private val speedController = SpearKillSpeedController()
     private val packetBootSession = SpearKillPacketBootSession()
+    private val remoteKillRouteEngine = RemoteKillRouteEngine(
+        session = packetBootSession,
+        weaponAdapter = RemoteKillSpearAdapter,
+        movementOwner = "SpearKill",
+    )
+    private var standaloneRemoteMovementLease: RemoteKillMovementOwnership.Lease? = null
     private val physicalReturnPositioner = SpearKillPhysicalReturnPositioner()
     private val returnRecoveryTracker = SpearKillReturnRecoveryTracker()
     private val setbackGuard = SpearKillSetbackGuard()
@@ -618,6 +624,9 @@ object ModuleSpearKill : ClientModule("SpearKill", ModuleCategories.COMBAT, alia
         ) {
             return SpearKillHighSpeedResearchProbeStartResult.ACTIVE_SESSION
         }
+        if (RemoteKillMovementOwnership.active) {
+            return SpearKillHighSpeedResearchProbeStartResult.ACTIVE_SESSION
+        }
         if (!enabled || !usesPacketMovementMode || player.isPassenger ||
             request.primingPackets !in 0..SPEAR_KILL_HIGH_SPEED_MAX_EXPLICIT_PRIMING
         ) {
@@ -672,23 +681,33 @@ object ModuleSpearKill : ClientModule("SpearKill", ModuleCategories.COMBAT, alia
         ) {
             return SpearKillHighSpeedResearchProbeStartResult.ROUTE_REJECTED
         }
+        val movementLease = RemoteKillMovementOwnership.tryAcquire("SpearKillResearch")
+            ?: return SpearKillHighSpeedResearchProbeStartResult.ACTIVE_SESSION
         if (!beginVirtualFallSafety(route.outboundMovements, origin)) {
+            movementLease.close()
             return SpearKillHighSpeedResearchProbeStartResult.ROUTE_REJECTED
         }
 
-        activeMovementTransport = settings.transport
-        beginSpearKillSpeedSession()
-        packetSessionSettings = settings
-        packetAStarAttackActive = false
-        clearAStarRenderPath()
-        clearAStarTargetLock()
-        packetSessionOrigin = origin
-        physicalReturnPositioner.clear()
-        returnRecoveryTracker.begin(origin)
-        startSpearKillInstantPacketSession(packetBootSession, burst)
-        primedSessionPacketsDelivered = 0
-        highSpeedMoveProbeActive = true
-        return SpearKillHighSpeedResearchProbeStartResult.STARTED
+        try {
+            activeMovementTransport = settings.transport
+            beginSpearKillSpeedSession()
+            packetSessionSettings = settings
+            packetAStarAttackActive = false
+            clearAStarRenderPath()
+            clearAStarTargetLock()
+            packetSessionOrigin = origin
+            physicalReturnPositioner.clear()
+            returnRecoveryTracker.begin(origin)
+            startSpearKillInstantPacketSession(packetBootSession, burst)
+            standaloneRemoteMovementLease = movementLease
+            primedSessionPacketsDelivered = 0
+            highSpeedMoveProbeActive = true
+            return SpearKillHighSpeedResearchProbeStartResult.STARTED
+        } catch (throwable: Throwable) {
+            movementLease.close()
+            clearVirtualMovementState()
+            throw throwable
+        }
     }
 
     private fun startHighSpeedAttackProbe(
@@ -1195,6 +1214,7 @@ object ModuleSpearKill : ClientModule("SpearKill", ModuleCategories.COMBAT, alia
         } else if (!motionReturnPrepared) {
             attackMovements.clear()
             player.deltaMovement = Vec3.ZERO
+            releaseStandaloneRemoteMovementOwnership()
         }
 
         packetAStarAttackActive = false
@@ -1425,6 +1445,8 @@ object ModuleSpearKill : ClientModule("SpearKill", ModuleCategories.COMBAT, alia
         "local_velocity" to spearKillDebugVector(player.deltaMovement),
         "local_on_ground" to player.onGround(),
         "local_fall_distance" to player.fallDistance,
+        "remote_movement_owner" to RemoteKillMovementOwnership.currentOwner,
+        "spear_engine_owns_movement" to remoteKillRouteEngine.ownsMovement,
         "packet_session_active" to packetBootSession.active,
         "packet_recovering" to packetBootSession.recovering,
         "packet_holding_pre_strike" to packetBootSession.holdingPreStrike,
@@ -1896,6 +1918,7 @@ object ModuleSpearKill : ClientModule("SpearKill", ModuleCategories.COMBAT, alia
         if (motionAttemptActive) {
             abortSpearKillAttempt("motion-reset")
             resetSpearKillSpeedSession()
+            releaseStandaloneRemoteMovementOwnership()
         }
         motionPacketHeading = null
         fallDamageDeliveryTracker.clear()
@@ -1937,7 +1960,10 @@ object ModuleSpearKill : ClientModule("SpearKill", ModuleCategories.COMBAT, alia
     }
 
     /** Discards the current virtual path while retaining the recovery origins and transport. */
-    private fun clearVirtualMovementState(retainPrimedPacketBudget: Boolean = false) {
+    private fun clearVirtualMovementState(
+        retainPrimedPacketBudget: Boolean = false,
+        retainRemoteKillOwnership: Boolean = false,
+    ) {
         val retainedPrimedPacketsDelivered = primedSessionPacketsDelivered
         previewTarget = null
         // A correction starts packet recovery through this same cleanup path. Retain its active
@@ -1977,8 +2003,20 @@ object ModuleSpearKill : ClientModule("SpearKill", ModuleCategories.COMBAT, alia
         plannedPacket = null
         awaitingVanillaMovementPacket = false
         movementAssistPreparationActive = false
-        packetBootSession.clear()
+        if (!retainRemoteKillOwnership) {
+            clearRemoteKillPacketOwnership()
+        }
         clearAStarTargetLock()
+    }
+
+    private fun clearRemoteKillPacketOwnership() {
+        remoteKillRouteEngine.clear()
+        releaseStandaloneRemoteMovementOwnership()
+    }
+
+    private fun releaseStandaloneRemoteMovementOwnership() {
+        standaloneRemoteMovementLease?.close()
+        standaloneRemoteMovementLease = null
     }
 
     private fun clearAStarRenderPath() {
@@ -2076,7 +2114,7 @@ object ModuleSpearKill : ClientModule("SpearKill", ModuleCategories.COMBAT, alia
 
         val committedOffset = packetBootSession.committedOffset
         if (committedOffset.lengthSqr() < SPEAR_KILL_FALL_SAFETY_OFFSET_EPSILON_SQUARED) {
-            packetBootSession.beginExactReturn()
+            beginCoordinatedExactReturn()
             fallSafetyLifecycle.invalidate()
             resetVirtualFallSafety()
             return !packetBootSession.active
@@ -2105,16 +2143,44 @@ object ModuleSpearKill : ClientModule("SpearKill", ModuleCategories.COMBAT, alia
                     activePacketStepWaitTicks,
                 )
             } else {
-                packetBootSession.beginPacketExactRecoveryFrom(
+                beginCoordinatedPacketExactRecoveryFrom(
                     committedOffset,
                     recoveryMovements,
                     activePacketStepWaitTicks,
                 )
             }
         } else {
-            packetBootSession.beginExactReturn()
+            beginCoordinatedExactReturn()
         }
         return packetBootSession.active
+    }
+
+    private fun beginCoordinatedExactReturn() {
+        if (remoteKillRouteEngine.ownsMovement) {
+            remoteKillRouteEngine.abort()
+        } else {
+            packetBootSession.beginExactReturn()
+        }
+    }
+
+    private fun beginCoordinatedPacketExactRecoveryFrom(
+        authoritativeOffset: Vec3,
+        recoveryMovements: List<Vec3>,
+        stepWaitTicks: Int,
+    ) {
+        if (remoteKillRouteEngine.ownsMovement) {
+            remoteKillRouteEngine.beginPacketExactRecoveryFrom(
+                authoritativeOffset,
+                recoveryMovements,
+                stepWaitTicks,
+            )
+        } else {
+            packetBootSession.beginPacketExactRecoveryFrom(
+                authoritativeOffset,
+                recoveryMovements,
+                stepWaitTicks,
+            )
+        }
     }
 
     private fun stopFailClosedPacketRoute(): Boolean {
@@ -2126,7 +2192,7 @@ object ModuleSpearKill : ClientModule("SpearKill", ModuleCategories.COMBAT, alia
         }
         fallSafetyLifecycle.invalidate()
         resetVirtualFallSafety()
-        packetBootSession.clear()
+        clearRemoteKillPacketOwnership()
         packetSetbackRecoveryAttempted = true
         attemptTracker.markBlocked()
         plannedPacket = null
@@ -2480,10 +2546,41 @@ object ModuleSpearKill : ClientModule("SpearKill", ModuleCategories.COMBAT, alia
         return lineOfSight(eye, hitPoint)
     }
 
+    private fun reconcileAndReportRemoteMovementBlocker(target: LivingEntity, distance: Double): Boolean {
+        remoteKillRouteEngine.reconcileCompletedOwnership()
+        val movementOwner = RemoteKillMovementOwnership.currentOwner ?: return false
+        debugSpearKillChanged(
+            channel = "start-blocker",
+            event = "START_BLOCKED",
+            fingerprint = { listOf(target.id, "remote-movement-owned", movementOwner) },
+        ) {
+            listOf(
+                "tick" to player.tickCount,
+                "reason" to "remote-movement-owned",
+                "movement_owner" to movementOwner,
+            ) + spearKillDebugTargetFields(target, distance) + spearKillDebugSessionFields()
+        }
+        return true
+    }
+
     private fun createAttackMovement(target: LivingEntity, distance: Double): SpearKillAttackStartResult {
+        if (reconcileAndReportRemoteMovementBlocker(target, distance)) return SpearKillAttackStartResult.BLOCKED
         if (!usesPacketMovementMode) {
-            beginSpearKillSpeedSession()
-            return startSpearKillMotionAttack(target, distance)
+            val movementLease = RemoteKillMovementOwnership.tryAcquire("SpearKillMotion")
+                ?: return SpearKillAttackStartResult.BLOCKED
+            return try {
+                beginSpearKillSpeedSession()
+                startSpearKillMotionAttack(target, distance).also { result ->
+                    if (result == SpearKillAttackStartResult.STARTED) {
+                        standaloneRemoteMovementLease = movementLease
+                    } else {
+                        movementLease.close()
+                    }
+                }
+            } catch (throwable: Throwable) {
+                movementLease.close()
+                throw throwable
+            }
         }
 
         val settings = resolveSpearKillPacketSettings(prepareElytra = true)
@@ -2658,10 +2755,17 @@ object ModuleSpearKill : ClientModule("SpearKill", ModuleCategories.COMBAT, alia
         physicalReturnPositioner.clear()
         returnRecoveryTracker.begin(origin)
         if (instantBurst != null) {
-            startSpearKillInstantPacketSession(packetBootSession, instantBurst)
+            startSpearKillInstantPacketSession(
+                engine = remoteKillRouteEngine,
+                target = target,
+                origin = origin,
+                burst = instantBurst,
+            )
         } else {
             startSpearKillDirectPacketSession(
-                session = packetBootSession,
+                engine = remoteKillRouteEngine,
+                target = target,
+                origin = origin,
                 route = route,
                 stepWaitTicks = settings.stepWaitTicks,
                 strikeHoldTicks = settings.strikeHoldTicks,
@@ -2751,15 +2855,16 @@ object ModuleSpearKill : ClientModule("SpearKill", ModuleCategories.COMBAT, alia
         packetSessionOrigin = origin
         physicalReturnPositioner.clear()
         returnRecoveryTracker.begin(origin)
-        packetBootSession.startPhysicalReturn(
-            path = plan.packetRoute.roundTripMovements,
-            outboundSteps = plan.packetRoute.outboundMovements.size,
+        remoteKillRouteEngine.start(target, RemoteKillRouteRequest(
+            origin = origin,
+            outboundMovements = plan.packetRoute.outboundMovements,
             strikeHoldTicks = settings.strikeHoldTicks,
             stepWaitTicks = settings.stepWaitTicks,
+            physicalReturn = true,
             preStrikeHoldTicks = plan.preStrikeHoldTicks,
             terminalSuffixSteps = plan.terminalSuffixCount,
             requireTerminalAuthorization = true,
-        )
+        ))
         plannedAStarRenderPath = plan.renderPath
         plannedAStarApproach = plan.approach
         plannedAStarTargetPosition = plan.targetPosition
@@ -3166,6 +3271,21 @@ object ModuleSpearKill : ClientModule("SpearKill", ModuleCategories.COMBAT, alia
         val plan = selection.route
         val aStarPlan = plan.aStarPlan
         if (!installPacketChainPlan(plan)) return PacketChainStartResult.FAILED
+        remoteKillRouteEngine.handoff(
+            selection.target,
+            RemoteKillRouteRequest(
+                origin = routeOrigin,
+                outboundMovements = plan.outboundMovements,
+                strikeHoldTicks = plan.strikeHoldTicks,
+                stepWaitTicks = settings.stepWaitTicks,
+                physicalReturn = packetBootSession.physicalReturnConfigured,
+                preStrikeHoldTicks = plan.preStrikeHoldTicks,
+                terminalSuffixSteps = aStarPlan?.terminalSuffixCount
+                    ?: plan.terminalBurstSteps.coerceAtLeast(1),
+                terminalBurstSteps = plan.terminalBurstSteps,
+                requireTerminalAuthorization = plan.terminalAuthorizationRequired,
+            ),
+        )
 
         packetAStarAttackActive = aStarPlan != null
         directTerminalReplanInstalled = false
@@ -3612,6 +3732,19 @@ object ModuleSpearKill : ClientModule("SpearKill", ModuleCategories.COMBAT, alia
         ) {
             return SpearKillPacketRouteReplanResult.TRANSIENT_FAILURE
         }
+        remoteKillRouteEngine.handoff(
+            target,
+            RemoteKillRouteRequest(
+                origin = routeOrigin,
+                outboundMovements = plan.packetRoute.outboundMovements,
+                strikeHoldTicks = settings.strikeHoldTicks,
+                stepWaitTicks = settings.stepWaitTicks,
+                physicalReturn = packetBootSession.physicalReturnConfigured,
+                preStrikeHoldTicks = plan.preStrikeHoldTicks,
+                terminalSuffixSteps = plan.terminalSuffixCount,
+                requireTerminalAuthorization = true,
+            ),
+        )
         replanVirtualFallSafety(fallSafetyPlan)
         plannedAStarRenderPath = plan.renderPath
         plannedAStarApproach = plan.approach
@@ -3641,7 +3774,7 @@ object ModuleSpearKill : ClientModule("SpearKill", ModuleCategories.COMBAT, alia
         }
     }
 
-    @Suppress("ReturnCount")
+    @Suppress("ReturnCount", "LongMethod")
     private fun installReplannedDirectPacketRoute(
         target: LivingEntity,
         routeOrigin: Vec3,
@@ -3693,6 +3826,28 @@ object ModuleSpearKill : ClientModule("SpearKill", ModuleCategories.COMBAT, alia
         ) {
             return SpearKillPacketRouteReplanResult.TRANSIENT_FAILURE
         }
+        remoteKillRouteEngine.handoff(
+            target,
+            RemoteKillRouteRequest(
+                origin = routeOrigin,
+                outboundMovements = route.outboundMovements,
+                strikeHoldTicks = settings.strikeHoldTicks,
+                stepWaitTicks = settings.stepWaitTicks,
+                physicalReturn = packetBootSession.physicalReturnConfigured,
+                preStrikeHoldTicks = if (settings.primedInstant) {
+                    0
+                } else {
+                    SPEAR_KILL_PACKET_MAX_PRE_STRIKE_HOLD_TICKS
+                },
+                terminalSuffixSteps = if (settings.primedInstant) {
+                    1
+                } else {
+                    route.terminalBurstSteps.coerceAtLeast(1)
+                },
+                terminalBurstSteps = route.terminalBurstSteps,
+                requireTerminalAuthorization = !settings.primedInstant,
+            ),
+        )
         replanVirtualFallSafety(fallSafetyPlan)
         plannedAStarTargetPosition = plan.targetSnapshot.observedPosition
         plannedAStarTargetVelocity = plan.targetSnapshot.velocity
@@ -4369,14 +4524,17 @@ object ModuleSpearKill : ClientModule("SpearKill", ModuleCategories.COMBAT, alia
             expectedNetMovement = attempt.authoritativeOffset.scale(-1.0),
             initialFallDistance = initialFallDistance,
         ) ?: return false
-        clearVirtualMovementState(retainPrimedPacketBudget = primedSettings != null)
+        clearVirtualMovementState(
+            retainPrimedPacketBudget = primedSettings != null,
+            retainRemoteKillOwnership = true,
+        )
         packetSessionOrigin = attempt.destination
         physicalReturnPositioner.clear()
         packetRecoveryStallTicks = 0
         packetSetbackRecoveryAttempted = true
         attemptTracker.markRecovery()
         beginVirtualFallSafety(fallSafetyPlan)
-        packetBootSession.beginPacketExactRecoveryFrom(
+        beginCoordinatedPacketExactRecoveryFrom(
             attempt.authoritativeOffset,
             movements,
             activePacketStepWaitTicks,
@@ -5050,7 +5208,10 @@ object ModuleSpearKill : ClientModule("SpearKill", ModuleCategories.COMBAT, alia
         motionPacketHeading = spearKillKineticHeading(movement)
         player.deltaMovement = movement
         lastDeliveredMovement = movement
-        if (attackMovements.isEmpty()) resetSpearKillSpeedSession()
+        if (attackMovements.isEmpty()) {
+            resetSpearKillSpeedSession()
+            releaseStandaloneRemoteMovementOwnership()
+        }
     }
 
     private fun applyNextKillAuraMotionReturnStep() {
@@ -5058,7 +5219,18 @@ object ModuleSpearKill : ClientModule("SpearKill", ModuleCategories.COMBAT, alia
         motionPacketHeading = spearKillKineticHeading(movement)
         player.deltaMovement = movement
         lastDeliveredMovement = movement
-        if (attackMovements.isEmpty()) resetSpearKillSpeedSession()
+        if (attackMovements.isEmpty()) {
+            resetSpearKillSpeedSession()
+            releaseStandaloneRemoteMovementOwnership()
+        }
+    }
+
+    private fun confirmRemoteSpearKillPacketStep(delivered: Boolean) {
+        if (remoteKillRouteEngine.ownsMovement) {
+            remoteKillRouteEngine.confirmStep(delivered)
+            return
+        }
+        packetBootSession.confirmStep(delivered)
     }
 
     @Suppress("unused")
@@ -5187,7 +5359,7 @@ object ModuleSpearKill : ClientModule("SpearKill", ModuleCategories.COMBAT, alia
             step.noFallPacketDelivered = delivery.delivered
         }
         if (!delivery.delivered) {
-            packetBootSession.confirmStep(delivered = false)
+            confirmRemoteSpearKillPacketStep(delivered = false)
             awaitingVanillaMovementPacket = false
             failActivePrimedStep()
             if (primedStep != null) {
@@ -5258,7 +5430,7 @@ object ModuleSpearKill : ClientModule("SpearKill", ModuleCategories.COMBAT, alia
         outboundStep: Boolean,
         packetsSent: Int,
     ): InstantStepDelivery {
-        packetBootSession.confirmStep(delivered = false)
+        confirmRemoteSpearKillPacketStep(delivered = false)
         plannedPacket = null
         awaitingVanillaMovementPacket = false
         failActivePrimedStep()
@@ -5269,12 +5441,53 @@ object ModuleSpearKill : ClientModule("SpearKill", ModuleCategories.COMBAT, alia
         outboundStep: Boolean,
         packetsSent: Int,
     ): InstantStepDelivery {
-        if (outboundStep && !packetBootSession.recovering) {
-            terminatePacketFollow(lockedAStarTarget, PacketFollowTermination.BLOCKED)
+        val action = resolveSpearKillInstantRejectedStepAction(
+            outboundStep = outboundStep,
+            recovering = packetBootSession.recovering,
+        )
+        when (action) {
+            SpearKillInstantRejectedStepAction.TERMINATE_OUTBOUND ->
+                terminatePacketFollow(lockedAStarTarget, PacketFollowTermination.BLOCKED)
+            SpearKillInstantRejectedStepAction.REPLAN_RETURN ->
+                replanRejectedSpearKillInstantReturn()
+            SpearKillInstantRejectedStepAction.PAUSE -> Unit
         }
         return InstantStepDelivery(
             packetsSent = packetsSent,
-            continueBurst = outboundStep && packetBootSession.active,
+            continueBurst = action == SpearKillInstantRejectedStepAction.TERMINATE_OUTBOUND &&
+                packetBootSession.active,
+        )
+    }
+
+    /** Re-enters the bounded packet-first recovery immediately when the installed inverse is blocked. */
+    private fun replanRejectedSpearKillInstantReturn() {
+        val sessionOrigin = packetSessionOrigin ?: run {
+            clearAttack("instant-return-without-origin")
+            return
+        }
+        if (returnRecoveryTracker.recoveryOrigin == null) {
+            returnRecoveryTracker.begin(sessionOrigin)
+        }
+        val authoritativeOffset = packetBootSession.committedOffset
+        val authoritativePosition = sessionOrigin.add(authoritativeOffset)
+        val preferredReturn = packetBootSession.exactRecoveryMovementsFrom(authoritativeOffset)
+        val recoveryFallDistance = maxOf(
+            player.fallDistance.toDouble(),
+            fallSafetyLifecycle.confirmedFallDistance.takeIf { fallSafetyLifecycle.active } ?: 0.0,
+        )
+        debugSpearKill("INSTANT_RETURN_REPLAN") {
+            listOf(
+                "tick" to player.tickCount,
+                "authoritative_position" to spearKillDebugVector(authoritativePosition),
+                "authoritative_offset" to spearKillDebugVector(authoritativeOffset),
+                "preferred_return_steps" to preferredReturn?.size,
+                "recovery_fall_distance" to recoveryFallDistance,
+            ) + spearKillDebugTargetFields(lockedAStarTarget) + spearKillDebugSessionFields()
+        }
+        startPacketFirstReturnRecovery(
+            authoritativePosition = authoritativePosition,
+            preferredFirstLeg = preferredReturn,
+            initialFallDistance = recoveryFallDistance,
         )
     }
 
@@ -5441,7 +5654,7 @@ object ModuleSpearKill : ClientModule("SpearKill", ModuleCategories.COMBAT, alia
                     "confirmed_fall_distance" to fallSafetyLifecycle.confirmedFallDistance,
                 ) + spearKillDebugTargetFields(lockedAStarTarget) + spearKillDebugSessionFields()
             }
-            packetBootSession.confirmStep(delivered = false)
+            confirmRemoteSpearKillPacketStep(delivered = false)
             awaitingVanillaMovementPacket = false
             beginSafeExactReturn()
             applyConfirmedPhysicalReturnPosition()
@@ -5657,7 +5870,7 @@ object ModuleSpearKill : ClientModule("SpearKill", ModuleCategories.COMBAT, alia
 
     private fun rejectPendingSpearKillPacketStep(validation: SpearKillPendingPacketStepValidation) {
         val outboundStep = packetBootSession.pendingOutboundStep
-        packetBootSession.confirmStep(delivered = false)
+        confirmRemoteSpearKillPacketStep(delivered = false)
         plannedPacket = null
         awaitingVanillaMovementPacket = false
         if (validation == SpearKillPendingPacketStepValidation.BUDGET_EXCEEDED && outboundStep) {
@@ -6052,7 +6265,7 @@ object ModuleSpearKill : ClientModule("SpearKill", ModuleCategories.COMBAT, alia
                 ),
             )
         } ?: false
-        packetBootSession.confirmStep(delivered)
+        confirmRemoteSpearKillPacketStep(delivered)
         if (delivered) {
             packetRecoveryStallTicks = nextSpearKillRecoveryStallTicks(
                 currentTicks = packetRecoveryStallTicks,
@@ -6104,6 +6317,7 @@ object ModuleSpearKill : ClientModule("SpearKill", ModuleCategories.COMBAT, alia
             packetSessionOrigin = null
             packetSessionSettings = null
             highSpeedMoveProbeActive = false
+            releaseStandaloneRemoteMovementOwnership()
             requestSpearKillAttemptCompletion()
             synchronizeSpearKillServerSneak()
         }
@@ -6133,6 +6347,7 @@ object ModuleSpearKill : ClientModule("SpearKill", ModuleCategories.COMBAT, alia
             targetPlayer.setPos(physicalPosition)
             targetPlayer.deltaMovement = Vec3.ZERO
         }
+        remoteKillRouteEngine.reconcileCompletedOwnership()
         if (!packetBootSession.active) {
             finishSpearKillFallSafety(targetPlayer.position(), allowPacket = true, targetPlayer = targetPlayer)
             packetSessionOrigin = null
@@ -6143,6 +6358,7 @@ object ModuleSpearKill : ClientModule("SpearKill", ModuleCategories.COMBAT, alia
         }
     }
 
+    @Suppress("LongMethod")
     internal fun preparePacketSetback(packet: ClientboundPlayerPositionPacket, player: Player) {
         if (!setbackRollback.isMarked(packet)) return
         attemptTracker.markSetback()
@@ -6193,7 +6409,10 @@ object ModuleSpearKill : ClientModule("SpearKill", ModuleCategories.COMBAT, alia
             fallSafetyLifecycle.confirmedFallDistance.takeIf { fallSafetyLifecycle.active } ?: 0.0,
         )
         pendingSetbackConfirmedOffset = packetBootSession.committedOffset
-        clearVirtualMovementState(retainPrimedPacketBudget = recoverySettings?.primedInstant == true)
+        clearVirtualMovementState(
+            retainPrimedPacketBudget = recoverySettings?.primedInstant == true,
+            retainRemoteKillOwnership = true,
+        )
         physicalReturnPositioner.clear()
         packetRecoveryStallTicks = 0
         rejectedRouteTarget?.let(::rejectSpearKillTarget)

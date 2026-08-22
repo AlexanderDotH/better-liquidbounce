@@ -34,6 +34,7 @@ import net.ccbluex.liquidbounce.features.module.modules.combat.killaura.ModuleKi
 import net.ccbluex.liquidbounce.features.module.modules.render.ModuleDebug
 import net.ccbluex.liquidbounce.render.engine.type.Color4b
 import net.ccbluex.liquidbounce.utils.aiming.data.Rotation
+import net.ccbluex.liquidbounce.utils.client.SilentHotbar
 import net.ccbluex.liquidbounce.utils.combat.TargetPriority
 import net.ccbluex.liquidbounce.utils.combat.TargetTracker
 import net.ccbluex.liquidbounce.utils.entity.doesCollideAt
@@ -41,6 +42,8 @@ import net.ccbluex.liquidbounce.utils.entity.doesNotCollideBelow
 import net.ccbluex.liquidbounce.utils.entity.getMovementDirectionOfInput
 import net.ccbluex.liquidbounce.utils.entity.rotation
 import net.ccbluex.liquidbounce.utils.entity.squaredBoxedDistanceTo
+import net.ccbluex.liquidbounce.utils.inventory.Slots
+import net.ccbluex.liquidbounce.utils.item.isSpear
 import net.ccbluex.liquidbounce.utils.kotlin.EventPriorityConvention.CRITICAL_MODIFICATION
 import net.ccbluex.liquidbounce.utils.math.fma
 import net.ccbluex.liquidbounce.utils.math.sq
@@ -49,6 +52,7 @@ import net.ccbluex.liquidbounce.utils.movement.getDegreesRelativeToView
 import net.ccbluex.liquidbounce.utils.movement.getDirectionalInputForDegrees
 import net.minecraft.world.entity.LivingEntity
 import net.minecraft.world.entity.player.Player
+import net.minecraft.world.item.Items
 import net.minecraft.world.phys.Vec3
 import kotlin.math.abs
 import kotlin.math.min
@@ -62,6 +66,7 @@ object ModuleFightBot : ClientModule("FightBot", ModuleCategories.COMBAT) {
     private val runawayOnCooldown by boolean("RunawayOnCooldown", true)
     private val autoEnableKillAura by boolean("AutoEnableKillAura", true)
     private val spearAutomation by enumChoice("SpearAutomation", FightBotSpearAutomation.HeldOrHotbar)
+    private val maceAutomation by enumChoice("MaceAutomation", FightBotMaceAutomation.Off)
     private val autoAction by multiEnumChoice("Auto", AutoAction.entries)
 
     private val targetTracker = tree(FightBotTargetTracker())
@@ -88,6 +93,9 @@ object ModuleFightBot : ClientModule("FightBot", ModuleCategories.COMBAT) {
     internal val configuredSpearAutomation: FightBotSpearAutomation
         get() = spearAutomation
 
+    internal val configuredMaceAutomation: FightBotMaceAutomation
+        get() = maceAutomation
+
     private val combatOperational: Boolean
         get() = killAuraLease.isOperational(ModuleKillAura.running)
 
@@ -101,7 +109,7 @@ object ModuleFightBot : ClientModule("FightBot", ModuleCategories.COMBAT) {
 
     override fun onDisabled() {
         val disableLeasedKillAura = killAuraLease.shouldDisableKillAuraOnRelease
-        clearTargetAndSpear(SpearKillFightBotTerminal.Disable)
+        clearTargetAndWeapons(SpearKillFightBotTerminal.Disable, MaceKillFightBotTerminal.Disable)
         killAuraLease = FightBotKillAuraLease.start(autoEnable = false, killAuraEnabled = false)
         if (disableLeasedKillAura && ModuleKillAura.enabled) {
             ModuleKillAura.enabled = false
@@ -113,15 +121,23 @@ object ModuleFightBot : ClientModule("FightBot", ModuleCategories.COMBAT) {
         if (!event.moduleName.equals(ModuleKillAura.name, ignoreCase = true) || event.enabled) return@handler
 
         killAuraLease = killAuraLease.onKillAuraDisabled()
-        clearTargetAndSpear(SpearKillFightBotTerminal.TargetLoss)
+        clearTargetAndWeapons(SpearKillFightBotTerminal.TargetLoss, MaceKillFightBotTerminal.TargetLoss)
     }
 
     @Suppress("unused")
     private val targetUpdateHandler = handler<RotationUpdateEvent> {
         if (!combatOperational || player.isDeadOrDying || player.isSpectator) {
-            clearTargetAndSpear(
-                if (player.isDeadOrDying) SpearKillFightBotTerminal.Death else SpearKillFightBotTerminal.TargetLoss,
-            )
+            val spearTerminal = if (player.isDeadOrDying) {
+                SpearKillFightBotTerminal.Death
+            } else {
+                SpearKillFightBotTerminal.TargetLoss
+            }
+            val maceTerminal = if (player.isDeadOrDying) {
+                MaceKillFightBotTerminal.Death
+            } else {
+                MaceKillFightBotTerminal.TargetLoss
+            }
+            clearTargetAndWeapons(spearTerminal, maceTerminal)
             return@handler
         }
 
@@ -131,14 +147,18 @@ object ModuleFightBot : ClientModule("FightBot", ModuleCategories.COMBAT) {
 
         if (target == null || target.squaredBoxedDistanceTo(player) <= ModuleKillAura.extendedInteractionRange.sq()) {
             ModuleSpearKill.releaseFightBotSpearUse(SpearKillFightBotTerminal.TargetLoss)
+            ModuleMaceKill.releaseFightBotMaceUse(MaceKillFightBotTerminal.TargetLoss)
             return@handler
         }
 
-        ModuleSpearKill.requestFightBotSpearUse(target)
+        requestFightBotRemoteWeaponUse(target)
     }
 
     private fun updateTarget() {
-        val routeTarget = ModuleSpearKill.fightBotRouteTarget
+        val routeTarget = selectFightBotRouteTarget(
+            maceRouteTarget = ModuleMaceKill.fightBotRouteTarget,
+            spearRouteTarget = ModuleSpearKill.fightBotRouteTarget,
+        )
         if (routeTarget != null && targetTracker.validate(routeTarget)) {
             targetTracker.target = routeTarget
             return
@@ -155,20 +175,77 @@ object ModuleFightBot : ClientModule("FightBot", ModuleCategories.COMBAT) {
         )
     }
 
-    private fun clearTargetAndSpear(terminal: SpearKillFightBotTerminal) {
+    private fun requestFightBotRemoteWeaponUse(target: LivingEntity) {
+        val maceSource = resolveFightBotMaceUseSource()
+        val spearSource = resolveFightBotSpearUseSource()
+        when (selectFightBotRemoteWeapon(
+            maceSource = maceSource,
+            spearSource = spearSource,
+            maceRouteActive = ModuleMaceKill.fightBotStateFor(target) == MaceKillFightBotState.RouteActive,
+            spearRouteActive = ModuleSpearKill.fightBotStateFor(target) == SpearKillFightBotState.RouteActive,
+        )) {
+            FightBotRemoteWeapon.Mace -> {
+                ModuleSpearKill.releaseFightBotSpearUse(SpearKillFightBotTerminal.TargetLoss)
+                if (!ModuleMaceKill.fightBotStateFor(target).retainsRejectedTarget) {
+                    ModuleMaceKill.requestFightBotMaceUse(target)
+                }
+            }
+            FightBotRemoteWeapon.Spear -> {
+                ModuleMaceKill.releaseFightBotMaceUse(MaceKillFightBotTerminal.TargetLoss)
+                ModuleSpearKill.requestFightBotSpearUse(target)
+            }
+            null -> {
+                ModuleMaceKill.releaseFightBotMaceUse(MaceKillFightBotTerminal.TargetLoss)
+                ModuleSpearKill.releaseFightBotSpearUse(SpearKillFightBotTerminal.TargetLoss)
+            }
+        }
+    }
+
+    private fun resolveFightBotMaceUseSource(): FightBotMaceUseSource? {
+        if (!ModuleMaceKill.running) return null
+        return selectFightBotMaceUseSource(
+            automation = maceAutomation,
+            mainHandMace = player.mainHandItem.item === Items.MACE,
+            selectedHotbarSlot = SilentHotbar.serversideSlot,
+            hotbarMaceSlots = Slots.Hotbar.asSequence()
+                .filter { it.itemStack.item === Items.MACE }
+                .mapNotNull { it.hotbarIndex }
+                .toList(),
+        )
+    }
+
+    private fun resolveFightBotSpearUseSource(): FightBotSpearUseSource? {
+        if (!ModuleSpearKill.running) return null
+        return selectFightBotSpearUseSource(
+            automation = spearAutomation,
+            mainHandSpear = player.mainHandItem.isSpear,
+            offhandSpear = player.offhandItem.isSpear,
+            selectedHotbarSlot = SilentHotbar.serversideSlot,
+            hotbarSpearSlots = Slots.Hotbar.asSequence()
+                .filter { it.itemStack.isSpear }
+                .mapNotNull { it.hotbarIndex }
+                .toList(),
+        )
+    }
+
+    private fun clearTargetAndWeapons(
+        spearTerminal: SpearKillFightBotTerminal,
+        maceTerminal: MaceKillFightBotTerminal,
+    ) {
         targetTracker.reset()
         currentTargetHandoff = FightBotTargetHandoff.Idle
-        ModuleSpearKill.releaseFightBotSpearUse(terminal)
+        ModuleSpearKill.releaseFightBotSpearUse(spearTerminal)
+        ModuleMaceKill.releaseFightBotMaceUse(maceTerminal)
     }
 
     @Suppress("unused")
     private val worldChangeHandler = handler<WorldChangeEvent> {
-        clearTargetAndSpear(SpearKillFightBotTerminal.WorldChange)
+        clearTargetAndWeapons(SpearKillFightBotTerminal.WorldChange, MaceKillFightBotTerminal.WorldChange)
     }
 
     @Suppress("unused")
     private val disconnectHandler = handler<DisconnectEvent> {
-        clearTargetAndSpear(SpearKillFightBotTerminal.Disconnect)
+        clearTargetAndWeapons(SpearKillFightBotTerminal.Disconnect, MaceKillFightBotTerminal.Disconnect)
     }
 
     @Suppress("unused")

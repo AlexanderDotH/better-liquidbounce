@@ -1,0 +1,30 @@
+{
+  "id": "paper-26.2-build-112-unvalidated",
+  "validation": "UNVALIDATED",
+  "minecraft": {
+    "version": "26.2",
+    "protocol": 776
+  },
+  "paper": {
+    "buildId": 112,
+    "channel": "STABLE",
+    "publishedAt": "2026-08-11T05:18:39Z",
+    "file": "paper-26.2-112.jar",
+    "url": "https://fill-data.papermc.io/v1/objects/bd3a58cf96874e5ea6643f5f6fe9b4f5bf9e34b795fa078c2f0ee8b98b2f907e/paper-26.2-112.jar",
+    "sha256": "bd3a58cf96874e5ea6643f5f6fe9b4f5bf9e34b795fa078c2f0ee8b98b2f907e"
+  },
+  "java": 25,
+  "plugins": [
+    {
+      "name": "MaceKillLabObserver",
+      "version": "0.1.0",
+      "file": "macekill-lab-observer-0.1.0.jar",
+      "sha256": "b84faf38c6db14618a71bc31409be3e36e52832bb92aed472e8bca517a25076c"
+    }
+  ],
+  "evidence": {
+    "client": "LiquidBounce/maceclip-research/*.jsonl",
+    "server": "plugins/MaceKillLabObserver/evidence/*.jsonl",
+    "status": "NOT_RUN"
+  }
+}

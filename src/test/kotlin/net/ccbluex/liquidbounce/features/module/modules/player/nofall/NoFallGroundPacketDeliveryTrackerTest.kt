@@ -23,6 +23,7 @@ import net.ccbluex.liquidbounce.event.events.TransferOrigin
 import net.ccbluex.liquidbounce.features.module.modules.player.nofall.modes.GroundPacketDeliveryTracker
 import net.ccbluex.liquidbounce.features.module.modules.player.nofall.modes.outgoingMovementPacket
 import net.ccbluex.liquidbounce.features.module.modules.player.nofall.modes.shouldSendNoFallPacketDuringSpearKill
+import net.ccbluex.liquidbounce.features.module.modules.player.nofall.modes.shouldSendNoFallPacketDuringRemoteKill
 import net.minecraft.network.protocol.game.ServerboundMovePlayerPacket
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
@@ -123,6 +124,24 @@ class NoFallGroundPacketDeliveryTrackerTest {
     fun `NoFall packet injection pauses during a SpearKill virtual route`() {
         assertTrue(shouldSendNoFallPacketDuringSpearKill(spearKillPacketRouteActive = false))
         assertFalse(shouldSendNoFallPacketDuringSpearKill(spearKillPacketRouteActive = true))
+    }
+
+    @Test
+    fun `NoFall packet injection pauses during any remote kill route`() {
+        assertTrue(shouldSendNoFallPacketDuringRemoteKill(remoteKillPacketRouteActive = false))
+        assertFalse(shouldSendNoFallPacketDuringRemoteKill(remoteKillPacketRouteActive = true))
+    }
+
+    @Test
+    fun `NoFall resumes during a retained correction window after route packets finish`() {
+        assertFalse(shouldSendNoFallPacketDuringRemoteKill(
+            remoteKillMovementOwned = true,
+            exclusiveRoutePacketsActive = true,
+        ))
+        assertTrue(shouldSendNoFallPacketDuringRemoteKill(
+            remoteKillMovementOwned = true,
+            exclusiveRoutePacketsActive = false,
+        ))
     }
 
     private fun movePacket(onGround: Boolean) =

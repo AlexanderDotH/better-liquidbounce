@@ -27,7 +27,7 @@ import net.ccbluex.liquidbounce.event.events.PlayerStepSuccessEvent
 import net.ccbluex.liquidbounce.event.events.TransferOrigin
 import net.ccbluex.liquidbounce.event.handler
 import net.ccbluex.liquidbounce.features.blink.BlinkManager
-import net.ccbluex.liquidbounce.features.module.modules.combat.ModuleSpearKill
+import net.ccbluex.liquidbounce.features.module.modules.combat.RemoteKillMovementOwnership
 import net.ccbluex.liquidbounce.features.module.modules.player.nofall.modes.outgoingMovementPacket
 import net.ccbluex.liquidbounce.utils.kotlin.EventPriorityConvention.FINAL_DECISION
 import net.ccbluex.liquidbounce.utils.kotlin.EventPriorityConvention.READ_FINAL_STATE
@@ -45,11 +45,11 @@ internal enum class PacketFlySpeedExploit(override val tag: String) : Tagged {
 
 internal object PacketFlyRuntimePolicy {
 
-    fun shouldPlan(collisionResolvedMovement: Vec3, spearKillOwnsPacketRoute: Boolean) =
-        !spearKillOwnsPacketRoute && collisionResolvedMovement != Vec3.ZERO
+    fun shouldPlan(collisionResolvedMovement: Vec3, remoteKillOwnsPacketRoute: Boolean) =
+        !remoteKillOwnsPacketRoute && collisionResolvedMovement != Vec3.ZERO
 
-    fun resolvePhysicalMovement(collisionResolvedMovement: Vec3, spearKillOwnsPacketRoute: Boolean) =
-        if (spearKillOwnsPacketRoute) Vec3.ZERO else collisionResolvedMovement
+    fun resolvePhysicalMovement(collisionResolvedMovement: Vec3, remoteKillOwnsPacketRoute: Boolean) =
+        if (remoteKillOwnsPacketRoute) Vec3.ZERO else collisionResolvedMovement
 }
 
 /**
@@ -201,7 +201,7 @@ internal object FlyPacket : VanillaFlyMode("Packet", 0.1f..500f) {
     private var expectedEndpoint: Vec3? = null
 
     override val movementSuspended: Boolean
-        get() = ModuleSpearKill.usesPacketMovement
+        get() = RemoteKillMovementOwnership.active
 
     override fun onVanillaFlyRuntimeReset() = clearPacketPlan()
 
@@ -217,13 +217,13 @@ internal object FlyPacket : VanillaFlyMode("Packet", 0.1f..500f) {
 
     @Suppress("unused")
     private val resolvedMovementHandler = handler<PlayerStepSuccessEvent>(priority = FINAL_DECISION) { event ->
-        val spearKillOwnsPacketRoute = ModuleSpearKill.usesPacketMovement
+        val remoteKillOwnsPacketRoute = RemoteKillMovementOwnership.active
         val resolvedMovement = PacketFlyRuntimePolicy.resolvePhysicalMovement(
             collisionResolvedMovement = event.adjustedVec,
-            spearKillOwnsPacketRoute = spearKillOwnsPacketRoute,
+            remoteKillOwnsPacketRoute = remoteKillOwnsPacketRoute,
         )
         event.adjustedVec = resolvedMovement
-        if (!PacketFlyRuntimePolicy.shouldPlan(resolvedMovement, spearKillOwnsPacketRoute)) {
+        if (!PacketFlyRuntimePolicy.shouldPlan(resolvedMovement, remoteKillOwnsPacketRoute)) {
             clearPacketPlan()
             return@handler
         }
@@ -347,7 +347,7 @@ internal object FlyPacket : VanillaFlyMode("Packet", 0.1f..500f) {
             clearPacketPlan()
             return@handler
         }
-        if (ModuleSpearKill.usesPacketMovement) {
+        if (RemoteKillMovementOwnership.active) {
             clearPacketPlan()
             return@handler
         }
