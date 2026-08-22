@@ -21,7 +21,6 @@
 
 package net.ccbluex.liquidbounce.features.chat
 
-import com.google.gson.GsonBuilder
 import com.mojang.authlib.exceptions.InvalidCredentialsException
 import io.netty.bootstrap.Bootstrap
 import io.netty.channel.Channel
@@ -52,6 +51,7 @@ import net.ccbluex.liquidbounce.event.events.ClientChatJwtTokenEvent
 import net.ccbluex.liquidbounce.event.events.ClientChatMessageEvent
 import net.ccbluex.liquidbounce.event.events.ClientChatStateChange
 import net.ccbluex.liquidbounce.features.chat.packet.AxochatPacket
+import net.ccbluex.liquidbounce.features.chat.packet.AxochatPacketCodec
 import net.ccbluex.liquidbounce.features.chat.packet.C2SBanUserPacket
 import net.ccbluex.liquidbounce.features.chat.packet.C2SLoginJWTPacket
 import net.ccbluex.liquidbounce.features.chat.packet.C2SLoginMojangPacket
@@ -59,13 +59,13 @@ import net.ccbluex.liquidbounce.features.chat.packet.C2SMessagePacket
 import net.ccbluex.liquidbounce.features.chat.packet.C2SPrivateMessagePacket
 import net.ccbluex.liquidbounce.features.chat.packet.C2SRequestJWTPacket
 import net.ccbluex.liquidbounce.features.chat.packet.C2SRequestMojangInfoPacket
+import net.ccbluex.liquidbounce.features.chat.packet.C2SRequestOnlineUsersPacket
 import net.ccbluex.liquidbounce.features.chat.packet.C2SUnbanUserPacket
-import net.ccbluex.liquidbounce.features.chat.packet.PacketDeserializer
-import net.ccbluex.liquidbounce.features.chat.packet.PacketSerializer
 import net.ccbluex.liquidbounce.features.chat.packet.S2CErrorPacket
 import net.ccbluex.liquidbounce.features.chat.packet.S2CMessagePacket
 import net.ccbluex.liquidbounce.features.chat.packet.S2CMojangInfoPacket
 import net.ccbluex.liquidbounce.features.chat.packet.S2CNewJWTPacket
+import net.ccbluex.liquidbounce.features.chat.packet.S2COnlineUsersPacket
 import net.ccbluex.liquidbounce.features.chat.packet.S2CPrivateMessagePacket
 import net.ccbluex.liquidbounce.features.chat.packet.S2CSuccessPacket
 import net.ccbluex.liquidbounce.utils.client.chat
@@ -76,29 +76,12 @@ import net.ccbluex.liquidbounce.utils.netty.syncSuspend
 import java.net.URI
 import java.util.UUID
 
-class AxochatClient {
+class AxochatClient(
+    private val onlineUsersHandler: (S2COnlineUsersPacket) -> Unit = {},
+) {
 
     private var channel: Channel? = null
-
-    private val serializer = PacketSerializer().apply {
-        register<C2SRequestMojangInfoPacket>("RequestMojangInfo")
-        register<C2SLoginMojangPacket>("LoginMojang")
-        register<C2SMessagePacket>("Message")
-        register<C2SPrivateMessagePacket>("PrivateMessage")
-        register<C2SBanUserPacket>("BanUser")
-        register<C2SUnbanUserPacket>("UnbanUser")
-        register<C2SRequestJWTPacket>("RequestJWT")
-        register<C2SLoginJWTPacket>("LoginJWT")
-    }
-
-    private val deserializer = PacketDeserializer().apply {
-        register<S2CMojangInfoPacket>("MojangInfo")
-        register<S2CNewJWTPacket>("NewJWT")
-        register<S2CMessagePacket>("Message")
-        register<S2CPrivateMessagePacket>("PrivateMessage")
-        register<S2CErrorPacket>("Error")
-        register<S2CSuccessPacket>("Success")
-    }
+    private val codec = AxochatPacketCodec()
 
     val isConnected: Boolean
         get() = channel != null && channel!!.isOpen
@@ -106,18 +89,6 @@ class AxochatClient {
     private var isConnecting = false
     var isLoggedIn = false
         private set
-
-    private val serializerGson by lazy {
-        GsonBuilder()
-            .registerTypeAdapter(AxochatPacket.C2S::class.java, serializer)
-            .create()
-    }
-
-    private val deserializerGson by lazy {
-        GsonBuilder()
-            .registerTypeAdapter(AxochatPacket.S2C::class.java, deserializer)
-            .create()
-    }
 
     /**
      * Connect to chat server via websocket.
@@ -222,6 +193,8 @@ class AxochatClient {
     fun sendPrivateMessage(receiver: String, message: String) =
         sendPacket(C2SPrivateMessagePacket(receiver, message))
 
+    fun requestOnlineUsers(packet: C2SRequestOnlineUsersPacket) = sendPacket(packet)
+
     /**
      * Ban user from server
      */
@@ -258,7 +231,7 @@ class AxochatClient {
      * Send packet to server
      */
     internal fun sendPacket(packet: AxochatPacket.C2S) {
-        channel?.writeAndFlush(TextWebSocketFrame(serializerGson.toJson(packet, AxochatPacket.C2S::class.java)))
+        channel?.writeAndFlush(TextWebSocketFrame(codec.encode(packet)))
     }
 
     private fun handleFunctionalPacket(packet: AxochatPacket.S2C) {
@@ -304,8 +277,8 @@ class AxochatClient {
             is S2CSuccessPacket -> {
                 when (packet.reason) {
                     "Login" -> {
-                        EventManager.callEvent(ClientChatStateChange(ClientChatStateChange.State.LOGGED_IN))
                         isLoggedIn = true
+                        EventManager.callEvent(ClientChatStateChange(ClientChatStateChange.State.LOGGED_IN))
                     }
 
                     // TODO: Replace with translation
@@ -315,6 +288,7 @@ class AxochatClient {
             }
 
             is S2CNewJWTPacket -> EventManager.callEvent(ClientChatJwtTokenEvent(packet.token))
+            is S2COnlineUsersPacket -> onlineUsersHandler(packet)
         }
     }
 
@@ -346,8 +320,7 @@ class AxochatClient {
      * Handle incoming message of websocket
      */
     internal fun handlePlainMessage(message: String) {
-        val packet = deserializerGson.fromJson(message, AxochatPacket.S2C::class.java)
-        handleFunctionalPacket(packet)
+        codec.decode(message)?.let(::handleFunctionalPacket)
     }
 
     private inner class ChannelHandler(
@@ -380,6 +353,7 @@ class AxochatClient {
          * Subclasses may override this method to change behavior.
          */
         override fun channelInactive(ctx: ChannelHandlerContext) {
+            isLoggedIn = false
             EventManager.callEvent(ClientChatStateChange(ClientChatStateChange.State.DISCONNECTED))
         }
 

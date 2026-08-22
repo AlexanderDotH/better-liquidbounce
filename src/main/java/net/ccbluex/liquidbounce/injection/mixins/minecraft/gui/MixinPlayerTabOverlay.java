@@ -192,6 +192,8 @@ public abstract class MixinPlayerTabOverlay {
     private Component modifyPlayerName(Component original, PlayerInfo entry) {
         var components = new TextBuilder(PlayerModelAppearanceHook.replacePlayerInfoName(entry, original));
 
+        components.add(ModuleBetterTab.liquidBounceBadge(entry));
+
         if (ModuleBetterTab.INSTANCE.getRunning() && ModuleBetterTab.INSTANCE.getShowGameMode()) {
             var playerGameMode = entry.getGameMode();
             var gameModeText = PlainText.of(" [" + shortName(playerGameMode) + "]");

@@ -19,6 +19,7 @@
 package net.ccbluex.liquidbounce.features.chat.packet
 
 import com.google.gson.annotations.SerializedName
+import java.util.UUID
 
 /**
  * AXOCHAT PROTOCOL
@@ -118,5 +119,18 @@ data class S2CErrorPacket(
 
     @SerializedName("message")
     val message: String
+
+) : AxochatPacket.S2C
+
+/**
+ * Authenticated LiquidChat users selected from a preceding [C2SRequestOnlineUsersPacket].
+ */
+data class S2COnlineUsersPacket(
+
+    @SerializedName("request_id")
+    val requestId: Long,
+
+    @SerializedName("users")
+    val users: List<UUID>,
 
 ) : AxochatPacket.S2C

@@ -31,12 +31,15 @@ import net.ccbluex.liquidbounce.event.events.ClientChatJwtTokenEvent
 import net.ccbluex.liquidbounce.event.events.ClientChatMessageEvent
 import net.ccbluex.liquidbounce.event.events.ClientChatStateChange
 import net.ccbluex.liquidbounce.event.events.ClientShutdownEvent
+import net.ccbluex.liquidbounce.event.events.DisconnectEvent
 import net.ccbluex.liquidbounce.event.events.NotificationEvent
 import net.ccbluex.liquidbounce.event.events.SessionEvent
+import net.ccbluex.liquidbounce.event.events.WorldChangeEvent
 import net.ccbluex.liquidbounce.event.handler
 import net.ccbluex.liquidbounce.event.suspendHandler
 import net.ccbluex.liquidbounce.event.tickHandler
 import net.ccbluex.liquidbounce.features.chat.AxochatClient
+import net.ccbluex.liquidbounce.features.chat.LiquidChatPlayers
 import net.ccbluex.liquidbounce.features.chat.packet.C2SRequestJWTPacket
 import net.ccbluex.liquidbounce.features.command.CommandExecutor.suspendHandler
 import net.ccbluex.liquidbounce.features.command.CommandManager
@@ -67,6 +70,7 @@ import net.minecraft.network.chat.Style
 import net.minecraft.network.chat.contents.ObjectContents
 import net.minecraft.network.chat.contents.objects.PlayerSprite
 import net.minecraft.world.item.component.ResolvableProfile
+import java.util.UUID
 import kotlin.time.Duration.Companion.seconds
 
 object GlobalSettingsClientChat : ToggleableValueGroup(
@@ -79,7 +83,7 @@ object GlobalSettingsClientChat : ToggleableValueGroup(
 
     private val autoTranslate by multiEnumChoice<ClientChatMessageEvent.ChatGroup>("AutoTranslate")
 
-    private val chatClient = AxochatClient()
+    private val chatClient = AxochatClient(LiquidChatPlayers::accept)
     private val prefix: Component = "".asText()
         .withStyle(ChatFormatting.RESET).withStyle(ChatFormatting.GRAY)
         .append(this.name.asPlainText(ChatFormatting.BLUE))
@@ -150,12 +154,33 @@ object GlobalSettingsClientChat : ToggleableValueGroup(
     }
 
     override fun onDisabled() {
+        LiquidChatPlayers.clear()
         chatClient.disconnect()
     }
 
     @Suppress("unused")
     private val shutdownHandler = handler<ClientShutdownEvent> {
+        LiquidChatPlayers.clear()
         chatClient.disconnect()
+    }
+
+    @Suppress("unused")
+    private val disconnectHandler = handler<DisconnectEvent> {
+        LiquidChatPlayers.clear()
+    }
+
+    @Suppress("unused")
+    private val worldChangeHandler = handler<WorldChangeEvent> {
+        LiquidChatPlayers.clear()
+    }
+
+    internal fun refreshOnlineUsers(candidates: Collection<UUID>) {
+        if (!running || !chatClient.isLoggedIn) {
+            LiquidChatPlayers.clear()
+            return
+        }
+
+        LiquidChatPlayers.requestFor(candidates)?.let(chatClient::requestOnlineUsers)
     }
 
     @Suppress("unused")
@@ -229,6 +254,10 @@ object GlobalSettingsClientChat : ToggleableValueGroup(
 
     @Suppress("unused")
     private val handleStateChange = suspendHandler<ClientChatStateChange>(behavior = CancelPrevious) {
+        if (it.state != ClientChatStateChange.State.LOGGED_IN) {
+            LiquidChatPlayers.clear()
+        }
+
         when (it.state) {
             ClientChatStateChange.State.CONNECTED -> {
                 notification(

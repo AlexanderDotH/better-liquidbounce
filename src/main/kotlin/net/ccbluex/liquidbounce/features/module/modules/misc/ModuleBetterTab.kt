@@ -21,11 +21,24 @@ package net.ccbluex.liquidbounce.features.module.modules.misc
 import net.ccbluex.liquidbounce.config.types.group.ToggleableValueGroup
 import net.ccbluex.liquidbounce.config.types.group.ValueGroup
 import net.ccbluex.liquidbounce.config.types.list.Tagged
+import net.ccbluex.liquidbounce.event.events.ClientChatStateChange
+import net.ccbluex.liquidbounce.event.events.PacketEvent
+import net.ccbluex.liquidbounce.event.events.WorldChangeEvent
+import net.ccbluex.liquidbounce.event.handler
+import net.ccbluex.liquidbounce.event.tickHandler
+import net.ccbluex.liquidbounce.event.waitTicks
+import net.ccbluex.liquidbounce.features.chat.LiquidChatPlayers
+import net.ccbluex.liquidbounce.features.global.GlobalSettingsClientChat
 import net.ccbluex.liquidbounce.features.module.ClientModule
 import net.ccbluex.liquidbounce.features.module.ModuleCategories
+import net.ccbluex.liquidbounce.features.module.modules.misc.bettertab.BetterTabLiquidBounceBadge
 import net.ccbluex.liquidbounce.render.engine.type.Color4b
 import net.ccbluex.liquidbounce.utils.text.PlainText
 import net.minecraft.client.multiplayer.PlayerInfo
+import net.minecraft.network.chat.Component
+import net.minecraft.network.protocol.game.ClientboundPlayerInfoRemovePacket
+import net.minecraft.network.protocol.game.ClientboundPlayerInfoUpdatePacket
+import java.util.concurrent.atomic.AtomicBoolean
 
 /**
  * ModuleBetterTab
@@ -76,6 +89,89 @@ object ModuleBetterTab : ClientModule("BetterTab", ModuleCategories.RENDER) {
         val filter = tree(PlayerFilter())
     }
 
+    object LiquidBouncePlayers : ToggleableValueGroup(ModuleBetterTab, "LiquidBouncePlayers", false) {
+
+        private const val REFRESH_INTERVAL_TICKS = 200
+
+        val color by color("Color", Color4b.LIQUID_BOUNCE)
+        private val refreshQueued = AtomicBoolean()
+
+        override fun onEnabled() {
+            requestRefresh()
+        }
+
+        override fun onDisabled() {
+            refreshQueued.set(false)
+            LiquidChatPlayers.clear()
+        }
+
+        @Suppress("unused")
+        private val refreshCycle = tickHandler(onCancellation = Runnable {
+            refreshQueued.set(false)
+            LiquidChatPlayers.clear()
+        }) {
+            refresh()
+            waitTicks(REFRESH_INTERVAL_TICKS)
+        }
+
+        @Suppress("unused")
+        private val playerListChange = handler<PacketEvent> { event ->
+            if (changesPlayerList(event)) {
+                requestRefresh()
+            }
+        }
+
+        @Suppress("unused")
+        private val chatStateChange = handler<ClientChatStateChange> { event ->
+            when (event.state) {
+                ClientChatStateChange.State.LOGGED_IN -> requestRefresh()
+                ClientChatStateChange.State.DISCONNECTED,
+                ClientChatStateChange.State.AUTHENTICATION_FAILED -> LiquidChatPlayers.clear()
+                else -> Unit
+            }
+        }
+
+        @Suppress("unused")
+        private val worldChange = handler<WorldChangeEvent> {
+            requestRefresh()
+        }
+
+        private fun changesPlayerList(event: PacketEvent): Boolean = when (val packet = event.packet) {
+            is ClientboundPlayerInfoRemovePacket -> true
+            is ClientboundPlayerInfoUpdatePacket ->
+                ClientboundPlayerInfoUpdatePacket.Action.ADD_PLAYER in packet.actions() ||
+                    ClientboundPlayerInfoUpdatePacket.Action.UPDATE_LISTED in packet.actions()
+            else -> false
+        }
+
+        private fun requestRefresh() {
+            if (!running || !refreshQueued.compareAndSet(false, true)) {
+                return
+            }
+
+            mc.execute {
+                refreshQueued.set(false)
+                refresh()
+            }
+        }
+
+        private fun refresh() {
+            if (!running) {
+                LiquidChatPlayers.clear()
+                return
+            }
+
+            val candidates = network.listedOnlinePlayers.map { it.profile.id }
+            GlobalSettingsClientChat.refreshOnlineUsers(candidates)
+        }
+    }
+
+    @JvmStatic
+    fun liquidBounceBadge(entry: PlayerInfo): Component? = BetterTabLiquidBounceBadge.create(
+        visible = running && LiquidBouncePlayers.running && LiquidChatPlayers.contains(entry.profile.id),
+        color = LiquidBouncePlayers.color,
+    )
+
     val showGameMode by boolean("ShowGameMode", true)
 
     init {
@@ -84,6 +180,7 @@ object ModuleBetterTab : ClientModule("BetterTab", ModuleCategories.RENDER) {
             Highlight,
             AccurateLatency,
             PlayerHider,
+            LiquidBouncePlayers,
         )
     }
 
@@ -137,4 +234,3 @@ enum class Visibility(
     FOOTER("Footer"),
     NAME_ONLY("NameOnly")
 }
-

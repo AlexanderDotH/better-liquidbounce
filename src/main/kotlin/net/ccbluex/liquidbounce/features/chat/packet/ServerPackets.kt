@@ -128,6 +128,22 @@ data class C2SUnbanUserPacket(
 ) : AxochatPacket.C2S
 
 /**
+ * Requests the authenticated LiquidChat users contained in the supplied Minecraft tab roster.
+ *
+ * The server must only return UUIDs included in [users]. [requestId] identifies the current roster so
+ * delayed responses cannot be applied after the player changes servers.
+ */
+data class C2SRequestOnlineUsersPacket(
+
+    @SerializedName("request_id")
+    val requestId: Long,
+
+    @SerializedName("users")
+    val users: List<UUID>,
+
+) : AxochatPacket.C2S
+
+/**
  * To log in using LoginJWT, a client needs to own a json web token.
  * This token can be retrieved by sending RequestJWT as an already authenticated client to the server.
  * The server will send a NewJWT packet to the client.
