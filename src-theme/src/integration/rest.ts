@@ -901,6 +901,16 @@ export async function getClipboardText(): Promise<string> {
     return data.text ?? "";
 }
 
+export async function setClipboardText(text: string) {
+    await fetch(`${API_BASE}/client/clipboard`, {
+        method: "PUT",
+        headers: {
+            "Content-Type": "application/json"
+        },
+        body: JSON.stringify({text})
+    });
+}
+
 export async function getClientUser(): Promise<ClientUser | null> {
     const response = await fetch(`${API_BASE}/client/user`);
 

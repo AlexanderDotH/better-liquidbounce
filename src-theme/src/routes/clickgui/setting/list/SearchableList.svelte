@@ -1,11 +1,16 @@
 <script lang="ts">
     import VirtualList from "./VirtualList.svelte";
     import type {NamedItem} from "../../../../integration/types.ts";
+    import {cefTextInput} from "../common/cefTextInput";
 
     export let items: NamedItem[];
 
     let searchQuery = "";
     let renderedItems: NamedItem[] = items;
+
+    function updateSearchQuery(value: string) {
+        searchQuery = value;
+    }
 
     $: {
         const queryParts = searchQuery.toLowerCase().match(/\S+/g) ?? [];
@@ -18,7 +23,18 @@
 </script>
 
 <div class="list-item-list">
-    <input type="text" placeholder="Search" class="search-input" bind:value={searchQuery} spellcheck="false">
+    <input
+            type="text"
+            placeholder="Search"
+            class="search-input"
+            spellcheck="false"
+            readonly
+            value={searchQuery}
+            use:cefTextInput={{
+                getValue: () => searchQuery,
+                onChange: updateSearchQuery,
+            }}
+    >
     <div class="results">
         <VirtualList items={renderedItems} let:item>
             <slot item={item} />

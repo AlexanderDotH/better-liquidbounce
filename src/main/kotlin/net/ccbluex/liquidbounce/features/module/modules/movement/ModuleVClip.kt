@@ -10,6 +10,7 @@
  */
 package net.ccbluex.liquidbounce.features.module.modules.movement
 
+import com.google.gson.JsonObject
 import net.ccbluex.liquidbounce.additions.forceSneak
 import net.ccbluex.liquidbounce.additions.suppressJump
 import net.ccbluex.liquidbounce.additions.suppressSneak
@@ -24,20 +25,23 @@ import net.ccbluex.liquidbounce.features.module.ClientModule
 import net.ccbluex.liquidbounce.features.module.ModuleCategories
 import net.ccbluex.liquidbounce.features.module.modules.movement.vclip.VClipDirection
 import net.ccbluex.liquidbounce.features.module.modules.movement.vclip.VClipDistanceTarget
-import net.ccbluex.liquidbounce.features.module.modules.movement.vclip.VClipFallProtection
+import net.ccbluex.liquidbounce.features.module.modules.movement.vclip.VClipClipResult
+import net.ccbluex.liquidbounce.features.module.modules.movement.vclip.VClipFallSafetyContext
 import net.ccbluex.liquidbounce.features.module.modules.movement.vclip.VClipFoliaMode
 import net.ccbluex.liquidbounce.features.module.modules.movement.vclip.VClipInputController
 import net.ccbluex.liquidbounce.features.module.modules.movement.vclip.VClipMovementMode
+import net.ccbluex.liquidbounce.features.module.modules.movement.vclip.VClipPacketDeliveryTracker
 import net.ccbluex.liquidbounce.features.module.modules.movement.vclip.VClipPosition
 import net.ccbluex.liquidbounce.features.module.modules.movement.vclip.VClipSmartTarget
 import net.ccbluex.liquidbounce.features.module.modules.movement.vclip.VClipTargetMode
 import net.ccbluex.liquidbounce.features.module.modules.movement.vclip.VClipVanillaMode
-import net.ccbluex.liquidbounce.features.module.modules.player.nofall.modes.GroundPacketDeliveryTracker
+import net.ccbluex.liquidbounce.features.module.modules.movement.vclip.migrateLegacyVClipBedrockSafety
 import net.ccbluex.liquidbounce.utils.client.notification
 import net.ccbluex.liquidbounce.utils.kotlin.EventPriorityConvention.READ_FINAL_STATE
 import net.minecraft.network.protocol.game.ServerboundMovePlayerPacket
 import net.minecraft.network.protocol.game.ServerboundPlayerCommandPacket
 import net.minecraft.network.protocol.game.ServerboundPlayerInputPacket
+import net.minecraft.world.entity.ai.attributes.Attributes
 
 /**
  * Moves vertically with Space and Shift without forwarding jump or sneak input to the server.
@@ -60,18 +64,24 @@ object ModuleVClip : ClientModule(
         arrayOf(VClipDistanceTarget, VClipSmartTarget),
     )
 
+    private val doNotClipAroundBedrock by boolean("DoNotClipAroundBedrock", true)
     private val repeatDelay by int("RepeatDelay", 5, 1..20, "ticks")
     private val inputController = VClipInputController()
-    private val fallProtectionTracker = GroundPacketDeliveryTracker()
+    private val packetDeliveryTracker = VClipPacketDeliveryTracker()
+
+    override fun prepareDeserialize(jsonObject: JsonObject) {
+        super.prepareDeserialize(jsonObject)
+        migrateLegacyVClipBedrockSafety(jsonObject)
+    }
 
     override fun onEnabled() {
         inputController.reset()
-        fallProtectionTracker.clear()
+        packetDeliveryTracker.clear()
     }
 
     override fun onDisabled() {
         inputController.reset()
-        fallProtectionTracker.clear()
+        packetDeliveryTracker.clear()
     }
 
     @Suppress("unused")
@@ -115,43 +125,48 @@ object ModuleVClip : ClientModule(
         }
     }
 
-    internal fun sendMovementPacket(packet: ServerboundMovePlayerPacket, fallProtection: VClipFallProtection) {
-        if (!fallProtection.resetLocalFallDistance) {
-            network.send(packet)
-            return
-        }
-
-        fallProtectionTracker.protect(packet)
+    internal fun sendMovementPacket(packet: ServerboundMovePlayerPacket): Boolean {
+        packetDeliveryTracker.protect(packet)
         try {
             network.send(packet)
+            return packetDeliveryTracker.takeDelivery(packet) != null
         } finally {
-            fallProtectionTracker.discard(packet)
+            packetDeliveryTracker.discard(packet)
         }
     }
 
     private fun clip(direction: VClipDirection) {
         val entity = player.vehicle ?: player
         val origin = entity.position().let { VClipPosition(it.x, it.y, it.z) }
-        val target = targets.activeMode.resolve(entity, direction)
+        val target = targets.activeMode.resolve(entity, direction, doNotClipAroundBedrock)
         if (target == null) {
             notification("VClip", message("noPositionFound"), NotificationEvent.Severity.ERROR)
             return
         }
 
-        modes.activeMode.clip(entity, origin, target)
+        val result = modes.activeMode.clip(
+            entity = entity,
+            origin = origin,
+            target = target,
+            fallSafety = VClipFallSafetyContext(
+                initialFallDistance = maxOf(entity.fallDistance, player.fallDistance),
+                safeFallDistance = player.getAttributeValue(Attributes.SAFE_FALL_DISTANCE),
+            ),
+        )
+        if (result == VClipClipResult.FALL_PROTECTION_UNAVAILABLE) {
+            notification("VClip", message("fallProtectionUnavailable"), NotificationEvent.Severity.ERROR)
+        }
     }
 
     private fun acceptsControlInput() = mc.gui.screen() == null
 
     private fun finalizeProtectedMovement(event: PacketEvent) {
         val packet = event.packet as? ServerboundMovePlayerPacket ?: return
-        if (!fallProtectionTracker.reassertGround(packet)) {
+        if (!packetDeliveryTracker.reassertRequiredState(packet)) {
             return
         }
 
-        if (fallProtectionTracker.confirmFinalState(packet, event.isCancelled)) {
-            player.resetFallDistance()
-        }
+        packetDeliveryTracker.confirmFinalState(packet, event.isCancelled)
     }
 
     private val ServerboundPlayerCommandPacket.Action.isRidingJumpAction: Boolean

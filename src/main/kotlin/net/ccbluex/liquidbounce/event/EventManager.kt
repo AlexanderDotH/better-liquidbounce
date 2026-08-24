@@ -144,6 +144,9 @@ import net.ccbluex.liquidbounce.event.events.WorldEntityRemoveEvent
 import net.ccbluex.liquidbounce.event.events.WorldFeatureSubmitEvent
 import net.ccbluex.liquidbounce.event.events.WorldRenderEvent
 import net.ccbluex.liquidbounce.features.misc.HideAppearance.isDestructed
+import net.ccbluex.liquidbounce.integration.interop.protocol.event.baritone.BaritoneLogEvent
+import net.ccbluex.liquidbounce.integration.interop.protocol.event.baritone.BaritoneRouteEvent
+import net.ccbluex.liquidbounce.integration.interop.protocol.event.baritone.BaritoneStateEvent
 import net.ccbluex.liquidbounce.utils.client.error.ErrorHandler
 import net.ccbluex.liquidbounce.utils.client.logger
 import net.minecraft.ReportedException
@@ -232,6 +235,9 @@ internal val ALL_EVENT_CLASSES: Array<Class<out Event>> = arrayOf(
     AccountManagerRemovalResultEvent::class.java,
     AccountManagerLoginResultEvent::class.java,
     VirtualScreenEvent::class.java,
+    BaritoneStateEvent::class.java,
+    BaritoneRouteEvent::class.java,
+    BaritoneLogEvent::class.java,
     FpsChangeEvent::class.java,
     FpsLimitEvent::class.java,
     ClientPlayerDataEvent::class.java,

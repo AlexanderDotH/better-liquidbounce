@@ -20,14 +20,16 @@
 package net.ccbluex.liquidbounce.features.module.modules.render
 
 import net.ccbluex.liquidbounce.additions.drawBorder
+import net.ccbluex.liquidbounce.additions.queueContainerItemView
 import net.ccbluex.liquidbounce.config.types.group.ModeValueGroup
 import net.ccbluex.liquidbounce.config.types.group.ToggleableValueGroup
 import net.ccbluex.liquidbounce.config.types.list.Tagged
 import net.ccbluex.liquidbounce.features.module.ClientModule
 import net.ccbluex.liquidbounce.features.module.ModuleCategories
 import net.ccbluex.liquidbounce.injection.mixins.minecraft.gui.MixinHudAccessor
-import net.ccbluex.liquidbounce.render.gui.ItemStackListRenderer.drawItemStackList
+import net.ccbluex.liquidbounce.render.engine.type.BoundingBox2f
 import net.ccbluex.liquidbounce.render.engine.type.Color4b
+import net.ccbluex.liquidbounce.render.gui.ItemStackListRenderer.drawItemStackList
 import net.ccbluex.liquidbounce.utils.inventory.InventoryManager
 import net.ccbluex.liquidbounce.utils.item.getCooldown
 import net.ccbluex.liquidbounce.utils.math.toFixed
@@ -157,16 +159,15 @@ object ModuleBetterInventory : ClientModule("BetterInventory", ModuleCategories.
         HighlightClicked.mode.activeMode.drawHighlightSlot(this, slot)
     }
 
-    fun GuiGraphicsExtractor.drawContainerItemView(
+    fun queueContainerItemView(
+        context: GuiGraphicsExtractor,
         stack: ItemStack,
-        x: Int,
-        y: Int,
         mouseX: Int,
         mouseY: Int,
-    ): Boolean {
-        if (!running || stack.isEmpty || !ContainerItemView.enabled) return false
+    ) {
+        if (!running || stack.isEmpty || !ContainerItemView.enabled) return
 
-        val containerComponent = stack[DataComponents.CONTAINER] ?: return false
+        val containerComponent = stack[DataComponents.CONTAINER] ?: return
 
         val stacks = if (ContainerItemView.skipEmptyStack) {
             containerComponent.nonEmptyItemCopyStream()
@@ -174,24 +175,43 @@ object ModuleBetterInventory : ClientModule("BetterInventory", ModuleCategories.
             containerComponent.allItemsCopyStream()
         }.toList()
 
-        if (stacks.isEmpty()) return false
+        if (stacks.isEmpty()) return
 
-        var renderX = ContainerItemView.renderOffsetX - x.toFloat()
-        var renderY = ContainerItemView.renderOffsetY - y.toFloat()
+        var renderX = ContainerItemView.renderOffsetX
+        var renderY = ContainerItemView.renderOffsetY
 
         if (ContainerItemView.relativeToMouse) {
             renderX += mouseX
             renderY += mouseY
         }
 
-        drawItemStackList(stacks)
-            .centerX(renderX)
-            .centerY(renderY)
-            .scale(ContainerItemView.scale)
-            .textureBackground()
-            .draw()
+        context.queueContainerItemView(stacks, renderX, renderY, ContainerItemView.scale)
+    }
 
-        return true
+    fun drawContainerItemView(
+        context: GuiGraphicsExtractor,
+        stacks: List<ItemStack>,
+        centerX: Float,
+        centerY: Float,
+        scale: Float,
+        tooltipBounds: BoundingBox2f,
+    ) {
+        val preview = context.drawItemStackList(stacks)
+            .centerX(centerX)
+            .centerY(centerY)
+            .scale(scale)
+            .textureBackground()
+        val placedBounds = ContainerItemViewLayout.avoidTooltip(
+            preview = preview.bounds,
+            tooltip = tooltipBounds,
+            viewportWidth = context.guiWidth().toFloat(),
+            viewportHeight = context.guiHeight().toFloat(),
+        )
+
+        preview
+            .centerX(placedBounds.xCenter)
+            .centerY(placedBounds.yCenter)
+            .draw()
     }
 
 }

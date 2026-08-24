@@ -3,6 +3,7 @@
     import type {BlockHitResult, ModuleSetting, Setting, Vec, Vec3Setting, VecAxis} from "../../../integration/types";
     import {convertToSpacedString, spaceSeperatedNames} from "../../../theme/theme_config";
     import {getCrosshairData, getPlayerData} from "../../../integration/rest";
+    import {cefTextInput} from "./common/cefTextInput";
 
     export let setting: ModuleSetting;
     export let vecAxes: VecAxis[];
@@ -10,12 +11,32 @@
 
     const cSetting = setting as Setting<Vec<typeof vecAxes[number]>>;
     const useLocateButton = (setting as Vec3Setting).useLocateButton ?? false;
+    const axisInputValues = Object.fromEntries(
+        vecAxes.map(axis => [axis, String(cSetting.value[axis])]),
+    ) as Record<VecAxis, string>;
 
     const dispatch = createEventDispatcher();
 
     function handleChange() {
         setting = {...cSetting};
         dispatch("change");
+    }
+
+    function handleAxisChange(axis: VecAxis, value: string) {
+        axisInputValues[axis] = value;
+        const parsed = Number(value);
+        if (value.trim() === "" || !Number.isFinite(parsed)) {
+            return;
+        }
+
+        cSetting.value[axis] = parsed;
+        handleChange();
+    }
+
+    function syncAxisInputValues() {
+        for (const axis of vecAxes) {
+            axisInputValues[axis] = String(cSetting.value[axis]);
+        }
     }
 
     async function locate() {
@@ -28,6 +49,7 @@
             const playerData = await getPlayerData();
             (cSetting as Vec3Setting).value = playerData.blockPosition;
         }
+        syncAxisInputValues();
         handleChange();
     }
 </script>
@@ -38,13 +60,18 @@
          style="grid-template-columns: repeat({vecAxes.length}, 1fr) {useLocateButton ? '20px' : ''}">
         {#each vecAxes as axis (axis)}
             <input
-                    type="number"
+                    type="text"
+                    inputmode="decimal"
                     {step}
                     class="value"
                     spellcheck="false"
+                    readonly
                     placeholder={axis.toUpperCase()}
-                    bind:value={cSetting.value[axis]}
-                    on:input={handleChange}
+                    value={axisInputValues[axis]}
+                    use:cefTextInput={{
+                        getValue: () => axisInputValues[axis],
+                        onChange: (value) => handleAxisChange(axis, value),
+                    }}
             />
         {/each}
         {#if useLocateButton}

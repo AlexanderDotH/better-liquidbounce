@@ -141,6 +141,7 @@ object ModuleMaceKill : ClientModule("MaceKill", ModuleCategories.COMBAT, disabl
     private val researchPacketContexts = IdentityHashMap<ServerboundMovePlayerPacket, MaceKillResearchPacketContext>()
     private var plannedRoutePacket: ServerboundMovePlayerPacket? = null
     private var routeOrigin: Vec3? = null
+    private var routeOriginBoundingBox: AABB? = null
     private var routeRenderPath = emptyList<Vec3>()
     private var routeStepWaitTicks = 0
     private var routeStallTicks = 0
@@ -150,6 +151,7 @@ object ModuleMaceKill : ClientModule("MaceKill", ModuleCategories.COMBAT, disabl
     private var primingDeliveryFailed = false
     private var applyingStrikePackets = false
     private var motionRouteActive = false
+    private var activeVanillaVClipSegments = emptySet<MaceKillVanillaVClipSegment>()
     private var activeClipReachSession: MaceClipReachSession? = null
     private var instantRecoveryPlan: MaceClipReachPlan? = null
     private var instantCorrectionRecoveryActive = false
@@ -672,11 +674,13 @@ object ModuleMaceKill : ClientModule("MaceKill", ModuleCategories.COMBAT, disabl
         activeRouteTarget = target
         activeRouteOwner = owner
         routeOrigin = origin
+        routeOriginBoundingBox = player.boundingBox
         routeRenderPath = planned.renderPath
         routeStepWaitTicks = planned.request.stepWaitTicks
         routeStallTicks = 0
         routeRejected = false
         motionRouteActive = planned.motion
+        activeVanillaVClipSegments = planned.vanillaVClipSegments
         activeClipReachSession = planned.clipReachPlan?.let { MaceClipReachSession(it, player.tickCount.toLong()) }
         instantRecoveryPlan = planned.clipReachPlan
         instantTerminalHandled = false
@@ -851,22 +855,53 @@ object ModuleMaceKill : ClientModule("MaceKill", ModuleCategories.COMBAT, disabl
         origin: Vec3,
         endpoint: Vec3,
         configuration: MaceKillRouteExecutionConfiguration,
+        originBoundingBox: AABB = player.boundingBox,
+        allowVanillaVClip: Boolean = true,
     ): MaceKillPlannedRoute? {
         lastInstantPlanBlockReason = null
         if (configuration.timing.transport == MaceKillRouteTransport.MOTION) {
-            val route = buildCollisionAwareRoute(origin, endpoint, configuration) ?: return null
-            return route.toMaceKillPlan(origin, stepWaitTicks = 0, motion = true)
+            return selectMaceKillMotionRoutePlan(
+                collisionPlan = {
+                    buildCollisionAwareRoute(origin, endpoint, configuration, originBoundingBox)
+                        ?.toMaceKillPlan(origin, stepWaitTicks = 0, motion = true)
+                },
+                vanillaVClipPlan = {
+                    if (allowVanillaVClip) {
+                        buildMaceKillVanillaVClipRoute(
+                            origin,
+                            endpoint,
+                            configuration,
+                            originBoundingBox,
+                            motion = true,
+                        )
+                    } else {
+                        null
+                    }
+                },
+            )
         }
 
         return selectMaceKillRoutePlan(
             routingMode = configuration.routingMode,
             directPlan = {
-                buildCollisionAwareRoute(origin, endpoint, configuration)
+                buildCollisionAwareRoute(origin, endpoint, configuration, originBoundingBox)
                     ?.toMaceKillPlan(origin, configuration.timing.stepWaitTicks)
             },
             aStarPlan = {
-                buildAStarRoute(origin, endpoint, configuration)
+                buildAStarRoute(origin, endpoint, configuration, originBoundingBox)
                     ?.toMaceKillPlan(origin, configuration.timing.stepWaitTicks)
+            },
+            vanillaVClipPlan = {
+                if (allowVanillaVClip) {
+                    buildMaceKillVanillaVClipRoute(
+                        origin,
+                        endpoint,
+                        configuration,
+                        originBoundingBox,
+                    )
+                } else {
+                    null
+                }
             },
             wallClipPlan = { buildInstantRoute(origin, endpoint, configuration) },
         )
@@ -969,30 +1004,114 @@ object ModuleMaceKill : ClientModule("MaceKill", ModuleCategories.COMBAT, disabl
         )
     }
 
+    /**
+     * Keeps one short, explicit vanilla VClip separate from the collision-validated route around it.
+     * The route engine derives the inverse return, so the same edge can only be crossed back exactly.
+     */
+    private fun buildMaceKillVanillaVClipRoute(
+        origin: Vec3,
+        endpoint: Vec3,
+        configuration: MaceKillRouteExecutionConfiguration,
+        originBoundingBox: AABB,
+        motion: Boolean = false,
+    ): MaceKillPlannedRoute? {
+        // Instant remains the explicit ClipReach mode while an ordinary collision route is available.
+        if (configuration.routingMode == MaceKillRoutingMode.INSTANT &&
+            buildCollisionAwareRoute(origin, endpoint, configuration, originBoundingBox) != null
+        ) {
+            return null
+        }
+        for (movement in maceKillVanillaVClipCandidates(origin, endpoint)) {
+            val originSegment = MaceKillVanillaVClipSegment(origin, origin.add(movement))
+            buildMaceKillVanillaVClipRoute(
+                origin = origin,
+                endpoint = endpoint,
+                configuration = configuration,
+                originBoundingBox = originBoundingBox,
+                segment = originSegment,
+                vClipBeforeCollisionRoute = true,
+                motion = motion,
+            )?.let { return it }
+
+            val endpointSegment = MaceKillVanillaVClipSegment(endpoint.subtract(movement), endpoint)
+            buildMaceKillVanillaVClipRoute(
+                origin = origin,
+                endpoint = endpoint,
+                configuration = configuration,
+                originBoundingBox = originBoundingBox,
+                segment = endpointSegment,
+                vClipBeforeCollisionRoute = false,
+                motion = motion,
+            )?.let { return it }
+        }
+        return null
+    }
+
+    @Suppress("LongParameterList")
+    private fun buildMaceKillVanillaVClipRoute(
+        origin: Vec3,
+        endpoint: Vec3,
+        configuration: MaceKillRouteExecutionConfiguration,
+        originBoundingBox: AABB,
+        segment: MaceKillVanillaVClipSegment,
+        vClipBeforeCollisionRoute: Boolean,
+        motion: Boolean,
+    ): MaceKillPlannedRoute? {
+        if (!isMaceKillAnchorValid(origin, segment.from, originBoundingBox) ||
+            !isMaceKillAnchorValid(origin, segment.to, originBoundingBox)
+        ) {
+            return null
+        }
+        val collisionOrigin = if (vClipBeforeCollisionRoute) segment.to else origin
+        val collisionEndpoint = if (vClipBeforeCollisionRoute) endpoint else segment.from
+        val collisionBoundingBox = originBoundingBox.move(collisionOrigin.subtract(origin))
+        val collisionRoute = when (configuration.routingMode) {
+            MaceKillRoutingMode.A_STAR ->
+                buildAStarRoute(collisionOrigin, collisionEndpoint, configuration, collisionBoundingBox)
+            MaceKillRoutingMode.DIRECT,
+            MaceKillRoutingMode.INSTANT,
+            -> buildCollisionAwareRoute(collisionOrigin, collisionEndpoint, configuration, collisionBoundingBox)
+        } ?: return null
+        return collisionRoute.toMaceKillPlan(
+            origin = origin,
+            stepWaitTicks = configuration.timing.stepWaitTicks,
+            motion = motion,
+            prefixMovements = if (vClipBeforeCollisionRoute) listOf(segment.movement) else emptyList(),
+            suffixMovements = if (vClipBeforeCollisionRoute) emptyList() else listOf(segment.movement),
+            vanillaVClipSegments = setOf(segment),
+        )
+    }
+
     private fun SpearKillAStarPacketRoute.toMaceKillPlan(
         origin: Vec3,
         stepWaitTicks: Int,
         motion: Boolean = false,
+        prefixMovements: List<Vec3> = emptyList(),
+        suffixMovements: List<Vec3> = emptyList(),
+        vanillaVClipSegments: Set<MaceKillVanillaVClipSegment> = emptySet(),
     ): MaceKillPlannedRoute {
+        val allOutboundMovements = prefixMovements + outboundMovements + suffixMovements
         val request = RemoteKillRouteRequest(
             origin = origin,
-            outboundMovements = outboundMovements,
+            outboundMovements = allOutboundMovements,
             strikeHoldTicks = MACE_KILL_CHAIN_EVIDENCE_HOLD_TICKS,
             stepWaitTicks = stepWaitTicks,
             physicalReturn = motion,
         )
         return MaceKillPlannedRoute(
             request = request,
-            renderPath = routePositions(origin, outboundMovements),
+            renderPath = routePositions(origin, allOutboundMovements),
             motion = motion,
+            vanillaVClipSegments = vanillaVClipSegments,
         )
     }
 
     private fun createMaceKillSegmentValidator(
         origin: Vec3,
         originBoundingBox: AABB = player.boundingBox,
-    ): SpearKillAStarSegmentValidator =
-        createSpearKillServerPacketSegmentValidator(
+        allowedVanillaVClipSegments: Set<MaceKillVanillaVClipSegment> = emptySet(),
+    ): SpearKillAStarSegmentValidator {
+        val collisionValidator = createSpearKillServerPacketSegmentValidator(
             origin = origin,
             playerBoundingBox = originBoundingBox,
             hasDestinationCollision = { box ->
@@ -1002,6 +1121,14 @@ object ModuleMaceKill : ClientModule("MaceKill", ModuleCategories.COMBAT, disabl
                 withVanillaSpearKillBlockShapes { resolveSpearKillServerPacketMovement(player, box, movement) }
             },
         )
+        return SpearKillAStarSegmentValidator { from, to ->
+            allowedVanillaVClipSegments.any { segment ->
+                segment.matches(from, to) &&
+                    isMaceKillAnchorValid(origin, from, originBoundingBox) &&
+                    isMaceKillAnchorValid(origin, to, originBoundingBox)
+            } || collisionValidator.isClear(from, to)
+        }
+    }
 
     private fun predictedMaceKillTarget(
         target: LivingEntity,
@@ -1017,6 +1144,7 @@ object ModuleMaceKill : ClientModule("MaceKill", ModuleCategories.COMBAT, disabl
         origin: Vec3,
         targetPosition: Vec3 = target.position(),
         targetEyePosition: Vec3 = target.eyePosition,
+        requireAttackCooldown: Boolean = true,
     ): Vec3? {
         val clearance = (player.bbWidth + target.bbWidth).toDouble() / 2.0 + 0.2
         return MaceKillEndpointPlanner.find(
@@ -1027,7 +1155,13 @@ object ModuleMaceKill : ClientModule("MaceKill", ModuleCategories.COMBAT, disabl
                 maximumRadius = MACE_KILL_ENDPOINT_MAX_SEARCH_RADIUS,
             ),
         ) { endpoint ->
-            isRemoteEndpointReady(player, target, endpoint, targetEyePosition)
+            isRemoteEndpointReady(
+                player,
+                target,
+                endpoint,
+                targetEyePosition,
+                requireAttackCooldown,
+            )
         }
     }
 
@@ -1134,7 +1268,11 @@ object ModuleMaceKill : ClientModule("MaceKill", ModuleCategories.COMBAT, disabl
     private fun validatePendingRouteStep(origin: Vec3, candidateOffset: Vec3): Boolean {
         val from = origin.add(routeSession.committedOffset)
         val to = origin.add(candidateOffset)
-        return createMaceKillSegmentValidator(origin).isClear(from, to)
+        return createMaceKillSegmentValidator(
+            origin = origin,
+            originBoundingBox = routeOriginBoundingBox ?: player.boundingBox,
+            allowedVanillaVClipSegments = activeVanillaVClipSegments,
+        ).isClear(from, to)
     }
 
     @Suppress("CognitiveComplexMethod", "LongMethod", "ReturnCount")
@@ -1395,6 +1533,7 @@ object ModuleMaceKill : ClientModule("MaceKill", ModuleCategories.COMBAT, disabl
         remoteStrikeTarget = null
         remoteStrikeEarliestTick = 0
         routeOrigin = null
+        routeOriginBoundingBox = null
         routeRenderPath = emptyList()
         routeStepWaitTicks = 0
         routeStallTicks = 0
@@ -1404,6 +1543,7 @@ object ModuleMaceKill : ClientModule("MaceKill", ModuleCategories.COMBAT, disabl
         primingPackets.clear()
         researchPacketContexts.clear()
         motionRouteActive = false
+        activeVanillaVClipSegments = emptySet()
         activeClipReachSession = null
         instantRecoveryPlan = null
         instantCorrectionRecoveryActive = false
@@ -1455,7 +1595,14 @@ object ModuleMaceKill : ClientModule("MaceKill", ModuleCategories.COMBAT, disabl
             beginSafeRouteAbort()
             return
         }
-        val replacement = buildMaceKillRoute(currentPosition, endpoint, configuration) ?: run {
+        val routeBoundingBox = routeOriginBoundingBox ?: player.boundingBox
+        val replacement = buildMaceKillRoute(
+            currentPosition,
+            endpoint,
+            configuration,
+            routeBoundingBox.move(routeSession.committedOffset),
+            allowVanillaVClip = activeVanillaVClipSegments.isEmpty(),
+        ) ?: run {
             beginSafeRouteAbort()
             return
         }
@@ -1470,15 +1617,18 @@ object ModuleMaceKill : ClientModule("MaceKill", ModuleCategories.COMBAT, disabl
         }
         val futureMovements = replacement.request.outboundMovements +
             replacement.request.returnMovements + committedRecovery
+        val replacementVClipSegments = activeVanillaVClipSegments + replacement.vanillaVClipSegments
         if (!replanMaceKillFallSafety(
                 currentPosition,
                 futureMovements,
                 replacement.request.outboundMovements.size,
+                vanillaVClipSegments = replacementVClipSegments,
             )
         ) {
             beginSafeRouteAbort()
             return
         }
+        activeVanillaVClipSegments = replacementVClipSegments
         val fullOutbound = buildList {
             if (routeSession.committedOffset.lengthSqr() >= MACE_KILL_MOVEMENT_EPSILON_SQUARED) {
                 add(routeSession.committedOffset)
@@ -1616,7 +1766,14 @@ object ModuleMaceKill : ClientModule("MaceKill", ModuleCategories.COMBAT, disabl
             predicted.position,
             predicted.eyePosition,
         ) ?: return false
-        val route = buildMaceKillRoute(chainOrigin, endpoint, configuration) ?: return false
+        val routeBoundingBox = routeOriginBoundingBox ?: player.boundingBox
+        val route = buildMaceKillRoute(
+            chainOrigin,
+            endpoint,
+            configuration,
+            routeBoundingBox.move(routeSession.committedOffset),
+            allowVanillaVClip = activeVanillaVClipSegments.isEmpty(),
+        ) ?: return false
         val committedRecovery = routeSession.exactRecoveryMovementsFrom(routeSession.committedOffset) ?: return false
         if (route.clipReachPlan != null || route.primingPackets != 0 || !routeSession.startChainedOutbound(
                 route.request.outboundMovements,
@@ -1626,15 +1783,18 @@ object ModuleMaceKill : ClientModule("MaceKill", ModuleCategories.COMBAT, disabl
             return false
         }
         val futureMovements = route.request.outboundMovements + route.request.returnMovements + committedRecovery
+        val chainedVClipSegments = activeVanillaVClipSegments + route.vanillaVClipSegments
         if (!replanMaceKillFallSafety(
                 chainOrigin,
                 futureMovements,
                 route.request.outboundMovements.size,
+                vanillaVClipSegments = chainedVClipSegments,
             )
         ) {
             beginSafeRouteAbort()
             return false
         }
+        activeVanillaVClipSegments = chainedVClipSegments
         val fullOutbound = listOf(routeSession.committedOffset) + route.request.outboundMovements
         routeEngine.handoff(
             nextTarget,
@@ -1887,11 +2047,13 @@ object ModuleMaceKill : ClientModule("MaceKill", ModuleCategories.COMBAT, disabl
         } else {
             MaceKillGroundPolicy.CLIP_ANCHOR_SPOOF
         },
+        vanillaVClipSegments = planned.vanillaVClipSegments,
     )
 
     private fun beginMaceKillFallSafety(
         request: RemoteKillRouteRequest,
         groundPolicy: MaceKillGroundPolicy = MaceKillGroundPolicy.COLLISION_DERIVED,
+        vanillaVClipSegments: Set<MaceKillVanillaVClipSegment> = emptySet(),
     ): Boolean {
         val originGrounded = isMaceKillPositionNearGround(request.origin)
         val finalPosition = request.returnMovements.fold(request.endpoint, Vec3::add)
@@ -1907,7 +2069,7 @@ object ModuleMaceKill : ClientModule("MaceKill", ModuleCategories.COMBAT, disabl
             return false
         }
         val movements = request.outboundMovements + request.returnMovements
-        val steps = maceKillFallSafetySteps(request.origin, movements, groundPolicy)
+        val steps = maceKillFallSafetySteps(request.origin, movements, groundPolicy, vanillaVClipSegments)
         val initialFallDistance = player.fallDistance
         val safeFallDistance = player.getAttributeValue(Attributes.SAFE_FALL_DISTANCE)
         val preflight = preflightMaceKillFallSafety(
@@ -1955,6 +2117,7 @@ object ModuleMaceKill : ClientModule("MaceKill", ModuleCategories.COMBAT, disabl
         movements: List<Vec3>,
         outboundStepCount: Int,
         groundPolicy: MaceKillGroundPolicy = MaceKillGroundPolicy.COLLISION_DERIVED,
+        vanillaVClipSegments: Set<MaceKillVanillaVClipSegment> = activeVanillaVClipSegments,
     ): Boolean {
         if (movements.isEmpty()) {
             fallSafetyLifecycle.invalidate()
@@ -1963,7 +2126,7 @@ object ModuleMaceKill : ClientModule("MaceKill", ModuleCategories.COMBAT, disabl
         val initialFallDistance = fallSafetyLifecycle.confirmedFallDistance.takeIf { fallSafetyLifecycle.active }
             ?: player.fallDistance
         val safeFallDistance = player.getAttributeValue(Attributes.SAFE_FALL_DISTANCE)
-        val steps = maceKillFallSafetySteps(start, movements, groundPolicy)
+        val steps = maceKillFallSafetySteps(start, movements, groundPolicy, vanillaVClipSegments)
         if (preflightMaceKillFallSafety(
                 initialFallDistance,
                 safeFallDistance,
@@ -1988,20 +2151,23 @@ object ModuleMaceKill : ClientModule("MaceKill", ModuleCategories.COMBAT, disabl
         start: Vec3,
         movements: List<Vec3>,
         groundPolicy: MaceKillGroundPolicy,
+        vanillaVClipSegments: Set<MaceKillVanillaVClipSegment>,
     ): List<MaceKillFallSafetyStep> {
         var position = start
-        val spoofed = groundPolicy.shouldSpoofOnGround(
+        val clipReachSpoofed = groundPolicy.shouldSpoofOnGround(
             MaceKillGroundPacketContext(
                 identityOwnedByRoute = true,
                 kind = MaceKillMovementPacketKind.CLIP_REACH_ANCHOR,
             ),
         )
         return movements.map { movement ->
+            val previousPosition = position
             position = position.add(movement)
+            val vanillaVClipSpoofed = vanillaVClipSegments.any { it.matches(previousPosition, position) }
             MaceKillFallSafetyStep(
                 movement = movement,
-                grounded = spoofed || isMaceKillPositionNearGround(position),
-                groundSpoofed = spoofed,
+                grounded = clipReachSpoofed || vanillaVClipSpoofed || isMaceKillPositionNearGround(position),
+                groundSpoofed = clipReachSpoofed || vanillaVClipSpoofed,
             )
         }
     }
@@ -2287,6 +2453,14 @@ object ModuleMaceKill : ClientModule("MaceKill", ModuleCategories.COMBAT, disabl
 
     private fun ownsClipReachRecoveryPackets(): Boolean = instantCorrectionRecoveryActive && routeEngine.ownsMovement
 
+    private fun ownsVanillaVClipPendingStep(): Boolean {
+        val origin = routeOrigin ?: return false
+        if (routeSession.pendingMovement == null) return false
+        val from = origin.add(routeSession.committedOffset)
+        val to = origin.add(routeSession.virtualOffset)
+        return activeVanillaVClipSegments.any { it.matches(from, to) }
+    }
+
     private fun activeMaceKillGroundPolicy(): MaceKillGroundPolicy = if (
         !ownsClipReachAnchorPackets() && !ownsClipReachRecoveryPackets()
     ) {
@@ -2296,6 +2470,7 @@ object ModuleMaceKill : ClientModule("MaceKill", ModuleCategories.COMBAT, disabl
     }
 
     private fun activeMaceKillPacketKind(): MaceKillMovementPacketKind = when {
+        ownsVanillaVClipPendingStep() -> MaceKillMovementPacketKind.VANILLA_VCLIP
         ownsClipReachRecoveryPackets() -> MaceKillMovementPacketKind.CLIP_REACH_RECOVERY
         ownsClipReachAnchorPackets() -> MaceKillMovementPacketKind.CLIP_REACH_ANCHOR
         activeRouteConfiguration?.routingMode == MaceKillRoutingMode.A_STAR ->
@@ -2306,9 +2481,12 @@ object ModuleMaceKill : ClientModule("MaceKill", ModuleCategories.COMBAT, disabl
     private fun maceKillRoutePacketGrounded(
         position: Vec3,
         identityOwnedByRoute: Boolean,
-    ): Boolean = activeMaceKillGroundPolicy().shouldSpoofOnGround(
-        MaceKillGroundPacketContext(identityOwnedByRoute, activeMaceKillPacketKind()),
-    ) || isMaceKillPositionNearGround(position)
+    ): Boolean {
+        val packet = MaceKillGroundPacketContext(identityOwnedByRoute, activeMaceKillPacketKind())
+        return shouldSpoofMaceKillVanillaVClipGround(packet) ||
+            activeMaceKillGroundPolicy().shouldSpoofOnGround(packet) ||
+            isMaceKillPositionNearGround(position)
+    }
 
     private fun createMaceKillMovementPacket(
         position: Vec3,
@@ -2449,8 +2627,12 @@ object ModuleMaceKill : ClientModule("MaceKill", ModuleCategories.COMBAT, disabl
         player.boundingBox.distanceToSqr(target.eyePosition) <= MACE_KILL_ATTACK_RANGE_SQUARED &&
             hasLineOfSight(player.eyePosition, target.eyePosition, player)
 
-    private fun isMaceKillAnchorValid(origin: Vec3, position: Vec3): Boolean {
-        val box = player.boundingBox.move(position.subtract(origin))
+    private fun isMaceKillAnchorValid(
+        origin: Vec3,
+        position: Vec3,
+        originBoundingBox: AABB = player.boundingBox,
+    ): Boolean {
+        val box = originBoundingBox.move(position.subtract(origin))
         return world.worldBorder.isWithinBounds(box) && withVanillaSpearKillBlockShapes {
             world.noCollision(player, box)
         }
@@ -2480,6 +2662,7 @@ object ModuleMaceKill : ClientModule("MaceKill", ModuleCategories.COMBAT, disabl
         target: Entity,
         endpoint: Vec3,
         targetEyePosition: Vec3 = target.eyePosition,
+        requireAttackCooldown: Boolean = true,
     ): Boolean {
         val livingTarget = target as? LivingEntity ?: return false
         val endpointBox = localPlayer.boundingBox.move(endpoint.subtract(localPlayer.position()))
@@ -2489,7 +2672,7 @@ object ModuleMaceKill : ClientModule("MaceKill", ModuleCategories.COMBAT, disabl
             bodySpaceClear = world.getBlockCollisions(localPlayer, endpointBox).allEmpty(),
             attackRayClear = endpointBox.distanceToSqr(targetEyePosition) <= MACE_KILL_ATTACK_RANGE_SQUARED &&
                 hasLineOfSight(endpointEyes, targetEyePosition, localPlayer),
-            cooldownReady = isAttackCooldownReady(),
+            cooldownReady = !requireAttackCooldown || isAttackCooldownReady(),
             usableFallHeight = determineUsableFallHeight(endpointBox),
         )
     }
@@ -2549,11 +2732,36 @@ object ModuleMaceKill : ClientModule("MaceKill", ModuleCategories.COMBAT, disabl
         return best?.first
     }
 
-    private fun findCombatTarget(): LivingEntity? = world.getEntitiesOfClass(
-        LivingEntity::class.java,
-        player.boundingBox.inflate(maximumTargetRange.toDouble() + spearKillTargetSelectionMargin()),
-        ::isMaceKillTargetEligible,
-    ).minWithOrNull(compareBy<LivingEntity>(RotationUtil::crosshairAngleToEntity).thenBy(player::distanceToSqr))
+    private fun findCombatTarget(): LivingEntity? {
+        val origin = player.position()
+        val timing = currentMaceKillRouteExecutionConfiguration(MaceKillRouteOwner.MANUAL).timing
+        val candidates = world.getEntitiesOfClass(
+            LivingEntity::class.java,
+            player.boundingBox.inflate(maximumTargetRange.toDouble() + spearKillTargetSelectionMargin()),
+            ::isMaceKillTargetEligible,
+        ).map { target ->
+            MaceKillCombatTargetCandidate(
+                target = target,
+                distance = player.distanceTo(target).toDouble(),
+                crosshairAngle = RotationUtil.crosshairAngleToEntity(target),
+            )
+        }
+
+        return selectMaceKillCombatTarget(
+            candidates = candidates,
+            retainedTarget = previewTarget,
+            hasAttackEndpoint = { target ->
+                val predicted = predictedMaceKillTarget(target, origin, timing)
+                findMaceKillAttackEndpoint(
+                    target = target,
+                    origin = origin,
+                    targetPosition = predicted.position,
+                    targetEyePosition = predicted.eyePosition,
+                    requireAttackCooldown = false,
+                ) != null
+            },
+        )
+    }
 
     private fun isMaceKillTargetEligible(target: LivingEntity): Boolean = isMaceKillTargetCandidateEligible(
         isCombatSafe = target.shouldBeAttacked(),
@@ -2750,6 +2958,7 @@ internal data class MaceKillPlannedRoute(
     val primingPackets: Int = 0,
     val returnPrimingPackets: Int = 0,
     val motion: Boolean = false,
+    val vanillaVClipSegments: Set<MaceKillVanillaVClipSegment> = emptySet(),
     val clipReachPlan: MaceClipReachPlan? = null,
 )
 

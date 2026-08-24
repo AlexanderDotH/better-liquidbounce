@@ -24,6 +24,11 @@ import net.ccbluex.liquidbounce.config.types.group.ModeValueGroup
 import net.ccbluex.liquidbounce.event.events.PlayerMoveEvent
 import net.ccbluex.liquidbounce.event.handler
 import net.ccbluex.liquidbounce.features.module.modules.movement.fly.ModuleFly.modes
+import net.ccbluex.liquidbounce.features.module.modules.movement.fly.automation.FlyAutomationCapabilities
+import net.ccbluex.liquidbounce.features.module.modules.movement.fly.automation.FlyAutomationKind
+import net.ccbluex.liquidbounce.features.module.modules.movement.fly.automation.FlyAutomationProfile
+import net.ccbluex.liquidbounce.features.module.modules.movement.fly.automation.FlyAutomationReadiness
+import net.ccbluex.liquidbounce.features.module.modules.movement.fly.modes.flyAutomationYaw
 import net.minecraft.world.phys.Vec3
 import kotlin.math.cos
 import kotlin.math.sin
@@ -34,13 +39,24 @@ import kotlin.math.sin
  * @testedOn minecraft.vagdedes.com
  * @note spartan flags less if your motion is stable, that's why we use PlayerMoveEvent
  */
-internal object FlySpartan524 : Mode("Spartan524") {
+internal object FlySpartan524 : Mode("Spartan524"), FlyAutomationProfile {
 
     override val parent: ModeValueGroup<*>
         get() = modes
 
+    override val automationCapabilities = FlyAutomationCapabilities(
+        horizontal = true,
+        ascend = false,
+        descend = false,
+        landing = false,
+        kind = FlyAutomationKind.CONTINUOUS,
+        reliableSpeed = true,
+    )
+
+    override fun automationReadiness(): FlyAutomationReadiness = FlyAutomationReadiness.Ready
+
     val moveHandler = handler<PlayerMoveEvent> { event ->
-        val yaw = Math.toRadians(player.yRot.toDouble())
+        val yaw = Math.toRadians(flyAutomationYaw(player.yRot).toDouble())
         event.movement = Vec3(
             -sin(yaw) * 0.28,
             0.0,

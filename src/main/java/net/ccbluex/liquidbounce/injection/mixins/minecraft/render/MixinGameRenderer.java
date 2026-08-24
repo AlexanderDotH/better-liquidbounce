@@ -33,6 +33,9 @@ import net.ccbluex.liquidbounce.features.module.modules.fun.ModuleDankBobbing;
 import net.ccbluex.liquidbounce.features.module.modules.render.*;
 import net.ccbluex.liquidbounce.features.module.modules.render.customambience.ModuleCustomAmbience;
 import net.ccbluex.liquidbounce.render.WorldRenderEnvironment;
+import net.ccbluex.liquidbounce.render.engine.CustomFogBlurRenderer;
+import net.ccbluex.liquidbounce.render.engine.CustomFogVolumeRenderer;
+import net.ccbluex.liquidbounce.render.engine.UnifiedFogRenderer;
 import net.ccbluex.liquidbounce.render.engine.esp.EspShaderRenderer;
 import net.ccbluex.liquidbounce.render.engine.gui.GuiGlowRenderer;
 import net.ccbluex.liquidbounce.utils.aiming.RotationManager;
@@ -87,6 +90,7 @@ public abstract class MixinGameRenderer {
     @Inject(method = "render", at = @At("HEAD"))
     public void hookGameRender(CallbackInfo callbackInfo) {
         EspShaderRenderer.beginFrame();
+        UnifiedFogRenderer.beginFrame();
         EventManager.INSTANCE.callEvent(GameRenderEvent.INSTANCE);
     }
 
@@ -97,6 +101,28 @@ public abstract class MixinGameRenderer {
     @Inject(method = "extract", at = @At("HEAD"))
     private void beginGuiGlowFrame(CallbackInfo callbackInfo) {
         GuiGlowRenderer.beginFrame();
+    }
+
+    @Inject(
+        method = "renderLevel",
+        at = @At(
+            value = "INVOKE",
+            target = "Lnet/minecraft/client/renderer/LevelRenderer;render(Lcom/mojang/blaze3d/resource/GraphicsResourceAllocator;Lnet/minecraft/client/DeltaTracker;ZLnet/minecraft/client/renderer/state/level/CameraRenderState;Lorg/joml/Matrix4fc;Lcom/mojang/blaze3d/buffers/GpuBufferSlice;Lorg/joml/Vector4f;Z)V",
+            shift = At.Shift.AFTER
+        )
+    )
+    private void renderCustomFogPostProcessing(
+        CallbackInfo ci,
+        @Local(name = "cameraState") CameraRenderState cameraState,
+        @Local(name = "projectionMatrix") Matrix4f projectionMatrix
+    ) {
+        if (ModuleCustomAmbience.FogValueGroup.INSTANCE.isUnified()) {
+            UnifiedFogRenderer.render(cameraState, projectionMatrix);
+            return;
+        }
+
+        CustomFogBlurRenderer.render(this.mainRenderTarget, cameraState, projectionMatrix);
+        CustomFogVolumeRenderer.render(this.mainRenderTarget, cameraState, projectionMatrix);
     }
 
     @Inject(
@@ -159,14 +185,23 @@ public abstract class MixinGameRenderer {
 
     @ModifyArg(
         method = "renderLevel",
-        at = @At(value = "INVOKE", target = "Lnet/minecraft/client/renderer/fog/FogRenderer;getBuffer(Lnet/minecraft/client/renderer/fog/FogRenderer$FogMode;)Lcom/mojang/blaze3d/buffers/GpuBufferSlice;")
+        at = @At(
+            value = "INVOKE",
+            target = "Lnet/minecraft/client/renderer/fog/FogRenderer;getBuffer(Lnet/minecraft/client/renderer/fog/FogRenderer$FogMode;)Lcom/mojang/blaze3d/buffers/GpuBufferSlice;",
+            ordinal = 0
+        )
     )
-    private FogRenderer.FogMode disableFog(FogRenderer.FogMode fogMode) {
-        var fogValueGroup = ModuleCustomAmbience.FogValueGroup.INSTANCE;
-        if (fogValueGroup.getRunning() && ModuleCustomAmbience.FogValueGroup.INSTANCE.getDisableWorldFog()) {
+    private FogRenderer.FogMode customFogMode(FogRenderer.FogMode fogMode) {
+        if (!ModuleCustomAmbience.FogValueGroup.INSTANCE.getRunning()) {
+            return fogMode;
+        }
+        if (ModuleCustomAmbience.FogValueGroup.INSTANCE.isUnified()) {
             return FogRenderer.FogMode.NONE;
         }
-        return fogMode;
+        if (ModuleCustomAmbience.FogValueGroup.VolumetricFog.INSTANCE.getRunning()) {
+            return FogRenderer.FogMode.NONE;
+        }
+        return FogRenderer.FogMode.WORLD;
     }
 
     @WrapOperation(

@@ -30,9 +30,15 @@ import net.ccbluex.liquidbounce.event.tickHandler
 import net.ccbluex.liquidbounce.event.tickUntil
 import net.ccbluex.liquidbounce.features.blink.BlinkManager
 import net.ccbluex.liquidbounce.features.module.modules.movement.fly.ModuleFly
+import net.ccbluex.liquidbounce.features.module.modules.movement.fly.automation.FlyAutomationCapabilities
+import net.ccbluex.liquidbounce.features.module.modules.movement.fly.automation.FlyAutomationEnd
+import net.ccbluex.liquidbounce.features.module.modules.movement.fly.automation.FlyAutomationKind
+import net.ccbluex.liquidbounce.features.module.modules.movement.fly.automation.FlyAutomationProfile
+import net.ccbluex.liquidbounce.features.module.modules.movement.fly.automation.FlyAutomationReadiness
+import net.ccbluex.liquidbounce.features.module.modules.movement.fly.modes.FlyAutomaticEndSignal
+import net.ccbluex.liquidbounce.features.module.modules.movement.fly.modes.withFlyAutomationStrafe
 import net.ccbluex.liquidbounce.utils.client.Timer
 import net.ccbluex.liquidbounce.utils.client.notification
-import net.ccbluex.liquidbounce.utils.entity.withStrafe
 import net.ccbluex.liquidbounce.utils.kotlin.Priority
 import net.ccbluex.liquidbounce.utils.math.anyNotEmpty
 import net.minecraft.network.protocol.game.ClientboundDamageEventPacket
@@ -51,7 +57,7 @@ import net.minecraft.world.phys.Vec3
  *
  * @author 1zuna <marco@ccbluex.net>
  */
-object FlyNcpClip : Mode("NcpClip") {
+internal object FlyNcpClip : Mode("NcpClip"), FlyAutomationProfile {
 
     private val speed by float("Speed", 7.5f, 2f..10f)
     private val additionalEntrySpeed by float("AdditionalEntry", 2f, 0f..2f)
@@ -71,6 +77,30 @@ object FlyNcpClip : Mode("NcpClip") {
     private var damage = false
 
     private var shouldLag = false
+    private var automationReady = false
+    private val automaticEnd = FlyAutomaticEndSignal()
+
+    override val automationCapabilities = FlyAutomationCapabilities(
+        horizontal = true,
+        ascend = false,
+        descend = true,
+        landing = true,
+        kind = FlyAutomationKind.BURST,
+    )
+
+    override fun automationReadiness(): FlyAutomationReadiness = when {
+        fallDamage && !damage -> FlyAutomationReadiness.Arming("Waiting for fall damage")
+        !automationReady -> FlyAutomationReadiness.Arming("Waiting for the clip setup")
+        else -> FlyAutomationReadiness.Ready
+    }
+
+    override fun consumeAutomaticEnd(): FlyAutomationEnd? = automaticEnd.consume()
+
+    override fun enable() {
+        automaticEnd.reset()
+        automationReady = false
+        super.enable()
+    }
 
     @Suppress("unused")
     val tickHandler = tickHandler {
@@ -111,17 +141,22 @@ object FlyNcpClip : Mode("NcpClip") {
 
             // Proceed to jump (just like speeding up) and boost strafe entry
             player.jumpFromGround()
-            player.deltaMovement = player.deltaMovement.withStrafe(speed = (speed + additionalEntrySpeed).toDouble())
+            player.deltaMovement = player.deltaMovement.withFlyAutomationStrafe(
+                player,
+                (speed + additionalEntrySpeed).toDouble(),
+            )
 
             // Wait until the player is in air
             tickUntil { !player.onGround() }
 
             // Proceed to strafe with the normal speed
-            player.deltaMovement = player.deltaMovement.withStrafe(speed = speed.toDouble())
+            player.deltaMovement = player.deltaMovement.withFlyAutomationStrafe(player, speed.toDouble())
+            automationReady = true
         } else if (collidesBottomVertical()) {
             shouldLag = false
 
             // Disable the module when the player touches ground
+            automaticEnd.mark("NCP clip flight landed")
             ModuleFly.enabled = false
             return@tickHandler
         } else if (startPos.distanceTo(player.position()) > maximumDistance) {
@@ -132,6 +167,7 @@ object FlyNcpClip : Mode("NcpClip") {
             }
 
             // Disable the module
+            automaticEnd.mark("NCP clip maximum distance reached")
             ModuleFly.enabled = false
 
             notification("Fly", "You have exceeded the maximum distance.",
@@ -141,7 +177,7 @@ object FlyNcpClip : Mode("NcpClip") {
 
         // Strafe the player to improve control
         if (strafe) {
-            player.deltaMovement = player.deltaMovement.withStrafe()
+            player.deltaMovement = player.deltaMovement.withFlyAutomationStrafe(player)
         }
 
         // Set timer speed
@@ -190,6 +226,7 @@ object FlyNcpClip : Mode("NcpClip") {
         startPosition = null
         damage = false
         shouldLag = false
+        automationReady = false
 
         // Cancel the motion
         player.setDeltaMovement(0.0, player.deltaMovement.y, 0.0)

@@ -4,6 +4,7 @@
     import {addComponent, getComponentCatalog, getMetadata} from "../../../../../integration/rest";
     import DrawerHudComponent from "./DrawerHudComponent.svelte";
     import {fly} from "svelte/transition";
+    import {cefTextInput} from "../../../setting/common/cefTextInput";
 
     let metadata: Metadata;
 
@@ -32,7 +33,8 @@
         }
     }
 
-    function handleSearch() {
+    function handleSearch(value: string) {
+        query = value;
         filteredComponents = components.filter(c => c.name.toLowerCase().includes(query.toLowerCase()));
     }
 
@@ -64,8 +66,18 @@
 
     {#if drawerShown}
         <div class="drawer" transition:fly={{ y: -10, duration: 200 }}>
-            <input bind:this={searchInput} type="text" class="input-search" placeholder="Search" bind:value={query}
-                   oninput={handleSearch}>
+            <input
+                    bind:this={searchInput}
+                    type="text"
+                    class="input-search"
+                    placeholder="Search"
+                    readonly
+                    value={query}
+                    use:cefTextInput={{
+                        getValue: () => query,
+                        onChange: handleSearch,
+                    }}
+            >
 
             <div class="component-list">
                 {#if filteredComponents.length !== 0}

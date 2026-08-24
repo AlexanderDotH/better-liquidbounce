@@ -35,49 +35,120 @@ internal data class VClipPlayerPacketStep(
     val onGround: Boolean,
 )
 
+internal sealed interface VClipPacketPlanResult {
+
+    sealed interface Ready : VClipPacketPlanResult {
+        val steps: List<VClipPlayerPacketStep>
+    }
+
+    data class GroundedSegmentation(
+        override val steps: List<VClipPlayerPacketStep>,
+    ) : Ready
+
+    data class PacketJumpFallback(
+        override val steps: List<VClipPlayerPacketStep>,
+    ) : Ready
+
+    data object Unavailable : VClipPacketPlanResult
+}
+
 internal object VClipPacketPlanner {
 
     private const val PAPER_DISTANCE_PER_PACKET = 10.0
+    private const val PACKET_JUMP_Y_OFFSET = 1.0E-9
     private const val MAX_FOLIA_MOVEMENT_PACKETS = 5
+    private const val VCLIP_ON_GROUND = true
 
     fun vanilla(
         origin: VClipPosition,
         target: VClipPosition,
         paperBypass: Boolean,
-        forceTargetPacket: Boolean = false,
         fullPacket: Boolean,
-        onGround: Boolean,
-    ): List<VClipPlayerPacketStep> {
-        if (!paperBypass && !forceTargetPacket) {
-            return emptyList()
-        }
-
+        initialFallDistance: Double,
+        safeFallDistance: Double,
+    ): VClipPacketPlanResult {
+        val checkpoints = groundedCheckpoints(
+            origin,
+            target,
+            initialFallDistance,
+            safeFallDistance,
+        ) ?: return VClipPacketPlanResult.Unavailable
         val shape = positionalShape(fullPacket)
         val stationaryPackets = if (paperBypass) vanillaStationaryPackets(origin, target) else 0
-        return buildList(stationaryPackets + 1) {
+        val steps = buildList(stationaryPackets + checkpoints.size) {
             repeat(stationaryPackets) {
-                add(VClipPlayerPacketStep(shape, origin, onGround))
+                add(VClipPlayerPacketStep(shape, origin, VCLIP_ON_GROUND))
             }
-            add(VClipPlayerPacketStep(shape, target, onGround))
+            checkpoints.forEach { checkpoint ->
+                add(VClipPlayerPacketStep(shape, checkpoint, VCLIP_ON_GROUND))
+            }
         }
+        return VClipPacketPlanResult.GroundedSegmentation(steps)
     }
 
     fun folia(
+        origin: VClipPosition,
         target: VClipPosition,
         movementPackets: Int,
         fullPacket: Boolean,
-        onGround: Boolean,
-    ): List<VClipPlayerPacketStep> {
-        require(movementPackets in 1..MAX_FOLIA_MOVEMENT_PACKETS) {
-            "Folia movement packets must stay within the researched 1..5 window"
+        initialFallDistance: Double,
+        safeFallDistance: Double,
+    ): VClipPacketPlanResult {
+        requireFoliaPacketCount(movementPackets)
+
+        val checkpoints = groundedCheckpoints(origin, target, initialFallDistance, safeFallDistance)
+        if (checkpoints == null || checkpoints.size > movementPackets) {
+            return packetJumpFallback(target, movementPackets, fullPacket)
         }
 
-        return buildList(movementPackets) {
-            repeat(movementPackets - 1) {
-                add(VClipPlayerPacketStep(VClipPlayerPacketShape.STATUS_ONLY, null, onGround))
+        val shape = positionalShape(fullPacket)
+        val steps = buildList(movementPackets) {
+            repeat(movementPackets - checkpoints.size) {
+                add(VClipPlayerPacketStep(VClipPlayerPacketShape.STATUS_ONLY, null, VCLIP_ON_GROUND))
             }
-            add(VClipPlayerPacketStep(positionalShape(fullPacket), target, onGround))
+            checkpoints.forEach { checkpoint ->
+                add(VClipPlayerPacketStep(shape, checkpoint, VCLIP_ON_GROUND))
+            }
         }
+        return VClipPacketPlanResult.GroundedSegmentation(steps)
+    }
+
+    private fun packetJumpFallback(
+        target: VClipPosition,
+        movementPackets: Int,
+        fullPacket: Boolean,
+    ): VClipPacketPlanResult {
+        if (movementPackets < 2) {
+            return VClipPacketPlanResult.Unavailable
+        }
+
+        val shape = positionalShape(fullPacket)
+        val steps = buildList(movementPackets) {
+            repeat(movementPackets - 2) {
+                add(VClipPlayerPacketStep(VClipPlayerPacketShape.STATUS_ONLY, null, onGround = false))
+            }
+            add(VClipPlayerPacketStep(shape, target, onGround = false))
+            add(
+                VClipPlayerPacketStep(
+                    shape,
+                    target.copy(y = target.y + PACKET_JUMP_Y_OFFSET),
+                    onGround = false,
+                ),
+            )
+        }
+        return VClipPacketPlanResult.PacketJumpFallback(steps)
+    }
+
+    private fun groundedCheckpoints(
+        origin: VClipPosition,
+        target: VClipPosition,
+        initialFallDistance: Double,
+        safeFallDistance: Double,
+    ) = when (
+        val plan = VClipFallSafetyPlanner.plan(origin, target, initialFallDistance, safeFallDistance)
+    ) {
+        is VClipFallSafetyPlan.GroundedSegmentation -> plan.checkpoints
+        VClipFallSafetyPlan.Unsafe -> null
     }
 
     private fun positionalShape(fullPacket: Boolean) = if (fullPacket) {
@@ -91,5 +162,11 @@ internal object VClipPacketPlanner {
             abs(target.y - origin.y) +
             abs(target.z - origin.z)
         return (floor(manhattanDistance / PAPER_DISTANCE_PER_PACKET) - 1).toInt().coerceAtLeast(0)
+    }
+
+    private fun requireFoliaPacketCount(movementPackets: Int) {
+        require(movementPackets in 1..MAX_FOLIA_MOVEMENT_PACKETS) {
+            "Folia movement packets must stay within the researched 1..5 window"
+        }
     }
 }

@@ -15,17 +15,24 @@ import net.minecraft.core.BlockPos
 import net.minecraft.core.Vec3i
 import net.minecraft.world.phys.Vec3
 
-/** Keeps the selected normal route authoritative and uses ClipReach only when collision routing fails. */
+/** Keeps the selected normal route authoritative and uses bounded Vanilla VClip before ClipReach. */
 internal inline fun <T> selectMaceKillRoutePlan(
     routingMode: MaceKillRoutingMode,
     directPlan: () -> T?,
     aStarPlan: () -> T?,
+    vanillaVClipPlan: () -> T?,
     wallClipPlan: () -> T?,
 ): T? = when (routingMode) {
-    MaceKillRoutingMode.DIRECT -> directPlan() ?: wallClipPlan()
-    MaceKillRoutingMode.A_STAR -> aStarPlan() ?: wallClipPlan()
-    MaceKillRoutingMode.INSTANT -> wallClipPlan()
+    MaceKillRoutingMode.DIRECT -> directPlan() ?: vanillaVClipPlan() ?: wallClipPlan()
+    MaceKillRoutingMode.A_STAR -> aStarPlan() ?: vanillaVClipPlan() ?: wallClipPlan()
+    MaceKillRoutingMode.INSTANT -> vanillaVClipPlan() ?: wallClipPlan()
 }
+
+/** Motion has no ClipReach fallback, but it still owns the same bounded Vanilla VClip option. */
+internal inline fun <T> selectMaceKillMotionRoutePlan(
+    collisionPlan: () -> T?,
+    vanillaVClipPlan: () -> T?,
+): T? = collisionPlan() ?: vanillaVClipPlan()
 
 /** A* must validate the exact fractional endpoints already accepted by MaceKill's endpoint planner. */
 internal fun maceKillAStarNodePosition(

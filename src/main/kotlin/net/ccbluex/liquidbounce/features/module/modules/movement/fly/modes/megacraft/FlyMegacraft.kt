@@ -22,22 +22,37 @@ import net.ccbluex.liquidbounce.config.types.group.Mode
 import net.ccbluex.liquidbounce.config.types.group.ModeValueGroup
 import net.ccbluex.liquidbounce.event.tickHandler
 import net.ccbluex.liquidbounce.features.module.modules.movement.fly.ModuleFly
+import net.ccbluex.liquidbounce.features.module.modules.movement.fly.automation.FlyAutomationCapabilities
+import net.ccbluex.liquidbounce.features.module.modules.movement.fly.automation.FlyAutomationKind
+import net.ccbluex.liquidbounce.features.module.modules.movement.fly.automation.FlyAutomationProfile
+import net.ccbluex.liquidbounce.features.module.modules.movement.fly.automation.FlyAutomationReadiness
+import net.ccbluex.liquidbounce.features.module.modules.movement.fly.modes.flyAutomationSneak
+import net.ccbluex.liquidbounce.features.module.modules.movement.fly.modes.flyAutomationMoving
 import net.ccbluex.liquidbounce.features.module.modules.movement.fly.modes.revive.requestReviveFlyTimer
 import net.ccbluex.liquidbounce.features.module.modules.movement.fly.modes.revive.setReviveFlySpeed
 import net.ccbluex.liquidbounce.features.module.modules.movement.fly.modes.revive.stopReviveFlySpeed
-import net.ccbluex.liquidbounce.utils.entity.moving
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.TimeSource
 
 /**
  * Revive Megacraft fly port.
  */
-internal object FlyMegacraft : Mode("Megacraft") {
+internal object FlyMegacraft : Mode("Megacraft"), FlyAutomationProfile {
 
     override val parent: ModeValueGroup<*>
         get() = ModuleFly.modes
 
     private var lastBoost = TimeSource.Monotonic.markNow()
+
+    override val automationCapabilities = FlyAutomationCapabilities(
+        horizontal = true,
+        ascend = true,
+        descend = true,
+        landing = true,
+        kind = FlyAutomationKind.CONTINUOUS,
+    )
+
+    override fun automationReadiness(): FlyAutomationReadiness = FlyAutomationReadiness.Ready
 
     override fun enable() {
         lastBoost = TimeSource.Monotonic.markNow()
@@ -59,12 +74,12 @@ internal object FlyMegacraft : Mode("Megacraft") {
                 lastBoost = TimeSource.Monotonic.markNow()
             }
 
-            if (player.moving) {
+            if (player.flyAutomationMoving()) {
                 player.setReviveFlySpeed(2.0)
             }
         }
 
-        if (mc.options.keyShift.isDown) {
+        if (flyAutomationSneak(mc.options.keyShift.isDown)) {
             player.setPos(player.x, player.y - 1.0, player.z)
         }
     }

@@ -22,19 +22,35 @@ import net.ccbluex.liquidbounce.config.types.group.Mode
 import net.ccbluex.liquidbounce.config.types.group.ModeValueGroup
 import net.ccbluex.liquidbounce.event.tickHandler
 import net.ccbluex.liquidbounce.features.module.modules.movement.fly.ModuleFly
+import net.ccbluex.liquidbounce.features.module.modules.movement.fly.automation.FlyAutomationCapabilities
+import net.ccbluex.liquidbounce.features.module.modules.movement.fly.automation.FlyAutomationKind
+import net.ccbluex.liquidbounce.features.module.modules.movement.fly.automation.FlyAutomationProfile
+import net.ccbluex.liquidbounce.features.module.modules.movement.fly.automation.FlyAutomationReadiness
+import net.ccbluex.liquidbounce.features.module.modules.movement.fly.modes.flyAutomationJump
+import net.ccbluex.liquidbounce.features.module.modules.movement.fly.modes.flyAutomationMoving
+import net.ccbluex.liquidbounce.features.module.modules.movement.fly.modes.flyAutomationSneak
 import net.ccbluex.liquidbounce.features.module.modules.movement.fly.modes.revive.setReviveFlySpeed
-import net.ccbluex.liquidbounce.utils.entity.moving
 import net.minecraft.network.protocol.game.ServerboundMovePlayerPacket
 
 /**
  * Revive AntiKickFly port.
  */
-internal object FlyAntiKickFly : Mode("AntiKickFly") {
+internal object FlyAntiKickFly : Mode("AntiKickFly"), FlyAutomationProfile {
 
     override val parent: ModeValueGroup<*>
         get() = ModuleFly.modes
 
     private var floorY = 0.0
+
+    override val automationCapabilities = FlyAutomationCapabilities(
+        horizontal = true,
+        ascend = true,
+        descend = false,
+        landing = false,
+        kind = FlyAutomationKind.CONTINUOUS,
+    )
+
+    override fun automationReadiness(): FlyAutomationReadiness = FlyAutomationReadiness.Ready
 
     override fun enable() {
         floorY = player.y - FLOOR_OFFSET
@@ -49,7 +65,7 @@ internal object FlyAntiKickFly : Mode("AntiKickFly") {
             player.setPos(player.x, player.y + FLOOR_OFFSET, player.z)
         }
 
-        if (player.moving) {
+        if (player.flyAutomationMoving()) {
             player.setReviveFlySpeed(0.4)
         }
 
@@ -61,7 +77,7 @@ internal object FlyAntiKickFly : Mode("AntiKickFly") {
             sendPosition(player.y + 1.0)
         }
 
-        if (mc.options.keyJump.isDown || mc.options.keyShift.isDown) {
+        if (flyAutomationJump(mc.options.keyJump.isDown) || flyAutomationSneak(mc.options.keyShift.isDown)) {
             player.setPos(player.x, player.y + 1.0, player.z)
             floorY = player.y - FLOOR_OFFSET
         }

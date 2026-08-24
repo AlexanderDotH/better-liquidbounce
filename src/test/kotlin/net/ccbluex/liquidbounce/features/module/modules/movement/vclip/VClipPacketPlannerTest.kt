@@ -11,8 +11,9 @@
 package net.ccbluex.liquidbounce.features.module.modules.movement.vclip
 
 import org.junit.jupiter.api.Assertions.assertEquals
-import org.junit.jupiter.api.Assertions.assertNull
+import org.junit.jupiter.api.Assertions.assertSame
 import org.junit.jupiter.api.Assertions.assertThrows
+import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 
 class VClipPacketPlannerTest {
@@ -20,76 +21,146 @@ class VClipPacketPlannerTest {
     private val origin = VClipPosition(2.0, 64.0, -3.0)
 
     @Test
-    fun `vanilla without Paper bypass leaves movement local`() {
-        val target = origin.copy(y = 69.0)
+    fun `Folia five packet descent uses two primers and three grounded checkpoints`() {
+        val target = origin.copy(y = 57.63)
 
+        val result = VClipPacketPlanner.folia(
+            origin = origin,
+            target = target,
+            movementPackets = 5,
+            fullPacket = false,
+            initialFallDistance = 0.0,
+            safeFallDistance = 3.0,
+        ) as VClipPacketPlanResult.GroundedSegmentation
+
+        assertEquals(5, result.steps.size)
         assertEquals(
-            emptyList<VClipPlayerPacketStep>(),
-            VClipPacketPlanner.vanilla(origin, target, paperBypass = false, fullPacket = false, onGround = true),
+            List(2) { VClipPlayerPacketShape.STATUS_ONLY },
+            result.steps.take(2).map(VClipPlayerPacketStep::shape),
         )
+        assertEquals(
+            listOf(origin.copy(y = 61.25), origin.copy(y = 58.5), target),
+            result.steps.drop(2).map(VClipPlayerPacketStep::position),
+        )
+        assertEquals(List(5) { true }, result.steps.map(VClipPlayerPacketStep::onGround))
     }
 
     @Test
-    fun `Vanilla NoFall sends one grounded target packet without Paper bypass`() {
-        val target = origin.copy(y = 54.0)
+    fun `Vanilla uses full grounded checkpoints and preserves the exact target`() {
+        val target = origin.copy(y = 57.63)
 
-        val plan = VClipPacketPlanner.vanilla(
+        val result = VClipPacketPlanner.vanilla(
             origin = origin,
             target = target,
             paperBypass = false,
-            forceTargetPacket = true,
-            fullPacket = false,
-            onGround = true,
-        )
+            fullPacket = true,
+            initialFallDistance = 0.0,
+            safeFallDistance = 3.0,
+        ) as VClipPacketPlanResult.GroundedSegmentation
 
+        assertEquals(3, result.steps.size)
         assertEquals(
-            listOf(VClipPlayerPacketStep(VClipPlayerPacketShape.POSITION, target, onGround = true)),
-            plan,
+            List(3) { VClipPlayerPacketShape.FULL },
+            result.steps.map(VClipPlayerPacketStep::shape),
         )
+        assertEquals(List(3) { true }, result.steps.map(VClipPlayerPacketStep::onGround))
+        assertEquals(target, result.steps.last().position)
     }
 
     @Test
-    fun `vanilla Paper bypass preserves the command stationary packet calculation`() {
-        val target = origin.copy(y = 89.0)
+    fun `Vanilla keeps Paper stationary primers before safe checkpoints`() {
+        val target = origin.copy(y = 39.0)
 
-        val plan = VClipPacketPlanner.vanilla(
-            origin,
-            target,
+        val result = VClipPacketPlanner.vanilla(
+            origin = origin,
+            target = target,
             paperBypass = true,
             fullPacket = false,
-            onGround = false,
-        )
+            initialFallDistance = 0.0,
+            safeFallDistance = 3.0,
+        ) as VClipPacketPlanResult.GroundedSegmentation
 
-        assertEquals(2, plan.size)
-        assertEquals(origin, plan.first().position)
-        assertEquals(target, plan.last().position)
-        assertEquals(List(2) { VClipPlayerPacketShape.POSITION }, plan.map { it.shape })
-        assertEquals(List(2) { false }, plan.map { it.onGround })
+        assertEquals(11, result.steps.size)
+        assertEquals(origin, result.steps.first().position)
+        assertEquals(origin.copy(y = 61.25), result.steps[1].position)
+        assertEquals(target, result.steps.last().position)
+        assertTrue(result.steps.all(VClipPlayerPacketStep::onGround))
     }
 
     @Test
-    fun `Folia primes four status packets before the fifth movement packet`() {
-        val target = origin.copy(y = 72.0)
+    fun `Folia long descent uses exact packet budget for ungrounded PacketJump fallback`() {
+        val target = origin.copy(y = 40.0)
 
-        val plan = VClipPacketPlanner.folia(
-            target,
+        val result = VClipPacketPlanner.folia(
+            origin = origin,
+            target = target,
             movementPackets = 5,
             fullPacket = true,
-            onGround = true,
+            initialFallDistance = 0.0,
+            safeFallDistance = 3.0,
+        ) as VClipPacketPlanResult.PacketJumpFallback
+
+        assertEquals(5, result.steps.size)
+        assertEquals(
+            List(3) { VClipPlayerPacketShape.STATUS_ONLY },
+            result.steps.take(3).map(VClipPlayerPacketStep::shape),
+        )
+        assertTrue(result.steps.take(3).all { it.position == null })
+        assertEquals(target, result.steps[3].position)
+        assertEquals(VClipPlayerPacketShape.FULL, result.steps[3].shape)
+        assertEquals(target.y + 1.0E-9, result.steps[4].position?.y)
+        assertEquals(target.x, result.steps[4].position?.x)
+        assertEquals(target.z, result.steps[4].position?.z)
+        assertEquals(VClipPlayerPacketShape.FULL, result.steps[4].shape)
+        assertTrue(result.steps.none(VClipPlayerPacketStep::onGround))
+    }
+
+    @Test
+    fun `Folia one packet rejects a descent that needs PacketJump fallback`() {
+        val result = VClipPacketPlanner.folia(
+            origin = origin,
+            target = origin.copy(y = 58.0),
+            movementPackets = 1,
+            fullPacket = false,
+            initialFallDistance = 0.0,
+            safeFallDistance = 3.0,
         )
 
-        assertEquals(5, plan.size)
-        assertEquals(List(4) { VClipPlayerPacketShape.STATUS_ONLY }, plan.dropLast(1).map { it.shape })
-        assertEquals(List(4) { null }, plan.dropLast(1).map { it.position })
-        assertEquals(VClipPlayerPacketShape.FULL, plan.last().shape)
-        assertEquals(target, plan.last().position)
-        assertEquals(List(5) { true }, plan.map { it.onGround })
+        assertSame(VClipPacketPlanResult.Unavailable, result)
+    }
+
+    @Test
+    fun `Folia upward clip preserves four status primers before the target`() {
+        val target = origin.copy(y = 72.0)
+
+        val result = VClipPacketPlanner.folia(
+            origin = origin,
+            target = target,
+            movementPackets = 5,
+            fullPacket = true,
+            initialFallDistance = 0.0,
+            safeFallDistance = 3.0,
+        ) as VClipPacketPlanResult.GroundedSegmentation
+
+        assertEquals(5, result.steps.size)
+        assertEquals(List(4) { VClipPlayerPacketShape.STATUS_ONLY }, result.steps.dropLast(1).map { it.shape })
+        assertEquals(List(4) { null }, result.steps.dropLast(1).map { it.position })
+        assertEquals(VClipPlayerPacketShape.FULL, result.steps.last().shape)
+        assertEquals(target, result.steps.last().position)
+        assertEquals(List(5) { true }, result.steps.map { it.onGround })
     }
 
     @Test
     fun `Folia movement packet setting is bounded to the researched five packet window`() {
         assertThrows(IllegalArgumentException::class.java) {
-            VClipPacketPlanner.folia(origin, movementPackets = 6, fullPacket = false, onGround = false)
+            VClipPacketPlanner.folia(
+                origin = origin,
+                target = origin.copy(y = 60.0),
+                movementPackets = 6,
+                fullPacket = false,
+                initialFallDistance = 0.0,
+                safeFallDistance = 3.0,
+            )
         }
     }
 }

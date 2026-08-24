@@ -1362,5 +1362,7 @@
     "liquidbounce.scripts.debug.support": "腳本 %s 被配置為以調試器支援啟動: ",
     "liquidbounce.tooltip.clickToCopy": "點擊複製",
     "liquidbounce.unsupportedDeepLearning": "深度學習引擎尚未初始化。您的系統可能不受支援。",
-    "modmenu.descriptionTranslation.liquidbounce": "一個基於mixin注入的免費Minecraft作弊客戶端。"
+    "modmenu.descriptionTranslation.liquidbounce": "一個基於mixin注入的免費Minecraft作弊客戶端。",
+    "liquidbounce.command.baritone.description": "Controls Baritone navigation and opens its dashboard.",
+    "liquidbounce.module.baritone.description": "Integrates Baritone pathfinding with LiquidBounce controls and dashboard."
 }

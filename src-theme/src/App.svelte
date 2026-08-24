@@ -16,6 +16,7 @@
     import Disconnected from "./routes/menu/disconnected/Disconnected.svelte";
     import Browser from "./routes/browser/Browser.svelte";
     import ClickGuiThemeHost from "./routes/clickgui/theme/ClickGuiThemeHost.svelte";
+    import BaritoneDashboard from "./routes/baritone/BaritoneDashboard.svelte";
     import {intToRgba, rgbaToHex} from "./integration/util";
     import type {ThemeColorChangeEvent} from "./integration/events";
     import Menu from "./routes/menu/common/Menu.svelte";
@@ -32,6 +33,7 @@
 
     const routes = {
         "/clickgui": ClickGuiThemeHost,
+        "/baritone": BaritoneDashboard,
         "/hud": Hud,
         "/inventory": Inventory,
         "/none": None,

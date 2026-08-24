@@ -169,6 +169,7 @@ import net.ccbluex.liquidbounce.features.module.modules.player.ModuleAutoFish
 import net.ccbluex.liquidbounce.features.module.modules.player.ModuleAutoRespawn
 import net.ccbluex.liquidbounce.features.module.modules.player.ModuleAutoWalk
 import net.ccbluex.liquidbounce.features.module.modules.player.ModuleAutoWindCharge
+import net.ccbluex.liquidbounce.features.module.modules.player.ModuleBaritone
 import net.ccbluex.liquidbounce.features.module.modules.player.ModuleBlink
 import net.ccbluex.liquidbounce.features.module.modules.player.ModuleChestCleaner
 import net.ccbluex.liquidbounce.features.module.modules.player.ModuleEagle
@@ -618,6 +619,7 @@ object ModuleManager : EventListener, Collection<ClientModule> by modules {
             ModuleOffhand,
             ModuleAutoShop,
             ModuleAutoWalk,
+            ModuleBaritone,
             ModuleBlink,
             ModuleChestCleaner,
             ModuleChestStealer,

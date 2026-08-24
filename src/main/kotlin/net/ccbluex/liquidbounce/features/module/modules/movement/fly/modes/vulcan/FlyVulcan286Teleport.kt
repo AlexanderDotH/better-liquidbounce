@@ -28,6 +28,13 @@ import net.ccbluex.liquidbounce.event.tickHandler
 import net.ccbluex.liquidbounce.event.tickUntil
 import net.ccbluex.liquidbounce.features.module.modules.movement.fly.ModuleFly
 import net.ccbluex.liquidbounce.features.module.modules.movement.fly.ModuleFly.modes
+import net.ccbluex.liquidbounce.features.module.modules.movement.fly.automation.FlyAutomationCapabilities
+import net.ccbluex.liquidbounce.features.module.modules.movement.fly.automation.FlyAutomationEnd
+import net.ccbluex.liquidbounce.features.module.modules.movement.fly.automation.FlyAutomationKind
+import net.ccbluex.liquidbounce.features.module.modules.movement.fly.automation.FlyAutomationProfile
+import net.ccbluex.liquidbounce.features.module.modules.movement.fly.automation.FlyAutomationReadiness
+import net.ccbluex.liquidbounce.features.module.modules.movement.fly.modes.FlyAutomaticEndSignal
+import net.ccbluex.liquidbounce.features.module.modules.movement.fly.modes.flyAutomationYaw
 import net.ccbluex.liquidbounce.utils.math.copy
 import net.minecraft.network.protocol.game.ClientboundPlayerPositionPacket
 import net.minecraft.network.protocol.game.ServerboundMovePlayerPacket
@@ -41,13 +48,37 @@ import net.minecraft.world.phys.Vec3
  * @note Few seconds cooldown to not flag. Requires 1.8 serverside
  * @author Nullable
  */
-internal object FlyVulcan286Teleport : Mode("Vulcan286-Teleport-18") {
+internal object FlyVulcan286Teleport : Mode("Vulcan286-Teleport-18"), FlyAutomationProfile {
 
     override val parent: ModeValueGroup<*>
         get() = modes
 
     private var jumping = false
     private var flagged = false
+    private val automaticEnd = FlyAutomaticEndSignal()
+
+    override val automationCapabilities = FlyAutomationCapabilities(
+        horizontal = true,
+        ascend = false,
+        descend = false,
+        landing = true,
+        kind = FlyAutomationKind.BURST,
+    )
+
+    override fun automationReadiness(): FlyAutomationReadiness = when {
+        jumping -> FlyAutomationReadiness.Arming("Preparing Vulcan fall damage")
+        flagged -> FlyAutomationReadiness.Ready
+        else -> FlyAutomationReadiness.Arming("Waiting for the Vulcan setback")
+    }
+
+    override fun consumeAutomaticEnd(): FlyAutomationEnd? = automaticEnd.consume()
+
+    override fun enable() {
+        automaticEnd.reset()
+        jumping = false
+        flagged = false
+        super.enable()
+    }
 
     override fun disable() {
         jumping = false
@@ -92,7 +123,7 @@ internal object FlyVulcan286Teleport : Mode("Vulcan286-Teleport-18") {
         tickUntil { flagged }
 
         // Cool, we took damage so lets fly
-        val vector = Vec3.directionFromRotation(0F, player.yRot).normalize()
+        val vector = Vec3.directionFromRotation(0F, flyAutomationYaw(player.yRot)).normalize()
         // After 3 times vulcan flags us. 3 is the max
         repeat(3) {
             // 10 Blocks per teleport...
@@ -109,6 +140,7 @@ internal object FlyVulcan286Teleport : Mode("Vulcan286-Teleport-18") {
             ))
         }
 
+        automaticEnd.mark("Vulcan teleport burst completed")
         ModuleFly.enabled = false
     }
 
@@ -134,4 +166,3 @@ internal object FlyVulcan286Teleport : Mode("Vulcan286-Teleport-18") {
     }
 
 }
-

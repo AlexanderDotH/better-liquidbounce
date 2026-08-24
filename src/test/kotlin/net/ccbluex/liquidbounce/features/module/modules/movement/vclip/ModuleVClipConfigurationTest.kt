@@ -37,17 +37,17 @@ class ModuleVClipConfigurationTest {
     }
 
     @Test
-    fun `VClip preserves distance and smart command targets as settings`() {
+    fun `VClip exposes shared default-on bedrock safety for distance and smart targets`() {
         assertEquals(listOf("Distance", "Smart"), ModuleVClip.targets.modes.map { it.name })
         assertEquals("Smart", ModuleVClip.targets.activeMode.name)
         assertEquals(5.0, ModuleVClip.target("Distance").setting("Blocks").numericValue(), 0.0)
+        assertEquals(true, ModuleVClip.setting("DoNotClipAroundBedrock").get())
 
         val smart = ModuleVClip.target("Smart")
         val scanDistance = smart.setting("ScanDistance") as ToggleableValueGroup
-        assertEquals(listOf("ScanDistance", "DoNotClipAroundBedrock"), smart.inner.map { it.name })
+        assertEquals(listOf("ScanDistance"), smart.inner.map { it.name })
         assertTrue(scanDistance.enabled)
         assertEquals(10, scanDistance.setting("MaxDistance").get())
-        assertEquals(true, smart.setting("DoNotClipAroundBedrock").get())
         assertEquals(5, ModuleVClip.setting("RepeatDelay").get())
     }
 
@@ -67,17 +67,28 @@ class ModuleVClipConfigurationTest {
     }
 
     @Test
-    fun `Vanilla keeps relevant command movement settings and Folia defaults to five packets`() {
+    fun `VClip exposes bedrock safety as a default-on ClickGUI checkbox`() {
+        val moduleJson = interopGson.toJsonTree(ModuleVClip).asJsonObject
+        val safety = moduleJson.getAsJsonArray("value")
+            .map { it.asJsonObject }
+            .single { it["name"].asString == "DoNotClipAroundBedrock" }
+
+        assertEquals(ValueType.BOOLEAN.name, safety["valueType"].asString)
+        assertEquals(true, safety["value"].asBoolean)
+    }
+
+    @Test
+    fun `VClip modes always ground packets without exposing a contradictory ground setting`() {
         val vanilla = ModuleVClip.mode("Vanilla")
         val folia = ModuleVClip.mode("Folia")
 
         assertEquals(false, vanilla.setting("PaperBypass").get())
         assertEquals(false, vanilla.setting("FullPacket").get())
-        assertEquals(VClipGroundMode.CORRECT, vanilla.setting("GroundMode").get())
+        assertFalse(vanilla.inner.any { it.name == "GroundMode" })
         assertEquals(true, vanilla.setting("ResetMotion").get())
         assertEquals(5, folia.setting("MovementPackets").get())
         assertEquals(false, folia.setting("FullPacket").get())
-        assertEquals(VClipGroundMode.CORRECT, folia.setting("GroundMode").get())
+        assertFalse(folia.inner.any { it.name == "GroundMode" })
         assertEquals(true, folia.setting("ResetMotion").get())
     }
 

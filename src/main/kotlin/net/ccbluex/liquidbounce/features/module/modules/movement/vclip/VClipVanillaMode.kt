@@ -11,37 +11,41 @@
 package net.ccbluex.liquidbounce.features.module.modules.movement.vclip
 
 import net.ccbluex.liquidbounce.features.module.modules.movement.ModuleVClip
-import net.ccbluex.liquidbounce.features.module.modules.player.nofall.ModuleNoFall
 import net.minecraft.world.entity.Entity
 
 internal object VClipVanillaMode : VClipMovementMode("Vanilla") {
 
     private val paperBypass by boolean("PaperBypass", false)
     private val fullPacket by boolean("FullPacket", false)
-    private val groundMode by enumChoice("GroundMode", VClipGroundMode.CORRECT)
     private val resetMotion by boolean("ResetMotion", true)
 
-    override fun clip(entity: Entity, origin: VClipPosition, target: VClipPosition) {
-        val fallProtection = VClipFallProtectionPolicy.resolve(
-            noFallRunning = ModuleNoFall.running,
-            configuredOnGround = groundMode.resolve(player.onGround()),
-        )
-        val plan = VClipPacketPlanner.vanilla(
+    override fun clip(
+        entity: Entity,
+        origin: VClipPosition,
+        target: VClipPosition,
+        fallSafety: VClipFallSafetyContext,
+    ): VClipClipResult {
+        val result = VClipPacketPlanner.vanilla(
             origin = origin,
             target = target,
             paperBypass = paperBypass,
-            forceTargetPacket = fallProtection.forceTargetPacket,
             fullPacket = fullPacket,
-            onGround = fallProtection.packetOnGround,
+            initialFallDistance = fallSafety.initialFallDistance,
+            safeFallDistance = fallSafety.safeFallDistance,
         )
-        VClipPacketEmitter.sendPlayerPlan(
+        val plan = (result as? VClipPacketPlanResult.Ready)?.steps
+            ?: return VClipClipResult.FALL_PROTECTION_UNAVAILABLE
+        val completed = VClipPacketEmitter.sendPlayerPlan(
             plan,
             player.yRot,
             player.xRot,
             player.horizontalCollision,
-        ) { packet ->
-            ModuleVClip.sendMovementPacket(packet, fallProtection)
+            ModuleVClip::sendMovementPacket,
+        )
+        if (!completed) {
+            return VClipClipResult.FALL_PROTECTION_UNAVAILABLE
         }
-        applyLocalPosition(entity, target, resetMotion, fallProtection)
+        applyLocalPosition(entity, target, resetMotion)
+        return VClipClipResult.COMPLETED
     }
 }

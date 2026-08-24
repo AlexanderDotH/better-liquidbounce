@@ -19,14 +19,14 @@
 package net.ccbluex.liquidbounce.features.module.modules.movement.fly.modes.revive
 
 import net.ccbluex.liquidbounce.features.module.modules.movement.fly.ModuleFly
+import net.ccbluex.liquidbounce.features.module.modules.movement.fly.modes.withFlyAutomationStrafe
 import net.ccbluex.liquidbounce.utils.client.Timer
-import net.ccbluex.liquidbounce.utils.entity.withStrafe
 import net.ccbluex.liquidbounce.utils.kotlin.Priority
 import net.ccbluex.liquidbounce.utils.movement.stopXZVelocity
 import net.minecraft.client.player.LocalPlayer
 
 internal fun LocalPlayer.setReviveFlySpeed(speed: Double) {
-    deltaMovement = deltaMovement.withStrafe(speed = speed)
+    deltaMovement = deltaMovement.withFlyAutomationStrafe(this, speed)
 }
 
 internal fun LocalPlayer.stopReviveFlySpeed() {

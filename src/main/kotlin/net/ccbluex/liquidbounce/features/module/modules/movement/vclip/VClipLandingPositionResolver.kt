@@ -11,19 +11,21 @@
 package net.ccbluex.liquidbounce.features.module.modules.movement.vclip
 
 import net.ccbluex.liquidbounce.features.module.MinecraftShortcuts
-import net.ccbluex.liquidbounce.utils.block.canStandOn
-import net.ccbluex.liquidbounce.utils.block.collisionShape
-import net.minecraft.core.BlockPos
-import net.minecraft.core.Direction
-import net.minecraft.util.Mth
+import net.ccbluex.liquidbounce.utils.math.anyNotEmpty
 import net.minecraft.world.entity.Entity
 import net.minecraft.world.level.block.Blocks
 import net.minecraft.world.phys.AABB
-import net.minecraft.world.phys.shapes.BooleanOp
-import net.minecraft.world.phys.shapes.Shapes
-import net.minecraft.world.phys.shapes.VoxelShape
 
 internal object VClipLandingPositionResolver : MinecraftShortcuts {
+
+    fun isBedrockPathBlocked(entity: Entity, targetY: Double, enabled: Boolean): Boolean =
+        VClipBedrockPath.isBlocked(
+            enabled = enabled,
+            boundingBox = controlledBoundingBox(entity),
+            verticalOffset = targetY - entity.y,
+        ) { position ->
+            entity.level().getBlockState(position).block === Blocks.BEDROCK
+        }
 
     fun resolve(
         entity: Entity,
@@ -31,142 +33,75 @@ internal object VClipLandingPositionResolver : MinecraftShortcuts {
         maxDistance: Int?,
         doNotClipAroundBedrock: Boolean,
     ): VClipPosition? {
-        val blockPosition = entity.blockPosition()
         val position = entity.position()
         val level = entity.level()
-        val bedrockFootprint = controlledBoundingBox(entity).takeIf { doNotClipAroundBedrock }
         val targetY = VClipTargetPlanner.smartTargetY(
             scan = VClipSmartScan(
-                startBlockY = blockPosition.y,
                 currentY = position.y,
                 direction = direction,
                 minBuildY = level.minY,
                 maxBuildY = level.maxY,
                 maxDistance = maxDistance,
+                scanStep = SMART_SCAN_STEP,
+                collisionRefinementStep = SMART_COLLISION_REFINEMENT_STEP,
             ),
-            isBarrierAt = { supportY ->
-                bedrockFootprint?.let { containsBedrock(entity, it, supportY) } == true
+            hasBlockCollisionBetween = { fromY, toY ->
+                hasBlockCollisionBetween(entity, fromY, toY)
             },
-            surfaceOffsetAt = { supportY ->
-                surfaceOffset(
-                    entity = entity,
-                    supportPosition = BlockPos(blockPosition.x, supportY, blockPosition.z),
-                    bedrockFootprint = bedrockFootprint,
-                )
+            hasAnyCollisionAt = { candidateY ->
+                hasAnyCollisionAt(entity, candidateY)
             },
         ) ?: return null
+        if (isBedrockPathBlocked(entity, targetY, doNotClipAroundBedrock)) {
+            return null
+        }
 
         return VClipPosition(position.x, targetY, position.z)
-    }
-
-    private fun surfaceOffset(entity: Entity, supportPosition: BlockPos, bedrockFootprint: AABB?): Double? {
-        val supportShape = supportPosition.collisionShape
-        if (supportShape.isEmpty) {
-            return null
-        }
-
-        val surfaceOffset = supportShape.max(Direction.Axis.Y)
-        val targetY = supportPosition.y + surfaceOffset
-        if (!fitsInsideBuildHeight(entity, targetY) ||
-            bedrockFootprint?.let { containsBedrockAtTarget(entity, it, targetY) } == true ||
-            !canLandOn(entity, supportPosition, supportShape)
-        ) {
-            return null
-        }
-
-        return surfaceOffset
     }
 
     private fun controlledBoundingBox(entity: Entity): AABB =
         if (entity === player) entity.boundingBox else entity.boundingBox.minmax(player.boundingBox)
 
-    private fun containsBedrock(entity: Entity, footprint: AABB, blockY: Int): Boolean {
-        val minBlockX = Mth.floor(footprint.minX + BOUNDING_BOX_EPSILON)
-        val maxBlockX = Mth.floor(footprint.maxX - BOUNDING_BOX_EPSILON)
-        val minBlockZ = Mth.floor(footprint.minZ + BOUNDING_BOX_EPSILON)
-        val maxBlockZ = Mth.floor(footprint.maxZ - BOUNDING_BOX_EPSILON)
+    private fun hasBlockCollisionBetween(entity: Entity, fromY: Double, toY: Double): Boolean {
+        val level = entity.level()
+        val referenceY = entity.y
 
-        for (blockX in minBlockX..maxBlockX) {
-            for (blockZ in minBlockZ..maxBlockZ) {
-                if (entity.level().getBlockState(BlockPos(blockX, blockY, blockZ)).block === Blocks.BEDROCK) {
-                    return true
-                }
-            }
+        fun Entity.collidesBetween(box: AABB): Boolean {
+            val fromBox = box.move(0.0, fromY - referenceY, 0.0)
+            val toBox = box.move(0.0, toY - referenceY, 0.0)
+            return level.getBlockCollisions(this, fromBox.minmax(toBox)).anyNotEmpty()
         }
 
-        return false
+        return entity.collidesBetween(entity.boundingBox) ||
+            (entity !== player && player.collidesBetween(player.boundingBox))
     }
 
-    private fun containsBedrockAtTarget(entity: Entity, footprint: AABB, targetY: Double): Boolean {
-        val movedFootprint = footprint.move(0.0, targetY - entity.y, 0.0)
-        val minBlockY = Mth.floor(movedFootprint.minY + BOUNDING_BOX_EPSILON)
-        val maxBlockY = Mth.floor(movedFootprint.maxY - BOUNDING_BOX_EPSILON)
-
-        return (minBlockY..maxBlockY).any { blockY -> containsBedrock(entity, movedFootprint, blockY) }
-    }
-
-    private fun fitsInsideBuildHeight(entity: Entity, targetY: Double): Boolean {
+    private fun hasAnyCollisionAt(entity: Entity, targetY: Double): Boolean {
         val level = entity.level()
         val verticalOffset = targetY - entity.y
+        if (!fitsInsideBuildHeight(entity, verticalOffset)) {
+            return true
+        }
+        if (!level.noCollision(entity, entity.boundingBox.move(0.0, verticalOffset, 0.0))) {
+            return true
+        }
+        return entity !== player && !level.noCollision(player, player.boundingBox.move(0.0, verticalOffset, 0.0))
+    }
+
+    private fun fitsInsideBuildHeight(entity: Entity, verticalOffset: Double): Boolean {
+        val level = entity.level()
         val minimumY = level.minY.toDouble()
         val maximumYExclusive = level.maxY + 1.0
 
-        fun AABB.fits() =
-            move(0.0, verticalOffset, 0.0).let { moved ->
-                moved.minY >= minimumY - BOUNDING_BOX_EPSILON &&
-                    moved.maxY <= maximumYExclusive + BOUNDING_BOX_EPSILON
-            }
+        fun AABB.fits() = move(0.0, verticalOffset, 0.0).let { moved ->
+            moved.minY >= minimumY - BOUNDING_BOX_EPSILON &&
+                moved.maxY <= maximumYExclusive + BOUNDING_BOX_EPSILON
+        }
 
         return entity.boundingBox.fits() && (entity === player || player.boundingBox.fits())
     }
 
-    private fun canLandOn(entity: Entity, position: BlockPos, supportShape: VoxelShape): Boolean {
-        if (isNotEnoughSpaceAboveBlock(position, entity.boundingBox, supportShape)) {
-            return false
-        }
-
-        if (entity !== player && isNotEnoughSpaceAboveBlock(position, player.boundingBox, supportShape)) {
-            return false
-        }
-
-        if (position.canStandOn()) {
-            return true
-        }
-
-        return intersectsAtSurface(position, entity.boundingBox, supportShape)
-    }
-
-    private fun intersectsAtSurface(position: BlockPos, boundingBox: AABB, supportShape: VoxelShape): Boolean {
-        val worldShape = supportShape.move(position.x.toDouble(), position.y.toDouble(), position.z.toDouble())
-        val verticalOffset = worldShape.min(Direction.Axis.Y) - boundingBox.minY
-        return Shapes.joinIsNotEmpty(
-            worldShape,
-            Shapes.create(boundingBox.move(0.0, verticalOffset, 0.0)),
-            BooleanOp.AND,
-        )
-    }
-
-    private fun isNotEnoughSpaceAboveBlock(
-        position: BlockPos,
-        boundingBox: AABB,
-        supportShape: VoxelShape,
-    ): Boolean {
-        val supportHeight = supportShape.max(Direction.Axis.Y)
-        val requiredHeight = boundingBox.maxY - boundingBox.minY - (1.0 - supportHeight)
-        var accumulatedHeight = 0.0
-        var inspectedPosition = position
-
-        while (accumulatedHeight < requiredHeight) {
-            inspectedPosition = inspectedPosition.above()
-            val collisionShape = inspectedPosition.collisionShape
-            if (!collisionShape.isEmpty && collisionShape.min(Direction.Axis.Y) < requiredHeight - accumulatedHeight) {
-                return true
-            }
-            accumulatedHeight += 1.0
-        }
-
-        return false
-    }
-
+    private const val SMART_SCAN_STEP = 0.25
+    private const val SMART_COLLISION_REFINEMENT_STEP = 0.05
     private const val BOUNDING_BOX_EPSILON = 1.0E-7
 }

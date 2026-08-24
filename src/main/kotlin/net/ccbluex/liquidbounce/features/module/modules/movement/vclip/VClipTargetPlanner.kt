@@ -10,20 +10,28 @@
  */
 package net.ccbluex.liquidbounce.features.module.modules.movement.vclip
 
-import kotlin.math.abs
+import kotlin.math.min
 
 internal data class VClipSmartScan(
-    val startBlockY: Int,
     val currentY: Double,
     val direction: VClipDirection,
     val minBuildY: Int,
     val maxBuildY: Int,
     val maxDistance: Int?,
+    val scanStep: Double,
+    val collisionRefinementStep: Double,
 ) {
     init {
         require(currentY.isFinite()) { "Current Y must be finite" }
         require(minBuildY <= maxBuildY) { "Minimum build height cannot exceed maximum build height" }
         require(maxDistance == null || maxDistance >= 0) { "Maximum distance cannot be negative" }
+        require(scanStep.isFinite() && scanStep > 0.0) { "Scan step must be finite and positive" }
+        require(collisionRefinementStep.isFinite() && collisionRefinementStep > 0.0) {
+            "Collision refinement step must be finite and positive"
+        }
+        require(collisionRefinementStep <= scanStep) {
+            "Collision refinement step cannot exceed the initial scan step"
+        }
     }
 }
 
@@ -36,41 +44,44 @@ internal object VClipTargetPlanner {
 
     fun smartTargetY(
         scan: VClipSmartScan,
-        isBarrierAt: (supportY: Int) -> Boolean = { false },
-        surfaceOffsetAt: (supportY: Int) -> Double?,
+        hasBlockCollisionBetween: (fromY: Double, toY: Double) -> Boolean,
+        hasAnyCollisionAt: (candidateY: Double) -> Boolean,
     ): Double? {
-        var supportY = firstSupportY(scan)
-        var inspectedSupports = 0
+        val maximumDistance = maximumSearchDistance(scan)
+        if (maximumDistance <= 0.0) {
+            return null
+        }
 
-        while (supportY in scan.minBuildY.toLong()..scan.maxBuildY.toLong() &&
-            (scan.maxDistance == null || inspectedSupports < scan.maxDistance)
-        ) {
-            val currentSupportY = supportY.toInt()
-            if (isBarrierAt(currentSupportY)) {
-                return null
-            }
-
-            inspectedSupports++
-            val surfaceOffset = surfaceOffsetAt(currentSupportY)
-            if (surfaceOffset == null) {
-                supportY += scan.direction.verticalSign
+        var previousY = scan.currentY
+        var inspectedDistance = 0.0
+        var scanStep = scan.scanStep
+        var crossedBlock = false
+        while (inspectedDistance < maximumDistance) {
+            val distance = min(inspectedDistance + scanStep, maximumDistance)
+            val candidateY = scan.currentY + scan.direction.verticalSign * distance
+            val segmentCrossesBlock = hasBlockCollisionBetween(previousY, candidateY)
+            if (!crossedBlock && segmentCrossesBlock && scanStep > scan.collisionRefinementStep) {
+                scanStep = scan.collisionRefinementStep
                 continue
             }
 
-            val targetY = currentSupportY + surfaceOffset
-
-            if (scan.maxDistance != null && abs(targetY - scan.currentY) > scan.maxDistance) {
-                return null
+            crossedBlock = crossedBlock || segmentCrossesBlock
+            if (crossedBlock && !hasAnyCollisionAt(candidateY)) {
+                return candidateY
             }
-
-            return targetY
+            inspectedDistance = distance
+            previousY = candidateY
         }
 
         return null
     }
 
-    private fun firstSupportY(scan: VClipSmartScan) = when (scan.direction) {
-        VClipDirection.UP -> scan.startBlockY.toLong() + 1L
-        VClipDirection.DOWN -> scan.startBlockY.toLong() - 2L
+    private fun maximumSearchDistance(scan: VClipSmartScan): Double {
+        val buildHeightDistance = when (scan.direction) {
+            VClipDirection.UP -> scan.maxBuildY + 1.0 - scan.currentY
+            VClipDirection.DOWN -> scan.currentY - scan.minBuildY
+        }.coerceAtLeast(0.0)
+
+        return scan.maxDistance?.toDouble()?.coerceAtMost(buildHeightDistance) ?: buildHeightDistance
     }
 }

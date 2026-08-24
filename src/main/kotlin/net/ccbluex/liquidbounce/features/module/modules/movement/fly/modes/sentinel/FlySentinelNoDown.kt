@@ -25,10 +25,15 @@ import net.ccbluex.liquidbounce.event.events.PacketEvent
 import net.ccbluex.liquidbounce.event.handler
 import net.ccbluex.liquidbounce.event.tickHandler
 import net.ccbluex.liquidbounce.features.module.modules.movement.fly.ModuleFly
+import net.ccbluex.liquidbounce.features.module.modules.movement.fly.automation.FlyAutomationCapabilities
+import net.ccbluex.liquidbounce.features.module.modules.movement.fly.automation.FlyAutomationKind
+import net.ccbluex.liquidbounce.features.module.modules.movement.fly.automation.FlyAutomationProfile
+import net.ccbluex.liquidbounce.features.module.modules.movement.fly.automation.FlyAutomationReadiness
+import net.ccbluex.liquidbounce.features.module.modules.movement.fly.modes.flyAutomationMoving
+import net.ccbluex.liquidbounce.features.module.modules.movement.fly.modes.flyAutomationYaw
 import net.ccbluex.liquidbounce.features.module.modules.movement.fly.modes.revive.setReviveFlySpeed
 import net.ccbluex.liquidbounce.features.module.modules.movement.fly.modes.revive.stopReviveFlySpeed
 import net.ccbluex.liquidbounce.features.module.modules.movement.sentinel.isSentinelOutgoingMovementPacket
-import net.ccbluex.liquidbounce.utils.entity.moving
 import net.ccbluex.liquidbounce.utils.network.sendPacketSilently
 import net.minecraft.core.BlockPos
 import net.minecraft.network.protocol.game.ServerboundMovePlayerPacket
@@ -41,7 +46,7 @@ import kotlin.time.TimeSource
 /**
  * Revive SentinelNoDown fly port.
  */
-internal object FlySentinelNoDown : Mode("SentinelNoDown") {
+internal object FlySentinelNoDown : Mode("SentinelNoDown"), FlyAutomationProfile {
 
     private val horizontalSpeed by float("HorizontalSpeed", 0.4f, 0.1f..1f)
 
@@ -65,6 +70,16 @@ internal object FlySentinelNoDown : Mode("SentinelNoDown") {
     private var packetDelay = nextPacketDelay()
     private var nextTargetGrow = TimeSource.Monotonic.markNow()
     private var nextDirectionFlip = TimeSource.Monotonic.markNow()
+
+    override val automationCapabilities = FlyAutomationCapabilities(
+        horizontal = true,
+        ascend = false,
+        descend = false,
+        landing = false,
+        kind = FlyAutomationKind.CONTINUOUS,
+    )
+
+    override fun automationReadiness(): FlyAutomationReadiness = FlyAutomationReadiness.Ready
 
     override fun enable() {
         targetY = 0.0
@@ -104,7 +119,7 @@ internal object FlySentinelNoDown : Mode("SentinelNoDown") {
 
     @Suppress("unused")
     private val tickHandler = tickHandler {
-        if (player.moving) {
+        if (player.flyAutomationMoving()) {
             player.setReviveFlySpeed(horizontalSpeed.toDouble())
         }
 
@@ -130,7 +145,12 @@ internal object FlySentinelNoDown : Mode("SentinelNoDown") {
                         player.x,
                         y,
                         player.z,
-                        sentinelServerYaw(player.yRot, FakeStrafe.running, strafeRight, FakeStrafe.angle),
+                        sentinelServerYaw(
+                            flyAutomationYaw(player.yRot),
+                            FakeStrafe.running,
+                            strafeRight,
+                            FakeStrafe.angle,
+                        ),
                         player.xRot,
                         true,
                         player.horizontalCollision,

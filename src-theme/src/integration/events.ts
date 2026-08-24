@@ -16,10 +16,15 @@ import type {
     StatusEffect,
     TextComponent,
 } from "./types";
+import type {BaritoneLogEvent, BaritoneRouteEvent, BaritoneStateEvent} from "./baritone";
 
 
 export interface EventMap {
     socketReady: void;
+
+    baritoneState: BaritoneStateEvent;
+    baritoneRoute: BaritoneRouteEvent;
+    baritoneLog: BaritoneLogEvent;
 
     themeColorChange: ThemeColorChangeEvent;
     clickGuiScaleChange: ClickGuiScaleChangeEvent;

@@ -23,4 +23,4 @@ import net.ccbluex.liquidbounce.integration.screen.CustomScreenType
 
 internal fun shouldSuppressNativeClickGuiBackground(
     screenType: CustomScreenType,
-): Boolean = screenType == CustomScreenType.CLICK_GUI
+): Boolean = screenType == CustomScreenType.CLICK_GUI || screenType == CustomScreenType.BARITONE

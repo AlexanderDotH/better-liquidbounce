@@ -28,12 +28,20 @@ import net.ccbluex.liquidbounce.event.tickHandler
 import net.ccbluex.liquidbounce.event.waitTicks
 import net.ccbluex.liquidbounce.features.module.modules.exploit.ModulePingSpoof
 import net.ccbluex.liquidbounce.features.module.modules.movement.fly.ModuleFly
+import net.ccbluex.liquidbounce.features.module.modules.movement.fly.automation.FlyAutomationCapabilities
+import net.ccbluex.liquidbounce.features.module.modules.movement.fly.automation.FlyAutomationEnd
+import net.ccbluex.liquidbounce.features.module.modules.movement.fly.automation.FlyAutomationKind
+import net.ccbluex.liquidbounce.features.module.modules.movement.fly.automation.FlyAutomationProfile
+import net.ccbluex.liquidbounce.features.module.modules.movement.fly.automation.FlyAutomationReadiness
+import net.ccbluex.liquidbounce.features.module.modules.movement.fly.modes.FlyAutomaticEndSignal
+import net.ccbluex.liquidbounce.features.module.modules.movement.fly.modes.flyAutomationJump
+import net.ccbluex.liquidbounce.features.module.modules.movement.fly.modes.flyAutomationSneak
+import net.ccbluex.liquidbounce.features.module.modules.movement.fly.modes.withFlyAutomationStrafe
 import net.ccbluex.liquidbounce.features.module.modules.movement.speed.ModuleSpeed
 import net.ccbluex.liquidbounce.lang.translation
 import net.ccbluex.liquidbounce.utils.client.chat
 import net.ccbluex.liquidbounce.utils.client.notification
 import net.ccbluex.liquidbounce.utils.client.regular
-import net.ccbluex.liquidbounce.utils.entity.withStrafe
 import net.ccbluex.liquidbounce.utils.movement.stopXZVelocity
 import net.minecraft.network.protocol.game.ServerboundMovePlayerPacket
 
@@ -46,7 +54,7 @@ import net.minecraft.network.protocol.game.ServerboundMovePlayerPacket
  *
  * Thanks to the_bi11iona1re for making me aware that Sentinal folds to Verus Damage exploit.
  */
-internal object FlySentinel20thApr : Mode("Sentinel20thApr") {
+internal object FlySentinel20thApr : Mode("Sentinel20thApr"), FlyAutomationProfile {
 
     private val horizontalSpeed by float("HorizontalSpeed", 3.5f, 0.1f..10f)
     private val constantSpeed by boolean("ConstantSpeed", false)
@@ -60,6 +68,23 @@ internal object FlySentinel20thApr : Mode("Sentinel20thApr") {
 
     private var hasBeenHurt = false
     private var hasBeenTeleported = false
+    private val automaticEnd = FlyAutomaticEndSignal()
+
+    override val automationCapabilities = FlyAutomationCapabilities(
+        horizontal = true,
+        ascend = true,
+        descend = true,
+        landing = true,
+        kind = FlyAutomationKind.CONTINUOUS,
+    )
+
+    override fun automationReadiness(): FlyAutomationReadiness = if (hasBeenHurt) {
+        FlyAutomationReadiness.Ready
+    } else {
+        FlyAutomationReadiness.Arming("Waiting for the Sentinel damage boost")
+    }
+
+    override fun consumeAutomaticEnd(): FlyAutomationEnd? = automaticEnd.consume()
 
     override fun enable() {
         if (!ModulePingSpoof.enabled) {
@@ -72,6 +97,7 @@ internal object FlySentinel20thApr : Mode("Sentinel20thApr") {
 
         hasBeenHurt = false
         hasBeenTeleported = false
+        automaticEnd.reset()
 
         chat(regular(translation("liquidbounce.module.fly.messages.cubecraft20thAprBoostUsage")))
         super.enable()
@@ -86,6 +112,7 @@ internal object FlySentinel20thApr : Mode("Sentinel20thApr") {
         waitTicks(reboostTicks)
 
         if (boostOnce) {
+            automaticEnd.mark("Configured single Sentinel boost completed")
             ModuleFly.enabled = false
             player.stopXZVelocity()
         }
@@ -94,7 +121,7 @@ internal object FlySentinel20thApr : Mode("Sentinel20thApr") {
     val moveHandler = handler<PlayerMoveEvent> { event ->
         if (player.hurtTime > 0  && !hasBeenHurt) {
             hasBeenHurt = true
-            player.deltaMovement = player.deltaMovement.withStrafe(speed = horizontalSpeed.toDouble())
+            player.deltaMovement = player.deltaMovement.withFlyAutomationStrafe(player, horizontalSpeed.toDouble())
             notification(
                 "Fly",
                 translation("liquidbounce.module.fly.messages.cubecraft20thAprBoostMessage"),
@@ -117,13 +144,13 @@ internal object FlySentinel20thApr : Mode("Sentinel20thApr") {
         }
 
         event.movement.y = when {
-            mc.options.keyJump.isDown -> verticalSpeed.toDouble()
-            mc.options.keyShift.isDown -> (-verticalSpeed).toDouble()
+            flyAutomationJump(mc.options.keyJump.isDown) -> verticalSpeed.toDouble()
+            flyAutomationSneak(mc.options.keyShift.isDown) -> (-verticalSpeed).toDouble()
             else -> 0.0
         }
 
         if (constantSpeed) {
-            event.movement = event.movement.withStrafe(speed = horizontalSpeed.toDouble())
+            event.movement = event.movement.withFlyAutomationStrafe(player, horizontalSpeed.toDouble())
         }
     }
 

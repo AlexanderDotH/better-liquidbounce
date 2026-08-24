@@ -28,6 +28,7 @@ class MaceKillWallClipRouteTest {
             routingMode = MaceKillRoutingMode.DIRECT,
             directPlan = { calls += "direct"; "direct" },
             aStarPlan = { error("AStar must not run for Direct") },
+            vanillaVClipPlan = { error("Vanilla VClip must not replace a clear Direct route") },
             wallClipPlan = { calls += "clip"; "clip" },
         )
 
@@ -36,18 +37,19 @@ class MaceKillWallClipRouteTest {
     }
 
     @Test
-    fun `blocked Direct uses the route owned wall clip fallback`() {
+    fun `blocked Direct reaches ClipReach only after bounded Vanilla VClip is unavailable`() {
         val calls = mutableListOf<String>()
 
         val selected = selectMaceKillRoutePlan(
             routingMode = MaceKillRoutingMode.DIRECT,
             directPlan = { calls += "direct"; null },
             aStarPlan = { error("AStar must not run for Direct") },
+            vanillaVClipPlan = { calls += "vclip"; null },
             wallClipPlan = { calls += "clip"; "clip" },
         )
 
         assertEquals("clip", selected)
-        assertEquals(listOf("direct", "clip"), calls)
+        assertEquals(listOf("direct", "vclip", "clip"), calls)
     }
 
     @Test
@@ -58,6 +60,7 @@ class MaceKillWallClipRouteTest {
                 routingMode = MaceKillRoutingMode.A_STAR,
                 directPlan = { error("Direct must not replace explicit AStar") },
                 aStarPlan = { "astar" },
+                vanillaVClipPlan = { error("Vanilla VClip must not replace a clear AStar route") },
                 wallClipPlan = { error("valid AStar must not clip") },
             ),
         )
@@ -67,6 +70,7 @@ class MaceKillWallClipRouteTest {
                 routingMode = MaceKillRoutingMode.A_STAR,
                 directPlan = { error("Direct must not replace explicit AStar") },
                 aStarPlan = { null },
+                vanillaVClipPlan = { null },
                 wallClipPlan = { "clip" },
             ),
         )

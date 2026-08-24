@@ -28,6 +28,11 @@ import net.ccbluex.liquidbounce.event.events.TransferOrigin
 import net.ccbluex.liquidbounce.event.handler
 import net.ccbluex.liquidbounce.event.tickHandler
 import net.ccbluex.liquidbounce.features.module.modules.movement.fly.ModuleFly
+import net.ccbluex.liquidbounce.features.module.modules.movement.fly.automation.FlyAutomationCapabilities
+import net.ccbluex.liquidbounce.features.module.modules.movement.fly.automation.FlyAutomationKind
+import net.ccbluex.liquidbounce.features.module.modules.movement.fly.automation.FlyAutomationProfile
+import net.ccbluex.liquidbounce.features.module.modules.movement.fly.automation.FlyAutomationReadiness
+import net.ccbluex.liquidbounce.features.module.modules.movement.fly.modes.flyAutomationYaw
 import net.ccbluex.liquidbounce.features.module.modules.movement.speed.ModuleSpeed
 import net.ccbluex.liquidbounce.utils.kotlin.EventPriorityConvention
 import net.minecraft.network.protocol.game.ClientboundDamageEventPacket
@@ -42,7 +47,7 @@ import kotlin.math.sin
 /**
  * CubeCraft damage boost with a client-only look direction and a separately spoofed server yaw.
  */
-internal object FlyCubecraftDamage : Mode("CubecraftDamage") {
+internal object FlyCubecraftDamage : Mode("CubecraftDamage"), FlyAutomationProfile {
 
     private val damageMethod by enumChoice("DamageMethod", CubecraftSelfDamageMethod.VERUS)
     private val damageTimeout by int("DamageTimeout", 30, 5..60, "ticks")
@@ -63,6 +68,21 @@ internal object FlyCubecraftDamage : Mode("CubecraftDamage") {
     private lateinit var cycle: CubecraftDamageFlyCycle
     private var damageConfirmed = false
     private var velocityRedirected = false
+
+    override val automationCapabilities = FlyAutomationCapabilities(
+        horizontal = true,
+        ascend = true,
+        descend = false,
+        landing = false,
+        kind = FlyAutomationKind.BURST,
+    )
+
+    override fun automationReadiness(): FlyAutomationReadiness =
+        if (::cycle.isInitialized && cycle.boostActive) {
+            FlyAutomationReadiness.Ready
+        } else {
+            FlyAutomationReadiness.Arming("Waiting for the CubeCraft damage boost")
+        }
 
     override fun enable() {
         if (ModuleSpeed.enabled) {
@@ -127,7 +147,7 @@ internal object FlyCubecraftDamage : Mode("CubecraftDamage") {
                 val damageWindow = cycle.spoofServerYaw || damageConfirmed || player.hurtTime > 0
                 if (event.origin == TransferOrigin.OUTGOING && damageWindow && packet.hasRot && FakeStrafe.running) {
                     packet.yRot = cubecraftDamageServerYaw(
-                        clientYaw = player.yRot,
+                        clientYaw = flyAutomationYaw(player.yRot),
                         fakeStrafe = true,
                         yawOffset = FakeStrafe.serverYawOffset,
                     )
@@ -162,7 +182,11 @@ internal object FlyCubecraftDamage : Mode("CubecraftDamage") {
                 player.x,
                 player.y,
                 player.z,
-                cubecraftDamageServerYaw(player.yRot, FakeStrafe.running, FakeStrafe.serverYawOffset),
+                cubecraftDamageServerYaw(
+                    flyAutomationYaw(player.yRot),
+                    FakeStrafe.running,
+                    FakeStrafe.serverYawOffset,
+                ),
                 player.xRot,
                 player.onGround(),
                 player.horizontalCollision,
@@ -211,7 +235,7 @@ internal object FlyCubecraftDamage : Mode("CubecraftDamage") {
     private fun redirectKnockback(velocity: Vec3): Vec3 {
         return redirectCubecraftDamageKnockback(
             velocity = velocity,
-            clientYaw = player.yRot,
+            clientYaw = flyAutomationYaw(player.yRot),
             minimumHorizontalSpeed = horizontalBoost.toDouble(),
             minimumVerticalSpeed = verticalBoost.toDouble(),
         )
@@ -223,7 +247,7 @@ internal object FlyCubecraftDamage : Mode("CubecraftDamage") {
                 player.x,
                 player.y,
                 player.z,
-                player.yRot,
+                flyAutomationYaw(player.yRot),
                 player.xRot,
                 player.onGround(),
                 player.horizontalCollision,
@@ -267,6 +291,9 @@ internal class CubecraftDamageFlyCycle(
 
     val acceptsVelocity: Boolean
         get() = state != State.ARMED
+
+    val boostActive: Boolean
+        get() = state == State.HURT
 
     val spoofServerYaw: Boolean
         get() = state != State.ARMED

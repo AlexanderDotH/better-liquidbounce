@@ -27,8 +27,12 @@ import io.ktor.server.response.respond
 import io.ktor.server.routing.Route
 import io.ktor.server.routing.get
 import io.ktor.server.routing.post
+import io.ktor.server.routing.put
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import net.ccbluex.liquidbounce.integration.interop.badRequest
 import net.ccbluex.liquidbounce.utils.client.mc
+import net.ccbluex.liquidbounce.utils.kotlin.Minecraft
 import org.lwjgl.glfw.GLFW
 
 // GET /api/v1/client/input
@@ -66,6 +70,7 @@ private fun Route.getKeybinds() = get("/keybinds") {
 var isTyping = false
 
 private data class TypingState(val typing: Boolean)
+private data class ClipboardText(val text: String)
 
 // POST /api/v1/client/typing
 private fun Route.isTyping() = post("/typing") {
@@ -88,10 +93,20 @@ private fun Route.getClipboard() = get("/clipboard") {
     })
 }
 
+// PUT /api/v1/client/clipboard
+private fun Route.putClipboard() = put("/clipboard") {
+    val clipboard = call.receive<ClipboardText>()
+    withContext(Dispatchers.Minecraft) {
+        mc.keyboardHandler.clipboard = clipboard.text
+    }
+    call.respond(io.ktor.http.HttpStatusCode.NoContent)
+}
+
 internal fun Route.inputRoutes() {
     getInputInfo()
     getKeybinds()
     isTyping()
     getIsTyping()
     getClipboard()
+    putClipboard()
 }

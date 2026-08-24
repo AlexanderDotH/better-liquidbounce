@@ -28,6 +28,8 @@ import net.ccbluex.liquidbounce.event.events.TransferOrigin
 import net.ccbluex.liquidbounce.event.handler
 import net.ccbluex.liquidbounce.features.blink.BlinkManager
 import net.ccbluex.liquidbounce.features.module.modules.combat.RemoteKillMovementOwnership
+import net.ccbluex.liquidbounce.features.module.modules.movement.fly.automation.FlyAutomationCapabilities
+import net.ccbluex.liquidbounce.features.module.modules.movement.fly.automation.FlyAutomationKind
 import net.ccbluex.liquidbounce.features.module.modules.player.nofall.modes.outgoingMovementPacket
 import net.ccbluex.liquidbounce.utils.kotlin.EventPriorityConvention.FINAL_DECISION
 import net.ccbluex.liquidbounce.utils.kotlin.EventPriorityConvention.READ_FINAL_STATE
@@ -192,6 +194,15 @@ internal class PacketFlyDeliveryTracker<T : Any> {
  * ordinary endpoint packet after PRE, so camera, hitbox, collisions, and movement remain at the real client position.
  */
 internal object FlyPacket : VanillaFlyMode("Packet", 0.1f..500f) {
+
+    override val automationCapabilities = FlyAutomationCapabilities(
+        horizontal = true,
+        ascend = true,
+        descend = true,
+        landing = true,
+        kind = FlyAutomationKind.CONTINUOUS,
+        reliableSpeed = false,
+    )
 
     private val maxPackets by int("MaxPackets", 128, 2..512)
     private val speedExploit by enumChoice("SpeedExploit", PacketFlySpeedExploit.SAFE)

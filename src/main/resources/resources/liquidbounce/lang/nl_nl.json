@@ -1137,5 +1137,7 @@
     "liquidbounce.scripts.debug.dap": "met DAP op poort %s",
     "liquidbounce.scripts.debug.inspect.url": "Klik om de debugger-URL te kopiëren en plak deze in je browser (werkt helaas alleen in Chromium-browsers).",
     "liquidbounce.scripts.debug.support": "Script %s is geconfigureerd om te starten met debuggerondersteuning op: ",
-    "modmenu.descriptionTranslation.liquidbounce": "Een gratis, mixin-gebaseerde hackclient voor Minecraft."
+    "modmenu.descriptionTranslation.liquidbounce": "Een gratis, mixin-gebaseerde hackclient voor Minecraft.",
+    "liquidbounce.command.baritone.description": "Controls Baritone navigation and opens its dashboard.",
+    "liquidbounce.module.baritone.description": "Integrates Baritone pathfinding with LiquidBounce controls and dashboard."
 }

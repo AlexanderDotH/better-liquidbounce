@@ -1114,5 +1114,7 @@
   "liquidbounce.module.tracers.colorMode.health.extendedDescription": "Hedef varlık durumuna göre izleyici rengi.\nKırmızıdan yeşile geçiş.\nYalnızca canlı varlık izleyicileri için geçerlidir.\nUzaktan hızlı HP okuması.",
   "liquidbounce.module.tracers.colorMode.rainbow.extendedDescription": "Animasyonlu gökkuşağı izleyici renkleri.\nDöngüler zamanla renk değiştirir.\nSon derece görünür çizgiler.\nBirçok hedefle görsel olarak örtüşebilir.",
   "liquidbounce.module.tracers.colorMode.static.extendedDescription": "Tüm hedefler için sabit renk izleyicileri.\nYarı şeffaf beyaz varsayılan.\nMesafelerde tutarlı görünüm.\nBasit PvP takibi.",
-  "liquidbounce.module.zoom.scroll.extendedDescription": "Yakınlaştırma tuşunu basılı tutarken kaydırma tekerleğini kullanarak yakınlaştırma düzeyini ayarlayın.\nİç içe kaydırma hassasiyeti ayarları.\nGözlem için pürüzsüz FOV yakınlaştırma.\nZoom modülü tuş atamasıyla çalışır."
+  "liquidbounce.module.zoom.scroll.extendedDescription": "Yakınlaştırma tuşunu basılı tutarken kaydırma tekerleğini kullanarak yakınlaştırma düzeyini ayarlayın.\nİç içe kaydırma hassasiyeti ayarları.\nGözlem için pürüzsüz FOV yakınlaştırma.\nZoom modülü tuş atamasıyla çalışır.",
+  "liquidbounce.command.baritone.description": "Controls Baritone navigation and opens its dashboard.",
+  "liquidbounce.module.baritone.description": "Integrates Baritone pathfinding with LiquidBounce controls and dashboard."
 }

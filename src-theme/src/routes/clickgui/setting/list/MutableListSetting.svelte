@@ -4,6 +4,7 @@
     import {createEventDispatcher} from "svelte";
     import SettingButton from "../common/SettingButton.svelte";
     import RemovableItem from "../common/RemovableItem.svelte";
+    import {cefTextInput} from "../common/cefTextInput";
 
     export let setting: ModuleSetting;
 
@@ -26,6 +27,11 @@
         cSetting.value = ["", ...cSetting.value];
         handleChange();
     }
+
+    function updateValue(index: number, value: string) {
+        cSetting.value[index] = value;
+        handleChange();
+    }
 </script>
 
 <div class="setting">
@@ -35,8 +41,18 @@
         <div class="inputs">
             {#each cSetting.value as _, index}
                 <RemovableItem on:remove={() => removeValueIndex(index)}>
-                    <input type="text" class="value" spellcheck="false" placeholder={setting.name} bind:value={cSetting.value[index]}
-                           on:input={handleChange}>
+                    <input
+                            type="text"
+                            class="value"
+                            spellcheck="false"
+                            readonly
+                            placeholder={setting.name}
+                            value={cSetting.value[index]}
+                            use:cefTextInput={{
+                                getValue: () => cSetting.value[index],
+                                onChange: (value) => updateValue(index, value),
+                            }}
+                    >
                 </RemovableItem>
             {/each}
         </div>

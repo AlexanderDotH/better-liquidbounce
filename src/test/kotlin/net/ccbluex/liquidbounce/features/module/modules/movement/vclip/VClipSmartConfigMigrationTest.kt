@@ -17,6 +17,56 @@ import org.junit.jupiter.api.Test
 class VClipSmartConfigMigrationTest {
 
     @Test
+    fun `legacy Smart bedrock safety moves to the VClip module and preserves false`() {
+        val vClip = JsonParser.parseString(
+            """{"name":"VClip","value":[
+                {"name":"Target","active":"Smart","value":[],"choices":{
+                    "Distance":{"name":"Distance","value":[]},
+                    "Smart":{"name":"Smart","value":[
+                        {"name":"DoNotClipAroundBedrock","value":false}
+                    ]}
+                }}
+            ]}""",
+        ).asJsonObject
+
+        migrateLegacyVClipBedrockSafety(vClip)
+
+        val values = vClip.getAsJsonArray("value").map { it.asJsonObject }
+        val safety = values.single { it["name"].asString == "DoNotClipAroundBedrock" }
+        val target = values.single { it["name"].asString == "Target" }
+        val smart = target.getAsJsonObject("choices").getAsJsonObject("Smart")
+
+        assertEquals(false, safety["value"].asBoolean)
+        assertEquals(emptyList<String>(), smart.getAsJsonArray("value").map { it.asJsonObject["name"].asString })
+    }
+
+    @Test
+    fun `canonical module bedrock safety wins and removes a stale Smart value`() {
+        val vClip = JsonParser.parseString(
+            """{"name":"VClip","value":[
+                {"name":"DoNotClipAroundBedrock","value":true},
+                {"name":"Target","active":"Smart","value":[],"choices":{
+                    "Distance":{"name":"Distance","value":[]},
+                    "Smart":{"name":"Smart","value":[
+                        {"name":"DoNotClipAroundBedrock","value":false}
+                    ]}
+                }}
+            ]}""",
+        ).asJsonObject
+
+        migrateLegacyVClipBedrockSafety(vClip)
+
+        val values = vClip.getAsJsonArray("value").map { it.asJsonObject }
+        val safetyValues = values.filter { it["name"].asString == "DoNotClipAroundBedrock" }
+        val target = values.single { it["name"].asString == "Target" }
+        val smart = target.getAsJsonObject("choices").getAsJsonObject("Smart")
+
+        assertEquals(1, safetyValues.size)
+        assertEquals(true, safetyValues.single()["value"].asBoolean)
+        assertEquals(emptyList<String>(), smart.getAsJsonArray("value").map { it.asJsonObject["name"].asString })
+    }
+
+    @Test
     fun `legacy direct MaxDistance becomes an enabled ScanDistance group`() {
         val smart = JsonParser.parseString(
             """{"name":"Smart","value":[{"name":"MaxDistance","value":20}]}""",

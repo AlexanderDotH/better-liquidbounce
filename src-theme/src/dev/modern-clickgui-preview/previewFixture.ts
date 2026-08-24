@@ -79,6 +79,10 @@ export async function routeModernClickGuiPreviewRequest(
         return jsonResponse({text: state.clipboardText});
     }
 
+    if (route === `PUT ${API_PREFIX}/clipboard`) {
+        return routeClipboard(state, request);
+    }
+
     if (route === `GET ${API_PREFIX}/info`) {
         return jsonResponse(createClientInfo());
     }
@@ -210,6 +214,19 @@ async function routeTyping(
     }
 
     state.typing = body.typing;
+    return emptyResponse();
+}
+
+async function routeClipboard(
+    state: ModernClickGuiPreviewState,
+    request: Request,
+): Promise<Response> {
+    const body = await readJson<unknown>(request);
+    if (!isClipboardPayload(body)) {
+        return jsonResponse({error: "Invalid clipboard payload"}, 400);
+    }
+
+    state.clipboardText = body.text;
     return emptyResponse();
 }
 
@@ -767,6 +784,12 @@ function isModuleToggle(value: unknown): value is {name: string; enabled: boolea
 
 function isTypingPayload(value: unknown): value is {typing: boolean} {
     return isRecord(value) && typeof value.typing === "boolean";
+}
+
+function isClipboardPayload(value: unknown): value is {text: string} {
+    return isRecord(value)
+        && Object.hasOwn(value, "text")
+        && typeof value.text === "string";
 }
 
 function isPersistentStoragePayload(

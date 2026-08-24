@@ -48,6 +48,7 @@ import net.ccbluex.liquidbounce.event.handler
 import net.ccbluex.liquidbounce.features.account.AccountBanTracker
 import net.ccbluex.liquidbounce.features.account.AccountManager
 import net.ccbluex.liquidbounce.features.account.AccountServerAccessTracker
+import net.ccbluex.liquidbounce.features.baritone.BaritoneIntegration
 import net.ccbluex.liquidbounce.features.blink.BlinkManager
 import net.ccbluex.liquidbounce.features.command.CommandManager
 import net.ccbluex.liquidbounce.features.cosmetic.ClientAccountManager
@@ -61,6 +62,7 @@ import net.ccbluex.liquidbounce.features.module.ModuleManager
 import net.ccbluex.liquidbounce.features.spoofer.SpooferManager
 import net.ccbluex.liquidbounce.integration.backend.BrowserBackendManager
 import net.ccbluex.liquidbounce.integration.interop.ClientInteropServer
+import net.ccbluex.liquidbounce.integration.interop.protocol.event.baritone.BaritoneEventPublisher
 import net.ccbluex.liquidbounce.integration.interop.protocol.rest.v1.game.ActiveServerList
 import net.ccbluex.liquidbounce.integration.screen.ScreenManager
 import net.ccbluex.liquidbounce.integration.task.TaskManager
@@ -264,6 +266,8 @@ object LiquidBounce : EventListener {
         RenderedEntities
         ChunkScanner
         InputTracker
+        BaritoneIntegration.initialize()
+        BaritoneEventPublisher
 
         // Feature managers
         ModuleManager
@@ -443,6 +447,7 @@ object LiquidBounce : EventListener {
         logger.info("Shutting down client...")
 
         // Unregister all event listener and stop all running tasks
+        BaritoneIntegration.shutdown()
         ChunkScanner.stopThread()
         FontManager.closeGlyphManager()
         EventManager.unregisterAll()

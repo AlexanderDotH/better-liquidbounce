@@ -27,6 +27,12 @@ import net.ccbluex.liquidbounce.event.events.PlayerTickEvent
 import net.ccbluex.liquidbounce.event.handler
 import net.ccbluex.liquidbounce.features.module.modules.movement.fly.ModuleFly
 import net.ccbluex.liquidbounce.features.module.modules.movement.fly.ModuleFly.modes
+import net.ccbluex.liquidbounce.features.module.modules.movement.fly.automation.FlyAutomationCapabilities
+import net.ccbluex.liquidbounce.features.module.modules.movement.fly.automation.FlyAutomationEnd
+import net.ccbluex.liquidbounce.features.module.modules.movement.fly.automation.FlyAutomationKind
+import net.ccbluex.liquidbounce.features.module.modules.movement.fly.automation.FlyAutomationProfile
+import net.ccbluex.liquidbounce.features.module.modules.movement.fly.automation.FlyAutomationReadiness
+import net.ccbluex.liquidbounce.features.module.modules.movement.fly.modes.FlyAutomaticEndSignal
 import net.ccbluex.liquidbounce.utils.client.Timer
 import net.ccbluex.liquidbounce.utils.kotlin.Priority
 import net.minecraft.world.phys.Vec3
@@ -37,7 +43,7 @@ import net.minecraft.world.phys.Vec3
  * @testedOn eu.loyisa.cn
  * @note Slow on high ping
  */
-internal object FlyGrim2859V : Mode("Grim2859-V") {
+internal object FlyGrim2859V : Mode("Grim2859-V"), FlyAutomationProfile {
 
     private val toggle by int("Toggle", 0, 0..100)
     private val timer by float("Timer", 0.446f, 0.1f..1f)
@@ -48,10 +54,28 @@ internal object FlyGrim2859V : Mode("Grim2859-V") {
 
     var ticks = 0
     var pos: Vec3? = null
+    private val automaticEnd = FlyAutomaticEndSignal()
+
+    override val automationCapabilities = FlyAutomationCapabilities(
+        horizontal = true,
+        ascend = false,
+        descend = true,
+        landing = true,
+        kind = FlyAutomationKind.CONTINUOUS,
+    )
+
+    override fun automationReadiness(): FlyAutomationReadiness = if (ticks >= 2) {
+        FlyAutomationReadiness.Ready
+    } else {
+        FlyAutomationReadiness.Arming("Waiting for the Grim desync jump")
+    }
+
+    override fun consumeAutomaticEnd(): FlyAutomationEnd? = automaticEnd.consume()
 
     override fun enable() {
         ticks = 0
         pos = null
+        automaticEnd.reset()
     }
 
     val tickHandler = handler<PlayerTickEvent> {
@@ -61,7 +85,10 @@ internal object FlyGrim2859V : Mode("Grim2859-V") {
                a lot more stable. */
             ticks <= 5 -> Timer.requestTimerSpeed(timer, Priority.IMPORTANT_FOR_USAGE_2, ModuleFly, 1)
             // If ticks >= toggle limit and toggle isn't 0, disable.
-            ticks >= toggle && toggle != 0 -> ModuleFly.enabled = false
+            ticks >= toggle && toggle != 0 -> {
+                automaticEnd.mark("Configured Grim toggle limit reached")
+                ModuleFly.enabled = false
+            }
         }
 
         ticks++

@@ -28,6 +28,7 @@ import it.unimi.dsi.fastutil.objects.ObjectRBTreeSet
 import net.ccbluex.liquidbounce.config.types.group.ValueGroup
 import net.ccbluex.liquidbounce.features.command.CommandManager.getSubCommand
 import net.ccbluex.liquidbounce.features.command.commands.client.CommandBind
+import net.ccbluex.liquidbounce.features.command.commands.client.CommandBaritone
 import net.ccbluex.liquidbounce.features.command.commands.client.CommandBinds
 import net.ccbluex.liquidbounce.features.command.commands.client.CommandClear
 import net.ccbluex.liquidbounce.features.command.commands.client.CommandConfig
@@ -130,6 +131,7 @@ object CommandManager : Collection<Command> by commandSet {
         val commands = arrayOf(
             CommandClient,
             CommandFriend,
+            CommandBaritone,
             CommandToggle,
             CommandBind,
             CommandCenter,

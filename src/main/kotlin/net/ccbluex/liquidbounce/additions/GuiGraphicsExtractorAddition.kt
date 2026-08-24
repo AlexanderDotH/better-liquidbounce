@@ -42,6 +42,13 @@ interface GuiGraphicsExtractorAddition {
 
     fun `liquidbounce$drawCooldownProgress`(stack: ItemStack, x: Int, y: Int)
 
+    fun `liquidbounce$queueContainerItemView`(
+        stacks: List<ItemStack>,
+        centerX: Float,
+        centerY: Float,
+        scale: Float,
+    )
+
 }
 
 internal inline fun GuiGraphicsExtractor.drawItemBar(stack: ItemStack, x: Int, y: Int) =
@@ -58,6 +65,13 @@ internal inline fun GuiGraphicsExtractor.drawStackCount(
 
 internal inline fun GuiGraphicsExtractor.drawCooldownProgress(stack: ItemStack, x: Int, y: Int) =
     (this as GuiGraphicsExtractorAddition).`liquidbounce$drawCooldownProgress`(stack, x, y)
+
+internal inline fun GuiGraphicsExtractor.queueContainerItemView(
+    stacks: List<ItemStack>,
+    centerX: Float,
+    centerY: Float,
+    scale: Float,
+) = (this as GuiGraphicsExtractorAddition).`liquidbounce$queueContainerItemView`(stacks, centerX, centerY, scale)
 
 // Removed in 1.21.9, copied from 1.21.8
 fun GuiGraphicsExtractor.drawBorder(x: Int, y: Int, width: Int, height: Int, color: Int) {

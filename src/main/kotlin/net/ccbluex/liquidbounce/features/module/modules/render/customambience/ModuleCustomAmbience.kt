@@ -18,6 +18,7 @@
  */
 package net.ccbluex.liquidbounce.features.module.modules.render.customambience
 
+import com.google.gson.JsonObject
 import com.mojang.blaze3d.textures.GpuTexture
 import net.ccbluex.liquidbounce.config.types.group.Mode
 import net.ccbluex.liquidbounce.config.types.group.ModeValueGroup
@@ -52,10 +53,46 @@ object ModuleCustomAmbience : ClientModule("CustomAmbience", ModuleCategories.RE
      */
     object FogValueGroup : ToggleableValueGroup(this, "Fog", true) {
 
-        val disableWorldFog by boolean("DisableWorldFog", false)
+        val engine = enumChoice("Engine", FogEngine.LEGACY)
+        val horizon by floatRange("Horizon", 70f..100f, 0f..100f, "%")
+        val silhouetteFeather by float("SilhouetteFeather", 12f, 0f..32f, "px")
+
+        val fogDensity by int("FogDensity", 0, 0..100, "%")
 
         object FogColorOverride : ToggleableValueGroup(this, "FogColorOverride", false) {
             val color by color("Color", Color4b(47, 128, 255, 201))
+        }
+
+        init {
+            tree(FogColorOverride)
+        }
+
+        object BlurFog : ToggleableValueGroup(this, "BlurFog", false) {
+            val strength by float("Strength", 14f, 4f..24f)
+        }
+
+        init {
+            tree(BlurFog)
+        }
+
+        object VolumetricFog : ToggleableValueGroup(this, "VolumetricFog", false) {
+            val strength by float("Strength", 14f, 4f..24f)
+            val cameraClearRadius by float("CameraClearRadius", 12f, 0f..32f)
+
+            object MultiLayerFog : ToggleableValueGroup(this, "MultiLayerFog", true) {
+                val layerSpacing by float("LayerSpacing", 48f, 16f..128f)
+                val groundDensity by int("GroundDensity", 70, 0..100, "%")
+                val middleDensity by int("MiddleDensity", 45, 0..100, "%")
+                val upperDensity by int("UpperDensity", 25, 0..100, "%")
+            }
+
+            init {
+                tree(MultiLayerFog)
+            }
+        }
+
+        init {
+            tree(VolumetricFog)
         }
 
         private val backgroundColor by color("BackgroundColor", Color4b(47, 128, 255, 201))
@@ -65,6 +102,46 @@ object ModuleCustomAmbience : ClientModule("CustomAmbience", ModuleCategories.RE
         private val skyEnd by float("SkyEnd", 256f, 0f..1024f)
         private val cloudEnd by float("CloudEnd", 20480f, 0f..4096f)
 
+        val shouldRenderBlur: Boolean
+            get() = shouldApplyFogBlur(running, BlurFog.running)
+
+        val shouldRenderVolume: Boolean
+            get() = shouldApplyFogVolume(running, VolumetricFog.running)
+
+        val shouldRenderUnified: Boolean
+            get() = isUnified()
+
+        /** Java-friendly activation seam for render mixins and optional compatibility hooks. */
+        fun isUnified(): Boolean = shouldApplyUnifiedFog(running, engine.get())
+
+        override fun prepareDeserialize(jsonObject: JsonObject) {
+            val serializedValues = jsonObject.getAsJsonArray("value") ?: return
+            val hasSerializedEngine = serializedValues.any { value ->
+                value.asJsonObject["name"]?.asString == engine.name
+            }
+            if (!hasSerializedEngine) {
+                engine.set(FogEngine.LEGACY)
+            }
+        }
+
+        internal fun currentUnifiedHorizon(
+            distantHorizonsFarClipBlocks: Float?,
+            vanillaRenderDistanceChunks: Int,
+        ): UnifiedFogHorizon = resolveUnifiedFogHorizon(
+            horizonPercent = horizon,
+            distantHorizonsFarClipBlocks = distantHorizonsFarClipBlocks,
+            vanillaRenderDistanceChunks = vanillaRenderDistanceChunks,
+        )
+
+        internal fun currentFogBounds(): CustomFogBounds = CustomFogBounds(
+            environmentalStart = environmental.start,
+            environmentalEnd = environmental.endInclusive,
+            renderDistanceStart = renderDistance.start,
+            renderDistanceEnd = renderDistance.endInclusive,
+            skyEnd = skyEnd,
+            cloudEnd = cloudEnd,
+        ).withDensity(fogDensity)
+
         /**
          * @see net.ccbluex.liquidbounce.injection.mixins.minecraft.render.fog.MixinFogRenderer
          */
@@ -73,12 +150,13 @@ object ModuleCustomAmbience : ClientModule("CustomAmbience", ModuleCategories.RE
                 return
             }
 
-            fogData.environmentalStart = this.environmental.start
-            fogData.environmentalEnd = this.environmental.endInclusive
-            fogData.renderDistanceStart = this.renderDistance.start
-            fogData.renderDistanceEnd = this.renderDistance.endInclusive
-            fogData.skyEnd = this.skyEnd
-            fogData.cloudEnd = this.cloudEnd
+            val bounds = currentFogBounds()
+            fogData.environmentalStart = bounds.environmentalStart
+            fogData.environmentalEnd = bounds.environmentalEnd
+            fogData.renderDistanceStart = bounds.renderDistanceStart
+            fogData.renderDistanceEnd = bounds.renderDistanceEnd
+            fogData.skyEnd = bounds.skyEnd
+            fogData.cloudEnd = bounds.cloudEnd
         }
 
         fun modifyClearColor(original: Vector4fc): Vector4fc {

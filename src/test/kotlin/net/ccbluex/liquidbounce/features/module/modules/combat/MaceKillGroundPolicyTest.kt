@@ -64,6 +64,22 @@ class MaceKillGroundPolicyTest {
     }
 
     @Test
+    fun `Vanilla VClip ground flag is confined to its route owned packet`() {
+        val ownedVClip = MaceKillGroundPacketContext(
+            identityOwnedByRoute = true,
+            kind = MaceKillMovementPacketKind.VANILLA_VCLIP,
+        )
+
+        assertTrue(shouldSpoofMaceKillVanillaVClipGround(ownedVClip))
+        assertFalse(shouldSpoofMaceKillVanillaVClipGround(ownedVClip.copy(
+            identityOwnedByRoute = false,
+        )))
+        assertFalse(shouldSpoofMaceKillVanillaVClipGround(ownedVClip.copy(
+            kind = MaceKillMovementPacketKind.DIRECT_ROUTE,
+        )))
+    }
+
+    @Test
     fun `full inverse ClipReach recovery keeps the same intermediate collision exception`() {
         assertFalse(shouldValidateMaceKillRouteSegment(
             clipAnchorOwned = false,

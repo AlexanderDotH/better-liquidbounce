@@ -1,10 +1,11 @@
 <script lang="ts">
     import {createEventDispatcher} from "svelte";
+    import {cefTextInput} from "./cefTextInput";
 
     export let value: number;
     export let valueType: "int" | "float";
 
-    let inputElement: HTMLElement;
+    let inputElement: HTMLInputElement;
     let inputValue = "";
 
     $: {
@@ -17,7 +18,8 @@
         change: { value: number }
     }>();
 
-    function handleInput() {
+    function handleInput(value: string) {
+        inputValue = value;
         let parsed: number;
         if (valueType === "float") {
             parsed = parseFloat(inputValue);
@@ -37,8 +39,20 @@
     }
 </script>
 
-<!-- svelte-ignore a11y-no-static-element-interactions -->
-<span contenteditable="true" class="value" bind:innerText={inputValue} on:input={handleInput} on:keydown={handleKeyDown} bind:this={inputElement}></span>
+<input
+        type="text"
+        inputmode="decimal"
+        class="value"
+        readonly
+        value={inputValue}
+        size={Math.max(inputValue.length, 1)}
+        bind:this={inputElement}
+        use:cefTextInput={{
+            getValue: () => inputValue,
+            onChange: handleInput,
+        }}
+        on:keydown={handleKeyDown}
+/>
 
 <style lang="scss">
 
@@ -49,6 +63,7 @@
     font-size: var(--clickgui-control-font-size, 12px);
     background-color: transparent;
     border: none;
+    padding: 0;
     min-width: var(--clickgui-value-input-min-width, 5px);
     display: inline-block;
   }

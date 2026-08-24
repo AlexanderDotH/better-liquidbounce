@@ -25,9 +25,15 @@ import net.ccbluex.liquidbounce.event.tickHandler
 import net.ccbluex.liquidbounce.event.waitTicks
 import net.ccbluex.liquidbounce.features.module.modules.movement.fly.ModuleFly
 import net.ccbluex.liquidbounce.features.module.modules.movement.fly.ModuleFly.modes
+import net.ccbluex.liquidbounce.features.module.modules.movement.fly.automation.FlyAutomationCapabilities
+import net.ccbluex.liquidbounce.features.module.modules.movement.fly.automation.FlyAutomationEnd
+import net.ccbluex.liquidbounce.features.module.modules.movement.fly.automation.FlyAutomationKind
+import net.ccbluex.liquidbounce.features.module.modules.movement.fly.automation.FlyAutomationProfile
+import net.ccbluex.liquidbounce.features.module.modules.movement.fly.automation.FlyAutomationReadiness
+import net.ccbluex.liquidbounce.features.module.modules.movement.fly.modes.FlyAutomaticEndSignal
+import net.ccbluex.liquidbounce.features.module.modules.movement.fly.modes.withFlyAutomationStrafe
 import net.ccbluex.liquidbounce.utils.client.Timer
 import net.ccbluex.liquidbounce.utils.client.chat
-import net.ccbluex.liquidbounce.utils.entity.withStrafe
 import net.ccbluex.liquidbounce.utils.kotlin.Priority
 import net.ccbluex.liquidbounce.utils.movement.stopXZVelocity
 import net.minecraft.network.protocol.game.ServerboundMovePlayerPacket
@@ -38,7 +44,7 @@ import net.minecraft.network.protocol.game.ServerboundMovePlayerPacket
  * @testedOn eu.loyisa.cn
  * @note it gives you ~2 flags for damage
  */
-internal object FlyVerusB3896Damage : Mode("VerusB3896Damage") {
+internal object FlyVerusB3896Damage : Mode("VerusB3896Damage"), FlyAutomationProfile {
 
     override val parent: ModeValueGroup<*>
         get() = modes
@@ -46,8 +52,29 @@ internal object FlyVerusB3896Damage : Mode("VerusB3896Damage") {
     private var flyTicks = 0
     private var shouldStop = false
     private var gotDamage = false
+    private val automaticEnd = FlyAutomaticEndSignal()
+
+    override val automationCapabilities = FlyAutomationCapabilities(
+        horizontal = true,
+        ascend = false,
+        descend = false,
+        landing = false,
+        kind = FlyAutomationKind.BURST,
+    )
+
+    override fun automationReadiness(): FlyAutomationReadiness = when {
+        shouldStop -> FlyAutomationReadiness.Unavailable("Verus self-damage failed")
+        gotDamage -> FlyAutomationReadiness.Ready
+        else -> FlyAutomationReadiness.Arming("Waiting for Verus self-damage")
+    }
+
+    override fun consumeAutomaticEnd(): FlyAutomationEnd? = automaticEnd.consume()
 
     override fun enable() {
+        flyTicks = 0
+        shouldStop = false
+        gotDamage = false
+        automaticEnd.reset()
         network.send(
             ServerboundMovePlayerPacket.Pos(player.x, player.y, player.z, false,
             player.horizontalCollision))
@@ -82,17 +109,22 @@ internal object FlyVerusB3896Damage : Mode("VerusB3896Damage") {
         }
 
         if (++flyTicks > 20 || shouldStop) {
+            automaticEnd.mark(
+                if (shouldStop) "Verus self-damage failed" else "Verus damage boost completed",
+            )
             ModuleFly.enabled = false
             return@tickHandler
         }
 
-        player.deltaMovement = player.deltaMovement.withStrafe(speed = 9.95)
+        player.deltaMovement = player.deltaMovement.withFlyAutomationStrafe(player, 9.95)
         player.deltaMovement.y = 0.0
         Timer.requestTimerSpeed(0.1f, Priority.IMPORTANT_FOR_USAGE_2, ModuleFly)
     }
 
     override fun disable() {
         flyTicks = 0
+        shouldStop = false
+        gotDamage = false
         player.stopXZVelocity()
     }
 }

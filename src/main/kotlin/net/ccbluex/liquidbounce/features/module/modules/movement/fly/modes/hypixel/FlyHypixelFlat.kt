@@ -27,9 +27,15 @@ import net.ccbluex.liquidbounce.event.tickHandler
 import net.ccbluex.liquidbounce.event.tickUntil
 import net.ccbluex.liquidbounce.event.waitTicks
 import net.ccbluex.liquidbounce.features.module.modules.movement.fly.ModuleFly
+import net.ccbluex.liquidbounce.features.module.modules.movement.fly.automation.FlyAutomationCapabilities
+import net.ccbluex.liquidbounce.features.module.modules.movement.fly.automation.FlyAutomationEnd
+import net.ccbluex.liquidbounce.features.module.modules.movement.fly.automation.FlyAutomationKind
+import net.ccbluex.liquidbounce.features.module.modules.movement.fly.automation.FlyAutomationProfile
+import net.ccbluex.liquidbounce.features.module.modules.movement.fly.automation.FlyAutomationReadiness
+import net.ccbluex.liquidbounce.features.module.modules.movement.fly.modes.FlyAutomaticEndSignal
+import net.ccbluex.liquidbounce.features.module.modules.movement.fly.modes.withFlyAutomationStrafe
 import net.ccbluex.liquidbounce.utils.client.Timer
 import net.ccbluex.liquidbounce.utils.entity.horizontalSpeed
-import net.ccbluex.liquidbounce.utils.entity.withStrafe
 import net.ccbluex.liquidbounce.utils.kotlin.Priority
 import net.minecraft.network.protocol.game.ClientboundExplodePacket
 import kotlin.random.Random
@@ -40,7 +46,7 @@ import kotlin.random.Random
  * @testedOn hypixel.net
  * @author @liquidsquid1
  */
-object FlyHypixelFlat : Mode("HypixelFlat") {
+internal object FlyHypixelFlat : Mode("HypixelFlat"), FlyAutomationProfile {
 
     override val parent: ModeValueGroup<*>
         get() = ModuleFly.modes
@@ -50,6 +56,30 @@ object FlyHypixelFlat : Mode("HypixelFlat") {
 
     private var flyTicks = 0
     private var isFlying = false
+    private val automaticEnd = FlyAutomaticEndSignal()
+
+    override val automationCapabilities = FlyAutomationCapabilities(
+        horizontal = true,
+        ascend = false,
+        descend = false,
+        landing = true,
+        kind = FlyAutomationKind.BURST,
+    )
+
+    override fun automationReadiness(): FlyAutomationReadiness = if (isFlying) {
+        FlyAutomationReadiness.Ready
+    } else {
+        FlyAutomationReadiness.Arming("Waiting for an explosion boost")
+    }
+
+    override fun consumeAutomaticEnd(): FlyAutomationEnd? = automaticEnd.consume()
+
+    override fun enable() {
+        automaticEnd.reset()
+        flyTicks = 0
+        isFlying = false
+        super.enable()
+    }
 
     override fun disable() {
         flyTicks = 0
@@ -61,11 +91,12 @@ object FlyHypixelFlat : Mode("HypixelFlat") {
     private val speedHandler = tickHandler {
         tickUntil { isFlying }
 
-        player.deltaMovement = player.deltaMovement.withStrafe(speed = 0.8)
+        player.deltaMovement = player.deltaMovement.withFlyAutomationStrafe(player, 0.8)
         waitTicks(1)
-        player.deltaMovement = player.deltaMovement.withStrafe(speed = flySpeed.toDouble())
+        player.deltaMovement = player.deltaMovement.withFlyAutomationStrafe(player, flySpeed.toDouble())
 
         tickUntil { player.onGround() }
+        automaticEnd.mark("Hypixel flat boost landed")
         ModuleFly.enabled = false
     }
 
@@ -82,7 +113,7 @@ object FlyHypixelFlat : Mode("HypixelFlat") {
 
         Timer.requestTimerSpeed(timer, Priority.IMPORTANT_FOR_USAGE_1, ModuleFly)
         player.deltaMovement.y = 0.0314 + (Random.nextDouble() / 1000f)
-        player.deltaMovement = player.deltaMovement.withStrafe(speed = player.horizontalSpeed)
+        player.deltaMovement = player.deltaMovement.withFlyAutomationStrafe(player, player.horizontalSpeed)
     }
 
     @Suppress("unused")

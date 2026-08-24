@@ -58,6 +58,7 @@ enum class CustomScreenType(
 
     HUD("hud", isInGame = true),
     CLICK_GUI("clickgui"),
+    BARITONE("baritone", isInGame = true),
     ALT_MANAGER("altmanager"),
     PROXY_MANAGER("proxymanager"),
 

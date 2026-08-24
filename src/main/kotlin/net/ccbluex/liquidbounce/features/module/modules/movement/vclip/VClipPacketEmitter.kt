@@ -11,6 +11,8 @@
 package net.ccbluex.liquidbounce.features.module.modules.movement.vclip
 
 import net.minecraft.network.protocol.game.ServerboundMovePlayerPacket
+import net.minecraft.network.protocol.game.ServerboundMoveVehiclePacket
+import net.minecraft.world.phys.Vec3
 
 internal object VClipPacketEmitter {
 
@@ -19,10 +21,25 @@ internal object VClipPacketEmitter {
         yRot: Float,
         xRot: Float,
         horizontalCollision: Boolean,
-        sendPacket: (ServerboundMovePlayerPacket) -> Unit,
+        sendPacket: (ServerboundMovePlayerPacket) -> Boolean,
+    ): Boolean {
+        for (step in plan) {
+            if (!sendPacket(step.toPacket(yRot, xRot, horizontalCollision))) {
+                return false
+            }
+        }
+        return true
+    }
+
+    fun sendVehiclePlan(
+        plan: List<VClipPlayerPacketStep>,
+        origin: VClipPosition,
+        yRot: Float,
+        xRot: Float,
+        sendPacket: (ServerboundMoveVehiclePacket) -> Unit,
     ) {
         plan.forEach { step ->
-            sendPacket(step.toPacket(yRot, xRot, horizontalCollision))
+            sendPacket(step.toVehiclePacket(origin, yRot, xRot))
         }
     }
 
@@ -50,4 +67,18 @@ internal object VClipPacketEmitter {
 
     private fun VClipPlayerPacketStep.requirePosition() =
         requireNotNull(position) { "$shape VClip packet requires a position" }
+
+    private fun VClipPlayerPacketStep.toVehiclePacket(
+        origin: VClipPosition,
+        yRot: Float,
+        xRot: Float,
+    ): ServerboundMoveVehiclePacket {
+        val position = when (shape) {
+            VClipPlayerPacketShape.STATUS_ONLY -> origin
+            VClipPlayerPacketShape.POSITION, VClipPlayerPacketShape.FULL -> requirePosition()
+        }
+        return ServerboundMoveVehiclePacket(position.toVec3(), yRot, xRot, onGround)
+    }
+
+    private fun VClipPosition.toVec3() = Vec3(x, y, z)
 }

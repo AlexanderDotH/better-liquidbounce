@@ -28,6 +28,13 @@ import net.ccbluex.liquidbounce.event.handler
 import net.ccbluex.liquidbounce.features.module.modules.movement.fly.ModuleFly
 import net.ccbluex.liquidbounce.features.module.modules.movement.fly.ModuleFly.message
 import net.ccbluex.liquidbounce.features.module.modules.movement.fly.ModuleFly.modes
+import net.ccbluex.liquidbounce.features.module.modules.movement.fly.automation.FlyAutomationCapabilities
+import net.ccbluex.liquidbounce.features.module.modules.movement.fly.automation.FlyAutomationEnd
+import net.ccbluex.liquidbounce.features.module.modules.movement.fly.automation.FlyAutomationKind
+import net.ccbluex.liquidbounce.features.module.modules.movement.fly.automation.FlyAutomationProfile
+import net.ccbluex.liquidbounce.features.module.modules.movement.fly.automation.FlyAutomationReadiness
+import net.ccbluex.liquidbounce.features.module.modules.movement.fly.modes.FlyAutomaticEndSignal
+import net.ccbluex.liquidbounce.features.module.modules.movement.fly.modes.flyAutomationSneak
 import net.ccbluex.liquidbounce.utils.client.Timer
 import net.ccbluex.liquidbounce.utils.client.chat
 import net.ccbluex.liquidbounce.utils.client.regular
@@ -43,7 +50,7 @@ import net.minecraft.world.phys.shapes.Shapes
  * @note ONLY WORKS ON 1.8 SERVERS
  * @author Nullable
  */
-internal object FlyVulcan286MC18 : Mode("Vulcan286-18") {
+internal object FlyVulcan286MC18 : Mode("Vulcan286-18"), FlyAutomationProfile {
 
 
     // 2.5 is the maximum timer tested.
@@ -55,10 +62,28 @@ internal object FlyVulcan286MC18 : Mode("Vulcan286-18") {
 
     var flags = 0
     private var flagPos: Vec3? = null
+    private val automaticEnd = FlyAutomaticEndSignal()
+
+    override val automationCapabilities = FlyAutomationCapabilities(
+        horizontal = true,
+        ascend = false,
+        descend = true,
+        landing = true,
+        kind = FlyAutomationKind.CONTINUOUS,
+    )
+
+    override fun automationReadiness(): FlyAutomationReadiness = if (flags > 1) {
+        FlyAutomationReadiness.Ready
+    } else {
+        FlyAutomationReadiness.Arming("Waiting for the Vulcan desync setbacks")
+    }
+
+    override fun consumeAutomaticEnd(): FlyAutomationEnd? = automaticEnd.consume()
 
     override fun enable() {
         flags = 0
         flagPos = null
+        automaticEnd.reset()
         chat(regular(message("vulcanGhostOldMessage")))
     }
 
@@ -99,6 +124,7 @@ internal object FlyVulcan286MC18 : Mode("Vulcan286-18") {
                 if (flags == 2) {
                     flagPos = pos
                 } else if (flags > 2 && flagPos != pos) {
+                    automaticEnd.mark("Vulcan desync position changed")
                     ModuleFly.enabled = false
                     // Return here so we accept this packet
                     return@handler
@@ -109,7 +135,7 @@ internal object FlyVulcan286MC18 : Mode("Vulcan286-18") {
     }
 
     val shapeHandler = handler<BlockShapeEvent> { event ->
-        if (event.pos == player.blockPosition().below() && !player.isShiftKeyDown) {
+        if (event.pos == player.blockPosition().below() && !flyAutomationSneak(player.isShiftKeyDown)) {
             event.shape = Shapes.block()
         } else {
             event.shape = Shapes.empty()
@@ -117,4 +143,3 @@ internal object FlyVulcan286MC18 : Mode("Vulcan286-18") {
     }
 
 }
-

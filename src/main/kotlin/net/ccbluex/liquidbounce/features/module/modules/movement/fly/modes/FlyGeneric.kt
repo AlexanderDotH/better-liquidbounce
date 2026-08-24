@@ -42,15 +42,23 @@ import net.ccbluex.liquidbounce.event.tickHandler
 import net.ccbluex.liquidbounce.event.waitTicks
 import net.ccbluex.liquidbounce.features.module.modules.combat.RemoteKillMovementOwnership
 import net.ccbluex.liquidbounce.features.module.modules.movement.fly.ModuleFly
+import net.ccbluex.liquidbounce.features.module.modules.movement.fly.automation.FlyAutomationCapabilities
+import net.ccbluex.liquidbounce.features.module.modules.movement.fly.automation.FlyAutomationEnd
+import net.ccbluex.liquidbounce.features.module.modules.movement.fly.automation.FlyAutomationInput
+import net.ccbluex.liquidbounce.features.module.modules.movement.fly.automation.FlyAutomationKind
+import net.ccbluex.liquidbounce.features.module.modules.movement.fly.automation.FlyAutomationProfile
+import net.ccbluex.liquidbounce.features.module.modules.movement.fly.automation.FlyAutomationReadiness
 import net.ccbluex.liquidbounce.features.module.modules.player.nofall.modes.GroundPacketDeliveryTracker
 import net.ccbluex.liquidbounce.features.module.modules.player.nofall.modes.outgoingMovementPacket
 import net.ccbluex.liquidbounce.utils.client.chat
+import net.ccbluex.liquidbounce.utils.entity.getMovementDirectionOfInput
 import net.ccbluex.liquidbounce.utils.entity.withStrafe
 import net.ccbluex.liquidbounce.utils.kotlin.EventPriorityConvention.READ_FINAL_STATE
 import net.ccbluex.liquidbounce.utils.kotlin.EventPriorityConvention.SAFETY_FEATURE
 import net.ccbluex.liquidbounce.utils.math.anyNotEmpty
 import net.ccbluex.liquidbounce.utils.math.sq
 import net.ccbluex.liquidbounce.utils.math.withLength
+import net.ccbluex.liquidbounce.utils.movement.DirectionalInput
 import net.ccbluex.liquidbounce.utils.network.MovePacketType
 import net.minecraft.client.player.LocalPlayer
 import net.minecraft.core.BlockPos
@@ -296,10 +304,22 @@ private class VanillaFlySprintSpeed(
  * Runtime shared by ordinary Vanilla Fly and packet-sequenced Fly. Subclasses may change how a
  * collision-resolved movement is transmitted, but local movement and Vanilla safety behavior stay identical.
  */
+@Suppress("TooManyFunctions")
 internal abstract class VanillaFlyMode(
     name: String,
     speedRange: ClosedFloatingPointRange<Float>,
-) : Mode(name) {
+) : Mode(name), FlyAutomationProfile {
+
+    override val automationCapabilities = FlyAutomationCapabilities(
+        horizontal = true,
+        ascend = true,
+        descend = true,
+        landing = true,
+        kind = FlyAutomationKind.CONTINUOUS,
+        reliableSpeed = true,
+    )
+
+    override fun automationReadiness() = FlyAutomationReadiness.Ready
 
     private val glide by float("Glide", 0.0f, -1f..1f)
 
@@ -322,7 +342,7 @@ internal abstract class VanillaFlyMode(
         get() = ModuleFly.modes
 
     private val useSprintSpeed
-        get() = mc.options.keySprint.isDown && sprintSpeed.enabled
+        get() = FlyAutomationInput.sprint(mc.options.keySprint.isDown) && sprintSpeed.enabled
 
     private val horizontalSpeed
         get() = if (useSprintSpeed) sprintSpeed.horizontalSpeed else baseSpeed.horizontalSpeed
@@ -332,8 +352,10 @@ internal abstract class VanillaFlyMode(
 
     protected val requestedVerticalMotion
         get() = when {
-            mc.options.keyJump.isDown && !mc.options.keyShift.isDown -> verticalSpeed.toDouble()
-            mc.options.keyShift.isDown && !mc.options.keyJump.isDown -> -verticalSpeed.toDouble()
+            FlyAutomationInput.jump(mc.options.keyJump.isDown) &&
+                !FlyAutomationInput.sneak(mc.options.keyShift.isDown) -> verticalSpeed.toDouble()
+            FlyAutomationInput.sneak(mc.options.keyShift.isDown) &&
+                !FlyAutomationInput.jump(mc.options.keyJump.isDown) -> -verticalSpeed.toDouble()
             else -> glide.toDouble()
         }
 
@@ -473,7 +495,14 @@ internal abstract class VanillaFlyMode(
             return@tickHandler
         }
 
-        player.deltaMovement = player.deltaMovement.withStrafe(speed = horizontalSpeed.toDouble())
+        val physicalInput = DirectionalInput(player.input)
+        val resolvedInput = FlyAutomationInput.directional(physicalInput)
+        val physicalYaw = player.getMovementDirectionOfInput(physicalInput)
+        player.deltaMovement = player.deltaMovement.withStrafe(
+            speed = horizontalSpeed.toDouble(),
+            input = resolvedInput,
+            yaw = FlyAutomationInput.desiredYaw(physicalYaw, physicalInput),
+        )
         player.deltaMovement.y = requestedVerticalMotion
 
         if (
@@ -644,7 +673,17 @@ private fun LocalPlayer.restoreFlightAbilities(snapshot: FlightAbilitiesSnapshot
     }
 }
 
-internal object FlyCreative : Mode("Creative") {
+internal object FlyCreative : Mode("Creative"), FlyAutomationProfile {
+
+    override val automationCapabilities = FlyAutomationCapabilities(
+        horizontal = true,
+        ascend = true,
+        descend = true,
+        landing = true,
+        kind = FlyAutomationKind.CONTINUOUS,
+    )
+
+    override fun automationReadiness() = FlyAutomationReadiness.Ready
 
     override val parent: ModeValueGroup<*>
         get() = ModuleFly.modes
@@ -685,7 +724,11 @@ internal object FlyCreative : Mode("Creative") {
 
     val repeatable = tickHandler {
         player.abilities.flyingSpeed =
-            if (mc.options.keySprint.isDown && SprintSpeed.enabled) SprintSpeed.speed else speed
+            if (FlyAutomationInput.sprint(mc.options.keySprint.isDown) && SprintSpeed.enabled) {
+                SprintSpeed.speed
+            } else {
+                speed
+            }
 
         if (forceFlight) player.abilities.flying = true
 
@@ -711,7 +754,17 @@ internal object FlyCreative : Mode("Creative") {
 
 }
 
-internal object FlyAirWalk : Mode("AirWalk") {
+internal object FlyAirWalk : Mode("AirWalk"), FlyAutomationProfile {
+
+    override val automationCapabilities = FlyAutomationCapabilities(
+        horizontal = true,
+        ascend = false,
+        descend = false,
+        landing = true,
+        kind = FlyAutomationKind.CONTINUOUS,
+    )
+
+    override fun automationReadiness() = FlyAutomationReadiness.Ready
 
     override val parent: ModeValueGroup<*>
         get() = ModuleFly.modes
@@ -742,7 +795,22 @@ internal object FlyAirWalk : Mode("AirWalk") {
  * Takes any kind of damage, preferably explosion damage.
  * Might bypass some anti-cheats.
  */
-internal object FlyExplosion : Mode("Explosion") {
+internal object FlyExplosion : Mode("Explosion"), FlyAutomationProfile {
+
+    override val automationCapabilities = FlyAutomationCapabilities(
+        horizontal = true,
+        ascend = false,
+        descend = false,
+        landing = true,
+        kind = FlyAutomationKind.BURST,
+        resource = "explosion damage",
+    )
+
+    override fun automationReadiness(): FlyAutomationReadiness = if (strafeSince > 0f) {
+        FlyAutomationReadiness.Ready
+    } else {
+        FlyAutomationReadiness.Arming("Waiting for explosion damage")
+    }
 
     override val parent: ModeValueGroup<*>
         get() = ModuleFly.modes
@@ -752,19 +820,45 @@ internal object FlyExplosion : Mode("Explosion") {
     val strafeDecrease by float("StrafeDecrease", 0.005f, 0.001f..0.1f)
 
     private var strafeSince = 0.0f
+    private var automationBurstStarted = false
+    private var pendingAutomationEnd: FlyAutomationEnd? = null
 
     override fun enable() {
+        automationBurstStarted = false
+        pendingAutomationEnd = null
         chat("You need to be damaged by an explosion to fly.")
         super.enable()
+    }
+
+    override fun disable() {
+        strafeSince = 0f
+        automationBurstStarted = false
+        pendingAutomationEnd = null
+        super.disable()
+    }
+
+    override fun consumeAutomaticEnd(): FlyAutomationEnd? {
+        if (strafeSince > 0f) automationBurstStarted = true
+        return pendingAutomationEnd.also { pendingAutomationEnd = null }
     }
 
     val repeatable = tickHandler {
         if (strafeSince > 0) {
             if (!player.onGround()) {
-                player.deltaMovement = player.deltaMovement.withStrafe(speed = strafeSince.toDouble())
+                player.deltaMovement = player.deltaMovement.withFlyAutomationStrafe(
+                    player = player,
+                    speed = strafeSince.toDouble(),
+                )
                 strafeSince -= strafeDecrease
+                if (strafeSince <= 0f && automationBurstStarted) {
+                    strafeSince = 0f
+                    pendingAutomationEnd = FlyAutomationEnd("Explosion flight burst ended")
+                }
             } else {
                 strafeSince = 0f
+                if (automationBurstStarted) {
+                    pendingAutomationEnd = FlyAutomationEnd("Explosion flight landed")
+                }
             }
         }
     }
@@ -781,6 +875,7 @@ internal object FlyExplosion : Mode("Explosion") {
 
             waitTicks(1)
             strafeSince = startStrafe
+            automationBurstStarted = true
         } else if (packet is ClientboundExplodePacket) { // Check if explosion affects velocity
             packet.playerKnockback.getOrNull()?.let { knockback ->
                 knockback.x = 0.0
@@ -789,19 +884,30 @@ internal object FlyExplosion : Mode("Explosion") {
 
                 waitTicks(1)
                 strafeSince = startStrafe
+                automationBurstStarted = true
             }
         }
     }
 
 }
 
-internal object FlyJetpack : Mode("Jetpack") {
+internal object FlyJetpack : Mode("Jetpack"), FlyAutomationProfile {
+
+    override val automationCapabilities = FlyAutomationCapabilities(
+        horizontal = true,
+        ascend = true,
+        descend = false,
+        landing = true,
+        kind = FlyAutomationKind.CONTINUOUS,
+    )
+
+    override fun automationReadiness() = FlyAutomationReadiness.Ready
 
     override val parent: ModeValueGroup<*>
         get() = ModuleFly.modes
 
     val repeatable = handler<GameTickEvent> {
-        if (player.input.keyPresses.jump) {
+        if (flyAutomationJump(player.input.keyPresses.jump)) {
             val deltaMovement = player.deltaMovement
             player.deltaMovement = Vec3(
                 deltaMovement.x * 1.1,

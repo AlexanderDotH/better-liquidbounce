@@ -504,6 +504,129 @@ object ClientRenderPipelines {
     }
 
     @JvmField
+    val FogVolume = newPipeline("fog/volume") {
+        screenQuadSnippet()
+        withFragmentShader(ClientShaders.Fragment.FogVolume)
+        withBindGroupLayout {
+            withSampler("DepthSampler")
+            withSampler("DhDepthSampler")
+            withUniformBuffer(ClientUniformDefine.FOG_VOLUME)
+        }
+        withColorTargetState(ColorTargetState(BlendFunction.TRANSLUCENT))
+        withDepthStencilState(optional())
+    }
+
+    @JvmField
+    val FogBlurHorizontal = newPipeline("fog/blur_horizontal") {
+        screenQuadSnippet()
+        withFragmentShader(ClientShaders.Fragment.FogBlurHorizontal)
+        withBindGroupLayout {
+            withSampler("SceneSampler")
+            withSampler("DepthSampler")
+            withSampler("DhDepthSampler")
+            withUniformBuffer(ClientUniformDefine.FOG_BLUR)
+        }
+        withColorTargetState(
+            ColorTargetState(optional(), GpuFormat.RGBA8_UNORM, ColorTargetState.WRITE_ALL)
+        )
+        withDepthStencilState(optional())
+    }
+
+    @JvmField
+    val FogBlurComposite = newPipeline("fog/blur_composite") {
+        screenQuadSnippet()
+        withFragmentShader(ClientShaders.Fragment.FogBlurComposite)
+        withBindGroupLayout {
+            withSampler("BlurSampler")
+            withSampler("DepthSampler")
+            withSampler("DhDepthSampler")
+            withUniformBuffer(ClientUniformDefine.FOG_BLUR)
+        }
+        withColorTargetState(ColorTargetState(BlendFunction.TRANSLUCENT))
+        withDepthStencilState(optional())
+    }
+
+    @JvmField
+    val UnifiedFogTerrainMask = newPipeline("fog/unified/terrain_mask") {
+        screenQuadSnippet()
+        withFragmentShader(ClientShaders.Fragment.UnifiedFogTerrainMask)
+        withBindGroupLayout {
+            withSampler("DepthSampler")
+            withSampler("DhDepthSampler")
+            withUniformBuffer(ClientUniformDefine.UNIFIED_FOG)
+        }
+        withColorTargetState(
+            ColorTargetState(optional(), GpuFormat.RGBA8_UNORM, ColorTargetState.WRITE_ALL)
+        )
+        withDepthStencilState(optional())
+    }
+
+    @JvmField
+    val UnifiedFogGenerate = newPipeline("fog/unified/generate") {
+        screenQuadSnippet()
+        withFragmentShader(ClientShaders.Fragment.UnifiedFogGenerate)
+        withBindGroupLayout {
+            withSampler("TerrainMaskSampler")
+            withUniformBuffer(ClientUniformDefine.UNIFIED_FOG)
+        }
+        withColorTargetState(
+            ColorTargetState(optional(), GpuFormat.RGBA16_FLOAT, ColorTargetState.WRITE_ALL)
+        )
+        withDepthStencilState(optional())
+    }
+
+    @JvmField
+    val UnifiedFogBlurHorizontal = newPipeline("fog/unified/blur_horizontal") {
+        screenQuadSnippet()
+        withFragmentShader(ClientShaders.Fragment.UnifiedFogBlurHorizontal)
+        withBindGroupLayout {
+            withSampler("FogSampler")
+            withSampler("TerrainMaskSampler")
+            withUniformBuffer(ClientUniformDefine.UNIFIED_FOG)
+            withUniformBuffer(ClientUniformDefine.UNIFIED_FOG_KERNEL)
+        }
+        withColorTargetState(
+            ColorTargetState(optional(), GpuFormat.RGBA16_FLOAT, ColorTargetState.WRITE_ALL)
+        )
+        withDepthStencilState(optional())
+    }
+
+    @JvmField
+    val UnifiedFogBlurVertical = newPipeline("fog/unified/blur_vertical") {
+        screenQuadSnippet()
+        withFragmentShader(ClientShaders.Fragment.UnifiedFogBlurVertical)
+        withBindGroupLayout {
+            withSampler("FogSampler")
+            withSampler("TerrainMaskSampler")
+            withUniformBuffer(ClientUniformDefine.UNIFIED_FOG)
+            withUniformBuffer(ClientUniformDefine.UNIFIED_FOG_KERNEL)
+        }
+        withColorTargetState(
+            ColorTargetState(optional(), GpuFormat.RGBA16_FLOAT, ColorTargetState.WRITE_ALL)
+        )
+        withDepthStencilState(optional())
+    }
+
+    @JvmField
+    val UnifiedFogComposite = newPipeline("fog/unified/composite") {
+        screenQuadSnippet()
+        withFragmentShader(ClientShaders.Fragment.UnifiedFogComposite)
+        withBindGroupLayout {
+            withSampler("FogSampler")
+            withSampler("TerrainMaskSampler")
+            withUniformBuffer(ClientUniformDefine.UNIFIED_FOG)
+        }
+        withColorTargetState(
+            ColorTargetState(
+                optional(BlendFunction.TRANSLUCENT),
+                GpuFormat.RGBA8_UNORM,
+                ColorTargetState.WRITE_COLOR,
+            )
+        )
+        withDepthStencilState(optional())
+    }
+
+    @JvmField
     val EspGaussianBlur = newPipeline("esp/gaussian_blur") {
         screenQuadSnippet()
         withFragmentShader(ClientShaders.Fragment.EspGaussianBlur)

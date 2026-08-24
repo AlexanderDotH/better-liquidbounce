@@ -26,6 +26,10 @@ import net.ccbluex.liquidbounce.event.events.BlinkPacketEvent
 import net.ccbluex.liquidbounce.event.events.PlayerNetworkMovementTickEvent
 import net.ccbluex.liquidbounce.event.handler
 import net.ccbluex.liquidbounce.features.blink.BlinkManager.Action
+import net.ccbluex.liquidbounce.features.module.modules.movement.fly.automation.FlyAutomationCapabilities
+import net.ccbluex.liquidbounce.features.module.modules.movement.fly.automation.FlyAutomationKind
+import net.ccbluex.liquidbounce.features.module.modules.movement.fly.automation.FlyAutomationProfile
+import net.ccbluex.liquidbounce.features.module.modules.movement.fly.automation.FlyAutomationReadiness
 import net.ccbluex.liquidbounce.features.module.modules.movement.fly.ModuleFly.modes
 import net.ccbluex.liquidbounce.utils.entity.airTicks
 import net.minecraft.network.protocol.common.ClientboundPingPacket
@@ -40,7 +44,7 @@ import net.minecraft.network.protocol.game.ServerboundPlayerCommandPacket
  *   January 15, 2026
  * @testedOn test.ccbluex.net
  */
-object FlyGrim2373Jan15 : Mode("Grim2373Jan15") {
+internal object FlyGrim2373Jan15 : Mode("Grim2373Jan15"), FlyAutomationProfile {
 
     override val parent: ModeValueGroup<*>
         get() = modes
@@ -50,6 +54,21 @@ object FlyGrim2373Jan15 : Mode("Grim2373Jan15") {
 
     private var isStarted = false
     private var shouldDelay = false
+
+    override val automationCapabilities = FlyAutomationCapabilities(
+        horizontal = true,
+        ascend = true,
+        descend = true,
+        landing = true,
+        kind = FlyAutomationKind.CONTINUOUS,
+        resource = "Elytra",
+    )
+
+    override fun automationReadiness(): FlyAutomationReadiness = if (isStarted) {
+        FlyAutomationReadiness.Ready
+    } else {
+        FlyAutomationReadiness.Arming("Waiting to enter fall flying")
+    }
 
     override fun disable() {
         isStarted = false
@@ -102,4 +121,3 @@ object FlyGrim2373Jan15 : Mode("Grim2373Jan15") {
     }
 
 }
-

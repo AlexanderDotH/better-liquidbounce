@@ -18,20 +18,42 @@
  */
 package net.ccbluex.liquidbounce.injection.mixins.minecraft.gui;
 
+import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
+import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
+import java.util.List;
 import net.ccbluex.liquidbounce.additions.GuiGraphicsExtractorAddition;
 import net.ccbluex.liquidbounce.features.module.modules.render.ModuleBetterInventory;
+import net.ccbluex.liquidbounce.render.engine.type.BoundingBox2f;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.client.gui.screens.inventory.tooltip.ClientTooltipPositioner;
 import net.minecraft.world.item.ItemStack;
+import org.joml.Vector2ic;
 import org.jspecify.annotations.Nullable;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
+import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 @Mixin(GuiGraphicsExtractor.class)
 public abstract class MixinGuiGraphicsExtractor implements GuiGraphicsExtractorAddition {
+
+    @Unique
+    private static final float LIQUIDBOUNCE_TOOLTIP_BACKGROUND_MARGIN = 12F;
+
+    @Unique
+    private @Nullable List<ItemStack> liquidbounce$containerItemViewStacks;
+
+    @Unique
+    private float liquidbounce$containerItemViewCenterX;
+
+    @Unique
+    private float liquidbounce$containerItemViewCenterY;
+
+    @Unique
+    private float liquidbounce$containerItemViewScale;
 
     @Shadow
     protected abstract void itemBar(ItemStack stack, int x, int y);
@@ -48,6 +70,42 @@ public abstract class MixinGuiGraphicsExtractor implements GuiGraphicsExtractorA
         ModuleBetterInventory.INSTANCE.drawTextCooldownProgress((GuiGraphicsExtractor) (Object) this, stack, x, y);
     }
 
+    @WrapOperation(
+        method = "tooltip",
+        at = @At(
+            value = "INVOKE",
+            target = "Lnet/minecraft/client/gui/screens/inventory/tooltip/ClientTooltipPositioner;positionTooltip(IIIIII)Lorg/joml/Vector2ic;"
+        )
+    )
+    private Vector2ic drawContainerItemViewOutsideTooltip(
+            ClientTooltipPositioner positioner, int screenWidth, int screenHeight, int mouseX, int mouseY,
+            int tooltipWidth, int tooltipHeight, Operation<Vector2ic> original) {
+        var position = original.call(positioner, screenWidth, screenHeight, mouseX, mouseY, tooltipWidth, tooltipHeight);
+        var stacks = this.liquidbounce$containerItemViewStacks;
+        this.liquidbounce$containerItemViewStacks = null;
+
+        if (stacks == null) {
+            return position;
+        }
+
+        // TooltipRenderUtil expands the content rectangle by 3 px padding and a 9 px margin per side.
+        var tooltipBounds = new BoundingBox2f(
+            position.x() - LIQUIDBOUNCE_TOOLTIP_BACKGROUND_MARGIN,
+            position.y() - LIQUIDBOUNCE_TOOLTIP_BACKGROUND_MARGIN,
+            position.x() + tooltipWidth + LIQUIDBOUNCE_TOOLTIP_BACKGROUND_MARGIN,
+            position.y() + tooltipHeight + LIQUIDBOUNCE_TOOLTIP_BACKGROUND_MARGIN
+        );
+        ModuleBetterInventory.INSTANCE.drawContainerItemView(
+            (GuiGraphicsExtractor) (Object) this,
+            stacks,
+            this.liquidbounce$containerItemViewCenterX,
+            this.liquidbounce$containerItemViewCenterY,
+            this.liquidbounce$containerItemViewScale,
+            tooltipBounds
+        );
+        return position;
+    }
+
     @Override
     public void liquidbounce$drawItemBar(ItemStack stack, int x, int y) {
         itemBar(stack, x, y);
@@ -62,5 +120,14 @@ public abstract class MixinGuiGraphicsExtractor implements GuiGraphicsExtractorA
     @Override
     public void liquidbounce$drawCooldownProgress(ItemStack stack, int x, int y) {
         itemCooldown(stack, x, y);
+    }
+
+    @Override
+    public void liquidbounce$queueContainerItemView(
+            List<ItemStack> stacks, float centerX, float centerY, float scale) {
+        this.liquidbounce$containerItemViewStacks = List.copyOf(stacks);
+        this.liquidbounce$containerItemViewCenterX = centerX;
+        this.liquidbounce$containerItemViewCenterY = centerY;
+        this.liquidbounce$containerItemViewScale = scale;
     }
 }

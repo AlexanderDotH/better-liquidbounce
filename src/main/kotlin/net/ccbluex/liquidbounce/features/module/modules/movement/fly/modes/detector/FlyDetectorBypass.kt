@@ -25,7 +25,13 @@ import net.ccbluex.liquidbounce.event.events.PacketEvent
 import net.ccbluex.liquidbounce.event.handler
 import net.ccbluex.liquidbounce.event.tickHandler
 import net.ccbluex.liquidbounce.features.module.modules.movement.fly.ModuleFly
-import net.ccbluex.liquidbounce.utils.entity.withStrafe
+import net.ccbluex.liquidbounce.features.module.modules.movement.fly.automation.FlyAutomationCapabilities
+import net.ccbluex.liquidbounce.features.module.modules.movement.fly.automation.FlyAutomationKind
+import net.ccbluex.liquidbounce.features.module.modules.movement.fly.automation.FlyAutomationProfile
+import net.ccbluex.liquidbounce.features.module.modules.movement.fly.automation.FlyAutomationReadiness
+import net.ccbluex.liquidbounce.features.module.modules.movement.fly.modes.flyAutomationJump
+import net.ccbluex.liquidbounce.features.module.modules.movement.fly.modes.flyAutomationSneak
+import net.ccbluex.liquidbounce.features.module.modules.movement.fly.modes.withFlyAutomationStrafe
 import net.minecraft.network.protocol.game.ServerboundMovePlayerPacket
 
 /**
@@ -52,7 +58,7 @@ import net.minecraft.network.protocol.game.ServerboundMovePlayerPacket
  * `modules.misc.playercheatdetector.DetectionModel`; change [targetStrictness]
  * to tighten or loosen the envelope.
  */
-internal object FlyDetectorBypass : Mode("DetectorBypass") {
+internal object FlyDetectorBypass : Mode("DetectorBypass"), FlyAutomationProfile {
 
     override val parent: ModeValueGroup<*>
         get() = ModuleFly.modes
@@ -88,6 +94,17 @@ internal object FlyDetectorBypass : Mode("DetectorBypass") {
 
     private var tickPhase = 0
 
+    override val automationCapabilities = FlyAutomationCapabilities(
+        horizontal = true,
+        ascend = true,
+        descend = true,
+        landing = true,
+        kind = FlyAutomationKind.CONTINUOUS,
+        reliableSpeed = true,
+    )
+
+    override fun automationReadiness(): FlyAutomationReadiness = FlyAutomationReadiness.Ready
+
     override fun enable() {
         tickPhase = 0
         super.enable()
@@ -105,16 +122,18 @@ internal object FlyDetectorBypass : Mode("DetectorBypass") {
 
         // Horizontal movement, clamped under the detector's horizontalLimit.
         val effectiveHorizontal = horizontalSpeed.toDouble().coerceAtMost(maxHorizontal)
-        player.deltaMovement = player.deltaMovement.withStrafe(speed = effectiveHorizontal)
+        player.deltaMovement = player.deltaMovement.withFlyAutomationStrafe(player, effectiveHorizontal)
 
         // Vertical bob: alternating sign each tick keeps |dy| >= bobAmplitude
         // on every sampled tick, so ObservedFlightCheck's hover accumulator
         // never reaches hoverTicks while horizontalSpeed > 0.08.
         val bob = if (tickPhase % 2 == 0) bobAmplitude.toDouble() else -bobAmplitude.toDouble()
 
+        val ascending = flyAutomationJump(mc.options.keyJump.isDown)
+        val descending = flyAutomationSneak(mc.options.keyShift.isDown)
         val rawVertical = when {
-            mc.options.keyJump.isDown -> verticalSpeed.toDouble()
-            mc.options.keyShift.isDown -> (-verticalSpeed).toDouble()
+            ascending -> verticalSpeed.toDouble()
+            descending -> (-verticalSpeed).toDouble()
             else -> glide.toDouble()
         }.coerceIn(-maxUpward, maxUpward)
 
@@ -124,7 +143,7 @@ internal object FlyDetectorBypass : Mode("DetectorBypass") {
 
         // Anti-kick: a real downward dip while cruising (no ground spoof).
         // Only applied when the user is not actively ascending/descending.
-        val cruising = !mc.options.keyJump.isDown && !mc.options.keyShift.isDown
+        val cruising = !ascending && !descending
         if (antiKick && cruising && tickPhase % antiKickInterval == 0) {
             player.deltaMovement.y = -antiKickDip.toDouble()
         }

@@ -21,7 +21,9 @@ package net.ccbluex.liquidbounce.integration.interop.protocol.rest.v1
 
 import io.ktor.server.routing.Route
 import io.ktor.server.routing.route
+import net.ccbluex.liquidbounce.features.baritone.BaritoneIntegration
 import net.ccbluex.liquidbounce.integration.interop.protocol.rest.v1.client.accountRoutes
+import net.ccbluex.liquidbounce.integration.interop.protocol.rest.v1.client.baritoneRoutes
 import net.ccbluex.liquidbounce.integration.interop.protocol.rest.v1.client.clientRoutes
 import net.ccbluex.liquidbounce.integration.interop.protocol.rest.v1.client.componentRoutes
 import net.ccbluex.liquidbounce.integration.interop.protocol.rest.v1.client.globalRoutes
@@ -52,6 +54,7 @@ internal fun Route.registerInteropFunctions() = route("/api/v1/client") {
     themeRoutes()
     screenRoutes()
     moduleRoutes()
+    baritoneRoutes(BaritoneIntegration.facade)
     componentRoutes()
     sessionRoutes()
     accountRoutes()

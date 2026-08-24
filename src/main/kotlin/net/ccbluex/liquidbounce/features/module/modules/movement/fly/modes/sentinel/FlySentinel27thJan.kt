@@ -26,7 +26,13 @@ import net.ccbluex.liquidbounce.event.handler
 import net.ccbluex.liquidbounce.event.tickHandler
 import net.ccbluex.liquidbounce.event.waitTicks
 import net.ccbluex.liquidbounce.features.module.modules.movement.fly.ModuleFly
-import net.ccbluex.liquidbounce.utils.entity.withStrafe
+import net.ccbluex.liquidbounce.features.module.modules.movement.fly.automation.FlyAutomationCapabilities
+import net.ccbluex.liquidbounce.features.module.modules.movement.fly.automation.FlyAutomationKind
+import net.ccbluex.liquidbounce.features.module.modules.movement.fly.automation.FlyAutomationProfile
+import net.ccbluex.liquidbounce.features.module.modules.movement.fly.automation.FlyAutomationReadiness
+import net.ccbluex.liquidbounce.features.module.modules.movement.fly.modes.flyAutomationJump
+import net.ccbluex.liquidbounce.features.module.modules.movement.fly.modes.flyAutomationSneak
+import net.ccbluex.liquidbounce.features.module.modules.movement.fly.modes.withFlyAutomationStrafe
 import net.ccbluex.liquidbounce.utils.kotlin.random
 
 /**
@@ -40,12 +46,26 @@ import net.ccbluex.liquidbounce.utils.kotlin.random
  *
  * Thanks to icewormy3
  */
-internal object FlySentinel27thJan : Mode("Sentinel27thJan") {
+internal object FlySentinel27thJan : Mode("Sentinel27thJan"), FlyAutomationProfile {
 
     private val horizontalSpeed by floatRange("HorizontalSpeed", 0.33f..0.34f, 0.1f..1f)
 
     override val parent: ModeValueGroup<*>
         get() = ModuleFly.modes
+
+    override val automationCapabilities = FlyAutomationCapabilities(
+        horizontal = true,
+        ascend = true,
+        descend = true,
+        landing = true,
+        kind = FlyAutomationKind.CONTINUOUS,
+    )
+
+    override fun automationReadiness(): FlyAutomationReadiness = if (player.onGround()) {
+        FlyAutomationReadiness.Arming("Waiting to become airborne")
+    } else {
+        FlyAutomationReadiness.Ready
+    }
 
     val repeatable = tickHandler {
         if (player.onGround()) {
@@ -53,17 +73,20 @@ internal object FlySentinel27thJan : Mode("Sentinel27thJan") {
         }
 
         player.deltaMovement.y = when {
-            player.isShiftKeyDown -> -0.4
-            player.input.keyPresses.jump -> 0.42
+            flyAutomationSneak(player.isShiftKeyDown) -> -0.4
+            flyAutomationJump(player.input.keyPresses.jump) -> 0.42
             else -> 0.2
         }
-        player.deltaMovement = player.deltaMovement.withStrafe(speed = horizontalSpeed.random().toDouble())
+        player.deltaMovement = player.deltaMovement.withFlyAutomationStrafe(
+            player,
+            horizontalSpeed.random().toDouble(),
+        )
 
         waitTicks(6)
     }
 
     val moveHandler = handler<PlayerMoveEvent> { event ->
-        event.movement = event.movement.withStrafe()
+        event.movement = event.movement.withFlyAutomationStrafe(player)
     }
 
 }

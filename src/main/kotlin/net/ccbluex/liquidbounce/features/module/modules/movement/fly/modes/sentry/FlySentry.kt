@@ -22,6 +22,11 @@ import net.ccbluex.liquidbounce.config.types.group.Mode
 import net.ccbluex.liquidbounce.config.types.group.ModeValueGroup
 import net.ccbluex.liquidbounce.event.tickHandler
 import net.ccbluex.liquidbounce.features.module.modules.movement.fly.ModuleFly
+import net.ccbluex.liquidbounce.features.module.modules.movement.fly.automation.FlyAutomationCapabilities
+import net.ccbluex.liquidbounce.features.module.modules.movement.fly.automation.FlyAutomationKind
+import net.ccbluex.liquidbounce.features.module.modules.movement.fly.automation.FlyAutomationProfile
+import net.ccbluex.liquidbounce.features.module.modules.movement.fly.automation.FlyAutomationReadiness
+import net.ccbluex.liquidbounce.features.module.modules.movement.fly.modes.flyAutomationYaw
 import net.minecraft.network.protocol.game.ServerboundMovePlayerPacket
 import kotlin.math.cos
 import kotlin.math.sin
@@ -29,13 +34,23 @@ import kotlin.math.sin
 /**
  * Revive Sentry fly port.
  */
-internal object FlySentry : Mode("Sentry") {
+internal object FlySentry : Mode("Sentry"), FlyAutomationProfile {
 
     override val parent: ModeValueGroup<*>
         get() = ModuleFly.modes
 
     private var targetY = 0.0
     private var teleportedTimes = 0
+
+    override val automationCapabilities = FlyAutomationCapabilities(
+        horizontal = true,
+        ascend = true,
+        descend = false,
+        landing = false,
+        kind = FlyAutomationKind.CONTINUOUS,
+    )
+
+    override fun automationReadiness(): FlyAutomationReadiness = FlyAutomationReadiness.Ready
 
     override fun enable() {
         targetY = player.y + 5.0
@@ -74,7 +89,7 @@ internal object FlySentry : Mode("Sentry") {
     }
 
     private fun positionForward(distance: Double): TargetPosition {
-        val yaw = Math.toRadians(player.yRot.toDouble())
+        val yaw = Math.toRadians(flyAutomationYaw(player.yRot).toDouble())
 
         return TargetPosition(
             x = player.x - sin(yaw) * distance,

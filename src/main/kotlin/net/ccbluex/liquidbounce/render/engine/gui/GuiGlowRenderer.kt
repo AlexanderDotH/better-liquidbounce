@@ -22,11 +22,11 @@ import net.ccbluex.liquidbounce.event.handler
 import net.ccbluex.liquidbounce.render.ClientRenderPipelines
 import net.ccbluex.liquidbounce.render.ClientUniformDefine
 import net.ccbluex.liquidbounce.render.createRenderPass
+import net.ccbluex.liquidbounce.render.engine.GaussianKernel
 import net.ccbluex.liquidbounce.render.engine.RenderDrawKey
 import net.ccbluex.liquidbounce.render.engine.esp.EspGlowStyle
 import net.ccbluex.liquidbounce.render.engine.esp.EspRenderTargetHolder
 import net.ccbluex.liquidbounce.render.engine.esp.EspTargetSize
-import net.ccbluex.liquidbounce.render.engine.esp.GaussianKernel
 import net.ccbluex.liquidbounce.render.engine.type.Color4b
 import net.ccbluex.liquidbounce.render.getDynamicTransformsUniform
 import net.ccbluex.liquidbounce.render.mesh.BatchCollector

@@ -30,6 +30,10 @@ import net.ccbluex.liquidbounce.event.handler
 import net.ccbluex.liquidbounce.event.tickHandler
 import net.ccbluex.liquidbounce.features.blink.BlinkManager
 import net.ccbluex.liquidbounce.features.module.modules.movement.fly.ModuleFly
+import net.ccbluex.liquidbounce.features.module.modules.movement.fly.automation.FlyAutomationCapabilities
+import net.ccbluex.liquidbounce.features.module.modules.movement.fly.automation.FlyAutomationKind
+import net.ccbluex.liquidbounce.features.module.modules.movement.fly.automation.FlyAutomationProfile
+import net.ccbluex.liquidbounce.features.module.modules.movement.fly.automation.FlyAutomationReadiness
 import net.ccbluex.liquidbounce.utils.client.Timer
 import net.ccbluex.liquidbounce.utils.kotlin.Priority
 import net.ccbluex.liquidbounce.utils.math.copy
@@ -43,12 +47,22 @@ import net.minecraft.world.phys.shapes.Shapes
  * @testedOn anticheat-test
  * @note it can rarely flag once | needs 1.9x or above
  */
-internal object FlyVerusB3869Flat : Mode("VerusB3896Flat") {
+internal object FlyVerusB3869Flat : Mode("VerusB3896Flat"), FlyAutomationProfile {
 
     private val timer by float("Timer", 5.0f, 1.0f..20.0f)
 
     override val parent: ModeValueGroup<*>
         get() = ModuleFly.modes
+
+    override val automationCapabilities = FlyAutomationCapabilities(
+        horizontal = true,
+        ascend = false,
+        descend = false,
+        landing = true,
+        kind = FlyAutomationKind.CONTINUOUS,
+    )
+
+    override fun automationReadiness(): FlyAutomationReadiness = FlyAutomationReadiness.Ready
 
     @Suppress("unused")
     private val packetHandler = handler<PacketEvent> { event ->

@@ -69,12 +69,6 @@ public abstract class MixinAbstractContainerScreen<T extends AbstractContainerMe
     @Shadow
     private @Nullable Slot lastClickSlot;
 
-    @Shadow
-    protected int leftPos;
-
-    @Shadow
-    protected int topPos;
-
     @Inject(method = "slotClicked(Lnet/minecraft/world/inventory/Slot;IILnet/minecraft/world/inventory/ContainerInput;)V", at = @At("HEAD"), cancellable = true)
     private void cancelMouseClick(Slot slot, int slotId, int button, ContainerInput actionType, CallbackInfo ci) {
         var inventoryMove = ModuleInventoryMove.INSTANCE;
@@ -94,19 +88,14 @@ public abstract class MixinAbstractContainerScreen<T extends AbstractContainerMe
     }
 
     @Inject(method = "extractContents", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/gui/screens/inventory/AbstractContainerScreen;extractSlots(Lnet/minecraft/client/gui/GuiGraphicsExtractor;II)V", shift = At.Shift.AFTER))
-    private void hookDrawSlot(GuiGraphicsExtractor context, int mouseX, int mouseY, float delta, CallbackInfo ci) {
-        var cursorStack = this.menu.getCarried();
+    private void hookItemScroller(GuiGraphicsExtractor context, int mouseX, int mouseY, float delta, CallbackInfo ci) {
         var slot = getHoveredSlot(mouseX, mouseY);
 
-        if (!cursorStack.isEmpty() || slot == null) {
+        if (!this.menu.getCarried().isEmpty() || slot == null) {
             return;
         }
 
         var stack = slot.getItem();
-        if (!ModuleBetterInventory.INSTANCE.drawContainerItemView(context, cursorStack, this.leftPos, this.topPos, mouseX, mouseY)) {
-            ModuleBetterInventory.INSTANCE.drawContainerItemView(context, stack, this.leftPos, this.topPos, mouseX, mouseY);
-        }
-
         if (matchingItemScrollerMoveConditions(mouseX, mouseY)) {
             this.lastQuickMoved = stack.isEmpty() ? ItemStack.EMPTY : stack.copy();
 
@@ -136,6 +125,20 @@ public abstract class MixinAbstractContainerScreen<T extends AbstractContainerMe
 
             ModuleItemScroller.INSTANCE.resetChronometer();
         }
+    }
+
+    @Inject(method = "extractTooltip", at = @At("HEAD"))
+    private void queueContainerItemView(GuiGraphicsExtractor context, int mouseX, int mouseY, CallbackInfo ci) {
+        if (!this.menu.getCarried().isEmpty()) {
+            return;
+        }
+
+        var slot = getHoveredSlot(mouseX, mouseY);
+        if (slot == null) {
+            return;
+        }
+
+        ModuleBetterInventory.INSTANCE.queueContainerItemView(context, slot.getItem(), mouseX, mouseY);
     }
 
     @Inject(method = "mouseClicked", at = @At("HEAD"), cancellable = true)

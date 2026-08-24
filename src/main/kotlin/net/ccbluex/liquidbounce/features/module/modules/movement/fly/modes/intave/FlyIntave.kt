@@ -28,6 +28,11 @@ import net.ccbluex.liquidbounce.event.handler
 import net.ccbluex.liquidbounce.event.tickHandler
 import net.ccbluex.liquidbounce.features.module.modules.exploit.phase.modes.IntaveBlockPlacementSupport
 import net.ccbluex.liquidbounce.features.module.modules.movement.fly.ModuleFly
+import net.ccbluex.liquidbounce.features.module.modules.movement.fly.automation.FlyAutomationCapabilities
+import net.ccbluex.liquidbounce.features.module.modules.movement.fly.automation.FlyAutomationKind
+import net.ccbluex.liquidbounce.features.module.modules.movement.fly.automation.FlyAutomationProfile
+import net.ccbluex.liquidbounce.features.module.modules.movement.fly.automation.FlyAutomationReadiness
+import net.ccbluex.liquidbounce.features.module.modules.movement.fly.modes.flyAutomationSneak
 import net.ccbluex.liquidbounce.utils.client.mc
 import net.minecraft.network.protocol.game.ServerboundUseItemOnPacket
 import net.minecraft.world.item.context.BlockPlaceContext
@@ -41,7 +46,7 @@ import net.minecraft.world.phys.shapes.VoxelShape
  *
  * Place a block into the player's hitbox, then fly inside the loosened collision.
  */
-object FlyIntave : Mode("Intave") {
+internal object FlyIntave : Mode("Intave"), FlyAutomationProfile {
 
     private val upwardSneakMotion by float("UpwardSneakMotion", 0.01f, 0f..0.2f)
     private val collisionDrop by float("CollisionDrop", 1f, 0f..1f, "blocks")
@@ -51,6 +56,22 @@ object FlyIntave : Mode("Intave") {
 
     private var startY = 0
 
+    override val automationCapabilities = FlyAutomationCapabilities(
+        horizontal = true,
+        ascend = true,
+        descend = false,
+        landing = false,
+        kind = FlyAutomationKind.CONTINUOUS,
+        resource = "Placeable Block",
+    )
+
+    override fun automationReadiness(): FlyAutomationReadiness =
+        if (IntaveBlockPlacementSupport.isInsidePhaseBlock()) {
+            FlyAutomationReadiness.Ready
+        } else {
+            FlyAutomationReadiness.Arming("Waiting for a block inside the player hitbox")
+        }
+
     override fun enable() {
         startY = player.blockPosition().y
         super.enable()
@@ -58,7 +79,7 @@ object FlyIntave : Mode("Intave") {
 
     @Suppress("unused")
     private val tickHandler = tickHandler {
-        player.deltaMovement.y = if (mc.options.keyShift.isDown) {
+        player.deltaMovement.y = if (flyAutomationSneak(mc.options.keyShift.isDown)) {
             upwardSneakMotion.toDouble()
         } else {
             0.0

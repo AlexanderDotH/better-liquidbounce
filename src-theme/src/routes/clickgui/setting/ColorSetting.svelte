@@ -6,6 +6,7 @@
     import Pickr from "@simonwep/pickr";
     import {convertToSpacedString, spaceSeperatedNames} from "../../../theme/theme_config";
     import {intToRgba, rgbaToHex, rgbaToInt} from "../../../integration/util";
+    import {cefTextInput} from "./common/cefTextInput";
 
     export let setting: ModuleSetting;
 
@@ -57,7 +58,8 @@
         });
     });
 
-    function handleValueInput() {
+    function handleValueInput(value: string) {
+        hex = value;
         pickr.setColor(hex);
     }
 </script>
@@ -67,8 +69,12 @@
     <div class="value-spot">
         <input
             class="value"
-            bind:value={hex}
-            on:input={handleValueInput}
+            readonly
+            value={hex}
+            use:cefTextInput={{
+                getValue: () => hex,
+                onChange: handleValueInput,
+            }}
         />
         <!-- svelte-ignore a11y_consider_explicit_label -->
         <button

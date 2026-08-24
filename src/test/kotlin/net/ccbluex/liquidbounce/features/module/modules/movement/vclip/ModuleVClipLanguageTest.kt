@@ -20,38 +20,79 @@ class ModuleVClipLanguageTest {
     @Test
     fun `VClip controls and both movement modes are documented in English and German`() {
         listOf("en_us", "de_de").forEach { locale ->
-            val resource = checkNotNull(
-                javaClass.classLoader.getResourceAsStream("resources/liquidbounce/lang/$locale.json"),
-            )
-            val translations = resource.use { JsonParser.parseReader(InputStreamReader(it)).asJsonObject }
+            val translations = translations(locale)
 
             assertTrue(translations.keySet().containsAll(REQUIRED_KEYS), locale)
         }
     }
 
+    @Test
+    fun `VClip fall safety copy distinguishes grounded checkpoints from PacketJump fallback`() {
+        FALL_SAFETY_COPY.forEach { (locale, expected) ->
+            val translations = translations(locale)
+            val vanilla = translations["liquidbounce.module.vClip.mode.vanilla.extendedDescription"].asString
+            val folia = translations["liquidbounce.module.vClip.mode.folia.extendedDescription"].asString
+            val rejection = translations["liquidbounce.module.vClip.messages.fallProtectionUnavailable"].asString
+
+            assertTrue(vanilla.contains(expected.groundedCheckpoints, ignoreCase = true), locale)
+            assertTrue(folia.contains(expected.groundedCheckpoints, ignoreCase = true), locale)
+            assertTrue(folia.contains("PacketJump", ignoreCase = true), locale)
+            assertTrue(folia.contains(expected.ungroundedPackets, ignoreCase = true), locale)
+            assertTrue(rejection.contains(expected.cancelled, ignoreCase = true), locale)
+            assertTrue(rejection.contains(expected.noMovement, ignoreCase = true), locale)
+            assertTrue(!translations.has("liquidbounce.module.vClip.mode.vanilla.groundMode.description"), locale)
+            assertTrue(!translations.has("liquidbounce.module.vClip.mode.folia.groundMode.description"), locale)
+        }
+    }
+
+    private fun translations(locale: String) = checkNotNull(
+        javaClass.classLoader.getResourceAsStream("resources/liquidbounce/lang/$locale.json"),
+    ).use { JsonParser.parseReader(InputStreamReader(it)).asJsonObject }
+
     private companion object {
+        data class FallSafetyCopy(
+            val groundedCheckpoints: String,
+            val ungroundedPackets: String,
+            val cancelled: String,
+            val noMovement: String,
+        )
+
+        val FALL_SAFETY_COPY = mapOf(
+            "en_us" to FallSafetyCopy(
+                groundedCheckpoints = "grounded safe checkpoints",
+                ungroundedPackets = "ungrounded packets",
+                cancelled = "cancelled",
+                noMovement = "without moving",
+            ),
+            "de_de" to FallSafetyCopy(
+                groundedCheckpoints = "geerdete sichere Zwischenpunkte",
+                ungroundedPackets = "ungeerdete Pakete",
+                cancelled = "abgebrochen",
+                noMovement = "ohne Bewegung",
+            ),
+        )
+
         val REQUIRED_KEYS = setOf(
             "liquidbounce.module.vClip.description",
+            "liquidbounce.module.vClip.doNotClipAroundBedrock.description",
             "liquidbounce.module.vClip.repeatDelay.description",
             "liquidbounce.module.vClip.target.description",
             "liquidbounce.module.vClip.target.distance.blocks.description",
             "liquidbounce.module.vClip.target.smart.scanDistance.description",
             "liquidbounce.module.vClip.target.smart.scanDistance.maxDistance.description",
-            "liquidbounce.module.vClip.target.smart.doNotClipAroundBedrock.description",
             "liquidbounce.module.vClip.mode.description",
             "liquidbounce.module.vClip.mode.vanilla.description",
             "liquidbounce.module.vClip.mode.vanilla.extendedDescription",
             "liquidbounce.module.vClip.mode.vanilla.paperBypass.description",
             "liquidbounce.module.vClip.mode.vanilla.fullPacket.description",
-            "liquidbounce.module.vClip.mode.vanilla.groundMode.description",
             "liquidbounce.module.vClip.mode.vanilla.resetMotion.description",
             "liquidbounce.module.vClip.mode.folia.description",
             "liquidbounce.module.vClip.mode.folia.extendedDescription",
             "liquidbounce.module.vClip.mode.folia.movementPackets.description",
             "liquidbounce.module.vClip.mode.folia.fullPacket.description",
-            "liquidbounce.module.vClip.mode.folia.groundMode.description",
             "liquidbounce.module.vClip.mode.folia.resetMotion.description",
             "liquidbounce.module.vClip.messages.noPositionFound",
+            "liquidbounce.module.vClip.messages.fallProtectionUnavailable",
         )
     }
 }

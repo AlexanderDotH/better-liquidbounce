@@ -30,6 +30,7 @@ import net.ccbluex.liquidbounce.event.sequenceHandler
 import net.ccbluex.liquidbounce.event.waitTicks
 import net.ccbluex.liquidbounce.features.module.modules.movement.fly.ModuleFly
 import net.ccbluex.liquidbounce.features.module.modules.movement.fly.modes.fireball.FlyFireball
+import net.ccbluex.liquidbounce.features.module.modules.movement.fly.modes.flyAutomationYaw
 import net.ccbluex.liquidbounce.utils.aiming.RotationManager
 import net.ccbluex.liquidbounce.utils.aiming.RotationsValueGroup
 import net.ccbluex.liquidbounce.utils.aiming.data.Rotation
@@ -73,7 +74,7 @@ object FlyFireballCustomTechnique : Mode("Custom") {
     @Suppress("unused")
     private val rotationUpdateHandler = handler<RotationUpdateEvent> {
         RotationManager.setRotationTarget(
-            Rotation(player.yRot, Rotations.pitch),
+            Rotation(flyAutomationYaw(player.yRot), Rotations.pitch),
             valueGroup = Rotations,
             priority = Priority.IMPORTANT_FOR_PLAYER_LIFE,
             provider = ModuleFly
@@ -113,6 +114,7 @@ object FlyFireballCustomTechnique : Mode("Custom") {
 
         waitTicks(disableDelay)
 
+        FlyFireball.markAutomaticEnd()
         ModuleFly.enabled = false // Disable after the fireball was thrown
         canMove = true
         FlyFireball.wasTriggered = false

@@ -105,6 +105,32 @@ sealed class ClientShaders(val type: ShaderType) : ShaderSource {
             "gui_backdrop_blur_composite"("shaders/gui/backdrop_blur_composite.frag")
 
         @JvmField
+        val FogVolume = "fog_volume"("shaders/fog/volumetric_fog.frag")
+
+        @JvmField
+        val FogBlurHorizontal = "fog_blur_horizontal"("shaders/fog/fog_blur_horizontal.frag")
+
+        @JvmField
+        val FogBlurComposite = "fog_blur_composite"("shaders/fog/fog_blur_composite.frag")
+
+        @JvmField
+        val UnifiedFogTerrainMask = "unified_fog_terrain_mask"("shaders/fog/unified_mask.frag")
+
+        @JvmField
+        val UnifiedFogGenerate = "unified_fog_generate"("shaders/fog/unified_generate.frag")
+
+        @JvmField
+        val UnifiedFogBlurHorizontal =
+            "unified_fog_blur_horizontal"("shaders/fog/unified_blur_horizontal.frag")
+
+        @JvmField
+        val UnifiedFogBlurVertical =
+            "unified_fog_blur_vertical"("shaders/fog/unified_blur_vertical.frag")
+
+        @JvmField
+        val UnifiedFogComposite = "unified_fog_composite"("shaders/fog/unified_composite.frag")
+
+        @JvmField
         val EspGaussianBlur = "esp_gaussian_blur"("shaders/esp/gaussian_blur.frag")
 
         @JvmField

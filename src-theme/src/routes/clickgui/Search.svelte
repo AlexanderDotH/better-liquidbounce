@@ -1,20 +1,21 @@
 <script lang="ts">
     import type {ConfigurableSetting, Module} from "../../integration/types";
-    import {getModuleSettings, setModuleEnabled, setTyping} from "../../integration/rest";
+    import {getModuleSettings, setModuleEnabled} from "../../integration/rest";
     import {listen} from "../../integration/ws";
     import type {ClickGuiValueChangeEvent, KeyboardKeyEvent, ModuleToggleEvent} from "../../integration/events";
     import {highlightModuleName} from "./clickgui_store";
     import {onMount} from "svelte";
     import {convertToSpacedString, spaceSeperatedNames} from "../../theme/theme_config";
     import {isClickGuiScreen} from "../../util/utils";
+    import {cefTextInput} from "./setting/common/cefTextInput";
 
     export let modules: Module[];
 
     let resultElements: HTMLElement[] = [];
     let searchContainerElement: HTMLElement;
     let autoFocus: boolean = true
-    let searchInputElement: HTMLElement;
-    let query: string;
+    let searchInputElement: HTMLInputElement;
+    let query = "";
     let filteredModules: Module[] = [];
     let selectedIndex = 0;
     let hasFocus = false;
@@ -55,6 +56,11 @@
             return lowerName.includes(pureQuery)
                 || lowerAliases.some(a => a.includes(pureQuery));
         }).map(it => it.raw);
+    }
+
+    function updateQuery(value: string) {
+        query = value;
+        filterModules(true);
     }
 
     async function handleKeyDown(e: KeyboardKeyEvent) {
@@ -173,12 +179,14 @@
             class="search-input"
             placeholder="Search"
             spellcheck="false"
-            bind:value={query}
+            readonly
+            value={query}
             bind:this={searchInputElement}
-            on:input={() => filterModules(true)}
+            use:cefTextInput={{
+                getValue: () => query,
+                onChange: updateQuery,
+            }}
             on:keydown={handleBrowserKeyDown}
-            on:focusin={async () => await setTyping(true)}
-            on:focusout={async () => await setTyping(false)}
     />
 
     {#if query}

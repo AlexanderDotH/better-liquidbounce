@@ -36,6 +36,15 @@ class ClickGuiScreenBackgroundTest {
     }
 
     @Test
+    fun `baritone dashboard suppresses minecraft native background`() {
+        assertTrue(
+            shouldSuppressNativeClickGuiBackground(
+                CustomScreenType.BARITONE,
+            )
+        )
+    }
+
+    @Test
     fun `other browser screens preserve minecraft native background`() {
         assertFalse(
             shouldSuppressNativeClickGuiBackground(

@@ -23,6 +23,10 @@ import net.ccbluex.liquidbounce.config.types.group.Mode
 import net.ccbluex.liquidbounce.config.types.group.ModeValueGroup
 import net.ccbluex.liquidbounce.event.tickHandler
 import net.ccbluex.liquidbounce.features.module.modules.movement.fly.ModuleFly.modes
+import net.ccbluex.liquidbounce.features.module.modules.movement.fly.automation.FlyAutomationCapabilities
+import net.ccbluex.liquidbounce.features.module.modules.movement.fly.automation.FlyAutomationKind
+import net.ccbluex.liquidbounce.features.module.modules.movement.fly.automation.FlyAutomationProfile
+import net.ccbluex.liquidbounce.features.module.modules.movement.fly.automation.FlyAutomationReadiness
 
 /**
  * @anticheat Vulcan
@@ -30,10 +34,24 @@ import net.ccbluex.liquidbounce.features.module.modules.movement.fly.ModuleFly.m
  * @testedOn anticheat-test.com
  * @note NA
  */
-internal object FlyVulcan277 : Mode("Vulcan277") {
+internal object FlyVulcan277 : Mode("Vulcan277"), FlyAutomationProfile {
 
     override val parent: ModeValueGroup<*>
         get() = modes
+
+    override val automationCapabilities = FlyAutomationCapabilities(
+        horizontal = true,
+        ascend = false,
+        descend = true,
+        landing = true,
+        kind = FlyAutomationKind.CONTINUOUS,
+    )
+
+    override fun automationReadiness(): FlyAutomationReadiness = if (player.fallDistance > 0.1) {
+        FlyAutomationReadiness.Ready
+    } else {
+        FlyAutomationReadiness.Arming("Waiting to begin gliding")
+    }
 
     val repeatable = tickHandler {
         if (player.fallDistance > 0.1) {
@@ -46,4 +64,3 @@ internal object FlyVulcan277 : Mode("Vulcan277") {
     }
 
 }
-

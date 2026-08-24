@@ -24,6 +24,7 @@ import net.ccbluex.liquidbounce.config.types.group.ModeValueGroup
 import net.ccbluex.liquidbounce.event.events.MovementInputEvent
 import net.ccbluex.liquidbounce.event.handler
 import net.ccbluex.liquidbounce.features.module.modules.movement.fly.modes.fireball.FlyFireball
+import net.ccbluex.liquidbounce.features.module.modules.movement.fly.automation.FlyAutomationInput
 import net.ccbluex.liquidbounce.utils.entity.isCloseToEdge
 import net.ccbluex.liquidbounce.utils.kotlin.EventPriorityConvention
 
@@ -38,9 +39,10 @@ object FlyFireballOnEdgeTrigger : Mode("OnEdge") {
     val inputHandler = handler<MovementInputEvent>(
         priority = EventPriorityConvention.OBJECTION_AGAINST_EVERYTHING
     ) { event ->
-        val shouldBeActive = player.onGround() && !player.isShiftKeyDown
+        val shouldBeActive = player.onGround() && !FlyAutomationInput.sneak(player.isShiftKeyDown)
 
-        if (shouldBeActive && player.isCloseToEdge(event.directionalInput, edgeDistance.toDouble())) {
+        val directionalInput = FlyAutomationInput.directional(event.directionalInput)
+        if (shouldBeActive && player.isCloseToEdge(directionalInput, edgeDistance.toDouble())) {
             FlyFireball.wasTriggered = true
         }
     }

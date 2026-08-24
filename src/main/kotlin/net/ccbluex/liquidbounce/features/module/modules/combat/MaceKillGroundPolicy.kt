@@ -34,6 +34,7 @@ internal enum class MaceKillGroundPolicy {
 internal enum class MaceKillMovementPacketKind {
     DIRECT_ROUTE,
     ASTAR_ROUTE,
+    VANILLA_VCLIP,
     CLIP_REACH_ANCHOR,
     CLIP_REACH_RECOVERY,
     INSTANT_MACE_STRIKE,
@@ -43,6 +44,10 @@ internal data class MaceKillGroundPacketContext(
     val identityOwnedByRoute: Boolean,
     val kind: MaceKillMovementPacketKind,
 )
+
+/** Vanilla VClip uses its own ground bit and must never turn unrelated route packets into NoFall packets. */
+internal fun shouldSpoofMaceKillVanillaVClipGround(packet: MaceKillGroundPacketContext): Boolean =
+    packet.identityOwnedByRoute && packet.kind == MaceKillMovementPacketKind.VANILLA_VCLIP
 
 internal fun shouldValidateMaceKillRouteSegment(
     clipAnchorOwned: Boolean,

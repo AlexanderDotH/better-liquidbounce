@@ -3,22 +3,12 @@
     import type {ModuleSetting, TextSetting,} from "../../../integration/types";
     import {convertToSpacedString, spaceSeperatedNames} from "../../../theme/theme_config";
     import {cefTextInput} from "./common/cefTextInput";
-    import {listen} from "../../../integration/ws";
 
     export let setting: ModuleSetting;
 
     const cSetting = setting as TextSetting;
 
     const dispatch = createEventDispatcher();
-
-    listen("valueChanged", (event) => {
-        if (event.value.name !== cSetting.name) {
-            return;
-        }
-
-        cSetting.value = event.value.value as string;
-        setting = {...cSetting};
-    });
 
     function handleChange(value: string) {
         cSetting.value = value;

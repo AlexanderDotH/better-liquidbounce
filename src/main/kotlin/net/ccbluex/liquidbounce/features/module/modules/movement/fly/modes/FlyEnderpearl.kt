@@ -27,6 +27,10 @@ import net.ccbluex.liquidbounce.event.handler
 import net.ccbluex.liquidbounce.event.tickHandler
 import net.ccbluex.liquidbounce.event.waitTicks
 import net.ccbluex.liquidbounce.features.module.modules.movement.fly.ModuleFly
+import net.ccbluex.liquidbounce.features.module.modules.movement.fly.automation.FlyAutomationCapabilities
+import net.ccbluex.liquidbounce.features.module.modules.movement.fly.automation.FlyAutomationKind
+import net.ccbluex.liquidbounce.features.module.modules.movement.fly.automation.FlyAutomationProfile
+import net.ccbluex.liquidbounce.features.module.modules.movement.fly.automation.FlyAutomationReadiness
 import net.ccbluex.liquidbounce.features.module.modules.player.ModuleFastUse
 import net.ccbluex.liquidbounce.utils.aiming.RotationManager
 import net.ccbluex.liquidbounce.utils.aiming.RotationsValueGroup
@@ -34,7 +38,6 @@ import net.ccbluex.liquidbounce.utils.aiming.data.Rotation
 import net.ccbluex.liquidbounce.utils.block.isBlockAtPosition
 import net.ccbluex.liquidbounce.utils.client.SilentHotbar
 import net.ccbluex.liquidbounce.utils.entity.box
-import net.ccbluex.liquidbounce.utils.entity.withStrafe
 import net.ccbluex.liquidbounce.utils.inventory.Slots
 import net.ccbluex.liquidbounce.utils.kotlin.Priority
 import net.ccbluex.liquidbounce.utils.kotlin.random
@@ -43,7 +46,7 @@ import net.minecraft.network.protocol.game.ServerboundUseItemPacket
 import net.minecraft.world.item.Items
 import net.minecraft.world.level.block.Block
 
-internal object FlyEnderpearl : Mode("Enderpearl") {
+internal object FlyEnderpearl : Mode("Enderpearl"), FlyAutomationProfile {
 
     override val parent: ModeValueGroup<*>
         get() = ModuleFly.modes
@@ -52,6 +55,23 @@ internal object FlyEnderpearl : Mode("Enderpearl") {
 
     private var threwPearl = false
     private var shouldFly = false
+
+    override val automationCapabilities = FlyAutomationCapabilities(
+        horizontal = true,
+        ascend = true,
+        descend = true,
+        landing = true,
+        kind = FlyAutomationKind.CONTINUOUS,
+        resource = "Ender Pearl",
+    )
+
+    override fun automationReadiness(): FlyAutomationReadiness = when {
+        shouldFly -> FlyAutomationReadiness.Ready
+        threwPearl -> FlyAutomationReadiness.Arming("Waiting for the ender pearl teleport")
+        Slots.OffhandWithHotbar.findSlot(Items.ENDER_PEARL) == null ->
+            FlyAutomationReadiness.Unavailable("No ender pearl is available")
+        else -> FlyAutomationReadiness.Arming("Preparing the ender pearl")
+    }
 
     private val rotations = tree(RotationsValueGroup(this))
 
@@ -72,11 +92,11 @@ internal object FlyEnderpearl : Mode("Enderpearl") {
         }
 
         if (shouldFly) { // Fly after setback/pearl land
-            player.deltaMovement = player.deltaMovement.withStrafe(speed = speed.toDouble())
+            player.deltaMovement = player.deltaMovement.withFlyAutomationStrafe(player, speed.toDouble())
 
             player.deltaMovement.y = when {
-                mc.options.keyJump.isDown -> speed.toDouble()
-                mc.options.keyShift.isDown -> -speed.toDouble()
+                flyAutomationJump(mc.options.keyJump.isDown) -> speed.toDouble()
+                flyAutomationSneak(mc.options.keyShift.isDown) -> -speed.toDouble()
                 else -> 0.0
             }
 
@@ -90,7 +110,7 @@ internal object FlyEnderpearl : Mode("Enderpearl") {
 
         if (player.xRot <= 80) {
             RotationManager.setRotationTarget(
-                Rotation(player.yRot, (80f..90f).random()),
+                Rotation(flyAutomationYaw(player.yRot), (80f..90f).random()),
                 valueGroup = rotations,
                 provider = ModuleFastUse,
                 priority = Priority.IMPORTANT_FOR_USAGE_2
@@ -100,7 +120,7 @@ internal object FlyEnderpearl : Mode("Enderpearl") {
         waitTicks(2)
         SilentHotbar.selectSlotSilently(this, slot, 1)
         interaction.startPrediction(world) { sequence ->
-            ServerboundUseItemPacket(slot.useHand, sequence, player.yRot, player.xRot)
+            ServerboundUseItemPacket(slot.useHand, sequence, flyAutomationYaw(player.yRot), player.xRot)
         }
 
         threwPearl = true

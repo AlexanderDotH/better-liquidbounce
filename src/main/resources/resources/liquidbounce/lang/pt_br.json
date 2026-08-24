@@ -1018,5 +1018,7 @@
   "liquidbounce.module.derp.pitch.offset.extendedDescription": "Adiciona deslocamento ao tom atual a cada tick.\nOscilação vertical relativa.\nResultado das pinças SafePitch.\nCombine com rotação de guinada para o caos total.",
   "liquidbounce.module.derp.pitch.random.extendedDescription": "Lance aleatoriamente cada tick dentro da faixa segura ou completa.\nLimites do SafePitch para -90..90.\nNotDuringSprint pula durante a corrida, se habilitado.\nDerp vertical extremamente óbvio.",
   "liquidbounce.module.handDerp.mode.delay.extendedDescription": "Troca a mão principal/desligada a cada tique do Delay.\nUsa pacote de configurações do cliente para trocar de mão.\nO modo silencioso oculta pacotes de sincronização manual do servidor.\nRedefine para a mão original ao desativar.",
-  "liquidbounce.module.handDerp.mode.swing.extendedDescription": "Troca de mão em cada pacote swing enviado.\nAlternância mais rápida que o modo de atraso.\nFunciona com combate ao spam.\nSilencioso cancela os dados da entidade recebida."
+  "liquidbounce.module.handDerp.mode.swing.extendedDescription": "Troca de mão em cada pacote swing enviado.\nAlternância mais rápida que o modo de atraso.\nFunciona com combate ao spam.\nSilencioso cancela os dados da entidade recebida.",
+  "liquidbounce.command.baritone.description": "Controls Baritone navigation and opens its dashboard.",
+  "liquidbounce.module.baritone.description": "Integrates Baritone pathfinding with LiquidBounce controls and dashboard."
 }

@@ -29,6 +29,12 @@ import net.ccbluex.liquidbounce.event.waitTicks
 import net.ccbluex.liquidbounce.features.blink.BlinkManager
 import net.ccbluex.liquidbounce.features.module.modules.movement.fly.ModuleFly
 import net.ccbluex.liquidbounce.features.module.modules.movement.fly.ModuleFly.modes
+import net.ccbluex.liquidbounce.features.module.modules.movement.fly.automation.FlyAutomationCapabilities
+import net.ccbluex.liquidbounce.features.module.modules.movement.fly.automation.FlyAutomationEnd
+import net.ccbluex.liquidbounce.features.module.modules.movement.fly.automation.FlyAutomationKind
+import net.ccbluex.liquidbounce.features.module.modules.movement.fly.automation.FlyAutomationProfile
+import net.ccbluex.liquidbounce.features.module.modules.movement.fly.automation.FlyAutomationReadiness
+import net.ccbluex.liquidbounce.features.module.modules.movement.fly.modes.FlyAutomaticEndSignal
 import net.ccbluex.liquidbounce.utils.network.handlePacket
 import net.minecraft.network.protocol.common.ClientboundPingPacket
 import net.minecraft.network.protocol.game.ClientboundDamageEventPacket
@@ -41,7 +47,7 @@ import net.minecraft.network.protocol.game.ClientboundSetEntityMotionPacket
  *
  * @note Tested in Bedwars, Skywars. Pretty much flagless
  */
-internal object FlyHycraftDamage : Mode("HycraftDamage") {
+internal object FlyHycraftDamage : Mode("HycraftDamage"), FlyAutomationProfile {
 
     override val parent: ModeValueGroup<*>
         get() = modes
@@ -49,11 +55,29 @@ internal object FlyHycraftDamage : Mode("HycraftDamage") {
     private var damageTaken = false
     private var release = false
     private var ticks = 0
+    private val automaticEnd = FlyAutomaticEndSignal()
+
+    override val automationCapabilities = FlyAutomationCapabilities(
+        horizontal = true,
+        ascend = true,
+        descend = false,
+        landing = false,
+        kind = FlyAutomationKind.BURST,
+    )
+
+    override fun automationReadiness(): FlyAutomationReadiness = when {
+        release -> FlyAutomationReadiness.Ready
+        damageTaken -> FlyAutomationReadiness.Arming("Waiting for the Hycraft velocity boost")
+        else -> FlyAutomationReadiness.Arming("Waiting for damage")
+    }
+
+    override fun consumeAutomaticEnd(): FlyAutomationEnd? = automaticEnd.consume()
 
     override fun enable() {
         ticks = 0
         damageTaken = false
         release = false
+        automaticEnd.reset()
     }
 
     @Suppress("unused")
@@ -94,6 +118,7 @@ internal object FlyHycraftDamage : Mode("HycraftDamage") {
             is ClientboundPingPacket -> {
                 if (ticks <= 0) {
                     if (release) {
+                        automaticEnd.mark("Hycraft damage boost completed")
                         ModuleFly.enabled = false
                     }
                     return@handler

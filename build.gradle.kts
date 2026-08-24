@@ -42,6 +42,7 @@ base {
 
 /** Includes dependency recursively in the JAR file */
 val jij = configurations.create("jij")
+val baritoneApiFabric = "baritone.vendor:baritone-api-fabric:1.15.0-10-g2991d921"
 val seedFindingUnrelocated = configurations.create("seedFindingUnrelocated") {
     isCanBeConsumed = false
     isCanBeResolved = true
@@ -64,6 +65,14 @@ val seedFindingReferenceCoordinates = listOf(
 
 allprojects {
     repositories {
+        // Locally verified Baritone API artifact. A synthetic module coordinate is required because
+        // Loom cannot nest a raw file dependency while preserving Fabric metadata and capabilities.
+        flatDir {
+            dirs(rootProject.file("third_party/baritone"))
+            content {
+                includeGroup("baritone.vendor")
+            }
+        }
         // Produced by relocateSeedFindingJars before Loom resolves the matching include dependency.
         flatDir {
             dirs(layout.buildDirectory.dir("generated/seedcracker"))
@@ -139,6 +148,14 @@ dependencies {
     api(libs.fabric.loader)
     api(libs.fabric.api)
     api(libs.fabric.kotlin)
+
+    // Optional Distant Horizons integration. Keep the API off the runtime/JIJ path so DH remains optional.
+    compileOnly("maven.modrinth:DistantHorizonsApi:7.0.0")
+
+    // Baritone 26.2 API build pinned to upstream commit 2991d9218050707df9c8daca5efd371091a92d36.
+    // Keep it as an intact nested Fabric mod: its metadata, mixins and reflective provider must not be relocated.
+    compileOnly(baritoneApiFabric)
+    include(baritoneApiFabric)
 
     // Mod menu
     api(libs.modmenu)
@@ -226,6 +243,8 @@ dependencies {
     testImplementation(kotlin("test"))
     testImplementation(libs.fabric.loader.junit)
     testImplementation(libs.kotlinx.coroutines.test)
+    testImplementation("io.ktor:ktor-server-test-host:${libs.versions.ktor.get()}")
+    testImplementation(baritoneApiFabric)
 }
 
 addResolvedDependencies(jij, "compileOnly", "include", "api")
@@ -252,6 +271,15 @@ tasks.processResources {
 
     from("src-theme/dist") {
         into("resources/liquidbounce/themes/liquidbounce")
+    }
+    from("third_party/baritone/LICENSE") {
+        into("META-INF/licenses/baritone")
+    }
+    from("third_party/baritone/NOTICE.md") {
+        into("META-INF/notices/baritone")
+    }
+    from("third_party/baritone/ORIGIN.md") {
+        into("META-INF/notices/baritone")
     }
 
     val modVersion = providers.gradleProperty("mod_version")
@@ -474,6 +502,9 @@ tasks.jar {
 
 tasks.register<Copy>("copyZipInclude") {
     from("zip_include/")
+    from("third_party/baritone/baritone-1.15.0-10-g2991d921-sources.tar.gz") {
+        into("sources")
+    }
     into("build/libs/zip")
 }
 

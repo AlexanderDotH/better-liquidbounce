@@ -1009,5 +1009,7 @@
     "liquidbounce.scripts.debug.dap": "ポート %s のDAPで",
     "liquidbounce.scripts.debug.inspect.url": "クリックしてデバッガーURLをコピーし、ブラウザに貼り付けてください（残念ながらChromiumベースのブラウザのみ動作します）。",
     "liquidbounce.scripts.debug.support": "スクリプト %s はデバッガーサポートを有効にして起動するように設定されています: ",
-    "modmenu.descriptionTranslation.liquidbounce": "無料でオープンソースのハッククライアント"
+    "modmenu.descriptionTranslation.liquidbounce": "無料でオープンソースのハッククライアント",
+    "liquidbounce.command.baritone.description": "Controls Baritone navigation and opens its dashboard.",
+    "liquidbounce.module.baritone.description": "Integrates Baritone pathfinding with LiquidBounce controls and dashboard."
 }

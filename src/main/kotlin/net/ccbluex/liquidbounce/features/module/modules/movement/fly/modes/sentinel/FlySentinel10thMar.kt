@@ -27,7 +27,11 @@ import net.ccbluex.liquidbounce.event.handler
 import net.ccbluex.liquidbounce.event.tickHandler
 import net.ccbluex.liquidbounce.event.waitTicks
 import net.ccbluex.liquidbounce.features.module.modules.movement.fly.ModuleFly
-import net.ccbluex.liquidbounce.utils.entity.withStrafe
+import net.ccbluex.liquidbounce.features.module.modules.movement.fly.automation.FlyAutomationCapabilities
+import net.ccbluex.liquidbounce.features.module.modules.movement.fly.automation.FlyAutomationKind
+import net.ccbluex.liquidbounce.features.module.modules.movement.fly.automation.FlyAutomationProfile
+import net.ccbluex.liquidbounce.features.module.modules.movement.fly.automation.FlyAutomationReadiness
+import net.ccbluex.liquidbounce.features.module.modules.movement.fly.modes.withFlyAutomationStrafe
 import net.minecraft.network.protocol.game.ServerboundMovePlayerPacket
 
 /**
@@ -40,7 +44,7 @@ import net.minecraft.network.protocol.game.ServerboundMovePlayerPacket
  *
  * Thanks to icewormy3
  */
-internal object FlySentinel10thMar : Mode("Sentinel10thMar") {
+internal object FlySentinel10thMar : Mode("Sentinel10thMar"), FlyAutomationProfile {
 
     private val jumpHeight by float("Height", 0.42f, 0.1f..1f)
     private val jumpSpeed by float("Speed", 0.35f, 0.1f..1f)
@@ -48,12 +52,22 @@ internal object FlySentinel10thMar : Mode("Sentinel10thMar") {
 
     private var spoofOnGround = false
 
+    override val automationCapabilities = FlyAutomationCapabilities(
+        horizontal = true,
+        ascend = true,
+        descend = false,
+        landing = false,
+        kind = FlyAutomationKind.CONTINUOUS,
+    )
+
+    override fun automationReadiness(): FlyAutomationReadiness = FlyAutomationReadiness.Ready
+
     override val parent: ModeValueGroup<*>
         get() = ModuleFly.modes
 
     val repeatable = tickHandler {
         player.deltaMovement.y = jumpHeight.toDouble()
-        player.deltaMovement = player.deltaMovement.withStrafe(speed = jumpSpeed.toDouble())
+        player.deltaMovement = player.deltaMovement.withFlyAutomationStrafe(player, jumpSpeed.toDouble())
         spoofOnGround = true
         waitTicks(ticks)
     }

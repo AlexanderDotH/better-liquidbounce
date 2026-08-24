@@ -21,15 +21,27 @@ internal abstract class VClipTargetMode(name: String) : Mode(name) {
     final override val parent: ModeValueGroup<*>
         get() = ModuleVClip.targets
 
-    abstract fun resolve(entity: Entity, direction: VClipDirection): VClipPosition?
+    abstract fun resolve(
+        entity: Entity,
+        direction: VClipDirection,
+        doNotClipAroundBedrock: Boolean,
+    ): VClipPosition?
 }
 
 internal object VClipDistanceTarget : VClipTargetMode("Distance") {
     private val blocks by float("Blocks", 5.0F, 0.25F..20.0F, "blocks")
 
-    override fun resolve(entity: Entity, direction: VClipDirection): VClipPosition {
+    override fun resolve(
+        entity: Entity,
+        direction: VClipDirection,
+        doNotClipAroundBedrock: Boolean,
+    ): VClipPosition? {
         val position = entity.position()
         val targetY = VClipTargetPlanner.distanceTargetY(position.y, direction, blocks.toDouble())
+        if (VClipLandingPositionResolver.isBedrockPathBlocked(entity, targetY, doNotClipAroundBedrock)) {
+            return null
+        }
+
         return VClipPosition(position.x, targetY, position.z)
     }
 }
@@ -43,14 +55,16 @@ internal object VClipSmartTarget : VClipTargetMode("Smart") {
         tree(ScanDistance)
     }
 
-    private val doNotClipAroundBedrock by boolean("DoNotClipAroundBedrock", true)
-
     override fun prepareDeserialize(jsonObject: JsonObject) {
         super.prepareDeserialize(jsonObject)
         migrateLegacyVClipSmartScanDistance(jsonObject)
     }
 
-    override fun resolve(entity: Entity, direction: VClipDirection) =
+    override fun resolve(
+        entity: Entity,
+        direction: VClipDirection,
+        doNotClipAroundBedrock: Boolean,
+    ) =
         VClipLandingPositionResolver.resolve(
             entity = entity,
             direction = direction,

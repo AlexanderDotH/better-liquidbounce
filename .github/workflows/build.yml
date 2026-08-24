@@ -96,11 +96,30 @@ jobs:
         uses: gradle/actions/setup-gradle@v6
         with:
           cache-read-only: ${{ github.ref != 'refs/heads/nextgen' }}
+      - name: Verify pinned Baritone vendor bundle
+        run: scripts/verify-baritone-vendor.sh
       - name: Build
         env:
           CI: true
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: ./gradlew build -x test -x detekt
+      - name: Verify nested Baritone release artifact
+        run: |
+          set -euo pipefail
+          JAR=$(find build/libs -maxdepth 1 -type f -name 'liquidbounce-[0-9.]*.jar' \
+            ! -name '*-sources.jar' -print -quit)
+          test -n "$JAR"
+          scripts/verify-baritone-vendor.sh "$JAR"
+      - name: Enforce Baritone third-party release license gate
+        if: github.repository == 'CCBlueX/LiquidBounce'
+        env:
+          BARITONE_ENFORCE_LICENSE: 1
+        run: |
+          set -euo pipefail
+          JAR=$(find build/libs -maxdepth 1 -type f -name 'liquidbounce-[0-9.]*.jar' \
+            ! -name '*-sources.jar' -print -quit)
+          test -n "$JAR"
+          scripts/verify-baritone-vendor.sh "$JAR"
       - name: Upload artifact
         if: github.repository == 'CCBlueX/LiquidBounce'
         env:
@@ -169,10 +188,19 @@ jobs:
         uses: gradle/actions/setup-gradle@v6
         with:
           cache-read-only: ${{ github.ref != 'refs/heads/nextgen' }}
+      - name: Verify pinned Baritone vendor bundle
+        run: scripts/verify-baritone-vendor.sh
       - name: Build
         env:
           CI: true
         run: ./gradlew build
+      - name: Verify nested Baritone release artifact
+        run: |
+          set -euo pipefail
+          JAR=$(find build/libs -maxdepth 1 -type f -name 'liquidbounce-[0-9.]*.jar' \
+            ! -name '*-sources.jar' -print -quit)
+          test -n "$JAR"
+          scripts/verify-baritone-vendor.sh "$JAR"
       - name: Upload SARIF to GitHub using the upload-sarif action
         uses: github/codeql-action/upload-sarif@v4
         if: success() || failure()

@@ -64,3 +64,29 @@ embedded in this release.
 
 - <https://github.com/19MisterX98/Nether_Bedrock_Cracker>
 - <https://github.com/19MisterX98/Nether_Bedrock_Cracker/blob/gui/LICENSE>
+
+## Baritone 26.2
+
+The release embeds the unmodified Baritone API-Fabric artifact built from
+commit `2991d9218050707df9c8daca5efd371091a92d36` as an intact nested Fabric
+mod. Its API remains in the `baritone.api` namespace; its implementation,
+provider metadata and mixins are neither flattened nor relocated.
+
+- Artifact: `baritone-api-fabric-1.15.0-10-g2991d921.jar`
+- SHA-256: `ab779fd74cb995b89b0979e71adb0a1a839ff2d9a1b59d0813dab7a71759509f`
+- Source: <https://github.com/cabaletta/baritone/tree/2991d9218050707df9c8daca5efd371091a92d36>
+- License: GNU Lesser General Public License 3.0 or later
+
+The matching deterministic source archive is shipped under `sources/` in the
+LiquidBounce distribution. The release JAR also includes Baritone's license,
+origin and source-offer documents below `META-INF/licenses/baritone/` and
+`META-INF/notices/baritone/`.
+
+### Unresolved nested dependency license
+
+Baritone's official Fabric artifact itself nests `dev.babbaj:nether-pathfinder:1.6`.
+Its upstream repository and published POM do not currently declare a license.
+This notice records that unresolved provenance instead of treating Baritone's
+LGPL as a license grant for the separate dependency. Public redistribution
+remains gated on an explicit license/permission clarification or replacement
+of that dependency.

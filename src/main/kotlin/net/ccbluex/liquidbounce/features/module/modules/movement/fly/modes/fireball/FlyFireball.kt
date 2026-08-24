@@ -22,6 +22,12 @@ package net.ccbluex.liquidbounce.features.module.modules.movement.fly.modes.fire
 import net.ccbluex.liquidbounce.config.types.group.Mode
 import net.ccbluex.liquidbounce.config.types.group.ModeValueGroup
 import net.ccbluex.liquidbounce.features.module.modules.movement.fly.ModuleFly
+import net.ccbluex.liquidbounce.features.module.modules.movement.fly.automation.FlyAutomationCapabilities
+import net.ccbluex.liquidbounce.features.module.modules.movement.fly.automation.FlyAutomationEnd
+import net.ccbluex.liquidbounce.features.module.modules.movement.fly.automation.FlyAutomationKind
+import net.ccbluex.liquidbounce.features.module.modules.movement.fly.automation.FlyAutomationProfile
+import net.ccbluex.liquidbounce.features.module.modules.movement.fly.automation.FlyAutomationReadiness
+import net.ccbluex.liquidbounce.features.module.modules.movement.fly.modes.FlyAutomaticEndSignal
 import net.ccbluex.liquidbounce.features.module.modules.movement.fly.modes.fireball.techniques.FlyFireballCustomTechnique
 import net.ccbluex.liquidbounce.features.module.modules.movement.fly.modes.fireball.techniques.FlyFireballLegitTechnique
 import net.ccbluex.liquidbounce.features.module.modules.movement.fly.modes.fireball.trigger.FlyFireballInstantTrigger
@@ -31,7 +37,7 @@ import net.ccbluex.liquidbounce.utils.inventory.Slots
 import net.ccbluex.liquidbounce.utils.inventory.useHotbarSlotOrOffhand
 import net.minecraft.world.item.Items
 
-internal object FlyFireball : Mode("Fireball") {
+internal object FlyFireball : Mode("Fireball"), FlyAutomationProfile {
 
     override val parent: ModeValueGroup<*>
         get() = ModuleFly.modes
@@ -46,6 +52,35 @@ internal object FlyFireball : Mode("Fireball") {
     val slotResetDelay by intRange("SlotResetDelay", 4..6, 0..40, "ticks")
 
     var wasTriggered = false
+
+    private val automaticEnd = FlyAutomaticEndSignal()
+
+    override val automationCapabilities = FlyAutomationCapabilities(
+        horizontal = true,
+        ascend = true,
+        descend = false,
+        landing = false,
+        kind = FlyAutomationKind.BURST,
+        resource = "Fire Charge",
+    )
+
+    override fun automationReadiness(): FlyAutomationReadiness = when {
+        findFireballSlot() == null -> FlyAutomationReadiness.Unavailable("No fire charge is available")
+        wasTriggered -> FlyAutomationReadiness.Ready
+        else -> FlyAutomationReadiness.Arming("Waiting for the configured fireball trigger")
+    }
+
+    override fun consumeAutomaticEnd(): FlyAutomationEnd? = automaticEnd.consume()
+
+    override fun enable() {
+        automaticEnd.reset()
+        wasTriggered = false
+        super.enable()
+    }
+
+    internal fun markAutomaticEnd() {
+        automaticEnd.mark("Fireball launch completed")
+    }
 
     private fun findFireballSlot(): HotbarItemSlot? = Slots.OffhandWithHotbar.findSlot(Items.FIRE_CHARGE)
 

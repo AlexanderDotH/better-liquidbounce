@@ -1,8 +1,17 @@
 import {listen} from "../../../../integration/ws";
 import type {KeyboardCharEvent, KeyboardKeyEvent, VirtualScreenEvent} from "../../../../integration/events";
 import type {Screen} from "../../../../integration/types";
-import {getClipboardText, setTyping} from "../../../../integration/rest";
+import {getClipboardText, setClipboardText, setTyping} from "../../../../integration/rest";
 import {isClickGuiScreen} from "../../../../util/utils";
+import {
+    copyTextSelection,
+    cutTextSelection,
+    deleteTextBackward,
+    deleteTextForward,
+    pasteTextSelection,
+    type TextEdit,
+    type TextSelection,
+} from "./textEditing";
 
 const GLFW_PRESS = 1;
 const GLFW_REPEAT = 2;
@@ -15,7 +24,9 @@ const KEY_LEFT = 263;
 const KEY_RIGHT = 262;
 const KEY_HOME = 268;
 const KEY_END = 269;
+const KEY_C = 67;
 const KEY_V = 86;
+const KEY_X = 88;
 const KEY_A = 65;
 
 export type CefTextInputOptions = {
@@ -51,48 +62,18 @@ function isActiveKeyboardScreen(screen: Screen | undefined, options: CefTextInpu
     return options.isActiveScreen?.(screen) === true || isClickGuiScreen(screen) || isCustomVirtualScreen(screen, options);
 }
 
-function replaceSelection(input: HTMLInputElement, text: string): string {
-    const start = input.selectionStart ?? input.value.length;
-    const end = input.selectionEnd ?? input.value.length;
-    const newValue = input.value.slice(0, start) + text + input.value.slice(end);
-    const cursor = start + text.length;
-    input.value = newValue;
-    input.setSelectionRange(cursor, cursor);
-    return newValue;
+function readSelection(input: HTMLInputElement): TextSelection {
+    const fallback = input.value.length;
+    return {
+        start: input.selectionStart ?? fallback,
+        end: input.selectionEnd ?? fallback,
+    };
 }
 
-function deleteBackspace(input: HTMLInputElement): string {
-    const start = input.selectionStart ?? 0;
-    const end = input.selectionEnd ?? 0;
-
-    if (start !== end) {
-        return replaceSelection(input, "");
-    }
-
-    if (start === 0) {
-        return input.value;
-    }
-
-    input.value = input.value.slice(0, start - 1) + input.value.slice(start);
-    input.setSelectionRange(start - 1, start - 1);
-    return input.value;
-}
-
-function deleteForward(input: HTMLInputElement): string {
-    const start = input.selectionStart ?? 0;
-    const end = input.selectionEnd ?? 0;
-
-    if (start !== end) {
-        return replaceSelection(input, "");
-    }
-
-    if (start >= input.value.length) {
-        return input.value;
-    }
-
-    input.value = input.value.slice(0, start) + input.value.slice(start + 1);
-    input.setSelectionRange(start, start);
-    return input.value;
+function restoreSelection(input: HTMLInputElement, selection: TextSelection) {
+    const start = Math.max(0, Math.min(input.value.length, selection.start));
+    const end = Math.max(start, Math.min(input.value.length, selection.end));
+    input.setSelectionRange(start, end);
 }
 
 function moveCursor(input: HTMLInputElement, delta: number) {
@@ -111,35 +92,56 @@ function shortcutModifier(mods: number) {
 export function cefTextInput(node: HTMLInputElement, options: CefTextInputOptions) {
     let focused = false;
     let screenActive = false;
+    let focusRevision = 0;
 
-    function syncDisplay() {
+    function syncDisplay(selection?: TextSelection) {
         node.value = options.getValue() ?? "";
+        if (selection !== undefined && focused) {
+            restoreSelection(node, selection);
+        }
     }
 
-    function commit(value: string) {
-        options.onChange(value);
-        syncDisplay();
+    function commit(edit: TextEdit) {
+        options.onChange(edit.value);
+        syncDisplay(edit.selection);
     }
 
     function releaseFocus() {
-        if (!focused) {
+        if (!focused && document.activeElement !== node) {
             return;
         }
 
         focused = false;
-        node.blur();
+        focusRevision += 1;
+        if (document.activeElement === node) {
+            node.blur();
+        }
         void setTyping(false);
     }
 
     function handleFocusIn() {
         focused = true;
+        focusRevision += 1;
         syncDisplay();
         void setTyping(true);
     }
 
     function handleFocusOut() {
+        if (!focused) {
+            return;
+        }
+
         focused = false;
+        focusRevision += 1;
         void setTyping(false);
+    }
+
+    function handlePointerDown(event: PointerEvent) {
+        if (event.composedPath().includes(node)) {
+            return;
+        }
+
+        releaseFocus();
     }
 
     listen("virtualScreen", (event: VirtualScreenEvent) => {
@@ -166,13 +168,11 @@ export function cefTextInput(node: HTMLInputElement, options: CefTextInputOption
             return;
         }
 
-        commit(replaceSelection(node, char));
+        commit(pasteTextSelection(node.value, readSelection(node), char));
     });
 
     listen("keyboardKey", async (event: KeyboardKeyEvent) => {
-        if (event.screen !== undefined) {
-            screenActive = isActiveKeyboardScreen(event.screen, options);
-        }
+        screenActive = isActiveKeyboardScreen(event.screen, options);
 
         if (!screenActive) {
             releaseFocus();
@@ -189,10 +189,34 @@ export function cefTextInput(node: HTMLInputElement, options: CefTextInputOption
 
         const shortcut = shortcutModifier(event.mods);
 
+        if (shortcut && event.keyCode === KEY_C) {
+            const {clipboardText} = copyTextSelection(node.value, readSelection(node));
+            if (clipboardText) {
+                await setClipboardText(clipboardText);
+            }
+            return;
+        }
+
+        if (shortcut && event.keyCode === KEY_X) {
+            const edit = cutTextSelection(node.value, readSelection(node));
+            if (edit.clipboardText) {
+                commit(edit);
+                await setClipboardText(edit.clipboardText);
+            }
+            return;
+        }
+
         if (shortcut && event.keyCode === KEY_V) {
+            const requestedForFocusRevision = focusRevision;
             const text = await getClipboardText();
-            if (text) {
-                commit(replaceSelection(node, text));
+            if (
+                text
+                && focused
+                && document.activeElement === node
+                && screenActive
+                && requestedForFocusRevision === focusRevision
+            ) {
+                commit(pasteTextSelection(node.value, readSelection(node), text));
             }
             return;
         }
@@ -204,10 +228,10 @@ export function cefTextInput(node: HTMLInputElement, options: CefTextInputOption
 
         switch (event.keyCode) {
             case KEY_BACKSPACE:
-                commit(deleteBackspace(node));
+                commit(deleteTextBackward(node.value, readSelection(node)));
                 break;
             case KEY_DELETE:
-                commit(deleteForward(node));
+                commit(deleteTextForward(node.value, readSelection(node)));
                 break;
             case KEY_LEFT:
                 moveCursor(node, -1);
@@ -226,6 +250,8 @@ export function cefTextInput(node: HTMLInputElement, options: CefTextInputOption
 
     node.addEventListener("focusin", handleFocusIn);
     node.addEventListener("focusout", handleFocusOut);
+    document.addEventListener("pointerdown", handlePointerDown, true);
+    window.addEventListener("blur", releaseFocus);
     syncDisplay();
 
     return {
@@ -236,6 +262,8 @@ export function cefTextInput(node: HTMLInputElement, options: CefTextInputOption
         destroy() {
             node.removeEventListener("focusin", handleFocusIn);
             node.removeEventListener("focusout", handleFocusOut);
+            document.removeEventListener("pointerdown", handlePointerDown, true);
+            window.removeEventListener("blur", releaseFocus);
             releaseFocus();
         },
     };

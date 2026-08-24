@@ -23,140 +23,127 @@ class VClipTargetPlannerTest {
     }
 
     @Test
-    fun `smart up selects the first valid support surface above the player`() {
-        val visitedSupports = mutableListOf<Int>()
+    fun `smart down starts at the exact player Y and selects the nearest free pocket`() {
+        val inspectedSegments = mutableListOf<Pair<Double, Double>>()
 
         val targetY = VClipTargetPlanner.smartTargetY(
             scan = scan(
-                startBlockY = 64,
+                currentY = 70.75,
+                direction = VClipDirection.DOWN,
+                scanStep = 0.25,
+            ),
+            hasBlockCollisionBetween = { fromY, toY ->
+                inspectedSegments += fromY to toY
+                fromY > 67.75 && toY < 70.0
+            },
+            hasAnyCollisionAt = { candidateY -> candidateY > 67.75 && candidateY < 70.0 },
+        )
+
+        assertEquals(70.75 to 70.5, inspectedSegments.first())
+        assertEquals(67.75, targetY)
+    }
+
+    @Test
+    fun `smart up starts at the exact player Y and selects the nearest free pocket`() {
+        val inspectedSegments = mutableListOf<Pair<Double, Double>>()
+
+        val targetY = VClipTargetPlanner.smartTargetY(
+            scan = scan(
                 currentY = 64.25,
                 direction = VClipDirection.UP,
-                maxDistance = 10,
+                scanStep = 0.25,
             ),
-        ) { supportY ->
-            visitedSupports += supportY
-            if (supportY == 67) 0.5 else null
-        }
+            hasBlockCollisionBetween = { fromY, toY ->
+                inspectedSegments += fromY to toY
+                fromY < 67.25 && toY > 65.0
+            },
+            hasAnyCollisionAt = { candidateY -> candidateY > 65.0 && candidateY < 67.25 },
+        )
 
-        assertEquals(listOf(65, 66, 67), visitedSupports)
-        assertEquals(67.5, targetY)
+        assertEquals(64.25 to 64.5, inspectedSegments.first())
+        assertEquals(67.25, targetY)
     }
 
     @Test
-    fun `smart down skips the support directly beneath the current feet`() {
-        val visitedSupports = mutableListOf<Int>()
+    fun `smart target does not move through open air before crossing a block`() {
+        assertNull(
+            VClipTargetPlanner.smartTargetY(
+                scan = scan(maxDistance = 3),
+                hasBlockCollisionBetween = { _, _ -> false },
+                hasAnyCollisionAt = { false },
+            ),
+        )
+    }
+
+    @Test
+    fun `enabled scan distance is measured outward from the player position`() {
+        val inspectedCandidates = mutableListOf<Double>()
+
+        assertNull(
+            VClipTargetPlanner.smartTargetY(
+                scan = scan(currentY = 64.5, maxDistance = 1, scanStep = 0.25),
+                hasBlockCollisionBetween = { _, _ -> true },
+                hasAnyCollisionAt = { candidateY ->
+                    inspectedCandidates += candidateY
+                    true
+                },
+            ),
+        )
+
+        assertEquals(listOf(64.75, 65.0, 65.25, 65.5), inspectedCandidates)
+    }
+
+    @Test
+    fun `disabled scan distance still starts downward at the player instead of the world minimum`() {
+        val inspectedSegments = mutableListOf<Pair<Double, Double>>()
 
         val targetY = VClipTargetPlanner.smartTargetY(
             scan = scan(
-                startBlockY = 70,
-                currentY = 70.0,
-                direction = VClipDirection.DOWN,
-                maxDistance = 10,
-            ),
-        ) { supportY ->
-            visitedSupports += supportY
-            if (supportY == 68) 1.0 else null
-        }
-
-        assertEquals(listOf(68), visitedSupports)
-        assertEquals(69.0, targetY)
-    }
-
-    @Test
-    fun `smart target returns no position when the scan finds no landing`() {
-        assertNull(VClipTargetPlanner.smartTargetY(scan(maxDistance = 3)) { null })
-    }
-
-    @Test
-    fun `disabled scan distance searches upward through the dimension build height`() {
-        val visitedSupports = mutableListOf<Int>()
-
-        val targetY = VClipTargetPlanner.smartTargetY(
-            scan = scan(maxDistance = null),
-        ) { supportY ->
-            visitedSupports += supportY
-            if (supportY == 318) 0.5 else null
-        }
-
-        assertEquals(65, visitedSupports.first())
-        assertEquals(318, visitedSupports.last())
-        assertEquals(318.5, targetY)
-    }
-
-    @Test
-    fun `disabled scan distance searches downward through the dimension build height`() {
-        val visitedSupports = mutableListOf<Int>()
-
-        val targetY = VClipTargetPlanner.smartTargetY(
-            scan = scan(
-                startBlockY = 70,
                 currentY = 70.0,
                 direction = VClipDirection.DOWN,
                 maxDistance = null,
+                scanStep = 1.0,
             ),
-        ) { supportY ->
-            visitedSupports += supportY
-            if (supportY == -64) 1.0 else null
-        }
-
-        assertEquals(68, visitedSupports.first())
-        assertEquals(-64, visitedSupports.last())
-        assertEquals(-63.0, targetY)
-    }
-
-    @Test
-    fun `enabled scan distance still limits the number of inspected support blocks`() {
-        val visitedSupports = mutableListOf<Int>()
-
-        assertNull(
-            VClipTargetPlanner.smartTargetY(scan(maxDistance = 3)) { supportY ->
-                visitedSupports += supportY
-                null
+            hasBlockCollisionBetween = { fromY, toY ->
+                inspectedSegments += fromY to toY
+                fromY <= 69.0 && toY >= 67.0
             },
+            hasAnyCollisionAt = { candidateY -> candidateY in 67.0..69.0 },
         )
 
-        assertEquals(listOf(65, 66, 67), visitedSupports)
+        assertEquals(70.0 to 69.0, inspectedSegments.first())
+        assertEquals(66.0, targetY)
     }
 
     @Test
-    fun `bedrock barrier stops a full-height scan before positions beyond it`() {
-        val inspectedSurfaces = mutableListOf<Int>()
-
+    fun `smart refines after a floor collision so a fractional nearby pocket is not skipped`() {
         val targetY = VClipTargetPlanner.smartTargetY(
-            scan = scan(startBlockY = 124, currentY = 124.0, maxDistance = null),
-            isBarrierAt = { supportY -> supportY == 127 },
-        ) { supportY ->
-            inspectedSurfaces += supportY
-            if (supportY == 129) 1.0 else null
-        }
+            scan = scan(
+                currentY = 70.24,
+                direction = VClipDirection.DOWN,
+                scanStep = 0.25,
+                collisionRefinementStep = 0.05,
+            ),
+            hasBlockCollisionBetween = { fromY, toY -> fromY > 67.19 && toY < 69.95 },
+            hasAnyCollisionAt = { candidateY -> candidateY > 67.19 && candidateY < 69.95 },
+        )
 
-        assertNull(targetY)
-        assertEquals(listOf(125, 126), inspectedSurfaces)
-    }
-
-    @Test
-    fun `disabled bedrock protection allows the scan to find a surface beyond bedrock`() {
-        val targetY = VClipTargetPlanner.smartTargetY(
-            scan = scan(startBlockY = 124, currentY = 124.0, maxDistance = null),
-            isBarrierAt = { false },
-        ) { supportY ->
-            if (supportY == 129) 1.0 else null
-        }
-
-        assertEquals(130.0, targetY)
+        assertEquals(67.19, targetY!!, 1.0E-9)
     }
 
     private fun scan(
-        startBlockY: Int = 64,
         currentY: Double = 64.0,
         direction: VClipDirection = VClipDirection.UP,
         maxDistance: Int? = 10,
+        scanStep: Double = 0.25,
+        collisionRefinementStep: Double = scanStep,
     ) = VClipSmartScan(
-        startBlockY = startBlockY,
         currentY = currentY,
         direction = direction,
         minBuildY = -64,
         maxBuildY = 319,
         maxDistance = maxDistance,
+        scanStep = scanStep,
+        collisionRefinementStep = collisionRefinementStep,
     )
 }

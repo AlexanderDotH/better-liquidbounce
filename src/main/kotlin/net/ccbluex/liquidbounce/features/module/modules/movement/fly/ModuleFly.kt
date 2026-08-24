@@ -18,12 +18,17 @@
  */
 package net.ccbluex.liquidbounce.features.module.modules.movement.fly
 
+import net.ccbluex.liquidbounce.config.types.group.Mode
 import net.ccbluex.liquidbounce.config.types.group.ToggleableValueGroup
+import net.ccbluex.liquidbounce.event.events.MovementInputEvent
 import net.ccbluex.liquidbounce.event.events.PacketEvent
 import net.ccbluex.liquidbounce.event.events.PlayerStrideEvent
+import net.ccbluex.liquidbounce.event.events.SprintEvent
 import net.ccbluex.liquidbounce.event.handler
 import net.ccbluex.liquidbounce.features.module.ClientModule
 import net.ccbluex.liquidbounce.features.module.ModuleCategories
+import net.ccbluex.liquidbounce.features.module.modules.movement.fly.automation.FlyAutomation
+import net.ccbluex.liquidbounce.features.module.modules.movement.fly.automation.FlyAutomationInput
 import net.ccbluex.liquidbounce.features.module.modules.movement.fly.modes.FlyAirWalk
 import net.ccbluex.liquidbounce.features.module.modules.movement.fly.modes.FlyCreative
 import net.ccbluex.liquidbounce.features.module.modules.movement.fly.modes.FlyEnderpearl
@@ -59,6 +64,8 @@ import net.ccbluex.liquidbounce.features.module.modules.movement.fly.modes.vulca
 import net.ccbluex.liquidbounce.features.module.modules.movement.fly.modes.vulcan.FlyVulcan286Teleport
 import net.ccbluex.liquidbounce.utils.client.chat
 import net.ccbluex.liquidbounce.utils.client.markAsError
+import net.ccbluex.liquidbounce.utils.kotlin.EventPriorityConvention.FINAL_DECISION
+import net.ccbluex.liquidbounce.utils.movement.DirectionalInput
 import net.minecraft.network.protocol.game.ClientboundPlayerAbilitiesPacket
 import net.minecraft.network.protocol.game.ClientboundPlayerPositionPacket
 
@@ -70,7 +77,10 @@ import net.minecraft.network.protocol.game.ClientboundPlayerPositionPacket
 
 object ModuleFly : ClientModule("Fly", ModuleCategories.MOVEMENT, aliases = listOf("Glide", "Jetpack")) {
 
-    internal val modes = choices(
+    override val running: Boolean
+        get() = super.running && !FlyAutomation.runtimeSuspended
+
+    internal val modes = choices<Mode>(
         "Mode", FlyVanilla, arrayOf(
             // Generic fly modes
             FlyVanilla,
@@ -116,7 +126,10 @@ object ModuleFly : ClientModule("Fly", ModuleCategories.MOVEMENT, aliases = list
 
             FlyHycraftDamage
         )
-    ).apply { tagBy(this) }
+    ).apply {
+        tagBy(this)
+        onChanged { FlyAutomation.onSelectedModeChanged(activeMode.name) }
+    }
 
     private object Visuals : ToggleableValueGroup(this, "Visuals", true) {
 
@@ -143,10 +156,28 @@ object ModuleFly : ClientModule("Fly", ModuleCategories.MOVEMENT, aliases = list
     override fun onEnabled() {
         wasFlyingAllowed = player.abilities.mayfly
         player.abilities.mayfly = false
+        FlyAutomation.onModuleStateChanged(enabled = true)
     }
 
     override fun onDisabled() {
+        FlyAutomation.onModuleStateChanged(enabled = false)
         player.abilities.mayfly = wasFlyingAllowed
+    }
+
+    @Suppress("unused")
+    private val automationInputHandler = handler<MovementInputEvent>(priority = FINAL_DECISION) { event ->
+        if (FlyAutomation.activeIntent() == null) return@handler
+
+        val physical = DirectionalInput(mc.options)
+        event.directionalInput = FlyAutomationInput.directional(physical)
+        event.jump = FlyAutomationInput.jump(mc.options.keyJump.isDown)
+        event.sneak = FlyAutomationInput.sneak(mc.options.keyShift.isDown)
+    }
+
+    @Suppress("unused")
+    private val automationSprintHandler = handler<SprintEvent>(priority = FINAL_DECISION) { event ->
+        if (FlyAutomation.activeIntent() == null) return@handler
+        event.sprint = FlyAutomationInput.sprint(mc.options.keySprint.isDown)
     }
 
     @Suppress("unused")
@@ -154,6 +185,7 @@ object ModuleFly : ClientModule("Fly", ModuleCategories.MOVEMENT, aliases = list
         // Setback detection
         if (disableOnSetback && event.packet is ClientboundPlayerPositionPacket) {
             chat(markAsError(message("setbackDetected")))
+            FlyAutomation.markAutomaticEnd("Fly disabled after a server setback")
             enabled = false
         }
 

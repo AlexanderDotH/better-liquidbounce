@@ -30,6 +30,7 @@ import net.ccbluex.liquidbounce.event.tickUntil
 import net.ccbluex.liquidbounce.event.waitTicks
 import net.ccbluex.liquidbounce.features.module.modules.movement.fly.ModuleFly
 import net.ccbluex.liquidbounce.features.module.modules.movement.fly.modes.fireball.FlyFireball
+import net.ccbluex.liquidbounce.features.module.modules.movement.fly.modes.flyAutomationYaw
 import net.ccbluex.liquidbounce.utils.aiming.RotationManager
 import net.ccbluex.liquidbounce.utils.aiming.RotationsValueGroup
 import net.ccbluex.liquidbounce.utils.aiming.data.Rotation
@@ -66,7 +67,14 @@ object FlyFireballLegitTechnique : Mode("Legit") {
     @Suppress("unused")
     private val rotationUpdateHandler = handler<RotationUpdateEvent> {
         RotationManager.setRotationTarget(
-            Rotation(if (Rotations.backwards) this.invertYaw(player.yRot) else player.yRot, Rotations.pitch),
+            Rotation(
+                if (Rotations.backwards) {
+                    invertYaw(flyAutomationYaw(player.yRot))
+                } else {
+                    flyAutomationYaw(player.yRot)
+                },
+                Rotations.pitch,
+            ),
             valueGroup = Rotations,
             priority = Priority.IMPORTANT_FOR_PLAYER_LIFE,
             provider = ModuleFly
@@ -106,6 +114,7 @@ object FlyFireballLegitTechnique : Mode("Legit") {
                 player.isSprinting = true
             }
 
+            FlyFireball.markAutomaticEnd()
             ModuleFly.enabled = false // Disable after the fireball was thrown
             canMove = true
             FlyFireball.wasTriggered = false

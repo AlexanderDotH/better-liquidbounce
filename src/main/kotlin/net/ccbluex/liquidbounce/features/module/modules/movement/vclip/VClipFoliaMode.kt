@@ -10,52 +10,65 @@
  */
 package net.ccbluex.liquidbounce.features.module.modules.movement.vclip
 
-import net.ccbluex.liquidbounce.features.module.modules.player.nofall.ModuleNoFall
 import net.ccbluex.liquidbounce.utils.network.sendPacketSilently
-import net.minecraft.network.protocol.game.ServerboundMoveVehiclePacket
 import net.minecraft.world.entity.Entity
-import net.minecraft.world.phys.Vec3
 
 internal object VClipFoliaMode : VClipMovementMode("Folia") {
 
     private val movementPackets by int("MovementPackets", 5, 1..5)
     private val fullPacket by boolean("FullPacket", false)
-    private val groundMode by enumChoice("GroundMode", VClipGroundMode.CORRECT)
     private val resetMotion by boolean("ResetMotion", true)
 
-    override fun clip(entity: Entity, origin: VClipPosition, target: VClipPosition) {
-        val fallProtection = VClipFallProtectionPolicy.resolve(
-            noFallRunning = ModuleNoFall.running,
-            configuredOnGround = groundMode.resolve(entity.onGround()),
+    override fun clip(
+        entity: Entity,
+        origin: VClipPosition,
+        target: VClipPosition,
+        fallSafety: VClipFallSafetyContext,
+    ): VClipClipResult {
+        val result = VClipPacketPlanner.folia(
+            origin = origin,
+            target = target,
+            movementPackets = movementPackets,
+            fullPacket = fullPacket,
+            initialFallDistance = fallSafety.initialFallDistance,
+            safeFallDistance = fallSafety.safeFallDistance,
         )
+        val plan = (result as? VClipPacketPlanResult.Ready)?.steps
+            ?: return VClipClipResult.FALL_PROTECTION_UNAVAILABLE
+
         if (entity === player) {
-            sendPlayerClip(target, fallProtection.packetOnGround)
+            sendPlayerClip(plan)
         } else {
-            sendVehicleClip(entity, target, fallProtection.packetOnGround)
+            sendVehicleClip(entity, origin, plan)
         }
 
-        applyLocalPosition(entity, target, resetMotion, fallProtection)
+        applyLocalPosition(entity, target, resetMotion)
+        return VClipClipResult.COMPLETED
     }
 
-    private fun sendPlayerClip(target: VClipPosition, onGround: Boolean) {
-        val plan = VClipPacketPlanner.folia(target, movementPackets, fullPacket, onGround)
+    private fun sendPlayerClip(plan: List<VClipPlayerPacketStep>) {
         VClipPacketEmitter.sendPlayerPlan(
             plan,
             player.yRot,
             player.xRot,
             player.horizontalCollision,
-            ::sendPacketSilently,
-        )
+        ) { packet ->
+            sendPacketSilently(packet)
+            true
+        }
     }
 
-    private fun sendVehicleClip(entity: Entity, target: VClipPosition, onGround: Boolean) {
-        sendPacketSilently(
-            ServerboundMoveVehiclePacket(
-                Vec3(target.x, target.y, target.z),
-                entity.yRot,
-                entity.xRot,
-                onGround,
-            ),
+    private fun sendVehicleClip(
+        entity: Entity,
+        origin: VClipPosition,
+        plan: List<VClipPlayerPacketStep>,
+    ) {
+        VClipPacketEmitter.sendVehiclePlan(
+            plan = plan,
+            origin = origin,
+            yRot = entity.yRot,
+            xRot = entity.xRot,
+            sendPacket = ::sendPacketSilently,
         )
     }
 }

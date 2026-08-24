@@ -15,27 +15,39 @@ import net.ccbluex.liquidbounce.config.types.group.ModeValueGroup
 import net.ccbluex.liquidbounce.features.module.modules.movement.ModuleVClip
 import net.minecraft.world.entity.Entity
 
+internal data class VClipFallSafetyContext(
+    val initialFallDistance: Double,
+    val safeFallDistance: Double,
+)
+
+internal enum class VClipClipResult {
+    COMPLETED,
+    FALL_PROTECTION_UNAVAILABLE,
+}
+
 internal abstract class VClipMovementMode(name: String) : Mode(name) {
     final override val parent: ModeValueGroup<*>
         get() = ModuleVClip.modes
 
-    abstract fun clip(entity: Entity, origin: VClipPosition, target: VClipPosition)
+    abstract fun clip(
+        entity: Entity,
+        origin: VClipPosition,
+        target: VClipPosition,
+        fallSafety: VClipFallSafetyContext,
+    ): VClipClipResult
 
     protected fun applyLocalPosition(
         entity: Entity,
         target: VClipPosition,
         resetMotion: Boolean,
-        fallProtection: VClipFallProtection,
     ) {
         entity.absSnapTo(target.x, target.y, target.z)
         if (resetMotion) {
             entity.deltaMovement = entity.deltaMovement.multiply(0.0, 0.0, 0.0)
         }
-        if (fallProtection.resetLocalFallDistance) {
-            entity.resetFallDistance()
-            if (entity !== player) {
-                player.resetFallDistance()
-            }
+        entity.resetFallDistance()
+        if (entity !== player) {
+            player.resetFallDistance()
         }
     }
 }
