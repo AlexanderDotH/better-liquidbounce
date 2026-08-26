@@ -136,6 +136,38 @@ class SpearKillFallSafetyLifecycleTest {
     }
 
     @Test
+    fun `AStar defers an unsafe descent until its stabilization packet is delivered`() {
+        val firstDescent = Vec3(2.0, -2.0, 0.0)
+        val secondDescent = Vec3(2.0, -2.0, 0.0)
+        val lifecycle = lifecycleFor(listOf(firstDescent, secondDescent))
+
+        assertEquals(
+            SpearKillFallSafetyPendingStepAction.DELIVER,
+            resolveSpearKillFallSafetyPendingStepAction(
+                lifecycle.gatePendingMovement(firstDescent, physicallyNearGround = false),
+                lifecycle.shouldStabilizePendingMovement(firstDescent, physicalFallDanger = false),
+            ),
+        )
+        assertTrue(lifecycle.confirmMovement(firstDescent, delivered = true))
+
+        assertEquals(
+            SpearKillFallSafetyPendingStepAction.STABILIZE,
+            resolveSpearKillFallSafetyPendingStepAction(
+                lifecycle.gatePendingMovement(secondDescent, physicallyNearGround = false),
+                lifecycle.shouldStabilizePendingMovement(secondDescent, physicalFallDanger = false),
+            ),
+        )
+        assertTrue(lifecycle.confirmStabilization(delivered = true))
+        assertEquals(
+            SpearKillFallSafetyPendingStepAction.DELIVER,
+            resolveSpearKillFallSafetyPendingStepAction(
+                lifecycle.gatePendingMovement(secondDescent, physicallyNearGround = false),
+                lifecycle.shouldStabilizePendingMovement(secondDescent, physicalFallDanger = false),
+            ),
+        )
+    }
+
+    @Test
     fun `finish first requests grounding and resets locally only after confirmation`() {
         val lifecycle = lifecycleFor(emptyList())
 

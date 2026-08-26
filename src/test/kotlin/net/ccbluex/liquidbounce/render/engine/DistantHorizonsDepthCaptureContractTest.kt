@@ -18,18 +18,25 @@ import kotlin.test.assertTrue
 class DistantHorizonsDepthCaptureContractTest {
 
     @Test
-    fun `DH depth is copied from the public pre cleanup event`() {
+    fun `DH depth is copied while the public OpenGL texture is still active`() {
         val bridge = read(PUBLIC_EVENT_BRIDGE)
         val provider = read(DEPTH_PROVIDER)
         val config = read(MIXIN_CONFIG)
 
         assertTrue(bridge.contains("DhApiBeforeRenderCleanupEvent"))
         assertTrue(bridge.contains("onBeforeRenderCleanup"))
-        assertTrue(provider.contains("captureBeforeCleanup"))
+        assertTrue(bridge.contains("DhApiBeforeTextureClearEvent"))
+        assertTrue(bridge.contains("onBeforeTextureClear"))
+        assertTrue(provider.contains("captureAvailableDepth"))
+        assertTrue(provider.contains("fun captureCurrentFrame("))
+        assertTrue(provider.contains("completedRenderState"))
+        assertTrue(provider.contains("copy(frameToken = frameToken)"))
         assertTrue(provider.contains("capturedDepth"))
         assertTrue(provider.contains("GpuTexture.USAGE_COPY_SRC"))
         assertTrue(provider.contains("GpuTexture.USAGE_COPY_DST"))
         assertTrue(provider.contains("copyTextureToTexture"))
+        assertTrue(provider.contains("GL43C.glCopyImageSubData"))
+        assertTrue(provider.contains("captureOpenGl"))
         assertTrue(!config.contains("compat.distanthorizons.MixinDistantHorizonsDepthCapture"))
     }
 

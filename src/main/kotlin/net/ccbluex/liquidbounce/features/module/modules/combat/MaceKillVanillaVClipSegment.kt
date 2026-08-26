@@ -26,7 +26,11 @@ internal data class MaceKillVanillaVClipSegment(
         require(abs(movement.x) <= MACE_KILL_VANILLA_VCLIP_EPSILON &&
             abs(movement.z) <= MACE_KILL_VANILLA_VCLIP_EPSILON
         ) { "Vanilla VClip must be vertical" }
-        require(abs(movement.y) in MACE_KILL_VANILLA_VCLIP_EPSILON..MACE_KILL_MAX_VANILLA_VCLIP_DISTANCE) {
+        val verticalDistance = abs(movement.y)
+        require(
+            verticalDistance >= MACE_KILL_VANILLA_VCLIP_EPSILON &&
+                verticalDistance <= MACE_KILL_MAX_VANILLA_VCLIP_DISTANCE + MACE_KILL_VANILLA_VCLIP_EPSILON,
+        ) {
             "Vanilla VClip distance must stay within the 0..5 block limit"
         }
     }

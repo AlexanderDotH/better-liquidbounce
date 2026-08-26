@@ -92,7 +92,10 @@ internal data class GuiGlowFrameBatch(
     val requests: List<GuiGlowFrameRequest>,
     val style: EspGlowStyle,
     val backgroundBlurRadius: Float,
-)
+) {
+    val hasVisibleGlow: Boolean
+        get() = style.opacity > 0f && (style.intensity > 0f || style.coreSize > 0f)
+}
 
 /** Owns the CPU-side lifecycle of one GUI glow frame independently of GPU resources. */
 internal class GuiGlowFrameState {

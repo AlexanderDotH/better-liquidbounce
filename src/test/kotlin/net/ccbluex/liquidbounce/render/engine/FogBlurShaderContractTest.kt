@@ -84,12 +84,23 @@ class FogBlurShaderContractTest {
     }
 
     @Test
-    fun `fog blur releases its full resolution target and uniform ring`() {
+    fun `fog blur keeps horizontal and vertical uniforms on independent GPU rings`() {
+        val renderer = read(RENDERER)
+
+        assertTrue(renderer.contains("horizontalBlurData = createFogBlurData()"))
+        assertTrue(renderer.contains("verticalBlurData = createFogBlurData()"))
+        assertTrue(renderer.contains("horizontalBlurData.get(frame.uniform(1f / target.width, 0f))"))
+        assertTrue(renderer.contains("verticalBlurData.get(frame.uniform(0f, 1f / target.height))"))
+    }
+
+    @Test
+    fun `fog blur releases its full resolution target and both uniform rings`() {
         val renderer = read(RENDERER)
 
         assertTrue(renderer.contains("handler<ClientShutdownEvent>"))
         assertTrue(renderer.contains("intermediateTarget.close()"))
-        assertTrue(renderer.contains("blurData.close()"))
+        assertTrue(renderer.contains("horizontalBlurData.close()"))
+        assertTrue(renderer.contains("verticalBlurData.close()"))
     }
 
     private fun read(path: String): String = Files.readString(Path.of(path))

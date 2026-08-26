@@ -11,6 +11,7 @@
 package net.ccbluex.liquidbounce.features.baritone
 
 import net.ccbluex.liquidbounce.features.baritone.core.BaritoneFacade
+import net.ccbluex.liquidbounce.integration.screen.CustomScreenType
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.Assertions.assertSame
@@ -33,13 +34,13 @@ class BaritoneFeatureTest {
     }
 
     @Test
-    fun `dashboard action uses the installed screen opener`() {
-        var opened = 0
-        BaritoneFeature.useDashboardOpener { opened++ }
+    fun `dashboard action opens the Baritone Minecraft screen`() {
+        var openedScreen: CustomScreenType? = null
+        BaritoneFeature.useDashboardOpener { openedScreen = it }
 
         try {
             BaritoneFeature.openDashboard()
-            assertEquals(1, opened)
+            assertEquals(CustomScreenType.BARITONE, openedScreen)
         } finally {
             BaritoneFeature.restoreDashboardOpener()
         }

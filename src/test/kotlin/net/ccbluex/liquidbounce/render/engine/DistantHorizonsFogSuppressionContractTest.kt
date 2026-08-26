@@ -37,6 +37,7 @@ class DistantHorizonsFogSuppressionContractTest {
         assertTrue(bridge.contains("event.cancelEvent()"))
         assertTrue(provider.contains("override fun shouldSuppressNativeFog()"))
         assertTrue(provider.contains("FogValueGroup.isUnified()"))
+        assertTrue(provider.contains("UnifiedFogRenderer.shouldReplaceNativeFog()"))
         assertTrue(provider.contains("FogValueGroup.shouldRenderVolume"))
         assertTrue(!config.contains("compat.distanthorizons.MixinDistantHorizonsFogRenderer"))
     }

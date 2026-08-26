@@ -69,6 +69,9 @@ class ModuleMaceKillTest {
         val preview = ModuleMaceKill.inner.single { it.name == "Preview" }
         assertTrue(preview is ToggleableValueGroup)
         assertTrue((preview as ToggleableValueGroup).enabled)
+        val previewMode = preview.inner.single { it.name == "Mode" } as ModeValueGroup<*>
+        assertEquals("Glow", previewMode.activeMode.name)
+        assertEquals(listOf("Glow"), previewMode.modes.map { it.name })
     }
 
     @Test
@@ -511,18 +514,45 @@ class ModuleMaceKillTest {
     }
 
     @Test
-    fun `packet route restores local drift to the captured start position`() {
+    fun `ordinary packet route preserves local movement while research can still pin its origin`() {
         val origin = Vec3(4.0, 70.0, -8.0)
 
-        assertEquals(
-            origin,
+        assertNull(
             requiredMaceKillLocalRestore(
                 packetRouteOwned = true,
+                preservePhysicalMovement = true,
                 origin = origin,
                 currentPosition = origin.add(0.25, 0.0, 0.0),
             ),
         )
-        assertNull(requiredMaceKillLocalRestore(true, origin, origin))
-        assertNull(requiredMaceKillLocalRestore(false, origin, origin.add(1.0, 0.0, 0.0)))
+        assertEquals(
+            origin,
+            requiredMaceKillLocalRestore(
+                packetRouteOwned = true,
+                preservePhysicalMovement = false,
+                origin = origin,
+                currentPosition = origin.add(0.25, 0.0, 0.0),
+            ),
+        )
+        assertNull(requiredMaceKillLocalRestore(true, false, origin, origin))
+        assertNull(requiredMaceKillLocalRestore(false, false, origin, origin.add(1.0, 0.0, 0.0)))
+    }
+
+    @Test
+    fun `physical movement packets keep the confirmed virtual route position`() {
+        val committedOffset = Vec3(8.0, 3.0, -2.0)
+
+        assertEquals(
+            committedOffset,
+            maceKillPhysicalMovementVirtualOffset(
+                routeOwned = true,
+                packetMovement = true,
+                researchActive = false,
+                committedOffset = committedOffset,
+            ),
+        )
+        assertNull(maceKillPhysicalMovementVirtualOffset(true, true, true, committedOffset))
+        assertNull(maceKillPhysicalMovementVirtualOffset(true, false, false, committedOffset))
+        assertNull(maceKillPhysicalMovementVirtualOffset(false, true, false, committedOffset))
     }
 }

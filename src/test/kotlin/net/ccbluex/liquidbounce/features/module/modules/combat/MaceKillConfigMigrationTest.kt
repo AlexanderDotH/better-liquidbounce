@@ -182,4 +182,26 @@ class MaceKillConfigMigrationTest {
         assertEquals("Direct", routing["active"].asString)
         assertEquals(setOf("Direct"), routing.getAsJsonObject("choices").keySet())
     }
+
+    @Test
+    fun `legacy Box preview migrates to the shared Glow selector`() {
+        val root = JsonParser.parseString(
+            """
+            {"name":"modules","value":[{"name":"MaceKill","value":[{
+              "name":"Preview","value":[{"name":"Mode","active":"Box","value":[],"choices":{
+                "Box":{"name":"Box","value":[{"name":"FillColor","value":1140785152}]},
+                "Glow":{"name":"Glow","value":[{"name":"GlowColor","value":-65536}]}
+              }}]
+            }]}]}
+            """.trimIndent(),
+        ).asJsonObject
+
+        migrateLegacyMaceKillConfig(root)
+
+        val mode = root.getAsJsonArray("value").single().asJsonObject
+            .getAsJsonArray("value").single().asJsonObject
+            .getAsJsonArray("value").single().asJsonObject
+        assertEquals("Glow", mode["active"].asString)
+        assertEquals(setOf("Glow"), mode.getAsJsonObject("choices").keySet())
+    }
 }

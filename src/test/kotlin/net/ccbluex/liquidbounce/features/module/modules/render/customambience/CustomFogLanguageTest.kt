@@ -43,6 +43,7 @@ class CustomFogLanguageTest {
         )
         listOf(english, german).forEach { locale ->
             assertTerms(locale[ENGINE_KEY].asString, "Legacy", "Unified", "Distant Horizons")
+            assertTerms(locale[ENGINE_UNIFIED_KEY].asString, "terrain", "Distant Horizons", "Blur")
             assertTerms(locale[HORIZON_KEY].asString, "70", "100", "Distant Horizons", "Vanilla")
             assertTerms(locale[FEATHER_KEY].asString, "0", "32", "alpha", "terrain")
             assertTerms(locale[COLOR_KEY].asString, "Color", "alpha", "BlurFog", "VolumetricFog", "BackgroundColor")

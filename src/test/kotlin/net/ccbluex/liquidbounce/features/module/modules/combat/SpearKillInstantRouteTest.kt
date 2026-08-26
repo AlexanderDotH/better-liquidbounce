@@ -35,7 +35,6 @@ class SpearKillInstantRouteTest {
         assertEquals(1, spearKillInstantAimPredictionTicks(serverEvaluationTicks = 1))
         assertEquals(1, spearKillInstantAimPredictionTicks(serverEvaluationTicks = 2))
         assertEquals(1, spearKillInstantAimPredictionTicks(serverEvaluationTicks = 20))
-        assertEquals(20, spearKillInstantAimPredictionTicks(serverEvaluationTicks = 20, paced = true))
     }
 
     @Test
@@ -264,7 +263,7 @@ class SpearKillInstantRouteTest {
             maxSpeed = 40.0,
             segmentValidator = blockedCorridor,
         )
-        val primed = requireNotNull(buildSpearKillPrimedInstantPacketRoute(
+        val primed = requireNotNull(buildSpearKillInstantDirectPacketRoute(
             origin = origin,
             destination = destination,
             isEndpointFree = { true },
@@ -279,7 +278,7 @@ class SpearKillInstantRouteTest {
         val origin = Vec3.ZERO
         val destination = Vec3(100.0, 0.0, 0.0)
 
-        val route = buildSpearKillPrimedInstantPacketRoute(
+        val route = buildSpearKillInstantDirectPacketRoute(
             origin = origin,
             destination = destination,
             isEndpointFree = { it != destination },
@@ -333,9 +332,9 @@ class SpearKillInstantRouteTest {
     }
 
     @Test
-    fun `Primed route contains one lunge and its exact inverse only`() {
+    fun `Instant direct route contains one lunge and its exact inverse only`() {
         val movement = Vec3(75.0, -4.0, 3.0)
-        val route = requireNotNull(buildSpearKillPrimedInstantPacketRoute(
+        val route = requireNotNull(buildSpearKillInstantDirectPacketRoute(
             origin = Vec3.ZERO,
             destination = movement,
             isEndpointFree = { true },
@@ -346,113 +345,62 @@ class SpearKillInstantRouteTest {
     }
 
     @Test
-    fun `normal Primed attacks split a long lunge into source predicted accepted tick steps`() {
-        val movement = Vec3(75.0, -4.0, 3.0)
-        val profile = SpearKillSpeedProfile(
-            currentSpeed = 0.0,
-            limits = SpearKillSpeedLimits(
-                targetSpeed = 100.0,
-                acceleration = 100.0,
-                deceleration = 100.0,
-                stepDistance = 100.0,
-                vanillaBudget = 10.0,
-            ),
-        )
-        val route = requireNotNull(buildSpearKillPacedPrimedInstantPacketRoute(
-            origin = Vec3.ZERO,
-            destination = movement,
-            profile = profile,
-            expectedVelocitySquared = 0.0,
-            movementProfile = SpearKillPrimedInstantMovementProfile.NORMAL,
-            maxVerticalStep = 100.0,
-            isEndpointFree = { true },
-        ))
-
-        assertTrue(route.outboundMovements.size > 1)
-        assertTrue(
-            movement.distanceToSqr(route.outboundMovements.fold(Vec3.ZERO, Vec3::add)) < 1.0E-12,
-        )
-        assertEquals(
-            route.outboundMovements.asReversed().map { it.scale(-1.0) } + Vec3.ZERO,
-            route.roundTripMovements.drop(route.outboundMovements.size),
-        )
-        route.outboundMovements.forEach { step ->
-            val result = SpearKillPrimedInstantPlanner.plan(
-                SpearKillPrimedInstantPlanRequest(
-                    requestedDistance = step.length(),
-                    expectedVelocitySquared = 0.0,
-                    movementProfile = SpearKillPrimedInstantMovementProfile.NORMAL,
-                    priming = SpearKillPrimedInstantPriming.Auto,
-                    packetAccounting = SpearKillPrimedInstantPacketAccounting(0, 0, 0, 512),
-                    primingPacketType = SpearKillPrimedInstantPacketType.Position,
-                ),
-            ) as SpearKillPrimedInstantPlanResult.Ready
-            assertTrue(result.plan.sourcePredictedAccepted, "step=${step.length()}")
-        }
-    }
-
-    @Test
-    fun `reported ninety nine block lunge becomes six grounded speed steps with a full terminal hit`() {
-        val profile = SpearKillSpeedProfile(
-            currentSpeed = 0.0,
-            limits = SpearKillSpeedLimits(
-                targetSpeed = 17.32,
-                acceleration = 500.0,
-                deceleration = 500.0,
-                stepDistance = 500.0,
-                vanillaBudget = 10.0,
-            ),
-        )
-        val route = requireNotNull(buildSpearKillPacedPrimedInstantPacketRoute(
+    fun `reported ninety nine block lunge reaches its endpoint in one outbound tick`() {
+        val route = requireNotNull(buildSpearKillInstantDirectPacketRoute(
             origin = Vec3.ZERO,
             destination = Vec3(99.305, 0.0, 0.0),
-            profile = profile,
-            expectedVelocitySquared = 0.0,
-            movementProfile = SpearKillPrimedInstantMovementProfile.NORMAL,
-            maxVerticalStep = 2.95,
             isEndpointFree = { true },
         ))
 
-        assertEquals(6, route.outboundTickCount)
-        assertTrue(route.outboundMovements.all { it.length() <= 17.32 })
-        assertEquals(17.32, route.outboundMovements.last().length(), 1.0E-9)
+        assertEquals(1, route.outboundTickCount)
+        assertEquals(Vec3(99.305, 0.0, 0.0), route.outboundMovements.single())
         assertEquals(
-            6,
+            1,
             spearKillDirectRouteHitTicks(
                 routingMode = SpearKillRoutingMode.INSTANT,
                 outboundTickCount = route.outboundTickCount,
                 stepWaitTicks = 0,
                 strikeHoldTicks = SPEAR_KILL_INSTANT_SERVER_EVALUATION_TICKS,
-                pacedInstant = true,
             ),
         )
     }
 
     @Test
-    fun `paced Primed validates every segment endpoint without validating the blocked corridor`() {
-        val profile = SpearKillSpeedProfile(
-            currentSpeed = 0.0,
-            limits = SpearKillSpeedLimits(100.0, 100.0, 100.0, 100.0, 10.0),
-        )
-
-        val route = buildSpearKillPacedPrimedInstantPacketRoute(
+    fun `Instant direct route construction validates both endpoints`() {
+        val inspected = mutableListOf<Vec3>()
+        val destination = Vec3(40.0, 0.0, 0.0)
+        val route = buildSpearKillInstantDirectPacketRoute(
             origin = Vec3.ZERO,
-            destination = Vec3(40.0, 0.0, 0.0),
-            profile = profile,
-            expectedVelocitySquared = 0.0,
-            movementProfile = SpearKillPrimedInstantMovementProfile.NORMAL,
-            maxVerticalStep = 100.0,
-            isEndpointFree = { position -> position.x !in 17.0..18.0 },
+            destination = destination,
+            isEndpointFree = { position -> inspected += position; true },
         )
 
-        assertNull(route)
+        assertNotNull(route)
+        assertEquals(listOf(Vec3.ZERO, destination), inspected)
     }
 
     @Test
-    fun `normal Primed rejects a source predicted setback while explicit probes remain research capable`() {
-        assertTrue(isSpearKillPrimedPlanSendable(sourcePredictedAccepted = true, researchProbe = false))
-        assertFalse(isSpearKillPrimedPlanSendable(sourcePredictedAccepted = false, researchProbe = false))
-        assertTrue(isSpearKillPrimedPlanSendable(sourcePredictedAccepted = false, researchProbe = true))
+    fun `Instant direct teleport may attempt a source rejected Primed displacement`() {
+        assertTrue(isSpearKillPrimedPlanSendable(
+            sourcePredictedAccepted = true,
+            instantDirectTeleport = false,
+            researchProbe = false,
+        ))
+        assertFalse(isSpearKillPrimedPlanSendable(
+            sourcePredictedAccepted = false,
+            instantDirectTeleport = false,
+            researchProbe = false,
+        ))
+        assertTrue(isSpearKillPrimedPlanSendable(
+            sourcePredictedAccepted = false,
+            instantDirectTeleport = true,
+            researchProbe = false,
+        ))
+        assertTrue(isSpearKillPrimedPlanSendable(
+            sourcePredictedAccepted = false,
+            instantDirectTeleport = false,
+            researchProbe = true,
+        ))
     }
 
     @Test
@@ -473,7 +421,7 @@ class SpearKillInstantRouteTest {
 
     @Test
     fun `Primed budget reserves both movements NoFall and final grounding before admission`() {
-        val route = requireNotNull(buildSpearKillPrimedInstantPacketRoute(
+        val route = requireNotNull(buildSpearKillInstantDirectPacketRoute(
             origin = Vec3.ZERO,
             destination = Vec3(20.0, 0.0, 0.0),
             isEndpointFree = { true },

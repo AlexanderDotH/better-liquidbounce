@@ -11,6 +11,7 @@
 
 package net.ccbluex.liquidbounce.render.engine
 
+import net.ccbluex.liquidbounce.LiquidBounce
 import net.ccbluex.liquidbounce.features.module.modules.render.ModuleDebug
 import net.ccbluex.liquidbounce.features.module.modules.render.customambience.ModuleCustomAmbience
 
@@ -25,12 +26,27 @@ data class UnifiedFogDebugState(
     val horizonEndBlocks: Float,
     val passCount: Int,
     val skipReason: String?,
-)
+) {
+    internal fun diagnosticKey(): String = listOf(
+        engine,
+        distantHorizonsReady,
+        distantHorizonsBackend,
+        passCount,
+        skipReason ?: "rendered",
+    ).joinToString("|")
+
+    internal fun runtimeSummary(): String =
+        "Unified fog runtime: engine=$engine, vanillaReady=$vanillaReady, dhReady=$distantHorizonsReady, " +
+            "backend=${distantHorizonsBackend ?: "none"}, api=${distantHorizonsApiVersion ?: "none"}, " +
+            "frameAge=$frameAge, passes=$passCount, horizon=$horizonStartBlocks..$horizonEndBlocks, " +
+            "state=${skipReason ?: "rendered"}"
+}
 
 object UnifiedFogDebug {
 
     @Volatile
     private var current = inactive()
+    private var lastDiagnosticKey: String? = null
 
     @JvmStatic
     fun state(): UnifiedFogDebugState = current
@@ -38,11 +54,13 @@ object UnifiedFogDebug {
     internal fun record(state: UnifiedFogDebugState) {
         current = state
         publish(state)
+        reportTransition(state)
     }
 
     internal fun reset(publish: Boolean) {
         val inactive = inactive()
         current = inactive
+        lastDiagnosticKey = null
         if (publish) {
             publish(inactive)
         }
@@ -75,5 +93,12 @@ object UnifiedFogDebug {
         )
         ModuleDebug.debugParameter(ModuleCustomAmbience, "UnifiedFog.PassCount", state.passCount)
         ModuleDebug.debugParameter(ModuleCustomAmbience, "UnifiedFog.SkipReason", state.skipReason)
+    }
+
+    private fun reportTransition(state: UnifiedFogDebugState) {
+        val key = state.diagnosticKey()
+        if (key == lastDiagnosticKey) return
+        lastDiagnosticKey = key
+        LiquidBounce.logger.info(state.runtimeSummary())
     }
 }

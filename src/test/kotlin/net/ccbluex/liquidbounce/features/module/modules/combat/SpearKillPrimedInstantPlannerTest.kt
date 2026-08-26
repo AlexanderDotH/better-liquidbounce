@@ -242,21 +242,22 @@ class SpearKillPrimedInstantPlannerTest {
     }
 
     @Test
-    fun `burst tick estimator packs compatible acceleration packets into one client tick`() {
-        val movements = listOf(
-            Vec3(3.0, 0.0, 0.0),
-            Vec3(17.0, 0.0, 0.0),
-            Vec3(17.0, 0.0, 0.0),
+    fun `one hop Instant attempts the complete displacement without a paced defer`() {
+        val result = planSpearKillPrimedBurstStep(
+            windowOrigin = Vec3.ZERO,
+            currentPosition = Vec3.ZERO,
+            movement = Vec3(99.305, 0.0, 0.0),
+            expectedVelocitySquared = 0.0,
+            movementProfile = SpearKillPrimedInstantMovementProfile.NORMAL,
+            priming = SpearKillPrimedInstantPriming.Auto,
+            packetAccounting = SpearKillPrimedInstantPacketAccounting(0, 0, 0, 512),
+            primingPacketType = SpearKillPrimedInstantPacketType.Position,
+            instantDirectTeleport = true,
         )
 
-        assertEquals(
-            2,
-            calculateSpearKillPrimedBurstTickCount(
-                movements = movements,
-                expectedVelocitySquared = 0.0,
-                movementProfile = SpearKillPrimedInstantMovementProfile.NORMAL,
-            ),
-        )
+        val plan = assertInstanceOf(SpearKillPrimedBurstStepResult.Send::class.java, result).plan
+        assertEquals(99.305, plan.requestedDistance, 1.0E-12)
+        assertFalse(plan.sourcePredictedAccepted)
     }
 
     @Test

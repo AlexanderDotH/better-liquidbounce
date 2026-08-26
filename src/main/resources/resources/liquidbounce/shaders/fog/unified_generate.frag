@@ -4,6 +4,8 @@ in vec2 texCoord;
 out vec4 fragColor;
 
 uniform sampler2D TerrainMaskSampler;
+uniform sampler2D DepthSampler;
+uniform sampler2D DhDepthSampler;
 
 layout(std140) uniform UnifiedFogData {
     mat4 InverseProjection;
@@ -23,11 +25,19 @@ const int VOLUME_STEPS = 8;
 const float EPSILON = 1.0e-6;
 const float TERRAIN_THRESHOLD = 0.5;
 const float BASE_DENSITY_FLOOR = 0.18;
+const float SKY_FOG_FLOOR = 0.65;
 const float CLEAR_DEPTH_INSET = 1.0e-5;
 const float TWO_PI = 6.28318530718;
+const int SOURCE_SKY = 0;
+const int SOURCE_DH = 1;
+const int SOURCE_VANILLA = 2;
 
 bool isTerrain(vec2 uv) {
     return texture(TerrainMaskSampler, uv).r >= TERRAIN_THRESHOLD;
+}
+
+int terrainSource(vec2 uv) {
+    return int(floor(texture(TerrainMaskSampler, uv).g * 2.0 + 0.5));
 }
 
 float depthToClip(float depth, float zeroToOne) {
@@ -75,6 +85,28 @@ vec3 reconstructDhClearSkyRelative(vec2 uv) {
     return normalize(finiteRelative) * max(HorizonInfo.y, 1.0);
 }
 
+vec3 reconstructVanillaSurfaceRelative(vec2 uv) {
+    float depth = texture(DepthSampler, uv).r;
+    vec4 viewPosition = InverseProjection * vec4(
+        uv * 2.0 - 1.0,
+        depthToClip(depth, VanillaDepthInfo.y),
+        1.0
+    );
+    if (abs(viewPosition.w) <= EPSILON) return vec3(0.0);
+    return mat3(InverseViewRotation) * (viewPosition.xyz / viewPosition.w);
+}
+
+vec3 reconstructDhSurfaceRelative(vec2 uv) {
+    float depth = texture(DhDepthSampler, uv).r;
+    vec4 relativePosition = DhInverseMvmProjection * vec4(
+        uv * 2.0 - 1.0,
+        depthToClip(depth, DhDepthInfo.y),
+        1.0
+    );
+    if (abs(relativePosition.w) <= EPSILON) return vec3(0.0);
+    return relativePosition.xyz / relativePosition.w;
+}
+
 bool isFiniteRelative(vec3 relativePosition) {
     float distanceToCamera = length(relativePosition);
     return distanceToCamera == distanceToCamera && distanceToCamera > EPSILON && distanceToCamera < 1.0e9;
@@ -90,6 +122,21 @@ vec3 reconstructClearSkyRelative(vec2 uv) {
     return mat3(InverseViewRotation) * vanillaRelative;
 }
 
+vec3 validatedClearSkyRelative(vec3 relativePosition) {
+    float reconstructedDistance = length(relativePosition);
+    float configuredStart = max(min(HorizonInfo.x, HorizonInfo.y), 0.0);
+    float configuredEnd = max(max(HorizonInfo.x, HorizonInfo.y), 1.0);
+    float minimumPlausibleDistance = max(configuredStart * 0.5, 1.0);
+    if (isFiniteRelative(relativePosition) && reconstructedDistance >= minimumPlausibleDistance) {
+        return relativePosition;
+    }
+
+    vec3 direction = reconstructedDistance > EPSILON && reconstructedDistance == reconstructedDistance
+        ? relativePosition / reconstructedDistance
+        : vec3(0.0, 0.0, 1.0);
+    return direction * configuredEnd;
+}
+
 float linearFogFactor(float distanceToCamera, float startDistance, float endDistance) {
     if (endDistance <= startDistance + EPSILON) {
         return step(endDistance, distanceToCamera);
@@ -97,13 +144,16 @@ float linearFogFactor(float distanceToCamera, float startDistance, float endDist
     return smoothstep(startDistance, endDistance, distanceToCamera);
 }
 
-float analyticBaseFog(vec3 worldRay, float clearSkyDistance) {
+float analyticBaseFog(vec3 worldRay, float clearSkyDistance, int source) {
     float startDistance = max(HorizonInfo.x, 0.0);
     float endDistance = max(HorizonInfo.y, startDistance);
     float horizonProximity = 1.0 - smoothstep(0.02, 0.72, abs(worldRay.y));
     float distanceFactor = linearFogFactor(clearSkyDistance, startDistance, endDistance);
     float density = mix(BASE_DENSITY_FLOOR, 1.75, clamp(HorizonInfo.z, 0.0, 1.0));
-    return (1.0 - exp(-distanceFactor * density)) * horizonProximity;
+    float directionalFactor = source == SOURCE_SKY
+        ? mix(SKY_FOG_FLOOR, 1.0, horizonProximity)
+        : 1.0;
+    return (1.0 - exp(-distanceFactor * density)) * directionalFactor;
 }
 
 float layerProfile(float normalizedHeight) {
@@ -150,19 +200,22 @@ float multiLayerFogDensity(vec3 worldRay, float clearSkyDistance) {
 }
 
 void main() {
-    if (isTerrain(texCoord)) {
-        fragColor = vec4(0.0);
-        return;
+    int source = terrainSource(texCoord);
+    vec3 relativePosition = source == SOURCE_DH
+        ? reconstructDhSurfaceRelative(texCoord)
+        : (source == SOURCE_VANILLA
+            ? reconstructVanillaSurfaceRelative(texCoord)
+            : validatedClearSkyRelative(reconstructClearSkyRelative(texCoord)));
+    if (!isFiniteRelative(relativePosition)) {
+        relativePosition = validatedClearSkyRelative(reconstructClearSkyRelative(texCoord));
     }
-
-    vec3 clearSkyRelative = reconstructClearSkyRelative(texCoord);
-    float clearSkyDistance = length(clearSkyRelative);
-    vec3 worldRay = clearSkyDistance > EPSILON
-        ? clearSkyRelative / clearSkyDistance
+    float surfaceDistance = length(relativePosition);
+    vec3 worldRay = surfaceDistance > EPSILON
+        ? relativePosition / surfaceDistance
         : vec3(0.0, 0.0, 1.0);
-    float fogOpacity = analyticBaseFog(worldRay, clearSkyDistance);
+    float fogOpacity = analyticBaseFog(worldRay, surfaceDistance, source);
     if (VolumeSettings.x > 0.5) {
-        float volumeOpacity = multiLayerFogDensity(worldRay, clearSkyDistance);
+        float volumeOpacity = multiLayerFogDensity(worldRay, surfaceDistance);
         fogOpacity = 1.0 - (1.0 - fogOpacity) * (1.0 - volumeOpacity);
     }
 

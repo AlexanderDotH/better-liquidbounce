@@ -11,9 +11,39 @@
 package net.ccbluex.liquidbounce.features.module.modules.combat
 
 import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertFalse
+import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.Test
 
 class MaceKillTargetSelectionTest {
+
+    @Test
+    fun `active KillAura delegation never evaluates the configured local selector`() {
+        var localSelectorEvaluated = false
+
+        val selected = selectMaceKillDelegatedTarget(
+            killAuraAuthoritative = true,
+            killAuraTarget = null,
+            localTarget = {
+                localSelectorEvaluated = true
+                "cursor-target"
+            },
+        )
+
+        assertNull(selected)
+        assertFalse(localSelectorEvaluated)
+    }
+
+    @Test
+    fun `configured selector remains available while KillAura delegation is inactive`() {
+        val selected = selectMaceKillDelegatedTarget(
+            killAuraAuthoritative = false,
+            killAuraTarget = "kill-aura-target",
+            localTarget = { "combat-target" },
+        )
+
+        assertEquals("combat-target", selected)
+    }
 
     @Test
     fun `nearest viable target wins over a distant target closer to the crosshair`() {

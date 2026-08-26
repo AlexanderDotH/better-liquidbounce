@@ -10,6 +10,7 @@
  */
 package net.ccbluex.liquidbounce.features.module.modules.movement.fly.automation
 
+import net.ccbluex.liquidbounce.utils.entity.withStrafe
 import net.ccbluex.liquidbounce.utils.movement.DirectionalInput
 import net.minecraft.world.phys.Vec3
 import kotlin.test.Test
@@ -32,6 +33,18 @@ class FlyAutomationInputTest {
 
         assertEquals(DirectionalInput.LEFT, resolved)
         assertEquals(-90f, FlyAutomationInputResolver.desiredYaw(intent, DirectionalInput.NONE))
+    }
+
+    @Test
+    fun `resolved input and world yaw produce the requested velocity without a second rotation`() {
+        val intent = FlySteeringIntent(Vec3(1.0, 0.0, 0.0))
+        val input = FlyAutomationInputResolver.directional(intent, DirectionalInput.NONE, playerYaw = 0f)
+        val yaw = FlyAutomationInputResolver.desiredYaw(intent, DirectionalInput.NONE)
+
+        val movement = Vec3.ZERO.withStrafe(speed = 1.0, input = input, yaw = requireNotNull(yaw))
+
+        assertEquals(1.0, movement.x, 1.0e-9)
+        assertEquals(0.0, movement.z, 1.0e-9)
     }
 
     @Test

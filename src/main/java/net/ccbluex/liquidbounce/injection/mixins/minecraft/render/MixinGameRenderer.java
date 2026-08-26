@@ -196,7 +196,10 @@ public abstract class MixinGameRenderer {
             return fogMode;
         }
         if (ModuleCustomAmbience.FogValueGroup.INSTANCE.isUnified()) {
-            return FogRenderer.FogMode.NONE;
+            if (UnifiedFogRenderer.shouldReplaceNativeFog()) {
+                return FogRenderer.FogMode.NONE;
+            }
+            return FogRenderer.FogMode.WORLD;
         }
         if (ModuleCustomAmbience.FogValueGroup.VolumetricFog.INSTANCE.getRunning()) {
             return FogRenderer.FogMode.NONE;

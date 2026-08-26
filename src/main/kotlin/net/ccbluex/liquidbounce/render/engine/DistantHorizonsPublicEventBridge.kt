@@ -18,6 +18,7 @@ import com.seibel.distanthorizons.api.methods.events.abstractEvents.DhApiBeforeC
 import com.seibel.distanthorizons.api.methods.events.abstractEvents.DhApiBeforeFogRenderEvent
 import com.seibel.distanthorizons.api.methods.events.abstractEvents.DhApiBeforeRenderCleanupEvent
 import com.seibel.distanthorizons.api.methods.events.abstractEvents.DhApiBeforeRenderSetupEvent
+import com.seibel.distanthorizons.api.methods.events.abstractEvents.DhApiBeforeTextureClearEvent
 import com.seibel.distanthorizons.api.methods.events.abstractEvents.DhApiLevelLoadEvent
 import com.seibel.distanthorizons.api.methods.events.abstractEvents.DhApiLevelUnloadEvent
 import com.seibel.distanthorizons.api.methods.events.interfaces.IDhApiEvent
@@ -50,6 +51,11 @@ internal class DistantHorizonsPublicEventBridge private constructor(
             sink.onBeforeRenderCleanup(event.value.toPublicParam())
         }
     }
+    private val textureClear = object : DhApiBeforeTextureClearEvent() {
+        override fun beforeClear(event: DhApiCancelableEventParam<DhApiRenderParam>) {
+            sink.onBeforeTextureClear(event.value.toPublicParam())
+        }
+    }
     private val fogRender = object : DhApiBeforeFogRenderEvent() {
         override fun beforeRender(event: DhApiCancelableEventParam<EventParam>) {
             if (sink.shouldSuppressNativeFog()) {
@@ -80,6 +86,7 @@ internal class DistantHorizonsPublicEventBridge private constructor(
     init {
         runCatching {
             bind(DhApiBeforeRenderSetupEvent::class.java, renderSetup)
+            bind(DhApiBeforeTextureClearEvent::class.java, textureClear)
             bind(DhApiBeforeRenderCleanupEvent::class.java, renderCleanup)
             bind(DhApiBeforeFogRenderEvent::class.java, fogRender)
             bind(DhApiBeforeColorDepthTextureCreatedEvent::class.java, resize)

@@ -567,6 +567,8 @@ object ClientRenderPipelines {
         withFragmentShader(ClientShaders.Fragment.UnifiedFogGenerate)
         withBindGroupLayout {
             withSampler("TerrainMaskSampler")
+            withSampler("DepthSampler")
+            withSampler("DhDepthSampler")
             withUniformBuffer(ClientUniformDefine.UNIFIED_FOG)
         }
         withColorTargetState(

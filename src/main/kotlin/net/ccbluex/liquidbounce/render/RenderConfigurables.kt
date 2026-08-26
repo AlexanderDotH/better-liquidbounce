@@ -67,11 +67,14 @@ class MapColorMode(
     override val parent: ModeValueGroup<*>,
     private val alpha: Int = 100
 ) : GenericColorMode<Pair<BlockPos, BlockState>>("MapColor") {
+    private val prominentColorResolver = ProminentBlockColorResolver()
+
     override fun getColor(param: Pair<BlockPos, BlockState>): Color4b {
         val (pos, state) = param
 
-        val mapColor = state.getMapColor(world, pos).col
-        return Color4b(mapColor).alpha(alpha)
+        val prominentColor = prominentColorResolver.resolve(mc, world, pos, state)
+        val fallbackMapColor = Color4b(state.getMapColor(world, pos).col)
+        return (prominentColor ?: fallbackMapColor).alpha(alpha)
     }
 }
 

@@ -30,9 +30,12 @@ import net.ccbluex.liquidbounce.event.EventListener
 import net.ccbluex.liquidbounce.event.events.ClientShutdownEvent
 import net.ccbluex.liquidbounce.event.handler
 import net.ccbluex.liquidbounce.features.module.modules.render.customambience.ModuleCustomAmbience.FogValueGroup
+import net.ccbluex.liquidbounce.render.engine.unifiedfog.FrameDimensions
+import net.ccbluex.liquidbounce.render.engine.unifiedfog.TerrainDepthValidationPolicy
 import net.ccbluex.liquidbounce.utils.client.gpuDevice
 import org.joml.Matrix4f
 import org.lwjgl.opengl.GL11C
+import org.lwjgl.opengl.GL43C
 import org.lwjgl.opengl.GL45C
 import java.lang.reflect.InvocationTargetException
 
@@ -100,6 +103,14 @@ internal class DistantHorizonsFrameLifecycle {
     fun capturedFrame(): DistantHorizonsCaptureMetadata? = capturedFrame
 
     @Synchronized
+    fun recentCapture(expectedFrameToken: Long, maximumFrameAge: Long): DistantHorizonsCaptureMetadata? {
+        require(maximumFrameAge >= 0L) { "Maximum frame age must not be negative" }
+        val capture = capturedFrame ?: return null
+        val age = expectedFrameToken - capture.frameToken
+        return capture.takeIf { age in 0L..maximumFrameAge }
+    }
+
+    @Synchronized
     fun readiness(
         installed: Boolean,
         supported: Boolean,
@@ -146,6 +157,8 @@ internal data class DistantHorizonsDepthStatus(
 
 internal data class DistantHorizonsDepthTexture(
     val textureView: GpuTextureView,
+    val width: Int,
+    val height: Int,
     val clearDepth: Float,
     val zeroToOneDepth: Boolean,
     val inverseMvmProjection: Matrix4f,
@@ -164,6 +177,7 @@ internal data class DistantHorizonsPublicRenderParam(
 
 internal interface DistantHorizonsPublicEventSink {
     fun onRenderSetup(renderParam: DistantHorizonsPublicRenderParam)
+    fun onBeforeTextureClear(renderParam: DistantHorizonsPublicRenderParam)
     fun onBeforeRenderCleanup(renderParam: DistantHorizonsPublicRenderParam)
     fun shouldSuppressNativeFog(): Boolean
     fun onResize()
@@ -210,6 +224,9 @@ internal object DistantHorizonsDepthTextureProvider : EventListener, DistantHori
     private var warningReported = false
     private var externallyTokenedFrames = false
     private var legacyEventFrameToken = 0L
+    private var textureClearPrimed = false
+    private var currentRenderState: DistantHorizonsRenderState? = null
+    private var completedRenderState: DistantHorizonsRenderState? = null
 
     fun beginFrame(frameToken: Long) {
         externallyTokenedFrames = true
@@ -220,9 +237,13 @@ internal object DistantHorizonsDepthTextureProvider : EventListener, DistantHori
     /** Legacy accepts the latest compatible capture and intentionally does not enforce a frame token. */
     fun resolve(width: Int, height: Int): DistantHorizonsDepthTexture? {
         ensureIntegration()
-        return capturedDepth
-            ?.takeIf { it.matches(width, height) }
-            ?.snapshot()
+        val requestedDimensions = FrameDimensions(width, height)
+        return capturedDepth?.snapshot()?.takeIf { depth ->
+            FrameDimensions(depth.width, depth.height).hasCompatibleAspect(
+                requestedDimensions,
+                TerrainDepthValidationPolicy.RENDER_ASPECT_TOLERANCE,
+            )
+        }
     }
 
     /** Unified fails closed unless DH depth belongs to this exact terrain frame and resolution. */
@@ -231,6 +252,29 @@ internal object DistantHorizonsDepthTextureProvider : EventListener, DistantHori
         val readiness = lifecycle.readiness(apiInstalled, capabilitySupported, width, height, frameToken)
         if (readiness != DistantHorizonsSourceReadiness.READY) return null
         return capturedDepth?.snapshot()
+    }
+
+    /**
+     * Accepts the newest captured DH depth within a small frame-age budget. Normalized texture coordinates allow
+     * render-scaled DH targets to participate without pretending they have Minecraft's exact pixel dimensions.
+     */
+    fun resolveRecent(frameToken: Long, maximumFrameAge: Long): DistantHorizonsDepthTexture? {
+        ensureIntegration()
+        if (!apiInstalled || !capabilitySupported) return null
+        lifecycle.recentCapture(frameToken, maximumFrameAge) ?: return null
+        return capturedDepth?.snapshot()
+    }
+
+    /**
+     * Refreshes the public DH depth after terrain rendering. The public texture id is guaranteed to be active during
+     * the DH render pass, whereas cleanup timing differs between the OpenGL and Blaze implementations.
+     */
+    fun captureCurrentFrame(frameToken: Long): Boolean {
+        ensureIntegration()
+        val renderState = currentRenderState ?: completedRenderState ?: return false
+        return runCatching { captureAvailableDepth(renderState.copy(frameToken = frameToken)) }
+            .onFailure { markUnsupported("Unable to preserve current Distant Horizons depth", it) }
+            .getOrDefault(false)
     }
 
     fun status(width: Int, height: Int, currentFrameToken: Long): DistantHorizonsDepthStatus {
@@ -257,16 +301,37 @@ internal object DistantHorizonsDepthTextureProvider : EventListener, DistantHori
     override fun onRenderSetup(renderParam: DistantHorizonsPublicRenderParam) {
         val frameToken = eventFrameToken()
         runCatching { DistantHorizonsRenderApi.captureRenderParam(renderParam, frameToken) }
+            .onSuccess { currentRenderState = it }
             .onFailure { markUnsupported("DH supplied an invalid render transform", it) }
     }
 
     override fun onBeforeRenderCleanup(renderParam: DistantHorizonsPublicRenderParam) {
-        runCatching { captureBeforeCleanup(renderParam) }
+        val renderState = runCatching { captureRenderState(renderParam) }
+            .onFailure { markUnsupported("DH supplied an invalid completed render transform", it) }
+            .getOrNull() ?: return
+        runCatching { captureAvailableDepth(renderState) }
             .onFailure { markUnsupported("Unable to preserve Distant Horizons depth before cleanup", it) }
+        completedRenderState = renderState
     }
 
-    override fun shouldSuppressNativeFog(): Boolean =
-        FogValueGroup.isUnified() || FogValueGroup.shouldRenderVolume
+    override fun onBeforeTextureClear(renderParam: DistantHorizonsPublicRenderParam) {
+        if (!textureClearPrimed) {
+            textureClearPrimed = true
+            return
+        }
+        val frameToken = lifecycle.currentFrameToken() ?: eventFrameToken()
+        val completedState = completedRenderState
+            ?: runCatching { captureRenderState(renderParam) }.getOrNull()
+            ?: return
+        val renderState = completedState.copy(frameToken = frameToken)
+        runCatching { captureAvailableDepth(renderState) }
+            .onFailure { markUnsupported("Unable to preserve Distant Horizons depth before texture clear", it) }
+    }
+
+    override fun shouldSuppressNativeFog(): Boolean {
+        if (FogValueGroup.isUnified()) return UnifiedFogRenderer.shouldReplaceNativeFog()
+        return FogValueGroup.shouldRenderVolume
+    }
 
     override fun onResize() {
         invalidateDepth()
@@ -277,31 +342,78 @@ internal object DistantHorizonsDepthTextureProvider : EventListener, DistantHori
         invalidateDepth()
     }
 
-    private fun captureBeforeCleanup(renderParam: DistantHorizonsPublicRenderParam) {
+    private fun captureRenderState(renderParam: DistantHorizonsPublicRenderParam): DistantHorizonsRenderState {
         val frameToken = lifecycle.currentFrameToken() ?: eventFrameToken()
-        val renderState = DistantHorizonsRenderApi.captureRenderParam(renderParam, frameToken)
-        val fetch = integration?.depthTexture() ?: return
+        return DistantHorizonsRenderApi.captureRenderParam(renderParam, frameToken)
+    }
+
+    private fun captureAvailableDepth(renderState: DistantHorizonsRenderState): Boolean {
+        val snapshot = fetchDepthSnapshot() ?: return false
+        val openGlTextureId = snapshot.openGlTextureId
+        val openGlSize = openGlTextureId?.let(::openGlTextureSize)
+        if (openGlTextureId != null && openGlSize != null) {
+            captureOpenGlDepth(openGlTextureId, openGlSize, snapshot, renderState)
+            return true
+        }
+
+        return captureDeviceDepth(snapshot, renderState)
+    }
+
+    private fun fetchDepthSnapshot(): DistantHorizonsDepthSnapshot? {
+        val fetch = integration?.depthTexture() ?: return null
         backend = fetch.backend ?: backend
         fetch.unsupportedReason?.let { reason ->
             markUnsupported(reason)
-            return
+            return null
         }
-        val snapshot = fetch.snapshot ?: return
-        val source = liveTextureView(snapshot) ?: return
+        return fetch.snapshot ?: run {
+            statusDetail = "Distant Horizons depth texture is not ready"
+            null
+        }
+    }
+
+    private fun captureDeviceDepth(
+        snapshot: DistantHorizonsDepthSnapshot,
+        renderState: DistantHorizonsRenderState,
+    ): Boolean {
+        val source = liveTextureView(snapshot) ?: return false
         val width = source.getWidth(0)
         val height = source.getHeight(0)
+        val destination = captureTarget(width, height, snapshot)
+        destination.capture(source, snapshot, renderState, apiVersion)
+        finishCapture(width, height)
+        return true
+    }
+
+    private fun captureOpenGlDepth(
+        textureId: Int,
+        size: DepthTextureSize,
+        snapshot: DistantHorizonsDepthSnapshot,
+        renderState: DistantHorizonsRenderState,
+    ) {
+        val destination = captureTarget(size.width, size.height, snapshot)
+        destination.captureOpenGl(textureId, snapshot, renderState, apiVersion)
+        finishCapture(size.width, size.height)
+    }
+
+    private fun captureTarget(
+        width: Int,
+        height: Int,
+        snapshot: DistantHorizonsDepthSnapshot,
+    ): CapturedDepthTexture {
         val previousBackend = capturedDepth?.backend
         if (previousBackend != null && previousBackend != snapshot.backend.name) {
             invalidateDepth()
         }
-        val destination = capturedDepth
+        return capturedDepth
             ?.takeIf { it.matches(width, height) }
             ?: CapturedDepthTexture(width, height).also { replacement ->
                 capturedDepth?.close()
                 capturedDepth = replacement
             }
+    }
 
-        destination.capture(source, snapshot, renderState, apiVersion)
+    private fun finishCapture(width: Int, height: Int) {
         lifecycle.capture(width, height)
         capabilitySupported = true
         statusDetail = null
@@ -384,6 +496,9 @@ internal object DistantHorizonsDepthTextureProvider : EventListener, DistantHori
         borrowedTexture = null
         openGlFrameBufferCache.invalidate()
         lifecycle.invalidate()
+        textureClearPrimed = false
+        currentRenderState = null
+        completedRenderState = null
     }
 
     private fun shutdown() {
@@ -402,6 +517,9 @@ internal object DistantHorizonsDepthTextureProvider : EventListener, DistantHori
         warningReported = false
         externallyTokenedFrames = false
         legacyEventFrameToken = 0L
+        textureClearPrimed = false
+        currentRenderState = null
+        completedRenderState = null
     }
 
     @Suppress("unused")
@@ -473,6 +591,42 @@ private class CapturedDepthTexture(
         val encoder = gpuDevice.createCommandEncoder()
         encoder.copyTextureToTexture(source.texture(), texture, 0, 0, 0, 0, 0, width, height)
         encoder.submit()
+        updateMetadata(snapshot, renderState, apiVersion)
+    }
+
+    fun captureOpenGl(
+        sourceTextureId: Int,
+        snapshot: DistantHorizonsDepthSnapshot,
+        renderState: DistantHorizonsRenderState,
+        apiVersion: String?,
+    ) {
+        val destination = texture as? GlTexture
+            ?: error("Minecraft's OpenGL device did not create an OpenGL depth texture")
+        GL43C.glCopyImageSubData(
+            sourceTextureId,
+            GL11C.GL_TEXTURE_2D,
+            0,
+            0,
+            0,
+            0,
+            destination.glId(),
+            GL11C.GL_TEXTURE_2D,
+            0,
+            0,
+            0,
+            0,
+            width,
+            height,
+            1,
+        )
+        updateMetadata(snapshot, renderState, apiVersion)
+    }
+
+    private fun updateMetadata(
+        snapshot: DistantHorizonsDepthSnapshot,
+        renderState: DistantHorizonsRenderState,
+        apiVersion: String?,
+    ) {
         convention = snapshot.convention
         backend = snapshot.backend.name
         inverseMvmProjection = Matrix4f(renderState.inverseMvmProjection)
@@ -486,6 +640,8 @@ private class CapturedDepthTexture(
 
     fun snapshot() = DistantHorizonsDepthTexture(
         textureView = view,
+        width = width,
+        height = height,
         clearDepth = convention.clearDepth,
         zeroToOneDepth = convention.zeroToOneDepth,
         inverseMvmProjection = Matrix4f(inverseMvmProjection),

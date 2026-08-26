@@ -284,8 +284,7 @@ class BaritoneFlightRuntimeCoordinator(
         val currentLease = lease ?: return result(BaritoneFlightRuntimeSignal.FailTask("Fly lease is unavailable"))
         val target = nextRoutePoint(playerPosition)
         if (target != null) {
-            val direction = (target - playerPosition).normalized()
-            fly.steer(currentLease, BaritoneFlySteering(direction))
+            fly.steer(currentLease, steeringToward(currentLease, playerPosition, target))
             return result(pauseNative = true)
         }
         if (planStatus == RuntimeFlightPlanStatus.PARTIAL) {
@@ -331,7 +330,7 @@ class BaritoneFlightRuntimeCoordinator(
         }
         val target = nextRoutePoint(playerPosition)
         if (target != null) {
-            fly.steer(currentLease, BaritoneFlySteering((target - playerPosition).normalized()))
+            fly.steer(currentLease, steeringToward(currentLease, playerPosition, target))
             return null
         }
         if (planStatus == RuntimeFlightPlanStatus.PARTIAL) {
@@ -469,11 +468,47 @@ class BaritoneFlightRuntimeCoordinator(
 
     private fun nextRoutePoint(playerPosition: FlightRuntimePosition): FlightRuntimePosition? {
         val reachedIndex = (routeIndex until plannedRoute.size).lastOrNull { index ->
-            playerPosition.distanceTo(plannedRoute[index]) <= ARRIVAL_RADIUS
+            routePointReached(playerPosition, index)
         }
         if (reachedIndex != null) routeIndex = reachedIndex + 1
         return plannedRoute.getOrNull(routeIndex)
     }
+
+    private fun routePointReached(playerPosition: FlightRuntimePosition, index: Int): Boolean {
+        if (playerPosition.distanceTo(plannedRoute[index]) <= ARRIVAL_RADIUS) return true
+        if (index <= 0 || index >= plannedRoute.lastIndex) return false
+
+        val segment = plannedRoute[index] - plannedRoute[index - 1]
+        val fromPrevious = playerPosition - plannedRoute[index - 1]
+        val segmentLengthSquared = segment.squaredLength()
+        if (segmentLengthSquared <= MIN_ROUTE_LENGTH) return true
+
+        val projectedDistance = fromPrevious.dot(segment)
+        if (projectedDistance < segmentLengthSquared) return false
+        val crossTrackSquared = (
+            fromPrevious.squaredLength() - projectedDistance * projectedDistance / segmentLengthSquared
+        ).coerceAtLeast(0.0)
+        return crossTrackSquared <= WAYPOINT_PASS_RADIUS * WAYPOINT_PASS_RADIUS
+    }
+
+    private fun steeringToward(
+        currentLease: BaritoneFlyLease,
+        playerPosition: FlightRuntimePosition,
+        target: FlightRuntimePosition,
+    ): BaritoneFlySteering {
+        val distance = playerPosition.distanceTo(target)
+        val brakingDistance = (fly.capabilities(currentLease).reliableSpeed?.times(SPRINT_BRAKING_TICKS)
+            ?: MIN_SPRINT_BRAKING_DISTANCE).coerceIn(MIN_SPRINT_BRAKING_DISTANCE, MAX_SPRINT_BRAKING_DISTANCE)
+        return BaritoneFlySteering(
+            direction = (target - playerPosition).normalized(),
+            sprint = distance > brakingDistance,
+        )
+    }
+
+    private fun FlightRuntimeVector.dot(other: FlightRuntimeVector): Double =
+        x * other.x + y * other.y + z * other.z
+
+    private fun FlightRuntimeVector.squaredLength(): Double = x * x + y * y + z * z
 
     private fun shouldPauseNativeMovement(): Boolean {
         val automationMayMove = taskActive && !userInputActive && !automationPauseActive && !suspended
@@ -541,7 +576,11 @@ class BaritoneFlightRuntimeCoordinator(
     }
 
     private companion object {
-        const val ARRIVAL_RADIUS = 0.65
+        const val ARRIVAL_RADIUS = 0.9
+        const val WAYPOINT_PASS_RADIUS = 2.0
+        const val SPRINT_BRAKING_TICKS = 2.0
+        const val MIN_SPRINT_BRAKING_DISTANCE = 4.0
+        const val MAX_SPRINT_BRAKING_DISTANCE = 12.0
         const val TICKS_PER_SECOND = 20.0
         const val MIN_ROUTE_LENGTH = 1.0e-9
 

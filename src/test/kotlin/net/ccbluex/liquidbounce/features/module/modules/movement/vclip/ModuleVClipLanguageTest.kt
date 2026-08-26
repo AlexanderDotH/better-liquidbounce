@@ -27,7 +27,7 @@ class ModuleVClipLanguageTest {
     }
 
     @Test
-    fun `VClip fall safety copy distinguishes grounded checkpoints from PacketJump fallback`() {
+    fun `VClip fall safety copy documents unconditional downward Folia PacketJump`() {
         FALL_SAFETY_COPY.forEach { (locale, expected) ->
             val translations = translations(locale)
             val vanilla = translations["liquidbounce.module.vClip.mode.vanilla.extendedDescription"].asString
@@ -35,13 +35,25 @@ class ModuleVClipLanguageTest {
             val rejection = translations["liquidbounce.module.vClip.messages.fallProtectionUnavailable"].asString
 
             assertTrue(vanilla.contains(expected.groundedCheckpoints, ignoreCase = true), locale)
-            assertTrue(folia.contains(expected.groundedCheckpoints, ignoreCase = true), locale)
+            assertTrue(!folia.contains(expected.groundedCheckpoints, ignoreCase = true), locale)
+            assertTrue(folia.contains(expected.everyDescent, ignoreCase = true), locale)
             assertTrue(folia.contains("PacketJump", ignoreCase = true), locale)
             assertTrue(folia.contains(expected.ungroundedPackets, ignoreCase = true), locale)
             assertTrue(rejection.contains(expected.cancelled, ignoreCase = true), locale)
             assertTrue(rejection.contains(expected.noMovement, ignoreCase = true), locale)
             assertTrue(!translations.has("liquidbounce.module.vClip.mode.vanilla.groundMode.description"), locale)
             assertTrue(!translations.has("liquidbounce.module.vClip.mode.folia.groundMode.description"), locale)
+        }
+    }
+
+    @Test
+    fun `VClip safety selections are documented at their teleport destinations`() {
+        SAFETY_INDICATOR_COPY.forEach { (locale, expectedTerms) ->
+            val description = translations(locale)["liquidbounce.module.vClip.description"].asString
+
+            expectedTerms.forEach { term ->
+                assertTrue(description.contains(term, ignoreCase = true), "$locale missing '$term': $description")
+            }
         }
     }
 
@@ -52,6 +64,7 @@ class ModuleVClipLanguageTest {
     private companion object {
         data class FallSafetyCopy(
             val groundedCheckpoints: String,
+            val everyDescent: String,
             val ungroundedPackets: String,
             val cancelled: String,
             val noMovement: String,
@@ -60,16 +73,23 @@ class ModuleVClipLanguageTest {
         val FALL_SAFETY_COPY = mapOf(
             "en_us" to FallSafetyCopy(
                 groundedCheckpoints = "grounded safe checkpoints",
+                everyDescent = "Every downward",
                 ungroundedPackets = "ungrounded packets",
                 cancelled = "cancelled",
                 noMovement = "without moving",
             ),
             "de_de" to FallSafetyCopy(
                 groundedCheckpoints = "geerdete sichere Zwischenpunkte",
+                everyDescent = "Jeder Abstieg",
                 ungroundedPackets = "ungeerdete Pakete",
                 cancelled = "abgebrochen",
                 noMovement = "ohne Bewegung",
             ),
+        )
+
+        val SAFETY_INDICATOR_COPY = mapOf(
+            "en_us" to listOf("safety selections", "teleport destinations", "Y-distance", "no selection"),
+            "de_de" to listOf("Sicherheitsauswahlen", "Teleportzielen", "Y-Differenz", "keine Auswahl"),
         )
 
         val REQUIRED_KEYS = setOf(

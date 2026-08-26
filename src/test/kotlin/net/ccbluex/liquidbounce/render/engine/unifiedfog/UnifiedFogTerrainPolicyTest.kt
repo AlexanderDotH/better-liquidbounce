@@ -41,31 +41,35 @@ class UnifiedFogTerrainPolicyTest {
     }
 
     @Test
-    fun `final fog alpha is exactly zero on Vanilla and DH terrain`() {
-        for (layer in listOf(TerrainLayer.VANILLA, TerrainLayer.DISTANT_HORIZONS)) {
-            assertEquals(
-                0f,
-                UnifiedFogTerrainPolicy.finalFogAlpha(
-                    generatedFogAlpha = 1f,
-                    layer = layer,
-                    skyDistanceToTerrainPixels = 32f,
-                    silhouetteFeatherPixels = 12f,
-                ),
-            )
-        }
+    fun `near Vanilla stays clear while DH terrain receives generated fog`() {
+        assertEquals(0f, UnifiedFogTerrainPolicy.finalFogAlpha(0f, TerrainLayer.VANILLA, 32f, 12f))
+        assertEquals(
+            0.75f,
+            UnifiedFogTerrainPolicy.finalFogAlpha(0.75f, TerrainLayer.DISTANT_HORIZONS, 32f, 12f),
+        )
     }
 
     @Test
-    fun `silhouette feather is applied only outward into sky`() {
-        val terrainAlpha = UnifiedFogTerrainPolicy.finalFogAlpha(1f, TerrainLayer.VANILLA, 20f, 12f)
+    fun `silhouette envelope increases fog only outward into sky`() {
+        val vanillaAlpha = UnifiedFogTerrainPolicy.finalFogAlpha(1f, TerrainLayer.VANILLA, 20f, 12f)
+        val distantHorizonsAlpha =
+            UnifiedFogTerrainPolicy.finalFogAlpha(1f, TerrainLayer.DISTANT_HORIZONS, 0f, 12f)
         val boundarySkyAlpha = UnifiedFogTerrainPolicy.finalFogAlpha(1f, TerrainLayer.SKY, 0f, 12f)
         val middleSkyAlpha = UnifiedFogTerrainPolicy.finalFogAlpha(1f, TerrainLayer.SKY, 6f, 12f)
         val distantSkyAlpha = UnifiedFogTerrainPolicy.finalFogAlpha(1f, TerrainLayer.SKY, 12f, 12f)
 
-        assertEquals(0f, terrainAlpha)
-        assertEquals(0f, boundarySkyAlpha)
-        assertEquals(0.5f, middleSkyAlpha, 0.001f)
+        assertEquals(1f, vanillaAlpha)
+        assertEquals(1f, distantHorizonsAlpha)
+        assertEquals(1f, boundarySkyAlpha)
+        assertEquals(1f, middleSkyAlpha)
         assertEquals(1f, distantSkyAlpha)
+
+        val halfAlphaAtBoundary = UnifiedFogTerrainPolicy.finalFogAlpha(0.5f, TerrainLayer.SKY, 0f, 12f)
+        val halfAlphaAtMiddle = UnifiedFogTerrainPolicy.finalFogAlpha(0.5f, TerrainLayer.SKY, 6f, 12f)
+        val halfAlphaFarAway = UnifiedFogTerrainPolicy.finalFogAlpha(0.5f, TerrainLayer.SKY, 12f, 12f)
+        assertEquals(0.675f, halfAlphaAtBoundary, 0.001f)
+        assertEquals(0.5875f, halfAlphaAtMiddle, 0.001f)
+        assertEquals(0.5f, halfAlphaFarAway, 0.001f)
     }
 
     @Test
@@ -78,8 +82,12 @@ class UnifiedFogTerrainPolicyTest {
     }
 
     @Test
-    fun `zero feather keeps sky fog while terrain remains protected`() {
+    fun `zero feather keeps sky and DH fog while Vanilla remains protected`() {
         assertEquals(0.65f, UnifiedFogTerrainPolicy.finalFogAlpha(0.65f, TerrainLayer.SKY, 0f, 0f))
-        assertEquals(0f, UnifiedFogTerrainPolicy.finalFogAlpha(0.65f, TerrainLayer.DISTANT_HORIZONS, 0f, 0f))
+        assertEquals(
+            0.65f,
+            UnifiedFogTerrainPolicy.finalFogAlpha(0.65f, TerrainLayer.DISTANT_HORIZONS, 0f, 0f),
+        )
+        assertEquals(0f, UnifiedFogTerrainPolicy.finalFogAlpha(0f, TerrainLayer.VANILLA, 0f, 0f))
     }
 }

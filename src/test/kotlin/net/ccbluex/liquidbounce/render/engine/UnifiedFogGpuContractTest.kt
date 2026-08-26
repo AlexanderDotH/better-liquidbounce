@@ -27,24 +27,32 @@ class UnifiedFogGpuContractTest {
         assertTrue(renderer.contains("fun render(cameraState: CameraRenderState, projectionMatrix: Matrix4fc)"))
         assertTrue(renderer.contains("UnifiedFogFrameFactory.build"))
         assertTrue(renderer.contains("mc.options.getEffectiveRenderDistance()"))
+        assertTrue(renderer.contains("DistantHorizonsDepthTextureProvider.resolveRecent"))
+        assertTrue(renderer.contains("DistantHorizonsDepthTextureProvider.captureCurrentFrame(token.frameIndex)"))
+        assertTrue(renderer.contains("TerrainDepthValidationPolicy.renderCompatible"))
         assertTrue(renderer.contains("is UnifiedFogFrameBuild.Skipped"))
         assertTrue(renderer.contains("return recordSkippedFrame"))
 
         val validation = renderer.indexOf("UnifiedFogFrameFactory.build")
         val firstTarget = renderer.indexOf("terrainMaskTarget.initAndGet")
+        val liveDepthRefresh = renderer.indexOf("DistantHorizonsDepthTextureProvider.captureCurrentFrame")
+        val fallbackDecision = renderer.indexOf("if (!replaceNativeFogThisFrame)")
         assertTrue(validation in 0 until firstTarget, "Frame validation must happen before GPU target allocation")
+        assertTrue(liveDepthRefresh in 0 until fallbackDecision, "DH depth must refresh before the fallback decision")
     }
 
     @Test
-    fun `unified renderer keeps terrain mask full resolution and blurs only RGBA16F fog`() {
+    fun `unified renderer keeps full-resolution fog and applies depth-aware scene blur`() {
         val renderer = read(RENDERER) + read(RESOURCES)
 
         assertTrue(renderer.contains("GpuFormat.RGBA16_FLOAT"))
         assertTrue(renderer.contains("terrainMaskTarget.initAndGet(target.width, target.height)"))
         assertTrue(renderer.contains("fogTarget.initAndGet(target.width, target.height)"))
-        assertTrue(renderer.contains("fogBlurTarget.initAndGet(generatedFog.width, generatedFog.height)"))
+        assertTrue(renderer.contains("CustomFogBlurRenderer.render"))
         assertTrue(renderer.contains("bindTexture(\"TerrainMaskSampler\""))
-        assertTrue(renderer.contains("bindTexture(\"FogSampler\""))
+        assertTrue(renderer.contains("bindTexture(\"DepthSampler\""))
+        assertTrue(renderer.contains("bindTexture(\"DhDepthSampler\""))
+        assertFalse(renderer.contains("val fogForComposite = blurFogIfEnabled"))
         assertFalse(renderer.contains("bindTexture(\"SceneSampler\""))
     }
 
@@ -56,8 +64,6 @@ class UnifiedFogGpuContractTest {
         assertTrue(renderer.contains("IrisPipelineBypass.run"))
         assertTrue(renderer.contains("ClientRenderPipelines.UnifiedFogTerrainMask"))
         assertTrue(renderer.contains("ClientRenderPipelines.UnifiedFogGenerate"))
-        assertTrue(renderer.contains("ClientRenderPipelines.UnifiedFogBlurHorizontal"))
-        assertTrue(renderer.contains("ClientRenderPipelines.UnifiedFogBlurVertical"))
         assertTrue(renderer.contains("ClientRenderPipelines.UnifiedFogComposite"))
         assertTrue(renderer.contains("useDepthAttachment = false"))
         assertTrue(pipelines.contains("ColorTargetState.WRITE_COLOR"))

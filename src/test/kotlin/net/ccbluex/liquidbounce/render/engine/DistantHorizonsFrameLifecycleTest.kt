@@ -47,6 +47,8 @@ class DistantHorizonsFrameLifecycleTest {
             lifecycle.readiness(installed = true, supported = true, 1920, 1080, 11L),
         )
         assertEquals(1L, lifecycle.frameAge(11L))
+        assertEquals(10L, lifecycle.recentCapture(11L, maximumFrameAge = 1)?.frameToken)
+        assertNull(lifecycle.recentCapture(12L, maximumFrameAge = 1))
     }
 
     @Test

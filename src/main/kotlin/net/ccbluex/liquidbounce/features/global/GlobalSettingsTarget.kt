@@ -19,6 +19,7 @@
 
 package net.ccbluex.liquidbounce.features.global
 
+import com.google.gson.JsonObject
 import net.ccbluex.fastutil.enumSetAllOf
 import net.ccbluex.fastutil.enumSetOf
 import net.ccbluex.liquidbounce.config.types.group.ValueGroup
@@ -33,6 +34,7 @@ object GlobalSettingsTarget : ValueGroup(
     val combatChoices = multiEnumChoice("Combat",
         default = enumSetOf(
             Targets.PLAYERS,
+            Targets.TRIAL,
             Targets.HOSTILE,
             Targets.ANGERABLE,
             Targets.WATER_CREATURE,
@@ -44,6 +46,7 @@ object GlobalSettingsTarget : ValueGroup(
     val visualChoices = multiEnumChoice("Visual",
         default = enumSetOf(
             Targets.PLAYERS,
+            Targets.TRIAL,
             Targets.HOSTILE,
             Targets.ANGERABLE,
             Targets.WATER_CREATURE,
@@ -55,4 +58,13 @@ object GlobalSettingsTarget : ValueGroup(
     inline val combat: EnumSet<Targets> get() = combatChoices.get() as EnumSet
 
     inline val visual: EnumSet<Targets> get() = visualChoices.get() as EnumSet
+
+    /** Persisted in file JSON, but intentionally excluded from REST and ClickGUI interop. */
+    @Suppress("unused")
+    private val trialTargetMigrationMarker = boolean(TrialTargetConfigMigration.MARKER_NAME, true).notAnOption()
+
+    override fun prepareDeserialize(jsonObject: JsonObject) {
+        super.prepareDeserialize(jsonObject)
+        TrialTargetConfigMigration.migrateFileSettings(jsonObject)
+    }
 }

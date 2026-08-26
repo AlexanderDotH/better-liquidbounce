@@ -94,7 +94,11 @@ object GuiGlowRenderer : EventListener {
         val batch = frameState.consume() ?: return
 
         drawMask(maskTarget, batch.requests)
-        compositeBackdropBlur(mainTarget, maskTarget, batch.backgroundBlurRadius)
+        if (batch.backgroundBlurRadius > 0f) {
+            compositeBackdropBlur(mainTarget, maskTarget, batch.backgroundBlurRadius)
+        }
+        if (!batch.hasVisibleGlow) return
+
         val blurredMask = downsampleAndBlur(maskTarget, batch.style)
         writeStyleData(batch.style)
 

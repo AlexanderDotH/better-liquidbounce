@@ -37,6 +37,21 @@ internal enum class SpearKillFallSafetyPendingStepGate {
     BLOCKED,
 }
 
+internal enum class SpearKillFallSafetyPendingStepAction {
+    DELIVER,
+    STABILIZE,
+    BLOCKED,
+}
+
+internal fun resolveSpearKillFallSafetyPendingStepAction(
+    gate: SpearKillFallSafetyPendingStepGate,
+    stabilizationRequired: Boolean,
+): SpearKillFallSafetyPendingStepAction = when {
+    gate == SpearKillFallSafetyPendingStepGate.BLOCKED -> SpearKillFallSafetyPendingStepAction.BLOCKED
+    stabilizationRequired -> SpearKillFallSafetyPendingStepAction.STABILIZE
+    else -> SpearKillFallSafetyPendingStepAction.DELIVER
+}
+
 /**
  * Instant's airborne ground bit resets Vanilla fall state but is not collision evidence. Keeping
  * those concepts separate preserves the preflighted route plan while the wire packet stays safe.

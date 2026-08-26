@@ -60,6 +60,7 @@ import net.ccbluex.liquidbounce.features.misc.FriendManager
 import net.ccbluex.liquidbounce.features.misc.proxy.ProxyManager
 import net.ccbluex.liquidbounce.features.module.ModuleManager
 import net.ccbluex.liquidbounce.features.spoofer.SpooferManager
+import net.ccbluex.liquidbounce.features.trialchamber.TrialChamberRuntime
 import net.ccbluex.liquidbounce.integration.backend.BrowserBackendManager
 import net.ccbluex.liquidbounce.integration.interop.ClientInteropServer
 import net.ccbluex.liquidbounce.integration.interop.protocol.event.baritone.BaritoneEventPublisher
@@ -265,6 +266,7 @@ object LiquidBounce : EventListener {
         // Utility
         RenderedEntities
         ChunkScanner
+        TrialChamberRuntime.initialize()
         InputTracker
         BaritoneIntegration.initialize()
         BaritoneEventPublisher

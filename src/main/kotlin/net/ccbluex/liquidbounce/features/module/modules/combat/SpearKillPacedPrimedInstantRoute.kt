@@ -21,74 +21,12 @@ package net.ccbluex.liquidbounce.features.module.modules.combat
 
 import net.minecraft.world.phys.Vec3
 
-/**
- * Splits a normal Primed attack across client tick boundaries. Each segment stays within the
- * source-predicted five-packet allowance, while endpoint-only validation intentionally keeps the
- * Primed corridor behavior. Explicit research probes continue to use the single-lunge builder.
- */
-@Suppress("LongParameterList", "ReturnCount")
-internal fun buildSpearKillPacedPrimedInstantPacketRoute(
-    origin: Vec3,
-    destination: Vec3,
-    profile: SpearKillSpeedProfile,
-    expectedVelocitySquared: Double,
-    movementProfile: SpearKillPrimedInstantMovementProfile,
-    maxVerticalStep: Double,
-    isEndpointFree: (Vec3) -> Boolean,
-): SpearKillAStarPacketRoute? {
-    val positionsValid = origin.hasFinitePacedPrimedCoordinates() &&
-        destination.hasFinitePacedPrimedCoordinates()
-    val stepValid = maxVerticalStep.isFinite() && maxVerticalStep > 0.0
-    val routeValid = origin.distanceToSqr(destination) >= SPEAR_KILL_PACED_PRIMED_EPSILON &&
-        isEndpointFree(origin)
-    if (!positionsValid || !stepValid || !routeValid) return null
-
-    val primedProfile = spearKillPrimedAutoSpeedProfile(
-        profile,
-        expectedVelocitySquared,
-        movementProfile,
-    ) ?: return null
-    val displacement = destination.subtract(origin)
-    val outbound = buildSpearKillTerminalLoadedProfiledMovements(
-        direction = displacement,
-        distance = displacement.length(),
-        profile = primedProfile,
-        maxVerticalStep = maxVerticalStep,
-    ) ?: return null
-    var position = origin
-    for (movement in outbound) {
-        position = position.add(movement)
-        if (!position.hasFinitePacedPrimedCoordinates() || !isEndpointFree(position)) return null
-    }
-    if (position.distanceToSqr(destination) >= SPEAR_KILL_PACED_PRIMED_EPSILON) return null
-
-    return SpearKillAStarPacketRoute(
-        outboundMovements = outbound,
-        roundTripMovements = buildList(outbound.size * 2 + 1) {
-            addAll(outbound)
-            outbound.asReversed().forEach { add(it.scale(-1.0)) }
-            add(Vec3.ZERO)
-        },
-    )
-}
-
-internal fun spearKillPrimedAutoSpeedProfile(
-    profile: SpearKillSpeedProfile,
-    expectedVelocitySquared: Double,
-    movementProfile: SpearKillPrimedInstantMovementProfile,
-): SpearKillSpeedProfile? {
-    val primedStepBudget = SpearKillPrimedInstantPlanner.maximumAutoAcceptedDistance(
-        expectedVelocitySquared,
-        movementProfile,
-    ) ?: return null
-    return profile.copy(limits = profile.limits.copy(vanillaBudget = primedStepBudget))
-}
-
-/** Normal attacks fail before their first packet; explicit probes may still test rejected values. */
+/** One-hop Instant explicitly permits the aggressive attempt; paced callers remain conservative. */
 internal fun isSpearKillPrimedPlanSendable(
     sourcePredictedAccepted: Boolean,
+    instantDirectTeleport: Boolean,
     researchProbe: Boolean,
-): Boolean = sourcePredictedAccepted || researchProbe
+): Boolean = sourcePredictedAccepted || instantDirectTeleport || researchProbe
 
 /** Normal Primed attacks preflight collision; only an explicit probe may test endpoint-only travel. */
 internal fun usesSpearKillPrimedEndpointOnlyPreflight(
@@ -117,6 +55,7 @@ internal fun planSpearKillPrimedBurstStep(
     priming: SpearKillPrimedInstantPriming,
     packetAccounting: SpearKillPrimedInstantPacketAccounting,
     primingPacketType: SpearKillPrimedInstantPacketType,
+    instantDirectTeleport: Boolean = false,
 ): SpearKillPrimedBurstStepResult {
     if (!windowOrigin.hasFinitePacedPrimedCoordinates() ||
         !currentPosition.hasFinitePacedPrimedCoordinates() ||
@@ -139,7 +78,11 @@ internal fun planSpearKillPrimedBurstStep(
     )
     val researchProbe = priming is SpearKillPrimedInstantPriming.Explicit
     if (currentWindowPlan is SpearKillPrimedInstantPlanResult.Ready &&
-        isSpearKillPrimedPlanSendable(currentWindowPlan.plan.sourcePredictedAccepted, researchProbe)
+        isSpearKillPrimedPlanSendable(
+            sourcePredictedAccepted = currentWindowPlan.plan.sourcePredictedAccepted,
+            instantDirectTeleport = instantDirectTeleport,
+            researchProbe = researchProbe,
+        )
     ) {
         return SpearKillPrimedBurstStepResult.Send(currentWindowPlan.plan)
     }
@@ -164,56 +107,4 @@ internal fun planSpearKillPrimedBurstStep(
     }
 }
 
-/** Source-based client-tick estimate used by target prediction and charge-window admission. */
-internal fun calculateSpearKillPrimedBurstTickCount(
-    movements: List<Vec3>,
-    expectedVelocitySquared: Double,
-    movementProfile: SpearKillPrimedInstantMovementProfile,
-): Int? {
-    if (movements.isEmpty()) return 0
-    var currentPosition = Vec3.ZERO
-    var windowOrigin = currentPosition
-    var packetsInWindow = 0
-    var tickCount = 1
-
-    for (movement in movements) {
-        var retriedInFreshWindow = false
-        while (true) {
-            when (val result = planSpearKillPrimedBurstStep(
-                windowOrigin = windowOrigin,
-                currentPosition = currentPosition,
-                movement = movement,
-                expectedVelocitySquared = expectedVelocitySquared,
-                movementProfile = movementProfile,
-                priming = SpearKillPrimedInstantPriming.Auto,
-                packetAccounting = SpearKillPrimedInstantPacketAccounting(
-                    ownedPreFinalPackets = packetsInWindow,
-                    noFallPreFinalPackets = 0,
-                    reservedPacketsAfterFinal = 0,
-                    maxPackets = SPEAR_KILL_PRIMED_BURST_PACKET_WINDOW,
-                ),
-                primingPacketType = SpearKillPrimedInstantPacketType.Position,
-            )) {
-                is SpearKillPrimedBurstStepResult.Send -> {
-                    packetsInWindow = result.plan.finalPacketOrdinal
-                    currentPosition = currentPosition.add(movement)
-                    break
-                }
-                SpearKillPrimedBurstStepResult.Defer -> {
-                    if (retriedInFreshWindow) return null
-                    tickCount++
-                    windowOrigin = currentPosition
-                    packetsInWindow = 0
-                    retriedInFreshWindow = true
-                }
-                SpearKillPrimedBurstStepResult.Block -> return null
-            }
-        }
-    }
-    return tickCount
-}
-
 private fun Vec3.hasFinitePacedPrimedCoordinates(): Boolean = x.isFinite() && y.isFinite() && z.isFinite()
-
-private const val SPEAR_KILL_PACED_PRIMED_EPSILON = 1.0E-12
-private const val SPEAR_KILL_PRIMED_BURST_PACKET_WINDOW = 5

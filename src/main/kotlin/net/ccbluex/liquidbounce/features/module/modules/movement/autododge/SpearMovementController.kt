@@ -77,7 +77,7 @@ internal class SpearMovementController(
         world: ClientLevel,
         settings: SpearMovementSettings,
     ): SpearMovementResult {
-        val threat = updateThreat(canStartDefense, player, world, settings)
+        val threat = updateThreatOnly(canStartDefense, player, world, settings)
         val jukePlan = updateJuke(canStartDefense, threat, player, world, settings)
         val teleportPlan = teleportRuntime.plan(
             enabled = settings.enabled && settings.teleportEnabled,
@@ -134,7 +134,8 @@ internal class SpearMovementController(
         teleportRuntime.reset()
     }
 
-    private fun updateThreat(
+    /** Updates the selected spear threat without planning or executing a movement response. */
+    fun updateThreatOnly(
         canStartDefense: Boolean,
         player: LocalPlayer,
         world: ClientLevel,

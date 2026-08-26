@@ -33,6 +33,7 @@ import net.ccbluex.liquidbounce.render.drawLine
 import net.ccbluex.liquidbounce.render.engine.type.Color4b
 import net.ccbluex.liquidbounce.render.engine.type.Vec3f
 import net.ccbluex.liquidbounce.render.renderEnvironment
+import net.ccbluex.liquidbounce.utils.aiming.RotationManager
 import net.ccbluex.liquidbounce.utils.aiming.data.Rotation
 import net.ccbluex.liquidbounce.utils.kotlin.EventPriorityConvention
 import net.ccbluex.liquidbounce.utils.math.toVec3f
@@ -108,7 +109,7 @@ object ModulePlayerModel : ClientModule(
     @Suppress("unused")
     private val modelUpdater = handler<GameTickEvent>(priority = EventPriorityConvention.READ_FINAL_STATE) {
         val snapshot = ServerPlayerModelStateTracker.snapshot
-        val current = snapshot.rotation
+        val current = resolvePlayerModelRotation(snapshot.rotation, RotationManager.currentRotation)
 
         if (!snapshot.isInitialized || current == null) {
             prevModelRotation = modelRotation
@@ -199,3 +200,8 @@ object ModulePlayerModel : ClientModule(
         super.onDisabled()
     }
 }
+
+internal fun resolvePlayerModelRotation(
+    transmittedRotation: Rotation?,
+    managedRotation: Rotation?,
+): Rotation? = managedRotation ?: transmittedRotation

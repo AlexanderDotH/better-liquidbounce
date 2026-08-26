@@ -20,6 +20,7 @@ internal enum class EspGlowSource(
     val protectsSurface: Boolean = false,
 ) {
     BASE_FINDER("Base Finder", false),
+    TRIAL_CHAMBER("Trial Chamber", false),
     BLOCK_ESP("Block ESP", true),
     BLOCK_OUTLINE("Block Outline", false, protectsSurface = true),
     BLOCK_ESP_TRACERS("Block ESP Tracers", false),

@@ -83,16 +83,6 @@ class SpearKillRoutingModeTest {
             ),
         )
         assertEquals(
-            24,
-            spearKillDirectRouteHitTicks(
-                routingMode = SpearKillRoutingMode.INSTANT,
-                outboundTickCount = 24,
-                stepWaitTicks = 4,
-                strikeHoldTicks = SPEAR_KILL_PACKET_STRIKE_HOLD_TICKS,
-                pacedInstant = true,
-            ),
-        )
-        assertEquals(
             spearKillDirectPacketHitTicks(stepCount = 24, stepWaitTicks = 0, strikeHoldTicks = 0),
             spearKillDirectRouteHitTicks(
                 routingMode = SpearKillRoutingMode.DIRECT,
@@ -104,32 +94,9 @@ class SpearKillRoutingModeTest {
     }
 
     @Test
-    fun `Instant alone applies the safe vertical packet cap to direct routes`() {
-        assertEquals(
-            2.95,
-            spearKillDirectRouteMaxVerticalStep(
-                routingMode = SpearKillRoutingMode.INSTANT,
-                maximumStepLimit = 500.0,
-                safeVerticalStep = 2.95,
-            ),
-            1.0E-9,
-        )
-        assertEquals(
-            500.0,
-            spearKillDirectRouteMaxVerticalStep(
-                routingMode = SpearKillRoutingMode.DIRECT,
-                maximumStepLimit = 500.0,
-                safeVerticalStep = 2.95,
-            ),
-            1.0E-9,
-        )
-    }
-
-    @Test
-    fun `paced Primed keeps tracking a moving target while same tick Instant does not`() {
-        assertFalse(shouldTrackSpearKillPacketTarget(SpearKillRoutingMode.INSTANT, pacedInstant = false))
-        assertTrue(shouldTrackSpearKillPacketTarget(SpearKillRoutingMode.INSTANT, pacedInstant = true))
-        assertTrue(shouldTrackSpearKillPacketTarget(SpearKillRoutingMode.DIRECT, pacedInstant = false))
+    fun `Instant does not replan after committing its one hop route`() {
+        assertFalse(shouldTrackSpearKillPacketTarget(SpearKillRoutingMode.INSTANT))
+        assertTrue(shouldTrackSpearKillPacketTarget(SpearKillRoutingMode.DIRECT))
     }
 
     @Test

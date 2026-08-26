@@ -18,7 +18,10 @@
  */
 package net.ccbluex.liquidbounce.features.module.modules.misc
 
+import net.ccbluex.liquidbounce.config.gson.interopGson
+import net.ccbluex.liquidbounce.config.types.ValueType
 import net.ccbluex.liquidbounce.config.types.group.ModeValueGroup
+import net.ccbluex.liquidbounce.config.types.group.ToggleableValueGroup
 import net.ccbluex.liquidbounce.test.MinecraftBootstrap
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -27,7 +30,7 @@ import kotlin.test.assertTrue
 class ModuleMiddleClickActionTest {
 
     @Test
-    fun `middle click action exposes nuker block selection`() {
+    fun `middle click action exposes smart after the existing modes`() {
         MinecraftBootstrap.ensureInitialized()
 
         val mode = ModuleMiddleClickAction.inner
@@ -35,9 +38,57 @@ class ModuleMiddleClickActionTest {
             .single { it.name == "Mode" }
 
         assertEquals(
-            setOf("FriendClicker", "Pearl", "AmnesiaTarget", "NukerBlock"),
-            mode.modes.mapTo(linkedSetOf()) { it.name },
+            listOf("FriendClicker", "Pearl", "AmnesiaTarget", "NukerBlock", "Smart"),
+            mode.modes.map { it.name },
         )
+        assertEquals("FriendClicker", mode.activeMode.name)
         assertTrue("Nuker Block" in mode.modes.single { it.name == "NukerBlock" }.aliases)
+    }
+
+    @Test
+    fun `smart mirrors every action as an enabled toggleable group`() {
+        MinecraftBootstrap.ensureInitialized()
+
+        val smart = ModuleMiddleClickAction.inner
+            .filterIsInstance<ModeValueGroup<*>>()
+            .single { it.name == "Mode" }
+            .modes.single { it.name == "Smart" }
+        val options = smart.inner.filterIsInstance<ToggleableValueGroup>()
+
+        assertEquals(
+            listOf("FriendClicker", "Pearl", "AmnesiaTarget", "NukerBlock", "VClipLock"),
+            options.map { it.name },
+        )
+        assertEquals(smart.inner.size, options.size)
+        assertTrue(options.all { it.enabled })
+        assertEquals(
+            mapOf(
+                "FriendClicker" to listOf("Enabled", "PickUpRange"),
+                "Pearl" to listOf("Enabled", "SlotResetDelay", "StopOnSubmit"),
+                "AmnesiaTarget" to listOf("Enabled", "PickUpRange"),
+                "NukerBlock" to listOf("Enabled"),
+                "VClipLock" to listOf("Enabled"),
+            ),
+            options.associate { option -> option.name to option.inner.map { it.name } },
+        )
+    }
+
+    @Test
+    fun `smart options expose toggleable ClickGUI metadata`() {
+        MinecraftBootstrap.ensureInitialized()
+
+        val smart = ModuleMiddleClickAction.inner
+            .filterIsInstance<ModeValueGroup<*>>()
+            .single { it.name == "Mode" }
+            .modes.single { it.name == "Smart" }
+        val settings = interopGson.toJsonTree(smart).asJsonObject
+            .getAsJsonArray("value")
+            .map { it.asJsonObject }
+
+        assertEquals(
+            listOf("FriendClicker", "Pearl", "AmnesiaTarget", "NukerBlock", "VClipLock"),
+            settings.map { it["name"].asString },
+        )
+        assertTrue(settings.all { it["valueType"].asString == ValueType.TOGGLEABLE.name })
     }
 }

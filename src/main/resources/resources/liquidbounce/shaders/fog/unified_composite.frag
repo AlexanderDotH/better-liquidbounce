@@ -25,9 +25,11 @@ const float TERRAIN_THRESHOLD = 0.5;
 const float MAX_FEATHER_PIXELS = 32.0;
 const float DIAGONAL = 0.70710678118;
 const int FEATHER_RING_COUNT = 4;
+const int SOURCE_SKY = 0;
+const float SKY_ENVELOPE_BOOST = 0.35;
 
-bool isTerrain(vec2 uv) {
-    return texture(TerrainMaskSampler, uv).r >= TERRAIN_THRESHOLD;
+int sourceLayer(vec2 uv) {
+    return int(floor(texture(TerrainMaskSampler, uv).g * 2.0 + 0.5));
 }
 
 float terrainSample(vec2 uv) {
@@ -35,7 +37,7 @@ float terrainSample(vec2 uv) {
     return step(TERRAIN_THRESHOLD, texture(TerrainMaskSampler, boundedUv).r);
 }
 
-float skySideFeatherFactor(vec2 uv) {
+float skyEnvelopeFactor(vec2 uv) {
     if (HorizonInfo.w <= EPSILON) return 1.0;
 
     float featherPixels = clamp(HorizonInfo.w, 0.0, MAX_FEATHER_PIXELS);
@@ -57,22 +59,23 @@ float skySideFeatherFactor(vec2 uv) {
         );
         float ringTerrain = max(cardinalTerrain, diagonalTerrain);
         if (ringTerrain > 0.5) {
-            nearestTerrainDistance = min(nearestTerrainDistance, normalizedDistance);
+            float estimatedEdgeDistance = max(
+                normalizedDistance - 1.0 / float(FEATHER_RING_COUNT),
+                0.0
+            );
+            nearestTerrainDistance = min(nearestTerrainDistance, estimatedEdgeDistance);
         }
     }
-    return smoothstep(0.0, 1.0, nearestTerrainDistance);
+    float terrainProximity = 1.0 - smoothstep(0.0, 1.0, nearestTerrainDistance);
+    return 1.0 + SKY_ENVELOPE_BOOST * terrainProximity;
 }
 
 void main() {
-    if (isTerrain(texCoord)) {
-        fragColor = vec4(0.0);
-        return;
-    }
-
     vec4 fog = texture(FogSampler, texCoord);
-    float skyFeather = skySideFeatherFactor(texCoord);
-    vec4 featheredFog = fog * skyFeather;
-    float fogAlpha = clamp(featheredFog.a, 0.0, 1.0);
+    bool centerIsSky = sourceLayer(texCoord) == SOURCE_SKY;
+    float skyEnvelope = centerIsSky ? skyEnvelopeFactor(texCoord) : 1.0;
+    vec4 envelopingFog = fog * skyEnvelope;
+    float fogAlpha = clamp(envelopingFog.a, 0.0, 1.0);
     if (fogAlpha <= EPSILON) {
         fragColor = vec4(0.0);
         return;
@@ -80,5 +83,5 @@ void main() {
 
     // The fog field is stored premultiplied so filtering cannot create color
     // fringes. The translucent pipeline expects straight-alpha output.
-    fragColor = vec4(featheredFog.rgb / fogAlpha, fogAlpha);
+    fragColor = vec4(envelopingFog.rgb / max(envelopingFog.a, EPSILON), fogAlpha);
 }

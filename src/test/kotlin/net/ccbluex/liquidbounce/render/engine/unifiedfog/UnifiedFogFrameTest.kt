@@ -19,6 +19,14 @@ import kotlin.test.assertNull
 class UnifiedFogFrameTest {
 
     @Test
+    fun `native fog is replaced only when Unified has every installed terrain source`() {
+        assertEquals(true, shouldReplaceNativeFog(true, false, false))
+        assertEquals(true, shouldReplaceNativeFog(true, true, true))
+        assertEquals(false, shouldReplaceNativeFog(true, true, false))
+        assertEquals(false, shouldReplaceNativeFog(false, false, true))
+    }
+
+    @Test
     fun `accepted frame carries the already resolved physical horizon`() {
         val resolvedHorizon = PhysicalFogHorizonRange(startBlocks = 7_000f, endBlocks = 10_000f)
         val request = frameRequest(
@@ -75,6 +83,26 @@ class UnifiedFogFrameTest {
     }
 
     @Test
+    fun `runtime DH policy accepts one-frame latency and same-aspect scaling`() {
+        val dh = depthSource(
+            kind = TerrainDepthKind.DISTANT_HORIZONS,
+            frameToken = TerrainFrameToken(3, 98),
+            dimensions = FrameDimensions(960, 540),
+        )
+        val request = frameRequest(
+            expectedToken = TerrainFrameToken(3, 99),
+            vanilla = depthSource(frameToken = TerrainFrameToken(3, 99)),
+            distantHorizons = OptionalTerrainDepthSource.Ready(dh),
+            distantHorizonsValidationPolicy = TerrainDepthValidationPolicy.renderCompatible(1),
+        )
+
+        val ready = assertIs<UnifiedFogFrameBuild.Ready<String>>(UnifiedFogFrameFactory.build(request))
+
+        assertEquals(TerrainFrameToken(3, 98), ready.frame.distantHorizonsSource?.frameToken)
+        assertEquals(FrameDimensions(960, 540), ready.frame.distantHorizonsSource?.dimensions)
+    }
+
+    @Test
     fun `installed DH without current depth skips instead of covering unknown LOD terrain`() {
         val request = frameRequest(
             distantHorizons = OptionalTerrainDepthSource.Unavailable(
@@ -94,12 +122,14 @@ class UnifiedFogFrameTest {
         vanilla: TerrainDepthSource<String> = depthSource(frameToken = expectedToken),
         distantHorizons: OptionalTerrainDepthSource<String> = OptionalTerrainDepthSource.Absent,
         horizonRange: PhysicalFogHorizonRange = PhysicalFogHorizonRange(268.8f, 384f),
+        distantHorizonsValidationPolicy: TerrainDepthValidationPolicy = TerrainDepthValidationPolicy.STRICT,
     ) = UnifiedFogFrameRequest(
         expectedFrameToken = expectedToken,
         targetDimensions = FrameDimensions(1920, 1080),
         vanillaSource = vanilla,
         distantHorizonsSource = distantHorizons,
         horizonRange = horizonRange,
+        distantHorizonsValidationPolicy = distantHorizonsValidationPolicy,
     )
 
     private fun depthSource(

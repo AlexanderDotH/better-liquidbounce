@@ -67,6 +67,26 @@ class GuiGlowFrameStateTest {
         assertNull(state.consume())
     }
 
+    @Test
+    fun `backdrop-only request skips the Gaussian halo pipeline`() {
+        val state = GuiGlowFrameState()
+        state.append(GuiGlowFrameRequest.axisAligned(
+            x1 = 10f,
+            y1 = 10f,
+            x2 = 30f,
+            y2 = 20f,
+            radius = 6f,
+            color = Color4b.BLACK,
+            style = style.copy(intensity = 0f, coreSize = 0f, opacity = 0f),
+            backgroundBlurRadius = 12f,
+        ))
+
+        val batch = requireNotNull(state.consume())
+
+        assertFalse(batch.hasVisibleGlow)
+        assertEquals(12f, batch.backgroundBlurRadius)
+    }
+
     private fun request(x: Float) = GuiGlowFrameRequest.axisAligned(
         x1 = x,
         y1 = 10f,

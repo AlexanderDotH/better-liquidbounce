@@ -95,6 +95,9 @@ internal object VClipPacketPlanner {
         safeFallDistance: Double,
     ): VClipPacketPlanResult {
         requireFoliaPacketCount(movementPackets)
+        if (target.y < origin.y) {
+            return packetJumpFallback(target, movementPackets, fullPacket)
+        }
 
         val checkpoints = groundedCheckpoints(origin, target, initialFallDistance, safeFallDistance)
         if (checkpoints == null || checkpoints.size > movementPackets) {

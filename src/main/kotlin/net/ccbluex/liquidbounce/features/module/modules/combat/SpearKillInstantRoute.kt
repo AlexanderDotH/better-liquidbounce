@@ -63,10 +63,9 @@ internal fun shouldProtectSpearKillInstantGround(
  */
 internal fun spearKillInstantAimPredictionTicks(
     serverEvaluationTicks: Int,
-    paced: Boolean = false,
 ): Int {
     require(serverEvaluationTicks >= 0) { "Server evaluation ticks must not be negative" }
-    return if (paced) serverEvaluationTicks else serverEvaluationTicks.coerceAtMost(1)
+    return serverEvaluationTicks.coerceAtMost(1)
 }
 
 /** A complete direct round trip split into an immediate outbound and next-tick exact return. */
@@ -160,10 +159,10 @@ internal fun buildSpearKillInstantPacketBurst(
 }
 
 /**
- * Builds the aggressive one-packet lunge without inspecting the corridor. Only the two endpoint
- * hitboxes are admitted here; the terminal spear ray remains a separate mandatory check.
+ * Builds Instant's one-packet direct lunge. Only the two endpoint hitboxes are admitted here;
+ * normal attacks validate the complete corridor before launch and again at send time.
  */
-internal fun buildSpearKillPrimedInstantPacketRoute(
+internal fun buildSpearKillInstantDirectPacketRoute(
     origin: Vec3,
     destination: Vec3,
     isEndpointFree: (Vec3) -> Boolean,

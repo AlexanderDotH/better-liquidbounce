@@ -21,10 +21,13 @@
 package net.ccbluex.liquidbounce.features.module.modules.movement.autododge
 
 import net.ccbluex.fastutil.mapToArray
+import net.ccbluex.liquidbounce.config.types.group.Mode
+import net.ccbluex.liquidbounce.config.types.group.ModeValueGroup
 import net.ccbluex.liquidbounce.config.types.group.ToggleableValueGroup
 import net.ccbluex.liquidbounce.config.types.list.Tagged
 import net.ccbluex.liquidbounce.event.events.DisconnectEvent
 import net.ccbluex.liquidbounce.event.events.MovementInputEvent
+import net.ccbluex.liquidbounce.event.events.PacketEvent
 import net.ccbluex.liquidbounce.event.events.ScheduleInventoryActionEvent
 import net.ccbluex.liquidbounce.event.events.WorldChangeEvent
 import net.ccbluex.liquidbounce.event.handler
@@ -61,6 +64,7 @@ import net.ccbluex.liquidbounce.utils.network.releaseUsingItemInTickLoop
 import net.ccbluex.liquidbounce.utils.network.sendPacketSilently
 import net.minecraft.client.gui.screens.inventory.ContainerScreen
 import net.minecraft.client.multiplayer.ClientLevel
+import net.minecraft.network.protocol.game.ServerboundMovePlayerPacket
 import net.minecraft.world.InteractionHand
 import net.minecraft.world.entity.Entity
 import net.minecraft.world.entity.projectile.arrow.Arrow
@@ -71,10 +75,46 @@ import net.minecraft.world.item.Items
 import net.minecraft.world.phys.AABB
 import net.minecraft.world.phys.Vec3
 
-@Suppress("TooManyFunctions")
+@Suppress("TooManyFunctions", "LargeClass")
 object ModuleAutoDodge : ClientModule("AutoDodge", ModuleCategories.COMBAT) {
     private const val MIN_PACKET_DISTANCE = 0.9
     private const val MIN_PACKET_DISTANCE_SQ = MIN_PACKET_DISTANCE * MIN_PACKET_DISTANCE
+
+    private val mode = choices("Mode", Movement, arrayOf(Movement, Packet))
+
+    private sealed class AutoDodgeMode(name: String) : Mode(name) {
+        override val parent: ModeValueGroup<*>
+            get() = mode
+    }
+
+    private object Movement : AutoDodgeMode("Movement") {
+        override fun enable() {
+            ModuleAutoDodge.resetPacketRuntime()
+        }
+    }
+
+    private object Packet : AutoDodgeMode("Packet") {
+        val cooldown by int(
+            "Cooldown",
+            AUTO_DODGE_PACKET_MIN_COOLDOWN_TICKS,
+            AUTO_DODGE_PACKET_MIN_COOLDOWN_TICKS..AUTO_DODGE_PACKET_MAX_COOLDOWN_TICKS,
+            suffix = "ticks",
+        )
+        val holdTicks by int(
+            "HoldTicks",
+            AUTO_DODGE_PACKET_DEFAULT_HOLD_TICKS,
+            AUTO_DODGE_PACKET_MIN_HOLD_TICKS..AUTO_DODGE_PACKET_MAX_HOLD_TICKS,
+            suffix = "ticks",
+        )
+
+        override fun enable() {
+            ModuleAutoDodge.enterPacketMode()
+        }
+
+        override fun disable() {
+            ModuleAutoDodge.resetPacketRuntime()
+        }
+    }
 
     private object AllowRotationChange : ToggleableValueGroup(this, "AllowRotationChange", false) {
         val allowJump by boolean("AllowJump", true)
@@ -156,6 +196,7 @@ object ModuleAutoDodge : ClientModule("AutoDodge", ModuleCategories.COMBAT) {
 
     private val spearMovementController = SpearMovementController()
     private val maceMovementController = MaceMovementController()
+    private val packetController = AutoDodgePacketController()
 
     private var primarySpearThreat: SpearThreat? = null
     private var primaryMaceThreat: MaceThreat? = null
@@ -185,7 +226,34 @@ object ModuleAutoDodge : ClientModule("AutoDodge", ModuleCategories.COMBAT) {
     val tickRep = handler<MovementInputEvent>(priority = SAFETY_FEATURE) { event ->
         val availability = resolveAutoDodgeBranchAvailability(runtimeContext())
         val canStartDefense = enabled && availability.spear
-        val projectilePlan = if (enabled && availability.projectile) projectileDodgePlan() else null
+        val projectileHit = if (enabled && availability.projectile) findProjectileThreat() else null
+
+        if (mode.activeMode === Packet) {
+            updatePacketDefense(canStartDefense, projectileHit)
+        } else {
+            updateMovementDefense(event, canStartDefense, projectileHit)
+        }
+
+        // Movement teleports can change the shield arc immediately; Packet leaves the local position untouched.
+        updateSpearShield(canStartDefense)
+        debugSpearState()
+    }
+
+    @Suppress("unused")
+    private val packetHoldHandler = handler<PacketEvent>(priority = SAFETY_FEATURE) { event ->
+        if (shouldSuppressAutoDodgePacketHoldMovement(packetController.suppressesMovementPackets, event)) {
+            event.cancelEvent()
+        }
+    }
+
+    private fun updateMovementDefense(
+        event: MovementInputEvent,
+        canStartDefense: Boolean,
+        projectileHit: HitInfo?,
+    ) {
+        val projectilePlan = projectileHit?.let {
+            planEvasion(DodgePlannerConfig(allowRotations = AllowRotationChange.enabled), it)
+        }
         val spearMovement = spearMovementController.update(
             canStartDefense = canStartDefense,
             projectilePlanActive = projectilePlan != null,
@@ -208,6 +276,14 @@ object ModuleAutoDodge : ClientModule("AutoDodge", ModuleCategories.COMBAT) {
             spearMovement.jukePlan,
             maceMovement.teleportPlan,
         )
+        executeMovementAction(event, action, spearMovement)
+    }
+
+    private fun executeMovementAction(
+        event: MovementInputEvent,
+        action: AutoDodgeMovementAction,
+        spearMovement: SpearMovementResult,
+    ) {
         var teleported = false
         val dodgePlan = when (action) {
             is AutoDodgeMovementAction.Dodge -> action.plan
@@ -227,14 +303,10 @@ object ModuleAutoDodge : ClientModule("AutoDodge", ModuleCategories.COMBAT) {
             AutoDodgeMovementAction.None -> null
         }
 
-        // A teleport can change the shield arc immediately, so evaluate shield ownership at the final position.
-        updateSpearShield(canStartDefense)
-        debugSpearState()
-
         if (teleported) {
-            return@handler
+            return
         }
-        dodgePlan ?: return@handler
+        dodgePlan ?: return
 
         event.directionalInput = dodgePlan.directionalInput
 
@@ -253,6 +325,45 @@ object ModuleAutoDodge : ClientModule("AutoDodge", ModuleCategories.COMBAT) {
         }
     }
 
+    private fun updatePacketDefense(
+        canStartDefense: Boolean,
+        projectileHit: HitInfo?,
+    ) {
+        primarySpearThreat = spearMovementController.updateThreatOnly(
+            canStartDefense = canStartDefense,
+            player = player,
+            world = world,
+            settings = Spear.movementSettings(),
+        )
+        primaryMaceThreat = maceMovementController.updateThreatOnly(
+            canStartDefense = canStartDefense,
+            player = player,
+            world = world,
+            settings = Mace.movementSettings(),
+        )
+        packetController.update(
+            AutoDodgePacketUpdateRequest(
+                player = player,
+                world = world,
+                cooldownTicks = Packet.cooldown,
+                holdTicks = Packet.holdTicks,
+                projectileThreat = projectileHit?.let {
+                    AutoDodgePacketProjectileThreat(
+                        tickDelta = it.tickDelta,
+                        previousPosition = it.prevArrowPos,
+                        velocity = it.arrowVelocity,
+                        entityId = it.arrowEntity.id,
+                    )
+                },
+                maceThreat = primaryMaceThreat,
+                spearThreat = primarySpearThreat,
+                currentConnection = { mc.connection?.connection },
+                blinkMovementQueued = { BlinkManager.isLagging },
+                sendPacket = { sendPacketSilently(it) },
+            )
+        )
+    }
+
     private fun runtimeContext() = AutoDodgeRuntimeContext(
         blinkActive = ModuleBlink.running,
         inventoryBlocked = Ignore.OPEN_INVENTORY !in ignore &&
@@ -264,16 +375,14 @@ object ModuleAutoDodge : ClientModule("AutoDodge", ModuleCategories.COMBAT) {
         cleanupPending = shieldCleanupPending,
     )
 
-    private fun projectileDodgePlan(): DodgePlan? {
+    private fun findProjectileThreat(): HitInfo? {
         val arrows = world.findFlyingArrows()
         val simulatedPlayer = CachedPlayerSimulation(PlayerSimulationCache.getSimulationForLocalPlayer())
-        val inflictedHit = getInflictedHits(
+        return getInflictedHits(
             simulatedPlayer,
             arrows,
             hitboxExpansion = DodgePlanner.SAFE_DISTANCE_WITH_PADDING,
-        ) ?: return null
-
-        return planEvasion(DodgePlannerConfig(allowRotations = AllowRotationChange.enabled), inflictedHit)
+        )
     }
 
     private fun performSpearTeleport(plan: SpearTeleportPlan): Boolean {
@@ -566,6 +675,25 @@ object ModuleAutoDodge : ClientModule("AutoDodge", ModuleCategories.COMBAT) {
         maceMovementController.resetTeleport()
     }
 
+    private fun enterPacketMode() {
+        resetSpearMovement()
+        resetSpearTeleport()
+        resetMaceMovement()
+        resetMaceTeleport()
+        resetPacketRuntime()
+    }
+
+    private fun resetPacketRuntime(returnToOrigin: Boolean = true) {
+        val sendReturn = if (returnToOrigin && mc.connection?.connection?.isConnected == true) {
+            { packet: ServerboundMovePlayerPacket.Pos ->
+                sendPacketSilently(packet)
+            }
+        } else {
+            null
+        }
+        packetController.reset(sendReturn)
+    }
+
     private val shieldCleanupPending: Boolean
         get() = spearShieldState !is SpearShieldState.Idle &&
             spearShieldState !is SpearShieldState.Aborted
@@ -661,6 +789,18 @@ object ModuleAutoDodge : ClientModule("AutoDodge", ModuleCategories.COMBAT) {
         debugParameter("Mace/TeleportDestination") {
             maceMovementController.plannedTeleport?.destination ?: "-"
         }
+        debugParameter("Packet/State") { packetController.debug.state.debugName }
+        debugParameter("Packet/Threat") { packetController.debug.selectedThreat ?: "-" }
+        debugParameter("Packet/Destination") { packetController.debug.destination ?: "-" }
+        debugParameter("Packet/PredictedImpactTick") {
+            packetController.debug.predictedImpactTick ?: "-"
+        }
+        debugParameter("Packet/DodgeAtTick") { packetController.debug.dodgeAtTick ?: "-" }
+        debugParameter("Packet/HoldUntilTick") { packetController.debug.holdUntilTick ?: "-" }
+        debugParameter("Packet/LastSuccessTick") { packetController.debug.lastSuccessfulBurstTick ?: "-" }
+        debugParameter("Packet/LastSuccessDestination") {
+            packetController.debug.lastSuccessfulDestination ?: "-"
+        }
     }
 
     @Suppress("unused")
@@ -669,6 +809,7 @@ object ModuleAutoDodge : ClientModule("AutoDodge", ModuleCategories.COMBAT) {
         resetSpearTeleport()
         resetMaceMovement()
         resetMaceTeleport()
+        resetPacketRuntime(returnToOrigin = false)
         resetSpearShieldForWorldChange()
     }
 
@@ -678,6 +819,7 @@ object ModuleAutoDodge : ClientModule("AutoDodge", ModuleCategories.COMBAT) {
         resetSpearTeleport()
         resetMaceMovement()
         resetMaceTeleport()
+        resetPacketRuntime(returnToOrigin = false)
         resetSpearShieldForWorldChange()
     }
 
@@ -686,6 +828,7 @@ object ModuleAutoDodge : ClientModule("AutoDodge", ModuleCategories.COMBAT) {
         resetSpearTeleport()
         resetMaceMovement()
         resetMaceTeleport()
+        resetPacketRuntime()
         disableSpearShield()
         super.onDisabled()
     }

@@ -21,7 +21,7 @@ class VClipPacketPlannerTest {
     private val origin = VClipPosition(2.0, 64.0, -3.0)
 
     @Test
-    fun `Folia five packet descent uses two primers and three grounded checkpoints`() {
+    fun `Folia current five packet descent always uses an ungrounded PacketJump reset`() {
         val target = origin.copy(y = 57.63)
 
         val result = VClipPacketPlanner.folia(
@@ -31,18 +31,16 @@ class VClipPacketPlannerTest {
             fullPacket = false,
             initialFallDistance = 0.0,
             safeFallDistance = 3.0,
-        ) as VClipPacketPlanResult.GroundedSegmentation
+        ) as VClipPacketPlanResult.PacketJumpFallback
 
         assertEquals(5, result.steps.size)
         assertEquals(
-            List(2) { VClipPlayerPacketShape.STATUS_ONLY },
-            result.steps.take(2).map(VClipPlayerPacketStep::shape),
+            List(3) { VClipPlayerPacketShape.STATUS_ONLY },
+            result.steps.take(3).map(VClipPlayerPacketStep::shape),
         )
-        assertEquals(
-            listOf(origin.copy(y = 61.25), origin.copy(y = 58.5), target),
-            result.steps.drop(2).map(VClipPlayerPacketStep::position),
-        )
-        assertEquals(List(5) { true }, result.steps.map(VClipPlayerPacketStep::onGround))
+        assertEquals(target, result.steps[3].position)
+        assertEquals(target.copy(y = target.y + 1.0E-9), result.steps[4].position)
+        assertTrue(result.steps.none(VClipPlayerPacketStep::onGround))
     }
 
     @Test

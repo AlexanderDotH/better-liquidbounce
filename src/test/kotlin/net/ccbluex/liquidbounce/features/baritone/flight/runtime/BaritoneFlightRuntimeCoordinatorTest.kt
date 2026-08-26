@@ -41,6 +41,47 @@ class BaritoneFlightRuntimeCoordinatorTest {
     }
 
     @Test
+    fun `overshooting an intermediate waypoint continues toward the route goal`() {
+        val fly = FakeFlyPort()
+        val coordinator = coordinator(fly, FakePlannerPort())
+        coordinator.startTask(BaritoneNavigationMode.FLY)
+        coordinator.tick(input(goal = point(8.0)))
+
+        coordinator.tick(input(goal = point(8.0)).copy(playerPosition = point(5.0)))
+
+        assertEquals(FlightRuntimeVector(1.0, 0.0, 0.0), fly.lastSteering?.direction)
+    }
+
+    @Test
+    fun `a fast Fly lease drops sprint before reaching its final anchor`() {
+        val fly = FakeFlyPort(reliableSpeed = 3.0)
+        val planner = FakePlannerPort(
+            result = RuntimeFlightPlan.complete(listOf(point(0.0), point(12.0))),
+        )
+        val coordinator = coordinator(fly, planner)
+        coordinator.startTask(BaritoneNavigationMode.FLY)
+        coordinator.tick(input(goal = point(12.0)))
+
+        coordinator.tick(input(goal = point(12.0)).copy(playerPosition = point(9.0)))
+
+        assertFalse(requireNotNull(fly.lastSteering).sprint)
+    }
+
+    @Test
+    fun `sub-block arrival hands movement back to Baritone instead of oscillating`() {
+        val fly = FakeFlyPort()
+        val coordinator = coordinator(fly, FakePlannerPort())
+        coordinator.startTask(BaritoneNavigationMode.FLY)
+        coordinator.tick(input(goal = point(8.0)))
+
+        val result = coordinator.tick(input(goal = point(8.0)).copy(playerPosition = point(7.2)))
+
+        assertNull(fly.lastSteering)
+        assertEquals(1, fly.suspendCount)
+        assertEquals("Waiting for Baritone to advance or interact at the flight anchor", result.navigation.detail)
+    }
+
+    @Test
     fun `physical input suspends the lease and resumes it without consuming a restart`() {
         val fly = FakeFlyPort()
         val coordinator = coordinator(fly, FakePlannerPort())
@@ -328,6 +369,7 @@ class BaritoneFlightRuntimeCoordinatorTest {
 
     private class FakeFlyPort(
         private val ownership: BaritoneFlyOwnership = BaritoneFlyOwnership.BARITONE,
+        private val reliableSpeed: Double? = null,
     ) : BaritoneFlyAutomationPort {
         var valid = true
         var automaticEndReason: String? = null
@@ -348,7 +390,7 @@ class BaritoneFlightRuntimeCoordinatorTest {
 
         override fun readiness(lease: BaritoneFlyLease): BaritoneFlyReadiness = readiness
 
-        override fun capabilities(lease: BaritoneFlyLease) = BaritoneFlyCapabilities()
+        override fun capabilities(lease: BaritoneFlyLease) = BaritoneFlyCapabilities(reliableSpeed = reliableSpeed)
 
         override fun automaticEnd(lease: BaritoneFlyLease): String? = automaticEndReason.also {
             automaticEndReason = null

@@ -20,6 +20,7 @@
 package net.ccbluex.liquidbounce.features.module.modules.render
 
 import net.ccbluex.liquidbounce.test.MinecraftBootstrap
+import net.ccbluex.liquidbounce.utils.aiming.data.Rotation
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
@@ -63,6 +64,21 @@ class ModulePlayerModelTest {
         val legacyConfigName = "Rotations"
         assertTrue(
             legacyConfigName == ModulePlayerModel.name || legacyConfigName in ModulePlayerModel.aliases,
+        )
+    }
+
+    @Test
+    fun `managed KillAura rotation wins while the transmitted snapshot catches up`() {
+        val transmittedRotation = Rotation(yaw = 20f, pitch = 5f)
+        val managedRotation = Rotation(yaw = 110f, pitch = 35f)
+
+        assertEquals(
+            managedRotation,
+            resolvePlayerModelRotation(transmittedRotation, managedRotation),
+        )
+        assertEquals(
+            transmittedRotation,
+            resolvePlayerModelRotation(transmittedRotation, managedRotation = null),
         )
     }
 }

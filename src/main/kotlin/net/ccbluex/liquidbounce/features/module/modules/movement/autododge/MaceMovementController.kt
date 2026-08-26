@@ -60,18 +60,18 @@ internal class MaceMovementController(
         world: ClientLevel,
         settings: MaceMovementSettings,
     ): MaceMovementResult {
-        primaryThreat = detectThreat(canStartDefense, player, world, settings)
+        val threat = updateThreatOnly(canStartDefense, player, world, settings)
         val teleportPlan = teleportRuntime.planMace(
             enabled = settings.enabled && settings.teleportEnabled,
             canStartDefense = canStartDefense && !projectilePlanActive,
             projectilePlanActive = projectilePlanActive,
             tick = player.tickCount.toLong(),
             playerPosition = player.position(),
-            threat = primaryThreat,
+            threat = threat,
             settings = settings.teleport,
             isSafe = { candidate -> isSafeSpearTeleportCandidate(world, player, settings.teleport, candidate) },
         )
-        return MaceMovementResult(primaryThreat, teleportPlan)
+        return MaceMovementResult(threat, teleportPlan)
     }
 
     fun executeTeleport(
@@ -107,7 +107,8 @@ internal class MaceMovementController(
         teleportRuntime.reset()
     }
 
-    private fun detectThreat(
+    /** Updates the selected mace threat without planning or executing a movement response. */
+    fun updateThreatOnly(
         canStartDefense: Boolean,
         player: LocalPlayer,
         world: ClientLevel,
@@ -118,7 +119,7 @@ internal class MaceMovementController(
             return null
         }
 
-        return threatDetector.update(
+        primaryThreat = threatDetector.update(
             targetPosition = player.position(),
             candidates = world.players().asSequence()
                 .filterIsInstance<RemotePlayer>()
@@ -127,6 +128,7 @@ internal class MaceMovementController(
             packetThreatRange = settings.packetThreatRange,
             threatMemoryTicks = settings.threatMemoryTicks,
         )
+        return primaryThreat
     }
 
     private fun RemotePlayer.toMaceThreatCandidate() = MaceThreatCandidate(

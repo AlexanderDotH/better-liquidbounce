@@ -54,6 +54,17 @@ class MaceKillVanillaVClipRouteTest {
     }
 
     @Test
+    fun `Vanilla VClip accepts five block endpoint movement with floating point cancellation`() {
+        val endpoint = Vec3(4.0, -63.999998, -2.0)
+        val from = endpoint.subtract(Vec3(0.0, 5.0, 0.0))
+
+        val segment = MaceKillVanillaVClipSegment(from, endpoint)
+
+        assertTrue(segment.movement.y > MACE_KILL_MAX_VANILLA_VCLIP_DISTANCE)
+        assertTrue(segment.matches(from, endpoint))
+    }
+
+    @Test
     fun `every remote route reaches bounded Vanilla VClip before ClipReach fallback`() {
         assertRoutePlanOrder(MaceKillRoutingMode.DIRECT, listOf("direct", "vclip"))
         assertRoutePlanOrder(MaceKillRoutingMode.A_STAR, listOf("astar", "vclip"))

@@ -38,11 +38,13 @@ import net.ccbluex.liquidbounce.render.engine.unifiedfog.TerrainDepthConvention
 import net.ccbluex.liquidbounce.render.engine.unifiedfog.TerrainDepthKind
 import net.ccbluex.liquidbounce.render.engine.unifiedfog.TerrainDepthSource
 import net.ccbluex.liquidbounce.render.engine.unifiedfog.TerrainDepthUnavailableReason
+import net.ccbluex.liquidbounce.render.engine.unifiedfog.TerrainDepthValidationPolicy
 import net.ccbluex.liquidbounce.render.engine.unifiedfog.TerrainFrameToken
 import net.ccbluex.liquidbounce.render.engine.unifiedfog.UnifiedFogFrame
 import net.ccbluex.liquidbounce.render.engine.unifiedfog.UnifiedFogFrameBuild
 import net.ccbluex.liquidbounce.render.engine.unifiedfog.UnifiedFogFrameFactory
 import net.ccbluex.liquidbounce.render.engine.unifiedfog.UnifiedFogFrameRequest
+import net.ccbluex.liquidbounce.render.engine.unifiedfog.shouldReplaceNativeFog as shouldReplaceNativeFogForSources
 import net.ccbluex.liquidbounce.utils.client.clientStartDurationMs
 import net.ccbluex.liquidbounce.utils.client.gpuDevice
 import net.ccbluex.liquidbounce.utils.client.inGame
@@ -64,10 +66,11 @@ object UnifiedFogRenderer : MinecraftShortcuts, EventListener {
     private var currentFrameToken: TerrainFrameToken? = null
     private var lastDistantHorizonsBackend: String? = null
     private var pendingBackendInvalidation = false
+    private var replaceNativeFogThisFrame = false
+    private var preflightStatus: DistantHorizonsDepthStatus? = null
 
     private val terrainMaskTarget get() = gpuResources().terrainMaskTarget
     private val fogTarget get() = gpuResources().fogTarget
-    private val fogBlurTarget get() = gpuResources().fogBlurTarget
 
     /** Starts the token before either terrain renderer can publish or clear depth. */
     @JvmStatic
@@ -92,6 +95,29 @@ object UnifiedFogRenderer : MinecraftShortcuts, EventListener {
         frameIndex++
         currentFrameToken = TerrainFrameToken(lifecycleGeneration, frameIndex)
         DistantHorizonsDepthTextureProvider.beginFrame(frameIndex)
+        updateNativeFogReplacement(target)
+    }
+
+    @JvmStatic
+    fun shouldReplaceNativeFog(): Boolean = replaceNativeFogThisFrame
+
+    private fun updateNativeFogReplacement(target: RenderTarget) {
+        val targetDimensions = FrameDimensions(target.width, target.height)
+        val status = DistantHorizonsDepthTextureProvider.status(target.width, target.height, frameIndex)
+        val recentDepth = DistantHorizonsDepthTextureProvider.resolveRecent(frameIndex, MAX_DH_FRAME_AGE)
+        val compatibleDepthAvailable = recentDepth?.let { depth ->
+            FrameDimensions(depth.width, depth.height).hasCompatibleAspect(
+                targetDimensions,
+                TerrainDepthValidationPolicy.RENDER_ASPECT_TOLERANCE,
+            )
+        } == true
+
+        preflightStatus = status
+        replaceNativeFogThisFrame = shouldReplaceNativeFogForSources(
+            unifiedEnabled = true,
+            distantHorizonsInstalled = status.readiness != DistantHorizonsSourceReadiness.ABSENT,
+            compatibleDistantHorizonsDepthAvailable = compatibleDepthAvailable,
+        )
     }
 
     private fun beginLegacyDistantHorizonsFrame() {
@@ -106,6 +132,15 @@ object UnifiedFogRenderer : MinecraftShortcuts, EventListener {
         if (!inGame || !FogValueGroup.shouldRenderUnified) return
         val token = currentFrameToken ?: return recordSkippedFrame("missing unified frame token")
         val target = mc.gameRenderer.mainRenderTarget()
+        DistantHorizonsDepthTextureProvider.captureCurrentFrame(token.frameIndex)
+        updateNativeFogReplacement(target)
+        if (!replaceNativeFogThisFrame) {
+            return recordSkippedFrame(
+                reason = "native fog fallback while Distant Horizons depth warms up",
+                status = preflightStatus,
+                vanillaReady = true,
+            )
+        }
         if (target.width <= 0 || target.height <= 0) return recordSkippedFrame("invalid render-target size")
 
         val frameInput = buildFrameInput(target, token, projectionMatrix)
@@ -122,9 +157,20 @@ object UnifiedFogRenderer : MinecraftShortcuts, EventListener {
             )
         }
 
+        val sceneBlurPassCount = renderSceneBlur(target, cameraState, projectionMatrix)
         val uniform = snapshotUniform(frame, cameraState)
-        val passCount = renderFrame(target, frame, uniform)
-        recordRenderedFrame(frameInput, passCount)
+        val passCount = sceneBlurPassCount + renderFrame(target, frame, uniform)
+        recordRenderedFrame(frameInput, frame, passCount)
+    }
+
+    private fun renderSceneBlur(
+        target: RenderTarget,
+        cameraState: CameraRenderState,
+        projectionMatrix: Matrix4fc,
+    ): Int {
+        if (!FogValueGroup.BlurFog.running) return 0
+        CustomFogBlurRenderer.render(target, cameraState, projectionMatrix)
+        return SCENE_BLUR_PASS_COUNT
     }
 
     private fun buildFrameInput(
@@ -137,7 +183,10 @@ object UnifiedFogRenderer : MinecraftShortcuts, EventListener {
         val status = DistantHorizonsDepthTextureProvider.status(target.width, target.height, token.frameIndex)
         if (backendChanged(status.backend)) return null
 
-        val dhDepth = DistantHorizonsDepthTextureProvider.resolve(target.width, target.height, token.frameIndex)
+        val dhDepth = DistantHorizonsDepthTextureProvider.resolveRecent(
+            frameToken = token.frameIndex,
+            maximumFrameAge = MAX_DH_FRAME_AGE,
+        )
         val horizon = FogValueGroup.currentUnifiedHorizon(
             distantHorizonsFarClipBlocks = dhDepth?.farClipPlane,
             vanillaRenderDistanceChunks = mc.options.getEffectiveRenderDistance(),
@@ -150,7 +199,7 @@ object UnifiedFogRenderer : MinecraftShortcuts, EventListener {
             projectionMatrix,
             horizon.visibleDistanceBlocks,
         )
-        val distantHorizonsSource = distantHorizonsSource(status, dhDepth, dimensions, token)
+        val distantHorizonsSource = distantHorizonsSource(status, dhDepth, token)
 
         return UnifiedFogFrameInput(
             request = UnifiedFogFrameRequest(
@@ -159,6 +208,7 @@ object UnifiedFogRenderer : MinecraftShortcuts, EventListener {
                 vanillaSource = vanillaSource,
                 distantHorizonsSource = distantHorizonsSource,
                 horizonRange = physicalHorizon,
+                distantHorizonsValidationPolicy = TerrainDepthValidationPolicy.renderCompatible(MAX_DH_FRAME_AGE),
             ),
             status = status,
             horizon = physicalHorizon,
@@ -184,7 +234,6 @@ object UnifiedFogRenderer : MinecraftShortcuts, EventListener {
     private fun distantHorizonsSource(
         status: DistantHorizonsDepthStatus,
         depth: DistantHorizonsDepthTexture?,
-        dimensions: FrameDimensions,
         token: TerrainFrameToken,
     ): OptionalTerrainDepthSource<GpuTextureView> {
         if (status.readiness == DistantHorizonsSourceReadiness.ABSENT) {
@@ -206,7 +255,7 @@ object UnifiedFogRenderer : MinecraftShortcuts, EventListener {
                 ),
                 inverseReconstruction = InverseReconstructionMatrix(depth.inverseMvmProjection),
                 clipRange = clipRange,
-                dimensions = dimensions,
+                dimensions = FrameDimensions(depth.width, depth.height),
                 frameToken = TerrainFrameToken(token.lifecycleGeneration, depth.frameToken),
             )
         )
@@ -284,10 +333,15 @@ object UnifiedFogRenderer : MinecraftShortcuts, EventListener {
 
         return IrisPipelineBypass.run {
             drawTerrainMask(terrainMask, frame.vanillaSource.textureView, dhDepth, uniformSlice)
-            drawFogField(generatedFog, terrainMask, uniformSlice)
-            val fogForComposite = blurFogIfEnabled(generatedFog, terrainMask, uniformSlice)
-            composite(target, fogForComposite, terrainMask, uniformSlice)
-            if (FogValueGroup.BlurFog.running) BLURRED_PASS_COUNT else BASE_PASS_COUNT
+            drawFogField(
+                generatedFog,
+                terrainMask,
+                frame.vanillaSource.textureView,
+                dhDepth,
+                uniformSlice,
+            )
+            composite(target, generatedFog, terrainMask, uniformSlice)
+            BASE_PASS_COUNT
         }
     }
 
@@ -312,59 +366,16 @@ object UnifiedFogRenderer : MinecraftShortcuts, EventListener {
     private fun drawFogField(
         destination: RenderTarget,
         terrainMask: RenderTarget,
+        vanillaDepth: GpuTextureView,
+        distantHorizonsDepth: GpuTextureView,
         uniform: com.mojang.blaze3d.buffers.GpuBufferSlice,
     ) {
         destination.createRenderPass({ "LiquidBounce unified fog field" }, useDepthAttachment = false).use { pass ->
             pass.setPipeline(ClientRenderPipelines.UnifiedFogGenerate)
             pass.bindTexture("TerrainMaskSampler", terrainMask.colorTextureView, nearestSampler)
+            pass.bindTexture("DepthSampler", vanillaDepth, nearestSampler)
+            pass.bindTexture("DhDepthSampler", distantHorizonsDepth, nearestSampler)
             pass.setUniform(ClientUniformDefine.UNIFIED_FOG.uboName, uniform)
-            pass.draw(3, 1, 0, 0)
-        }
-    }
-
-    private fun blurFogIfEnabled(
-        generatedFog: RenderTarget,
-        terrainMask: RenderTarget,
-        uniform: com.mojang.blaze3d.buffers.GpuBufferSlice,
-    ): RenderTarget {
-        if (!FogValueGroup.BlurFog.running) return generatedFog
-        val intermediate = fogBlurTarget.initAndGet(generatedFog.width, generatedFog.height)
-        val kernel = scaledKernel(FogValueGroup.BlurFog.strength)
-        val kernelSlice = gpuResources().fogKernelData.get(UnifiedFogKernelUniform(kernel))
-
-        drawFogBlur(
-            ClientRenderPipelines.UnifiedFogBlurHorizontal,
-            intermediate,
-            generatedFog,
-            terrainMask,
-            uniform,
-            kernelSlice,
-        )
-        drawFogBlur(
-            ClientRenderPipelines.UnifiedFogBlurVertical,
-            generatedFog,
-            intermediate,
-            terrainMask,
-            uniform,
-            kernelSlice,
-        )
-        return generatedFog
-    }
-
-    private fun drawFogBlur(
-        pipeline: com.mojang.blaze3d.pipeline.RenderPipeline,
-        destination: RenderTarget,
-        source: RenderTarget,
-        terrainMask: RenderTarget,
-        uniform: com.mojang.blaze3d.buffers.GpuBufferSlice,
-        kernel: com.mojang.blaze3d.buffers.GpuBufferSlice,
-    ) {
-        destination.createRenderPass({ "LiquidBounce unified fog-only blur" }, useDepthAttachment = false).use { pass ->
-            pass.setPipeline(pipeline)
-            pass.bindTexture("FogSampler", source.colorTextureView, linearSampler)
-            pass.bindTexture("TerrainMaskSampler", terrainMask.colorTextureView, nearestSampler)
-            pass.setUniform(ClientUniformDefine.UNIFIED_FOG.uboName, uniform)
-            pass.setUniform(ClientUniformDefine.UNIFIED_FOG_KERNEL.uboName, kernel)
             pass.draw(3, 1, 0, 0)
         }
     }
@@ -387,17 +398,16 @@ object UnifiedFogRenderer : MinecraftShortcuts, EventListener {
         }
     }
 
-    private fun scaledKernel(radius: Float): List<GaussianPair> {
-        val effectiveRadius = radius.coerceIn(MIN_BLUR_RADIUS, MAX_BLUR_RADIUS)
-        return GaussianKernel.forScreenRadius(effectiveRadius).pairs
-    }
-
-    private fun recordRenderedFrame(input: UnifiedFogFrameInput, passCount: Int) {
+    private fun recordRenderedFrame(
+        input: UnifiedFogFrameInput,
+        frame: UnifiedFogFrame<GpuTextureView>,
+        passCount: Int,
+    ) {
         UnifiedFogDebug.record(
             debugState(
                 status = input.status,
                 vanillaReady = true,
-                distantHorizonsReady = input.status.readiness == DistantHorizonsSourceReadiness.READY,
+                distantHorizonsReady = frame.distantHorizonsSource != null,
                 horizonStart = input.horizon.startBlocks,
                 horizonEnd = input.horizon.endBlocks,
                 passCount = passCount,
@@ -458,6 +468,8 @@ object UnifiedFogRenderer : MinecraftShortcuts, EventListener {
         lifecycleGeneration++
         lifecycleKey = nextKey
         pendingBackendInvalidation = false
+        replaceNativeFogThisFrame = false
+        preflightStatus = null
         resources?.close()
         resources = null
     }
@@ -467,6 +479,8 @@ object UnifiedFogRenderer : MinecraftShortcuts, EventListener {
         lifecycleKey = null
         lastDistantHorizonsBackend = null
         pendingBackendInvalidation = false
+        replaceNativeFogThisFrame = false
+        preflightStatus = null
         resources?.close()
         resources = null
         UnifiedFogDebug.reset(publishDebug)
@@ -497,11 +511,10 @@ object UnifiedFogRenderer : MinecraftShortcuts, EventListener {
     private const val MC_CLEAR_DEPTH = 0f
     private const val CLEAR_DEPTH_EPSILON = 1e-6f
     private const val MIN_CLIP_DISTANCE = 1f
-    private const val MIN_BLUR_RADIUS = 4f
-    private const val MAX_BLUR_RADIUS = 24f
     private const val VOLUME_SPEED = 0.15f
+    private const val MAX_DH_FRAME_AGE = 1L
     private const val BASE_PASS_COUNT = 3
-    private const val BLURRED_PASS_COUNT = 5
+    private const val SCENE_BLUR_PASS_COUNT = 2
 }
 
 private data class UnifiedFogFrameInput(

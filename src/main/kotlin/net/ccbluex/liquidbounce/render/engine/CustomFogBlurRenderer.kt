@@ -45,7 +45,10 @@ object CustomFogBlurRenderer : MinecraftShortcuts, EventListener {
     private val intermediateTarget = LazyRenderTargetHolder("LiquidBounce Fog Blur", useDepth = false)
     private val colorSampler = RenderSystem.getSamplerCache().getClampToEdge(FilterMode.LINEAR)
     private val depthSampler = RenderSystem.getSamplerCache().getClampToEdge(FilterMode.NEAREST)
-    private val blurData = CachedUniform<FogBlurUniform>(ClientUniformDefine.FOG_BLUR) { value ->
+    private val horizontalBlurData = createFogBlurData()
+    private val verticalBlurData = createFogBlurData()
+
+    private fun createFogBlurData() = CachedUniform<FogBlurUniform>(ClientUniformDefine.FOG_BLUR) { value ->
         putMat4f(value.inverseProjection)
         putMat4f(value.inverseViewRotation)
         putMat4f(value.dhInverseMvmProjection)
@@ -86,7 +89,7 @@ object CustomFogBlurRenderer : MinecraftShortcuts, EventListener {
         val intermediate = intermediateTarget.initAndGet(target.width, target.height)
 
         IrisPipelineBypass.run {
-            val horizontal = blurData.get(frame.uniform(1f / target.width, 0f))
+            val horizontal = horizontalBlurData.get(frame.uniform(1f / target.width, 0f))
             intermediate.createRenderPass({ "LiquidBounce fog blur horizontal" }).use { pass ->
                 pass.setPipeline(ClientRenderPipelines.FogBlurHorizontal)
                 pass.bindTexture("SceneSampler", sceneTexture, colorSampler)
@@ -96,7 +99,7 @@ object CustomFogBlurRenderer : MinecraftShortcuts, EventListener {
                 pass.draw(3, 1, 0, 0)
             }
 
-            val vertical = blurData.get(frame.uniform(0f, 1f / target.height))
+            val vertical = verticalBlurData.get(frame.uniform(0f, 1f / target.height))
             target.createRenderPass(
                 { "LiquidBounce fog blur composite" },
                 useDepthAttachment = false,
@@ -114,7 +117,8 @@ object CustomFogBlurRenderer : MinecraftShortcuts, EventListener {
     @Suppress("unused")
     private val shutdownHandler = handler<ClientShutdownEvent> {
         intermediateTarget.close()
-        blurData.close()
+        horizontalBlurData.close()
+        verticalBlurData.close()
     }
 
     private const val MC_CLEAR_DEPTH = 0f

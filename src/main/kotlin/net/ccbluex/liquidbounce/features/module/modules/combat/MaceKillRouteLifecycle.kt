@@ -238,14 +238,6 @@ internal fun maceKillOriginCorrectionAction(
     MaceKillOriginCorrectionAction.CONFIRM_COMPLETED_RETURN
 }
 
-internal fun requiredMaceKillLocalRestore(
-    packetRouteOwned: Boolean,
-    origin: Vec3?,
-    currentPosition: Vec3,
-): Vec3? = origin?.takeIf {
-    packetRouteOwned && currentPosition.distanceToSqr(it) >= MACE_KILL_LOCAL_POSITION_EPSILON_SQUARED
-}
-
 internal fun maceKillBoundingBoxAtRouteOrigin(
     currentBox: AABB,
     currentPosition: Vec3,
@@ -268,4 +260,3 @@ private const val MACE_KILL_CORRECTION_RECOVERY_STEP_DISTANCE = 3.0
 private const val MACE_KILL_MIN_ROUTE_DURATION_TICKS = 40
 private const val MACE_KILL_MAX_ROUTE_DURATION_TICKS = 240
 private const val MACE_KILL_ROUTE_DEADLINE_OVERHEAD_TICKS = 20
-private const val MACE_KILL_LOCAL_POSITION_EPSILON_SQUARED = 1.0E-8

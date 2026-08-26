@@ -39,6 +39,8 @@ class UnifiedFogShaderContractTest {
         val shader = read(GENERATE_SHADER)
 
         assertTrue(shader.contains("uniform sampler2D TerrainMaskSampler"))
+        assertTrue(shader.contains("uniform sampler2D DepthSampler"))
+        assertTrue(shader.contains("uniform sampler2D DhDepthSampler"))
         assertTrue(shader.contains("layout(std140) uniform UnifiedFogData"))
         assertTrue(shader.contains("linearFogFactor"))
         assertTrue(shader.contains("smoothstep(startDistance, endDistance, distanceToCamera)"))
@@ -46,18 +48,24 @@ class UnifiedFogShaderContractTest {
         assertTrue(shader.contains("reconstructDhClearSkyRelative"))
         assertTrue(shader.contains("DhDepthInfo.z > 0.5"))
         assertTrue(shader.contains("clearSkyDistance"))
+        assertTrue(shader.contains("validatedClearSkyRelative"))
+        assertTrue(shader.contains("minimumPlausibleDistance"))
         assertTrue(shader.contains("depthToClip(clearDepth"))
         assertTrue(shader.contains("normalize(finiteRelative) * max(HorizonInfo.y"))
         assertTrue(shader.contains("analyticBaseFog"))
+        assertTrue(shader.contains("SKY_FOG_FLOOR"))
+        assertTrue(shader.contains("mix(SKY_FOG_FLOOR, 1.0, horizonProximity)"))
         assertTrue(shader.contains("multiLayerFogDensity"))
+        assertTrue(shader.contains("terrainSource"))
+        assertTrue(shader.contains("SOURCE_DH"))
+        assertTrue(shader.contains("reconstructDhSurfaceRelative"))
+        assertTrue(shader.contains("SOURCE_VANILLA"))
+        assertTrue(shader.contains("reconstructVanillaSurfaceRelative"))
         assertTrue(shader.contains("VolumeSettings.x > 0.5"))
         assertTrue(shader.indexOf("analyticBaseFog") < shader.lastIndexOf("VolumeSettings.x > 0.5"))
         assertTrue(shader.contains("FogColor.a"))
-        assertTrue(shader.contains("if (isTerrain(texCoord))"))
         assertFalse(shader.contains("distanceToCamera = mix(startDistance, endDistance"))
         assertFalse(shader.contains("SceneSampler"))
-        assertFalse(shader.contains("DepthSampler"))
-        assertFalse(shader.contains("DhDepthSampler"))
     }
 
     @Test
@@ -84,21 +92,22 @@ class UnifiedFogShaderContractTest {
     }
 
     @Test
-    fun `composite makes terrain alpha exactly zero without sampling scene color`() {
+    fun `composite preserves terrain fog and envelopes the sky side of chunk silhouettes`() {
         val shader = read(COMPOSITE_SHADER)
 
         assertTrue(shader.contains("uniform sampler2D FogSampler"))
         assertTrue(shader.contains("uniform sampler2D TerrainMaskSampler"))
-        assertTrue(shader.contains("if (isTerrain(texCoord))"))
-        assertTrue(shader.contains("fragColor = vec4(0.0)"))
-        assertTrue(shader.indexOf("if (isTerrain(texCoord))") < shader.indexOf("texture(FogSampler"))
-        assertTrue(shader.contains("skySideFeatherFactor"))
+        assertTrue(shader.contains("sourceLayer"))
+        assertTrue(shader.contains("centerIsSky"))
+        assertFalse(shader.contains("if (isTerrain(texCoord))"))
+        assertTrue(shader.contains("skyEnvelopeFactor"))
+        assertTrue(shader.contains("SKY_ENVELOPE_BOOST"))
         assertTrue(shader.contains("if (HorizonInfo.w <= EPSILON) return 1.0"))
         assertTrue(shader.contains("clamp(HorizonInfo.w, 0.0, MAX_FEATHER_PIXELS)"))
         assertTrue(shader.contains("ViewportInfo.zw"))
         assertTrue(shader.contains("DIAGONAL = 0.70710678118"))
         assertTrue(shader.contains("diagonalOffset"))
-        assertTrue(shader.contains("vec4 featheredFog = fog * skyFeather"))
+        assertTrue(shader.contains("vec4 envelopingFog = fog * skyEnvelope"))
         assertFalse(shader.contains("SceneSampler"))
         assertFalse(shader.contains("DepthSampler"))
         assertFalse(shader.contains("DhDepthSampler"))

@@ -20,15 +20,20 @@ import net.ccbluex.liquidbounce.event.events.NotificationEvent
 import net.ccbluex.liquidbounce.event.events.PacketEvent
 import net.ccbluex.liquidbounce.event.events.PlayerJumpEvent
 import net.ccbluex.liquidbounce.event.events.TransferOrigin
+import net.ccbluex.liquidbounce.event.events.WorldRenderEvent
 import net.ccbluex.liquidbounce.event.handler
 import net.ccbluex.liquidbounce.features.module.ClientModule
 import net.ccbluex.liquidbounce.features.module.ModuleCategories
+import net.ccbluex.liquidbounce.features.module.modules.misc.ModuleMiddleClickAction
 import net.ccbluex.liquidbounce.features.module.modules.movement.vclip.VClipDirection
 import net.ccbluex.liquidbounce.features.module.modules.movement.vclip.VClipDistanceTarget
 import net.ccbluex.liquidbounce.features.module.modules.movement.vclip.VClipClipResult
 import net.ccbluex.liquidbounce.features.module.modules.movement.vclip.VClipFallSafetyContext
 import net.ccbluex.liquidbounce.features.module.modules.movement.vclip.VClipFoliaMode
 import net.ccbluex.liquidbounce.features.module.modules.movement.vclip.VClipInputController
+import net.ccbluex.liquidbounce.features.module.modules.movement.vclip.VClipInputSuppression
+import net.ccbluex.liquidbounce.features.module.modules.movement.vclip.VClipLandingIndicator
+import net.ccbluex.liquidbounce.features.module.modules.movement.vclip.VClipLandingIndicatorState
 import net.ccbluex.liquidbounce.features.module.modules.movement.vclip.VClipMovementMode
 import net.ccbluex.liquidbounce.features.module.modules.movement.vclip.VClipPacketDeliveryTracker
 import net.ccbluex.liquidbounce.features.module.modules.movement.vclip.VClipPosition
@@ -36,6 +41,8 @@ import net.ccbluex.liquidbounce.features.module.modules.movement.vclip.VClipSmar
 import net.ccbluex.liquidbounce.features.module.modules.movement.vclip.VClipTargetMode
 import net.ccbluex.liquidbounce.features.module.modules.movement.vclip.VClipVanillaMode
 import net.ccbluex.liquidbounce.features.module.modules.movement.vclip.migrateLegacyVClipBedrockSafety
+import net.ccbluex.liquidbounce.render.drawBlockSelection
+import net.ccbluex.liquidbounce.render.renderEnvironment
 import net.ccbluex.liquidbounce.utils.client.notification
 import net.ccbluex.liquidbounce.utils.kotlin.EventPriorityConvention.READ_FINAL_STATE
 import net.minecraft.network.protocol.game.ServerboundMovePlayerPacket
@@ -44,7 +51,7 @@ import net.minecraft.network.protocol.game.ServerboundPlayerInputPacket
 import net.minecraft.world.entity.ai.attributes.Attributes
 
 /**
- * Moves vertically with Space and Shift without forwarding jump or sneak input to the server.
+ * Moves vertically with Space and Shift, optionally gated by MiddleClickAction's held modifier.
  */
 object ModuleVClip : ClientModule(
     "VClip",
@@ -68,6 +75,7 @@ object ModuleVClip : ClientModule(
     private val repeatDelay by int("RepeatDelay", 5, 1..20, "ticks")
     private val inputController = VClipInputController()
     private val packetDeliveryTracker = VClipPacketDeliveryTracker()
+    private var landingIndicators = emptyList<VClipLandingIndicatorState>()
 
     override fun prepareDeserialize(jsonObject: JsonObject) {
         super.prepareDeserialize(jsonObject)
@@ -76,16 +84,35 @@ object ModuleVClip : ClientModule(
 
     override fun onEnabled() {
         inputController.reset()
+        ModuleMiddleClickAction.resetSmartVClipLock()
         packetDeliveryTracker.clear()
+        landingIndicators = emptyList()
     }
 
     override fun onDisabled() {
         inputController.reset()
+        ModuleMiddleClickAction.resetSmartVClipLock()
         packetDeliveryTracker.clear()
+        landingIndicators = emptyList()
     }
 
     @Suppress("unused")
     private val tickHandler = handler<GameTickEvent> {
+        updateLandingIndicators()
+
+        if (ModuleMiddleClickAction.isSmartVClipLockActive()) {
+            inputController.reset()
+            val acceptsInput = acceptsControlInput()
+            val direction = ModuleMiddleClickAction.resolveSmartVClipDirection(
+                jumpPressed = acceptsInput && mc.options.keyJump.isDown,
+                shiftPressed = acceptsInput && mc.options.keyShift.isDown,
+                repeatDelayTicks = repeatDelay,
+            ) ?: return@handler
+
+            clip(direction)
+            return@handler
+        }
+
         val direction = inputController.resolve(
             spacePressed = acceptsControlInput() && mc.options.keyJump.isDown,
             shiftPressed = acceptsControlInput() && mc.options.keyShift.isDown,
@@ -96,14 +123,29 @@ object ModuleVClip : ClientModule(
     }
 
     @Suppress("unused")
+    private val renderHandler = handler<WorldRenderEvent> { event ->
+        val indicators = landingIndicators
+        if (indicators.isEmpty()) return@handler
+
+        event.renderEnvironment {
+            indicators.forEach { indicator ->
+                drawBlockSelection(indicator.renderPosition, indicator.color)
+            }
+        }
+    }
+
+    @Suppress("unused")
     private val movementInputHandler = handler<MovementInputEvent>(priority = READ_FINAL_STATE) { event ->
-        event.jump = false
-        event.sneak = false
+        val suppression = inputSuppression()
+        if (suppression.jump) event.jump = false
+        if (suppression.sneak) event.sneak = false
     }
 
     @Suppress("unused")
     private val jumpHandler = handler<PlayerJumpEvent>(priority = READ_FINAL_STATE) { event ->
-        event.cancelEvent()
+        if (inputSuppression().jump) {
+            event.cancelEvent()
+        }
     }
 
     @Suppress("unused")
@@ -115,11 +157,17 @@ object ModuleVClip : ClientModule(
         finalizeProtectedMovement(event)
         when (val packet = event.packet) {
             is ServerboundPlayerInputPacket -> {
-                packet.forceSneak = false
-                packet.suppressJump = true
-                packet.suppressSneak = true
+                val suppression = inputSuppression()
+                if (suppression.jump) packet.suppressJump = true
+                if (suppression.sneak) {
+                    packet.forceSneak = false
+                    packet.suppressSneak = true
+                }
             }
-            is ServerboundPlayerCommandPacket -> if (packet.action.isRidingJumpAction) {
+            is ServerboundPlayerCommandPacket -> if (
+                packet.action.isRidingJumpAction &&
+                inputSuppression().jump
+            ) {
                 event.cancelEvent()
             }
         }
@@ -158,7 +206,25 @@ object ModuleVClip : ClientModule(
         }
     }
 
+    private fun updateLandingIndicators() {
+        val entity = player.vehicle ?: player
+        val position = entity.position()
+        val origin = VClipPosition(position.x, position.y, position.z)
+
+        landingIndicators = VClipDirection.entries.mapNotNull { direction ->
+            val target = targets.activeMode.resolve(entity, direction, doNotClipAroundBedrock)
+            VClipLandingIndicator.resolve(origin, target, direction)
+        }
+    }
+
     private fun acceptsControlInput() = mc.gui.screen() == null
+
+    private fun inputSuppression(): VClipInputSuppression {
+        val smartLockActive = ModuleMiddleClickAction.isSmartVClipLockActive()
+        val modifierHeld = ModuleMiddleClickAction.isSmartVClipModifierHeld()
+
+        return VClipInputSuppression.resolve(smartLockActive, modifierHeld)
+    }
 
     private fun finalizeProtectedMovement(event: PacketEvent) {
         val packet = event.packet as? ServerboundMovePlayerPacket ?: return

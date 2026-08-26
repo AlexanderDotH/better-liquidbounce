@@ -43,12 +43,56 @@ class FlightRoutePlannerTest {
         )
 
         assertEquals(FlightPlanStatus.COMPLETE, result.status)
-        assertEquals(point(0, 0, 0), result.route?.points?.first())
-        assertEquals(point(3, 0, 0), result.route?.points?.last())
-        assertEquals(1.0, result.route?.progress?.fraction)
-        assertEquals(0.0, result.route?.progress?.distanceRemaining)
-        assertTrue(result.route?.points.orEmpty().zipWithNext().all { (from, to) ->
+        val route = assertNotNull(result.route)
+        assertEquals(listOf(point(0, 0, 0), point(3, 0, 0)), route.points)
+        assertEquals(1.0, route.progress.fraction)
+        assertEquals(0.0, route.progress.distanceRemaining)
+        assertTrue(route.points.zipWithNext().all { (from, to) ->
             result.snapshot.isSegmentClear(from, to, body)
+        })
+    }
+
+    @Test
+    fun `route simplification preserves turns required to avoid a wall`() {
+        val wall = FlightAabb(
+            minX = 1.0,
+            minY = 0.0,
+            minZ = 0.0,
+            maxX = 2.0,
+            maxY = 2.0,
+            maxZ = 1.0,
+        )
+        val result = planner.plan(
+            request(
+                snapshot = openSnapshot(collisionBoxes = listOf(wall)),
+                start = point(0, 0, 0),
+                goal = point(3, 0, 0),
+            ),
+        )
+
+        assertEquals(FlightPlanStatus.COMPLETE, result.status)
+        val route = assertNotNull(result.route)
+        assertTrue(route.points.size > 2)
+        assertTrue(route.points.zipWithNext().all { (from, to) ->
+            result.snapshot.isSegmentClear(from, to, body)
+        })
+    }
+
+    @Test
+    fun `route simplification preserves non-diagonal traversal`() {
+        val result = planner.plan(
+            request(
+                snapshot = openSnapshot(),
+                start = point(0, 0, 0),
+                goal = point(2, 2, 0),
+                capabilities = FlightTraversalCapabilities(diagonal = false),
+            ),
+        )
+
+        assertEquals(FlightPlanStatus.COMPLETE, result.status)
+        val route = assertNotNull(result.route)
+        assertTrue(route.points.zipWithNext().all { (from, to) ->
+            listOf(to.x - from.x, to.y - from.y, to.z - from.z).count { it != 0.0 } == 1
         })
     }
 

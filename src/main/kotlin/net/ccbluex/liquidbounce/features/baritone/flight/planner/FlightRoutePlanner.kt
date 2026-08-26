@@ -216,8 +216,9 @@ class FlightRoutePlanner {
             includeExactGoal: Boolean,
             complete: Boolean,
         ): FlightRoute {
-            val points = reconstruct(destination).map { node -> node.toPoint(request.start) }.toMutableList()
-            if (includeExactGoal && points.last() != request.goal) points += request.goal
+            val rawPoints = reconstruct(destination).map { node -> node.toPoint(request.start) }.toMutableList()
+            if (includeExactGoal && rawPoints.last() != request.goal) rawPoints += request.goal
+            val points = simplify(rawPoints)
             val remaining = if (complete) 0.0 else points.last().distanceTo(request.goal)
             val initialDistance = request.start.distanceTo(request.goal)
             val fraction = if (complete || initialDistance <= COST_EPSILON) {
@@ -230,6 +231,22 @@ class FlightRoutePlanner {
                 totalDistance = points.zipWithNext().sumOf { (from, to) -> from.distanceTo(to) },
                 progress = FlightRouteProgress(fraction, remaining, expandedNodes),
             )
+        }
+
+        private fun simplify(points: List<FlightVec3>): List<FlightVec3> {
+            if (points.size <= 2) return points
+
+            val simplified = mutableListOf(points.first())
+            var anchorIndex = 0
+            while (anchorIndex < points.lastIndex) {
+                val nextIndex = (points.lastIndex downTo anchorIndex + 1).first { candidateIndex ->
+                    request.capabilities.allows(points[anchorIndex], points[candidateIndex]) &&
+                        snapshot.isSegmentClear(points[anchorIndex], points[candidateIndex], request.body)
+                }
+                simplified += points[nextIndex]
+                anchorIndex = nextIndex
+            }
+            return simplified
         }
 
         private fun reconstruct(destination: FlightGridNode): List<FlightGridNode> {
@@ -329,6 +346,18 @@ class FlightRoutePlanner {
             if (direction.y < 0 && !descend) return false
             val changedAxes = listOf(direction.x, direction.y, direction.z).count { it != 0 }
             return diagonal || changedAxes == 1
+        }
+
+        fun FlightTraversalCapabilities.allows(from: FlightVec3, to: FlightVec3): Boolean {
+            val deltaX = to.x - from.x
+            val deltaY = to.y - from.y
+            val deltaZ = to.z - from.z
+            val horizontalMovement = abs(deltaX) > COST_EPSILON || abs(deltaZ) > COST_EPSILON
+            if (horizontalMovement && !horizontal) return false
+            if (deltaY > COST_EPSILON && !ascend) return false
+            if (deltaY < -COST_EPSILON && !descend) return false
+            val changedAxes = listOf(deltaX, deltaY, deltaZ).count { abs(it) > COST_EPSILON }
+            return diagonal || changedAxes <= 1
         }
     }
 }

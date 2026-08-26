@@ -91,6 +91,7 @@ import net.ccbluex.liquidbounce.features.module.modules.`fun`.ModuleAmnesia
 import net.ccbluex.liquidbounce.features.module.modules.`fun`.ModuleDerp
 import net.ccbluex.liquidbounce.features.module.modules.`fun`.ModuleHandDerp
 import net.ccbluex.liquidbounce.features.module.modules.`fun`.ModuleSkinDerp
+import net.ccbluex.liquidbounce.features.module.modules.`fun`.ModuleSpinBot
 import net.ccbluex.liquidbounce.features.module.modules.`fun`.ModuleTwerk
 import net.ccbluex.liquidbounce.features.module.modules.`fun`.ModuleVomit
 import net.ccbluex.liquidbounce.features.module.modules.`fun`.notebot.ModuleNotebot
@@ -272,6 +273,7 @@ import net.ccbluex.liquidbounce.features.module.modules.world.ModuleSeedCracker
 import net.ccbluex.liquidbounce.features.module.modules.world.ModuleStrongholdFinder
 import net.ccbluex.liquidbounce.features.module.modules.world.ModuleSurround
 import net.ccbluex.liquidbounce.features.module.modules.world.ModuleTimer
+import net.ccbluex.liquidbounce.features.module.modules.world.ModuleTrialChamberTracker
 import net.ccbluex.liquidbounce.features.module.modules.world.basefinder.ModuleBaseFinder
 import net.ccbluex.liquidbounce.features.module.modules.world.autobuild.ModuleAutoBuild
 import net.ccbluex.liquidbounce.features.module.modules.world.autofarm.ModuleAutoFarm
@@ -531,6 +533,7 @@ object ModuleManager : EventListener, Collection<ClientModule> by modules {
             ModuleDerp,
             ModuleNotebot,
             ModuleSkinDerp,
+            ModuleSpinBot,
             ModuleHandDerp,
             ModuleTwerk,
             ModuleVomit,
@@ -729,6 +732,7 @@ object ModuleManager : EventListener, Collection<ClientModule> by modules {
             ModuleStrongholdFinder,
             ModuleSeedCracker,
             ModuleBaseFinder,
+            ModuleTrialChamberTracker,
             ModuleNoInterpolation,
         )
 

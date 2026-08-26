@@ -28,6 +28,7 @@ import net.ccbluex.liquidbounce.config.types.list.Tagged
 import net.ccbluex.liquidbounce.event.EventManager
 import net.ccbluex.liquidbounce.event.events.AttackEntityEvent
 import net.ccbluex.liquidbounce.features.global.GlobalSettingsTarget
+import net.ccbluex.liquidbounce.features.trialchamber.TrialChamberRuntime
 import net.ccbluex.liquidbounce.features.module.modules.combat.MaceKillAttackHook
 import net.ccbluex.liquidbounce.features.module.modules.combat.MaceKillAttackResult
 import net.ccbluex.liquidbounce.features.module.modules.combat.criticals.ModuleCriticals
@@ -93,6 +94,7 @@ enum class EntityTargetClassification {
 enum class Targets(override val tag: String) : Tagged {
     SELF("Self"),
     PLAYERS("Players"),
+    TRIAL("Trial"),
     HOSTILE("Hostile"),
     ANGERABLE("Angerable"),
     WATER_CREATURE("WaterCreature"),
@@ -147,6 +149,10 @@ private fun Set<Targets>.isInteresting(suspect: Entity, info: EntityTargetingInf
         return false
     }
 
+    // Trial membership is a terminal category decision. This keeps Trial and Hostile independent while
+    // retaining the Dead, Invisible, friend, and classification safety gates above.
+    trialMembershipDecision(TrialChamberRuntime.isCurrentTrialMob(suspect.uuid))?.let { return it }
+
     // Check if enemy is a player and should be considered as a target
     return when (suspect) {
         is Player -> when {
@@ -164,6 +170,10 @@ private fun Set<Targets>.isInteresting(suspect: Entity, info: EntityTargetingInf
         else -> false
     }
 }
+
+/** Null means normal type classification should continue; non-null is the terminal Trial decision. */
+internal fun Set<Targets>.trialMembershipDecision(isCurrentTrialMob: Boolean): Boolean? =
+    if (isCurrentTrialMob) Targets.TRIAL in this else null
 
 // Extensions
 @JvmOverloads

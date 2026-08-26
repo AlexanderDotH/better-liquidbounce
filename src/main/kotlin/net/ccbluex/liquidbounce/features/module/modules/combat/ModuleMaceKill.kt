@@ -30,13 +30,10 @@ import net.ccbluex.liquidbounce.features.module.modules.combat.killaura.ModuleKi
 import net.ccbluex.liquidbounce.features.module.modules.combat.killaura.features.KillAuraAutoBlock
 import net.ccbluex.liquidbounce.features.module.modules.player.ModuleBlink
 import net.ccbluex.liquidbounce.features.module.modules.render.ModuleDebug
-import net.ccbluex.liquidbounce.render.drawBox
 import net.ccbluex.liquidbounce.render.engine.esp.EspGlowStyleConfig
 import net.ccbluex.liquidbounce.render.engine.esp.TargetGlowSelection
 import net.ccbluex.liquidbounce.render.engine.esp.TargetGlowSourceRegistry
 import net.ccbluex.liquidbounce.render.engine.type.Color4b
-import net.ccbluex.liquidbounce.render.renderEnvironment
-import net.ccbluex.liquidbounce.render.withPositionRelativeToCamera
 import net.ccbluex.liquidbounce.utils.aiming.utils.RotationUtil
 import net.ccbluex.liquidbounce.utils.block.SwingMode
 import net.ccbluex.liquidbounce.utils.client.SilentHotbar
@@ -60,7 +57,6 @@ import net.minecraft.network.protocol.game.ServerboundMovePlayerPacket
 import net.minecraft.world.entity.ai.attributes.Attributes
 import net.minecraft.world.entity.Entity
 import net.minecraft.world.entity.LivingEntity
-import net.minecraft.world.entity.boss.enderdragon.EnderDragon
 import net.minecraft.world.entity.player.Player
 import net.minecraft.world.item.Items
 import net.minecraft.world.phys.AABB
@@ -90,15 +86,7 @@ object ModuleMaceKill : ClientModule("MaceKill", ModuleCategories.COMBAT, disabl
 
     private object Preview : ToggleableValueGroup(this, "Preview", true) {
         val renderPath by boolean("RenderPath", false)
-        val mode = choices("Mode", 0) { arrayOf(Box, Glow) }
-
-        object Box : Mode("Box") {
-            override val parent: ModeValueGroup<Mode>
-                get() = mode
-
-            val fillColor by color("FillColor", Color4b.RED.alpha(67))
-            val outlineColor by color("OutlineColor", Color4b.WHITE.alpha(167))
-        }
+        val mode = choices("Mode", 0) { arrayOf<Mode>(Glow) }
 
         object Glow : Mode("Glow") {
             override val parent: ModeValueGroup<Mode>
@@ -371,7 +359,7 @@ object ModuleMaceKill : ClientModule("MaceKill", ModuleCategories.COMBAT, disabl
         updateResearchEvidence()
         if (researchExecution != null) {
             if (routeEngine.ownsMovement) {
-                pinPacketRouteOrigin()
+                maintainPacketRouteOrigin()
                 if (routeSession.active || routeEngine.awaitingStrike) {
                     tickActiveRemoteRoute()
                 } else {
@@ -383,7 +371,7 @@ object ModuleMaceKill : ClientModule("MaceKill", ModuleCategories.COMBAT, disabl
             return@handler
         }
         if (routeEngine.ownsMovement) {
-            pinPacketRouteOrigin()
+            maintainPacketRouteOrigin()
             if (!routeSession.active && !routeEngine.awaitingStrike) {
                 finishCompletedRouteSession()
                 return@handler
@@ -434,6 +422,26 @@ object ModuleMaceKill : ClientModule("MaceKill", ModuleCategories.COMBAT, disabl
                     identityOwnedByRoute = true,
                 )
             }
+            return@handler
+        }
+        val virtualOffset = maceKillPhysicalMovementVirtualOffset(
+            routeOwned = routeEngine.ownsMovement,
+            packetMovement = localPacketRouteOrigin != null,
+            researchActive = researchExecution != null,
+            committedOffset = routeSession.committedOffset,
+        )
+        if (virtualOffset != null) {
+            val origin = routeOrigin ?: run {
+                event.cancelEvent()
+                return@handler
+            }
+            val position = origin.add(virtualOffset)
+            applySpearKillVirtualPosition(
+                packet = packet,
+                playerPosition = origin,
+                virtualOffset = virtualOffset,
+                grounded = maceKillRoutePacketGrounded(position, identityOwnedByRoute = true),
+            )
             return@handler
         }
         event.cancelEvent()
@@ -524,20 +532,6 @@ object ModuleMaceKill : ClientModule("MaceKill", ModuleCategories.COMBAT, disabl
                 routeRenderPath,
                 SpearKillAStarPathAppearance(Preview.Glow.glowColor, Preview.Glow.glowStyle.style),
             )
-        }
-        if (!Preview.enabled || Preview.mode.activeMode !== Preview.Box || !hasServerHeldMace()) return@handler
-        val target = previewTarget ?: return@handler
-
-        event.renderEnvironment {
-            withPositionRelativeToCamera {
-                if (target is EnderDragon) {
-                    target.subEntities.forEach {
-                        drawBox(it.boundingBox, Preview.Box.fillColor, Preview.Box.outlineColor)
-                    }
-                } else {
-                    drawBox(target.boundingBox, Preview.Box.fillColor, Preview.Box.outlineColor)
-                }
-            }
         }
     }
 
@@ -1450,19 +1444,21 @@ object ModuleMaceKill : ClientModule("MaceKill", ModuleCategories.COMBAT, disabl
         player.setPos(origin.add(routeSession.committedOffset))
     }
 
-    private fun pinPacketRouteOrigin() {
+    private fun maintainPacketRouteOrigin() {
         val origin = localPacketRouteOrigin ?: return
+        val preservePhysicalMovement = researchExecution == null
         requiredMaceKillLocalRestore(
             packetRouteOwned = routeEngine.ownsMovement,
+            preservePhysicalMovement = preservePhysicalMovement,
             origin = origin,
             currentPosition = player.position(),
         )?.let(player::setPos)
-        player.deltaMovement = Vec3.ZERO
+        if (!preservePhysicalMovement) player.deltaMovement = Vec3.ZERO
     }
 
     private fun finishCompletedRouteSession() {
         check(routeEngine.ownsMovement && !routeSession.active && !routeEngine.awaitingStrike)
-        pinPacketRouteOrigin()
+        maintainPacketRouteOrigin()
         activeClipReachSession?.complete()
         if (researchExecution != null || motionRouteActive) {
             if (!finishMaceKillFallSafety()) return
@@ -1501,7 +1497,6 @@ object ModuleMaceKill : ClientModule("MaceKill", ModuleCategories.COMBAT, disabl
 
     private fun finishInactiveRouteOwnership() {
         if (routeEngine.ownsMovement) return
-        localPacketRouteOrigin?.let(player::setPos)
 
         val research = researchExecution
         if (research != null) {
@@ -2695,14 +2690,16 @@ object ModuleMaceKill : ClientModule("MaceKill", ModuleCategories.COMBAT, disabl
     private fun findSelectedTarget(): LivingEntity? {
         activeRouteTarget?.takeIf(::isMaceKillTargetEligible)?.let { return it }
         fightBotMaceTarget?.takeIf(::isMaceKillTargetEligible)?.let { return it }
-        ModuleKillAura.targetForMaceKill()?.takeIf(::isMaceKillTargetEligible)?.let { return it }
-        if (!hasServerHeldMace()) return null
+        val killAuraTarget = ModuleKillAura.targetForMaceKill()?.takeIf(::isMaceKillTargetEligible)
 
-        return selectMaceKillTargetForSource(
-            targetSource = targetSource,
-            lookRayTarget = ::findLookRayTarget,
-            combatTarget = ::findCombatTarget,
-        )
+        return selectMaceKillDelegatedTarget(acceptsKillAuraDelegation, killAuraTarget) {
+            if (!hasServerHeldMace()) return@selectMaceKillDelegatedTarget null
+            selectMaceKillTargetForSource(
+                targetSource = targetSource,
+                lookRayTarget = ::findLookRayTarget,
+                combatTarget = ::findCombatTarget,
+            )
+        }
     }
 
     private fun findLookRayTarget(clipReachResearch: Boolean = false): LivingEntity? {

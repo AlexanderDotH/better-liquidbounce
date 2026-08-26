@@ -11,12 +11,19 @@
 
 package net.ccbluex.liquidbounce.render.engine.unifiedfog
 
+internal fun shouldReplaceNativeFog(
+    unifiedEnabled: Boolean,
+    distantHorizonsInstalled: Boolean,
+    compatibleDistantHorizonsDepthAvailable: Boolean,
+): Boolean = unifiedEnabled && (!distantHorizonsInstalled || compatibleDistantHorizonsDepthAvailable)
+
 internal data class UnifiedFogFrameRequest<T : Any>(
     val expectedFrameToken: TerrainFrameToken,
     val targetDimensions: FrameDimensions,
     val vanillaSource: TerrainDepthSource<T>,
     val distantHorizonsSource: OptionalTerrainDepthSource<T>,
     val horizonRange: PhysicalFogHorizonRange,
+    val distantHorizonsValidationPolicy: TerrainDepthValidationPolicy = TerrainDepthValidationPolicy.STRICT,
 )
 
 internal data class UnifiedFogFrame<T : Any>(
@@ -63,6 +70,7 @@ internal object UnifiedFogFrameFactory {
             expectedKind = TerrainDepthKind.DISTANT_HORIZONS,
             expectedFrameToken = request.expectedFrameToken,
             expectedDimensions = request.targetDimensions,
+            policy = request.distantHorizonsValidationPolicy,
         )
         if (rejection != null) return UnifiedFogFrameBuild.Skipped(rejection)
         return ready(request, source)

@@ -48,6 +48,13 @@ internal inline fun <T> selectMaceKillTargetForSource(
     MaceKillTargetSource.Combat -> combatTarget()
 }
 
+/** KillAura owns both a positive selection and the decision that no MaceKill target is available. */
+internal inline fun <T> selectMaceKillDelegatedTarget(
+    killAuraAuthoritative: Boolean,
+    killAuraTarget: T?,
+    localTarget: () -> T?,
+): T? = if (killAuraAuthoritative) killAuraTarget else localTarget()
+
 internal fun isMaceKillTargetCandidateEligible(
     isCombatSafe: Boolean,
     isAlive: Boolean,

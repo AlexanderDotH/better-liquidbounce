@@ -58,33 +58,16 @@ internal fun spearKillDirectRouteHitTicks(
     outboundTickCount: Int,
     stepWaitTicks: Int,
     strikeHoldTicks: Int,
-    pacedInstant: Boolean = false,
 ): Int = if (routingMode == SpearKillRoutingMode.INSTANT) {
-    if (pacedInstant) {
-        outboundTickCount.coerceAtLeast(SPEAR_KILL_INSTANT_DAMAGE_SAMPLE_TICKS)
-    } else {
-        SPEAR_KILL_INSTANT_DAMAGE_SAMPLE_TICKS
-    }
+    SPEAR_KILL_INSTANT_DAMAGE_SAMPLE_TICKS
 } else {
     spearKillDirectPacketHitTicks(outboundTickCount, stepWaitTicks, strikeHoldTicks)
 }
 
-/** Keeps Instant's synchronous burst while ensuring no downward packet can cross the safe-fall window alone. */
-internal fun spearKillDirectRouteMaxVerticalStep(
-    routingMode: SpearKillRoutingMode,
-    maximumStepLimit: Double,
-    safeVerticalStep: Double,
-): Double = if (routingMode == SpearKillRoutingMode.INSTANT) {
-    minOf(maximumStepLimit, safeVerticalStep)
-} else {
-    maximumStepLimit
-}
-
-/** Same-tick Instant cannot replan; paced Primed can safely replace its untouched outbound tail. */
+/** Instant commits its direct teleport in one movement boundary and cannot replan in flight. */
 internal fun shouldTrackSpearKillPacketTarget(
     routingMode: SpearKillRoutingMode,
-    pacedInstant: Boolean,
-): Boolean = routingMode != SpearKillRoutingMode.INSTANT || pacedInstant
+): Boolean = routingMode != SpearKillRoutingMode.INSTANT
 
 /**
  * Chooses whether this attack should use A* after direct-route preflight.

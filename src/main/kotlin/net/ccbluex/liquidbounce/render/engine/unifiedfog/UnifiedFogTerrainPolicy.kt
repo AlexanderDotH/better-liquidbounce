@@ -34,18 +34,22 @@ internal object UnifiedFogTerrainPolicy {
         skyDistanceToTerrainPixels: Float,
         silhouetteFeatherPixels: Float,
     ): Float {
-        if (layer != TerrainLayer.SKY) return 0f
         val safeAlpha = generatedFogAlpha.takeIf(Float::isFinite)?.coerceIn(0f, 1f) ?: return 0f
-        return safeAlpha * skyFeatherFactor(skyDistanceToTerrainPixels, silhouetteFeatherPixels)
+        if (layer != TerrainLayer.SKY) return safeAlpha
+        return (safeAlpha * skyEnvelopeFactor(skyDistanceToTerrainPixels, silhouetteFeatherPixels))
+            .coerceIn(0f, 1f)
     }
 
-    fun skyFeatherFactor(distanceToTerrainPixels: Float, featherPixels: Float): Float {
+    fun skyEnvelopeFactor(distanceToTerrainPixels: Float, featherPixels: Float): Float {
         if (featherPixels == 0f) return 1f
-        if (!featherPixels.isFinite() || featherPixels < 0f) return 0f
+        if (!featherPixels.isFinite() || featherPixels < 0f) return 1f
         if (distanceToTerrainPixels == Float.POSITIVE_INFINITY) return 1f
-        if (!distanceToTerrainPixels.isFinite()) return 0f
+        if (!distanceToTerrainPixels.isFinite()) return 1f
 
         val progress = (distanceToTerrainPixels / featherPixels).coerceIn(0f, 1f)
-        return progress * progress * (3f - 2f * progress)
+        val smoothDistance = progress * progress * (3f - 2f * progress)
+        return 1f + SKY_ENVELOPE_BOOST * (1f - smoothDistance)
     }
+
+    private const val SKY_ENVELOPE_BOOST = 0.35f
 }

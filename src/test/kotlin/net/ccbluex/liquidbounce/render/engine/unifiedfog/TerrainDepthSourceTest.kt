@@ -83,6 +83,58 @@ class TerrainDepthSourceTest {
     }
 
     @Test
+    fun `render compatible policy accepts one previous frame at the same aspect ratio`() {
+        val source = depthSource(
+            frameToken = TerrainFrameToken(2, 40),
+            dimensions = FrameDimensions(960, 540),
+        )
+
+        val rejection = TerrainDepthSourceValidator.validate(
+            source = source,
+            expectedKind = TerrainDepthKind.VANILLA,
+            expectedFrameToken = TerrainFrameToken(2, 41),
+            expectedDimensions = FrameDimensions(1920, 1080),
+            policy = TerrainDepthValidationPolicy.renderCompatible(maximumFrameAge = 1),
+        )
+
+        assertNull(rejection)
+    }
+
+    @Test
+    fun `render compatible policy rejects old lifecycle and mismatched aspect ratio`() {
+        val previousLifecycle = depthSource(
+            frameToken = TerrainFrameToken(1, 40),
+            dimensions = FrameDimensions(960, 540),
+        )
+        val mismatchedAspect = depthSource(
+            frameToken = TerrainFrameToken(2, 40),
+            dimensions = FrameDimensions(1024, 1024),
+        )
+        val policy = TerrainDepthValidationPolicy.renderCompatible(maximumFrameAge = 1)
+
+        assertEquals(
+            TerrainDepthSourceRejectionReason.STALE_FRAME,
+            TerrainDepthSourceValidator.validate(
+                previousLifecycle,
+                TerrainDepthKind.VANILLA,
+                TerrainFrameToken(2, 41),
+                FrameDimensions(1920, 1080),
+                policy,
+            )?.reason,
+        )
+        assertEquals(
+            TerrainDepthSourceRejectionReason.WRONG_SIZE,
+            TerrainDepthSourceValidator.validate(
+                mismatchedAspect,
+                TerrainDepthKind.VANILLA,
+                TerrainFrameToken(2, 41),
+                FrameDimensions(1920, 1080),
+                policy,
+            )?.reason,
+        )
+    }
+
+    @Test
     fun `vanilla slot rejects a DH source`() {
         val source = depthSource(kind = TerrainDepthKind.DISTANT_HORIZONS)
 

@@ -13,6 +13,8 @@ package net.ccbluex.liquidbounce.render.engine.unifiedfog
 
 import org.joml.Matrix4f
 import org.joml.Matrix4fc
+import kotlin.math.abs
+import kotlin.math.max
 
 internal data class TerrainFrameToken(
     val lifecycleGeneration: Long,
@@ -30,6 +32,13 @@ internal data class FrameDimensions(
 ) {
     init {
         require(width > 0 && height > 0) { "Frame dimensions must be positive" }
+    }
+
+    fun hasCompatibleAspect(other: FrameDimensions, tolerance: Float): Boolean {
+        val sourceAspect = width.toFloat() / height
+        val otherAspect = other.width.toFloat() / other.height
+        val relativeDifference = abs(sourceAspect - otherAspect) / max(sourceAspect, otherAspect)
+        return relativeDifference <= tolerance
     }
 }
 
@@ -123,6 +132,30 @@ internal data class TerrainDepthSourceRejection(
     val unavailableReason: TerrainDepthUnavailableReason? = null,
 )
 
+internal data class TerrainDepthValidationPolicy private constructor(
+    val maximumFrameAge: Long,
+    val allowSameAspectScaling: Boolean,
+    val aspectRatioTolerance: Float,
+) {
+    init {
+        require(maximumFrameAge >= 0L) { "Maximum frame age must not be negative" }
+        require(aspectRatioTolerance.isFinite() && aspectRatioTolerance >= 0f) {
+            "Aspect ratio tolerance must be finite and non-negative"
+        }
+    }
+
+    companion object {
+        const val RENDER_ASPECT_TOLERANCE = 0.02f
+        val STRICT = TerrainDepthValidationPolicy(0L, false, 0f)
+
+        fun renderCompatible(maximumFrameAge: Long) = TerrainDepthValidationPolicy(
+            maximumFrameAge = maximumFrameAge,
+            allowSameAspectScaling = true,
+            aspectRatioTolerance = RENDER_ASPECT_TOLERANCE,
+        )
+    }
+}
+
 internal object TerrainDepthSourceValidator {
 
     fun validate(
@@ -130,16 +163,33 @@ internal object TerrainDepthSourceValidator {
         expectedKind: TerrainDepthKind,
         expectedFrameToken: TerrainFrameToken,
         expectedDimensions: FrameDimensions,
+        policy: TerrainDepthValidationPolicy = TerrainDepthValidationPolicy.STRICT,
     ): TerrainDepthSourceRejection? {
         if (source.kind != expectedKind) {
             return TerrainDepthSourceRejection(source.kind, TerrainDepthSourceRejectionReason.WRONG_SOURCE_KIND)
         }
-        if (source.frameToken != expectedFrameToken) {
+        if (!frameIsAccepted(source.frameToken, expectedFrameToken, policy.maximumFrameAge)) {
             return TerrainDepthSourceRejection(source.kind, TerrainDepthSourceRejectionReason.STALE_FRAME)
         }
-        if (source.dimensions != expectedDimensions) {
+        if (!dimensionsAreAccepted(source.dimensions, expectedDimensions, policy)) {
             return TerrainDepthSourceRejection(source.kind, TerrainDepthSourceRejectionReason.WRONG_SIZE)
         }
         return null
+    }
+
+    private fun frameIsAccepted(source: TerrainFrameToken, expected: TerrainFrameToken, maximumAge: Long): Boolean {
+        if (source.lifecycleGeneration != expected.lifecycleGeneration) return false
+        val age = expected.frameIndex - source.frameIndex
+        return age in 0L..maximumAge
+    }
+
+    private fun dimensionsAreAccepted(
+        source: FrameDimensions,
+        expected: FrameDimensions,
+        policy: TerrainDepthValidationPolicy,
+    ): Boolean {
+        if (source == expected) return true
+        if (!policy.allowSameAspectScaling) return false
+        return source.hasCompatibleAspect(expected, policy.aspectRatioTolerance)
     }
 }
