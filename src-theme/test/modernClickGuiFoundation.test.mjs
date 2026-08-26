@@ -17,6 +17,9 @@ import {
     filterModulesBySearch,
     normalizeModuleSearchText,
 } from "../src/routes/clickgui/themes/modern/model/moduleSearch.ts";
+import {
+    shouldLoadModernModuleSettings,
+} from "../src/routes/clickgui/themes/modern/model/modernInteractionState.ts";
 
 function modules(count) {
     return Array.from({length: count}, (_, index) => ({
@@ -196,4 +199,37 @@ test("searches module names and aliases while preserving module order", () => {
 
 test("an empty search returns no popover results", () => {
     assert.deepEqual(filterModulesBySearch(modules(2), " \t "), []);
+});
+
+test("loads Modern module settings only for an expanded unloaded module", () => {
+    assert.equal(shouldLoadModernModuleSettings({
+        expanded: false,
+        hasSettings: true,
+        loaded: false,
+        loading: false,
+    }), false);
+    assert.equal(shouldLoadModernModuleSettings({
+        expanded: true,
+        hasSettings: true,
+        loaded: false,
+        loading: false,
+    }), true);
+    assert.equal(shouldLoadModernModuleSettings({
+        expanded: true,
+        hasSettings: true,
+        loaded: true,
+        loading: false,
+    }), false);
+    assert.equal(shouldLoadModernModuleSettings({
+        expanded: true,
+        hasSettings: true,
+        loaded: false,
+        loading: true,
+    }), false);
+    assert.equal(shouldLoadModernModuleSettings({
+        expanded: true,
+        hasSettings: false,
+        loaded: false,
+        loading: false,
+    }), false);
 });

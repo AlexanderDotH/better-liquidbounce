@@ -508,6 +508,7 @@ function createModules(): Module[] {
         },
         enabled,
         description: `${name} deterministic Modern HUD preview module.`,
+        hasSettings: true,
         hidden: false,
         aliases: [],
         tag,

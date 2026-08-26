@@ -2,8 +2,24 @@ import type {ConfigurableSetting} from "../../../../../integration/types";
 
 export const MODERN_MODULE_EXPANSION_PREFIX = "clickgui.modern.module.v1.";
 
+export interface ModernModuleSettingsLoadState {
+    expanded: boolean;
+    hasSettings: boolean;
+    loaded: boolean;
+    loading: boolean;
+}
+
 export function modernModuleExpansionKey(moduleName: string): string {
     return `${MODERN_MODULE_EXPANSION_PREFIX}${moduleName}`;
+}
+
+export function shouldLoadModernModuleSettings(
+    state: ModernModuleSettingsLoadState,
+): boolean {
+    return state.expanded
+        && state.hasSettings
+        && !state.loaded
+        && !state.loading;
 }
 
 export function clampSearchSelection(selectedIndex: number, resultCount: number): number {

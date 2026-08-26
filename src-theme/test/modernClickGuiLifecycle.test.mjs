@@ -69,3 +69,33 @@ test("CEF search uses only the websocket keyboard bridge while the dev preview o
     assert.match(tabbed, /allowNativeInput=\{nativeTextInput\}/);
     assert.match(previewMain, /nativeTextInput:\s*true/);
 });
+
+test("Modern modules defer settings requests until an expandable module is open", () => {
+    const panel = read("themes/modern/ModernPanel.svelte");
+    const module = read("themes/modern/ModernModule.svelte");
+    const moduleFunctions = readFileSync(
+        new URL(
+            "../../src/main/kotlin/net/ccbluex/liquidbounce/integration/interop/protocol/rest/v1/client/ModuleFunctions.kt",
+            import.meta.url,
+        ),
+        "utf8",
+    );
+
+    assert.match(panel, /\{hasSettings\}/);
+    assert.match(module, /hasSettings:\s*boolean/);
+    assert.match(module, /shouldLoadModernModuleSettings/);
+    assert.match(
+        module,
+        /expanded\s*=\s*hasSettings\s*&&\s*localStorage\.getItem\(settingsPath\)\s*===\s*"true"/,
+    );
+    assert.doesNotMatch(module, /onMount\(\(\)\s*=>\s*\{[\s\S]{0,180}void refreshSettings\(\);/);
+    assert.match(moduleFunctions, /addProperty\("hasSettings",\s*hasSettings\)/);
+});
+
+test("panel-level module events are not duplicated by every Modern module row", () => {
+    const panel = read("themes/modern/ModernPanel.svelte");
+    const module = read("themes/modern/ModernModule.svelte");
+
+    assert.match(panel, /listen\("moduleToggle"/);
+    assert.doesNotMatch(module, /listen\("moduleToggle"/);
+});

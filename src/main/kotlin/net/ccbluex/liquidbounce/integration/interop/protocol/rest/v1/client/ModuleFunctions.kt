@@ -48,11 +48,16 @@ import net.ccbluex.liquidbounce.utils.kotlin.Minecraft
 import org.apache.commons.io.input.CharSequenceReader
 
 private fun ClientModule.toJsonObject() = JsonObject().apply {
+    val hasSettings = inner.any { value ->
+        value.name != "Bind" && !value.notAnOption && value.checkIfInclude()
+    }
+
     addProperty("name", name)
     addProperty("category", category.tag)
     add("keyBind", interopGson.toJsonTree(bind))
     addProperty("enabled", enabled)
     addProperty("description", description.get())
+    addProperty("hasSettings", hasSettings)
     addProperty("tag", this@toJsonObject.tag)
     addProperty("hidden", hidden)
     add("aliases", interopGson.toJsonTree(aliases))

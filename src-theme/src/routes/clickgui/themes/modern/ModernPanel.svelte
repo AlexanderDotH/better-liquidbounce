@@ -28,6 +28,7 @@
     } from "./model/modernPanelState";
     import {
         MODERN_LAYOUT_RESET_DURATION_MS,
+        MODERN_MODULE_STAGGER_LIMIT,
         MODERN_PANEL_STAGGER_LIMIT,
         motionStaggerIndex,
     } from "./model/modernMotion";
@@ -460,14 +461,15 @@
             bind:this={modulesElement}
             onscroll={handleModulesScroll}
     >
-        {#each modules as {name, enabled, description, aliases}, moduleIndex (name)}
+        {#each modules as {name, enabled, description, aliases, hasSettings}, moduleIndex (name)}
             <ModernModule
                     {name}
                     {enabled}
                     {description}
                     {aliases}
+                    {hasSettings}
                     {moduleIndex}
-                    revealed={panelState.expanded}
+                    revealed={panelState.expanded && moduleIndex < MODERN_MODULE_STAGGER_LIMIT}
             />
         {/each}
     </div>

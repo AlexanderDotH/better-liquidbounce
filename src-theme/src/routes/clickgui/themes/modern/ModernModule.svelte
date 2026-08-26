@@ -1,10 +1,7 @@
 <script lang="ts">
     import {onDestroy, onMount} from "svelte";
     import type {ConfigurableSetting} from "../../../../integration/types";
-    import type {
-        ClickGuiValueChangeEvent,
-        ModuleToggleEvent,
-    } from "../../../../integration/events";
+    import type {ClickGuiValueChangeEvent} from "../../../../integration/events";
     import {listen} from "../../../../integration/ws";
     import {setItem} from "../../../../integration/persistent_storage";
     import {
@@ -19,7 +16,10 @@
     import GenericSetting from "../../setting/common/GenericSetting.svelte";
     import type {ClickGuiDataSource} from "./model/clickGuiDataSource";
     import {productionClickGuiDataSource} from "./model/clickGuiDataSource";
-    import {modernModuleExpansionKey} from "./model/modernInteractionState";
+    import {
+        modernModuleExpansionKey,
+        shouldLoadModernModuleSettings,
+    } from "./model/modernInteractionState";
     import {
         MODERN_MODULE_STAGGER_LIMIT,
         MODERN_SETTING_STAGGER_LIMIT,
@@ -36,6 +36,7 @@
         enabled: boolean;
         description: string;
         aliases: string[];
+        hasSettings: boolean;
         moduleIndex: number;
         revealed: boolean;
         dataSource?: ClickGuiDataSource;
@@ -46,6 +47,7 @@
         enabled,
         description,
         aliases,
+        hasSettings,
         moduleIndex,
         revealed,
         dataSource = productionClickGuiDataSource,
@@ -55,7 +57,7 @@
     let configurable = $state<ConfigurableSetting | null>(null);
     let liveEnabled = $state(false);
     let expanded = $state(false);
-    let loadingSettings = $state(true);
+    let loadingSettings = $state(false);
     let togglePending = $state(false);
     let toggleMotionVersion = $state(0);
     let toggleFeedbackActive = $state(false);
@@ -65,10 +67,6 @@
     let settingsSaveError = $state<string | null>(null);
 
     let settingsPath = $derived(modernModuleExpansionKey(name));
-    let hasSettings = $derived(
-        configurable ? hasConfigurableSettings(configurable) : false,
-    );
-
     const settingsSaveQueue = createLatestValueSaveQueue<ConfigurableSetting>({
         save: settings => dataSource.setModuleSettings(name, settings),
         reload: () => dataSource.getModuleSettings(name),
@@ -103,12 +101,6 @@
         return () => window.clearTimeout(timeout);
     });
 
-    listen("moduleToggle", (event: ModuleToggleEvent) => {
-        if (event.moduleName === name) {
-            liveEnabled = event.enabled;
-        }
-    });
-
     listen("clickGuiValueChange", (event: ClickGuiValueChangeEvent) => {
         if (event.configurable.name !== name) {
             return;
@@ -123,8 +115,8 @@
     });
 
     onMount(() => {
-        expanded = localStorage.getItem(settingsPath) === "true";
-        void refreshSettings();
+        expanded = hasSettings && localStorage.getItem(settingsPath) === "true";
+        loadSettingsIfNeeded();
     });
 
     onDestroy(() => {
@@ -147,6 +139,19 @@
         } finally {
             loadingSettings = false;
         }
+    }
+
+    function loadSettingsIfNeeded(): void {
+        if (!shouldLoadModernModuleSettings({
+            expanded,
+            hasSettings,
+            loaded: configurable !== null,
+            loading: loadingSettings,
+        })) {
+            return;
+        }
+
+        void refreshSettings();
     }
 
     async function toggleModule(): Promise<void> {
@@ -189,6 +194,7 @@
         }
 
         expanded = !expanded;
+        loadSettingsIfNeeded();
         void persistExpansion();
     }
 

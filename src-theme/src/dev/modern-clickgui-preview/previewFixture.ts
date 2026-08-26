@@ -281,6 +281,7 @@ function createPreviewModules(): ClickGuiModule[] {
         },
         enabled,
         description: previewDescription(name),
+        hasSettings: true,
         hidden: false,
         aliases,
         tag: null,

@@ -23,6 +23,7 @@ export interface Module {
     keyBind: InputBind;
     enabled: boolean;
     description: string;
+    hasSettings: boolean;
     hidden: boolean;
     aliases: string[];
     tag: string | null;

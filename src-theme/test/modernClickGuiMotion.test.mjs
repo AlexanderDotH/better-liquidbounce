@@ -96,6 +96,15 @@ test("panels and module rows use capped staggered entrance motion", () => {
     assert.match(module, /@keyframes\s+modern-state-confirm/);
 });
 
+test("large panels animate only the leading module rows", () => {
+    const panel = read("ModernPanel.svelte");
+
+    assert.match(
+        panel,
+        /revealed=\{panelState\.expanded\s*&&\s*moduleIndex\s*<\s*MODERN_MODULE_STAGGER_LIMIT\}/,
+    );
+});
+
 test("command, search, and settings surfaces expose purposeful motion cues", () => {
     const command = read("ModernCommandBar.svelte");
     const search = read("ModernSearch.svelte");

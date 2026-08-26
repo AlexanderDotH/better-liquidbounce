@@ -33,6 +33,7 @@ test("serves deterministic modules and comprehensive settings fixtures", async (
         [...new Set(modules.map(module => module.category))],
         ["Combat", "Movement", "Player", "World", "Render", "Exploit", "Fun", "Misc"],
     );
+    assert.equal(modules.every(module => typeof module.hasSettings === "boolean"), true);
     assert.deepEqual(
         new Set(settings.value.map(setting => setting.valueType)),
         new Set([
