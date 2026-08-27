@@ -45,7 +45,6 @@ import net.ccbluex.liquidbounce.features.module.modules.combat.ModuleHitbox
 import net.ccbluex.liquidbounce.features.module.modules.combat.ModuleKeepSprint
 import net.ccbluex.liquidbounce.features.module.modules.combat.ModuleMaceKill
 import net.ccbluex.liquidbounce.features.module.modules.combat.ModuleNoMissCooldown
-import net.ccbluex.liquidbounce.features.module.modules.combat.ModuleSuperHit
 import net.ccbluex.liquidbounce.features.module.modules.combat.ModuleSpearKill
 import net.ccbluex.liquidbounce.features.module.modules.combat.ModuleSuperKnockback
 import net.ccbluex.liquidbounce.features.module.modules.combat.ModuleSwordBlock
@@ -485,7 +484,6 @@ object ModuleManager : EventListener, Collection<ClientModule> by modules {
             ModuleFightBot,
             ModuleKillAura,
             ModuleTpAura,
-            ModuleSuperHit,
             ModuleSuperKnockback,
             ModuleTimerRange,
             ModuleTickBase,
@@ -780,7 +778,14 @@ object ModuleManager : EventListener, Collection<ClientModule> by modules {
 
     @JvmName("getModuleByName")
     @ScriptApiRequired
-    fun getModuleByName(module: String) = find { it.name.equals(module, true) }
+    fun getModuleByName(module: String) = findModuleByNameOrAlias(module)
 
-    operator fun get(moduleName: String) = modules.find { it.name.equals(moduleName, true) }
+    operator fun get(moduleName: String) = findModuleByNameOrAlias(moduleName)
+
+    private fun findModuleByNameOrAlias(moduleName: String) = findByExactNameOrAlias(
+        values = modules,
+        requestedName = moduleName,
+        nameOf = ClientModule::name,
+        aliasesOf = ClientModule::aliases,
+    )
 }

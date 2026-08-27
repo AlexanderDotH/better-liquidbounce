@@ -35,6 +35,7 @@ import net.ccbluex.liquidbounce.event.events.NotificationEvent
 import net.ccbluex.liquidbounce.features.module.ModuleManager
 import net.ccbluex.liquidbounce.features.module.modules.combat.migrateLegacyFightBotConfig
 import net.ccbluex.liquidbounce.features.module.modules.combat.migrateLegacyMaceKillConfig
+import net.ccbluex.liquidbounce.features.module.modules.player.reach.migrateLegacyReachConfig
 import net.ccbluex.liquidbounce.features.module.modules.render.ModuleClickGui
 import net.ccbluex.liquidbounce.features.spoofer.SpooferManager
 import net.ccbluex.liquidbounce.utils.client.MessageMetadata
@@ -351,6 +352,7 @@ object AutoConfig {
 }
 
 internal fun prepareModuleConfigForLoad(jsonObject: JsonObject) {
+    migrateLegacyReachConfig(jsonObject)
     migrateLegacyFightBotConfig(jsonObject)
     migrateLegacyMaceKillConfig(jsonObject)
 }

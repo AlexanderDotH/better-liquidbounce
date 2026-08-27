@@ -67,6 +67,7 @@ import net.minecraft.network.protocol.ping.ServerboundPingRequestPacket
 import net.minecraft.network.protocol.status.ServerboundStatusRequestPacket
 import net.minecraft.sounds.SoundEvents
 import java.util.concurrent.ConcurrentLinkedQueue
+import java.util.Queue
 
 /**
  * Allows queueing packets and flush them later on demand.
@@ -267,6 +268,10 @@ object BlinkManager : EventListener, ValueGroup("BlinkManager") {
         packetQueue.clear()
     }
 
+    /** Removes one exact queued packet without flushing it, allowing its owner to retry safely. */
+    internal fun takeQueued(packet: Packet<*>, origin: TransferOrigin): Boolean =
+        packetQueue.takeQueuedPacket(packet, origin)
+
     fun isAboveTime(delay: Long): Boolean {
         val entryPacketTime = (packetQueue.firstOrNull()?.timestamp ?: return false)
         return System.currentTimeMillis() - entryPacketTime >= delay
@@ -292,6 +297,17 @@ object BlinkManager : EventListener, ValueGroup("BlinkManager") {
         QUEUE(2),
     }
 
+}
+
+internal fun Queue<PacketSnapshot>.takeQueuedPacket(packet: Packet<*>, origin: TransferOrigin): Boolean {
+    val iterator = iterator()
+    while (iterator.hasNext()) {
+        val snapshot = iterator.next()
+        if (snapshot.packet !== packet || snapshot.origin != origin) continue
+        iterator.remove()
+        return true
+    }
+    return false
 }
 
 @JvmRecord

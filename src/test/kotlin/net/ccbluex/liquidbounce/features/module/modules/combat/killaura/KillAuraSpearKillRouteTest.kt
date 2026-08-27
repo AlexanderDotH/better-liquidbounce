@@ -35,15 +35,15 @@ class KillAuraSpearKillRouteTest {
                 normalAttackPossible = true,
                 spearKillRunning = true,
                 spearKillTargetPossible = true,
-                superHitAvailable = true,
-                superHitTargetPossible = true,
+                reachHitAvailable = true,
+                reachHitTargetPossible = true,
             ),
         )
         assertTrue(killAuraAttackRoutePriority(9.0, 16.0) < killAuraAttackRoutePriority(100.0, 16.0))
     }
 
     @Test
-    fun `SpearKill route takes precedence over SuperHit without a normal attack`() {
+    fun `SpearKill route takes precedence over Reach Hit without a normal attack`() {
         assertEquals(
             KillAuraAttackRoute.SPEAR_KILL,
             selectKillAuraSpearKillRoute(
@@ -51,34 +51,34 @@ class KillAuraSpearKillRouteTest {
                 normalAttackPossible = false,
                 spearKillRunning = true,
                 spearKillTargetPossible = true,
-                superHitAvailable = true,
-                superHitTargetPossible = true,
+                reachHitAvailable = true,
+                reachHitTargetPossible = true,
             ),
         )
     }
 
     @Test
-    fun `SuperHit route is selected only when SpearKill cannot own the attempt`() {
+    fun `Reach Hit route is selected only when SpearKill cannot own the attempt`() {
         assertEquals(
-            KillAuraAttackRoute.SUPER_HIT,
+            KillAuraAttackRoute.REACH_HIT,
             selectKillAuraSpearKillRoute(
                 delegateKillAuraAttacks = true,
                 normalAttackPossible = false,
                 spearKillRunning = false,
                 spearKillTargetPossible = true,
-                superHitAvailable = true,
-                superHitTargetPossible = true,
+                reachHitAvailable = true,
+                reachHitTargetPossible = true,
             ),
         )
         assertEquals(
-            KillAuraAttackRoute.SUPER_HIT,
+            KillAuraAttackRoute.REACH_HIT,
             selectKillAuraSpearKillRoute(
                 delegateKillAuraAttacks = true,
                 normalAttackPossible = false,
                 spearKillRunning = true,
                 spearKillTargetPossible = false,
-                superHitAvailable = true,
-                superHitTargetPossible = true,
+                reachHitAvailable = true,
+                reachHitTargetPossible = true,
             ),
         )
     }
@@ -92,8 +92,8 @@ class KillAuraSpearKillRouteTest {
                 normalAttackPossible = false,
                 spearKillRunning = true,
                 spearKillTargetPossible = true,
-                superHitAvailable = true,
-                superHitTargetPossible = true,
+                reachHitAvailable = true,
+                reachHitTargetPossible = true,
             ),
         )
     }
@@ -107,8 +107,8 @@ class KillAuraSpearKillRouteTest {
                 normalAttackPossible = false,
                 spearKillRunning = false,
                 spearKillTargetPossible = false,
-                superHitAvailable = false,
-                superHitTargetPossible = false,
+                reachHitAvailable = false,
+                reachHitTargetPossible = false,
             ),
         )
     }
@@ -123,10 +123,10 @@ class KillAuraSpearKillRouteTest {
     }
 
     @Test
-    fun `ordinary and SuperHit routes leave KillAura subsystems enabled`() {
+    fun `ordinary and Reach Hit routes leave KillAura subsystems enabled`() {
         listOf(
             KillAuraAttackRoute.NORMAL,
-            KillAuraAttackRoute.SUPER_HIT,
+            KillAuraAttackRoute.REACH_HIT,
             KillAuraAttackRoute.NONE,
         ).forEach { route ->
             val policy = selectKillAuraSpearKillSuppressionPolicy(route)

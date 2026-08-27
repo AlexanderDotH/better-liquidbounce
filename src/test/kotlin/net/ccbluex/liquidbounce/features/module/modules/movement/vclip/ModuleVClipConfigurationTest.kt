@@ -18,6 +18,7 @@ import net.ccbluex.liquidbounce.config.types.group.ToggleableValueGroup
 import net.ccbluex.liquidbounce.config.types.group.ValueGroup
 import net.ccbluex.liquidbounce.features.module.ModuleCategories
 import net.ccbluex.liquidbounce.features.module.modules.movement.ModuleVClip
+import net.ccbluex.liquidbounce.features.module.modules.movement.acceptsVClipControlInput
 import net.ccbluex.liquidbounce.test.MinecraftBootstrap
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
@@ -32,6 +33,10 @@ class ModuleVClipConfigurationTest {
         assertEquals(ModuleCategories.MOVEMENT, ModuleVClip.category)
         assertFalse(ModuleVClip.disableActivation)
         assertTrue(ModuleVClip.disableOnQuit)
+        assertEquals(
+            listOf("Enabled", "Bind", "Hidden", "Mode", "Target", "DoNotClipAroundBedrock", "RepeatDelay"),
+            ModuleVClip.inner.map { it.name },
+        )
         assertEquals(listOf("Vanilla", "Folia"), ModuleVClip.modes.modes.map { it.name })
         assertEquals("Vanilla", ModuleVClip.modes.activeMode.name)
     }
@@ -89,14 +94,23 @@ class ModuleVClipConfigurationTest {
         val vanilla = ModuleVClip.mode("Vanilla")
         val folia = ModuleVClip.mode("Folia")
 
+        assertEquals(listOf("PaperBypass", "FullPacket", "ResetMotion"), vanilla.inner.map { it.name })
         assertEquals(false, vanilla.setting("PaperBypass").get())
         assertEquals(false, vanilla.setting("FullPacket").get())
         assertFalse(vanilla.inner.any { it.name == "GroundMode" })
         assertEquals(true, vanilla.setting("ResetMotion").get())
+        assertEquals(listOf("MovementPackets", "FullPacket", "ResetMotion"), folia.inner.map { it.name })
         assertEquals(5, folia.setting("MovementPackets").get())
         assertEquals(false, folia.setting("FullPacket").get())
         assertFalse(folia.inner.any { it.name == "GroundMode" })
         assertEquals(true, folia.setting("ResetMotion").get())
+    }
+
+    @Test
+    fun `VClip input yields to exclusive remote movement`() {
+        assertTrue(acceptsVClipControlInput(screenOpen = false, remoteMovementOwned = false))
+        assertFalse(acceptsVClipControlInput(screenOpen = true, remoteMovementOwned = false))
+        assertFalse(acceptsVClipControlInput(screenOpen = false, remoteMovementOwned = true))
     }
 
     private companion object {

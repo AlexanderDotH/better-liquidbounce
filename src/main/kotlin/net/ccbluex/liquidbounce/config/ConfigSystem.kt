@@ -32,6 +32,7 @@ import net.ccbluex.liquidbounce.features.module.ModuleManager
 import net.ccbluex.liquidbounce.features.module.modules.combat.migrateLegacyFightBotConfig
 import net.ccbluex.liquidbounce.features.module.modules.combat.migrateLegacyMaceKillConfig
 import net.ccbluex.liquidbounce.features.module.modules.combat.killaura.ModuleKillAura
+import net.ccbluex.liquidbounce.features.module.modules.player.reach.migrateLegacyReachConfig
 import net.ccbluex.liquidbounce.utils.client.clientLogger
 import net.ccbluex.liquidbounce.utils.client.mc
 import net.ccbluex.liquidbounce.utils.io.createZipArchive
@@ -269,6 +270,7 @@ object ConfigSystem {
         val jsonObject = jsonElement.asJsonObject
 
         if (valueGroup === ModuleManager.modulesConfig) {
+            migrateLegacyReachConfig(jsonObject)
             migrateLegacyFightBotConfig(jsonObject)
             migrateLegacyMaceKillConfig(jsonObject)
         }

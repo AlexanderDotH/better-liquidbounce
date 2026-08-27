@@ -17,7 +17,7 @@
  * along with LiquidBounce. If not, see <https://www.gnu.org/licenses/>.
  */
 
-package net.ccbluex.liquidbounce.features.module.modules.combat
+package net.ccbluex.liquidbounce.features.module.modules.player.reach.hit
 
 import com.google.gson.JsonObject
 import com.google.gson.JsonParser
@@ -34,7 +34,7 @@ import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 
-class ModuleSuperHitTest {
+class ReachHitTest {
 
     companion object {
         init {
@@ -43,8 +43,26 @@ class ModuleSuperHitTest {
     }
 
     @Test
-    fun `SuperHit exposes isolated mode settings`() {
-        val mode = SuperHitModeConfiguration(null).choice
+    fun `Reach Hit is disabled by default and preserves the SuperHit settings`() {
+        val hit = ReachHit(null)
+
+        assertEquals("Hit", hit.name)
+        assertFalse(hit.enabled)
+        assertEquals(
+            listOf("Enabled", "Mode", "MaxRange", "MinRange", "AttackRange", "Tracers"),
+            hit.inner.filterNot { it.name == "TargetRendering" }.map { it.name },
+        )
+        assertEquals(100f, hit.inner.single { it.name == "MaxRange" }.get())
+        assertEquals(3f, hit.inner.single { it.name == "MinRange" }.get())
+        assertEquals(4.2f, hit.inner.single { it.name == "AttackRange" }.get())
+        assertEquals(false, hit.inner.single { it.name == "Tracers" }.get())
+    }
+
+    @Test
+    fun `Reach Hit exposes isolated mode settings and exact defaults`() {
+        val configuration = ReachHitModeConfiguration(null)
+        val mode = configuration.choice
+
         assertEquals("Packet", mode.activeMode.name)
         assertEquals(
             mapOf(
@@ -57,6 +75,16 @@ class ModuleSuperHitTest {
             ),
             mode.modes.associate { it.name to it.inner.map { value -> value.name } },
         )
+        assertEquals(10f, configuration.packet.stepSize)
+        assertEquals(250, configuration.aStar.maxCost)
+        assertFalse(configuration.aStar.diagonal)
+        assertEquals(6f, configuration.adaptive.initialStep)
+        assertEquals(0.75f, configuration.adaptive.minimumStep)
+        assertEquals(3, configuration.adaptive.retries)
+        assertEquals(2, configuration.adaptive.verifyTicks)
+        assertEquals(10f, configuration.pulse.stepSize)
+        assertEquals(1, configuration.pulse.delay)
+        assertEquals(2, configuration.sentinel.stayTicks)
 
         val serializedMode = fileGson.toJsonTree(mode, ModeValueGroup::class.java).asJsonObject
         val choices = serializedMode["choices"].asJsonObject
@@ -67,11 +95,11 @@ class ModuleSuperHitTest {
     }
 
     @Test
-    fun `legacy SuperHit values migrate into their owning modes`() {
+    fun `legacy SuperHit values migrate into their Reach Hit modes`() {
         val legacy = JsonParser.parseString(
             """
             {
-              "name": "SuperHit",
+              "name": "Hit",
               "value": [
                 { "name": "Mode", "value": "AStar" },
                 { "name": "StepSize", "value": 7.5 },
@@ -88,7 +116,7 @@ class ModuleSuperHitTest {
             """.trimIndent(),
         ).asJsonObject
 
-        migrateLegacySuperHitConfig(legacy)
+        migrateLegacyReachHitConfig(legacy)
 
         val values = legacy["value"].asJsonArray.map { it.asJsonObject }
         val mode = values.single { it["name"].asString == "Mode" }
@@ -121,7 +149,7 @@ class ModuleSuperHitTest {
         for ((alias, expected) in aliases) {
             val legacy = legacyModeConfig(alias)
 
-            migrateLegacySuperHitConfig(legacy)
+            migrateLegacyReachHitConfig(legacy)
 
             assertEquals(expected, legacyMode(legacy)["active"].asString)
         }
@@ -129,16 +157,16 @@ class ModuleSuperHitTest {
 
     @Test
     fun `changing configured mode retains captured execution travel mode`() {
-        val executionMode = SuperHitExecutionMode()
-        val configuredMode = SuperHitModeConfiguration(null).choice
+        val executionMode = ReachHitExecutionMode()
+        val configuredMode = ReachHitModeConfiguration(null).choice
 
         try {
             configuredMode.setByString("Packet")
-            assertEquals(SuperHitMode.PACKET, executionMode.capture(configuredMode.activeMode.travelMode))
+            assertEquals(ReachHitMode.PACKET, executionMode.capture(configuredMode.activeMode.travelMode))
 
             configuredMode.setByString("Motion")
-            assertEquals(SuperHitMode.MOTION, configuredMode.activeMode.travelMode)
-            assertEquals(SuperHitMode.PACKET, executionMode.current)
+            assertEquals(ReachHitMode.MOTION, configuredMode.activeMode.travelMode)
+            assertEquals(ReachHitMode.PACKET, executionMode.current)
         } finally {
             executionMode.clear()
             configuredMode.restore()
@@ -149,23 +177,23 @@ class ModuleSuperHitTest {
 
     @Test
     fun `sentinel mode accepts existing cubecraft configs`() {
-        val modes = SuperHitMode.entries
+        val modes = ReachHitMode.entries
         val lookup = modes.makeLookupTable()
 
         assertEquals(
             listOf("Packet", "AStar", "Adaptive", "Motion", "Pulse", "Sentinel"),
             modes.map { it.tag },
         )
-        assertEquals(SuperHitMode.PACKET, lookup["Direct"])
-        assertEquals(SuperHitMode.PACKET, lookup["SinglePacket"])
+        assertEquals(ReachHitMode.PACKET, lookup["Direct"])
+        assertEquals(ReachHitMode.PACKET, lookup["SinglePacket"])
         listOf("Cubecraft", "CubeCraft", "Cube Craft").forEach { savedName ->
-            assertEquals(SuperHitMode.SENTINEL, lookup[savedName])
+            assertEquals(ReachHitMode.SENTINEL, lookup[savedName])
         }
     }
 
     @Test
     fun `mode choice accepts every compatibility alias`() {
-        val mode = SuperHitModeConfiguration(null).choice
+        val mode = ReachHitModeConfiguration(null).choice
 
         try {
             mapOf(
@@ -187,8 +215,8 @@ class ModuleSuperHitTest {
     fun `packet modes expose distinct travel profiles`() {
         val origin = Vec3.ZERO
         val destination = Vec3(10.0, 0.0, 0.0)
-        val packetPath = buildSuperHitTravelPath(
-            SuperHitMode.PACKET, origin, destination, stepSize = 4.0
+        val packetPath = buildReachHitTravelPath(
+            ReachHitMode.PACKET, origin, destination, stepSize = 4.0,
         )
 
         assertEquals(3, packetPath.size)
@@ -197,32 +225,32 @@ class ModuleSuperHitTest {
         assertVec3Equals(destination, packetPath[2], 1e-9)
         assertEquals(
             packetPath,
-            buildSuperHitTravelPath(SuperHitMode.PULSE, origin, destination, stepSize = 4.0),
+            buildReachHitTravelPath(ReachHitMode.PULSE, origin, destination, stepSize = 4.0),
         )
         assertEquals(
             packetPath,
-            buildSuperHitTravelPath(SuperHitMode.ADAPTIVE, origin, destination, stepSize = 4.0),
+            buildReachHitTravelPath(ReachHitMode.ADAPTIVE, origin, destination, stepSize = 4.0),
         )
-        assertTrue(buildSuperHitTravelPath(SuperHitMode.A_STAR, origin, destination, stepSize = 4.0).isEmpty())
-        assertTrue(buildSuperHitTravelPath(SuperHitMode.MOTION, origin, destination, stepSize = 4.0).isEmpty())
-        assertTrue(buildSuperHitTravelPath(SuperHitMode.SENTINEL, origin, destination, stepSize = 4.0).isEmpty())
+        assertTrue(buildReachHitTravelPath(ReachHitMode.A_STAR, origin, destination, stepSize = 4.0).isEmpty())
+        assertTrue(buildReachHitTravelPath(ReachHitMode.MOTION, origin, destination, stepSize = 4.0).isEmpty())
+        assertTrue(buildReachHitTravelPath(ReachHitMode.SENTINEL, origin, destination, stepSize = 4.0).isEmpty())
     }
 
     @Test
     fun `packet travel classification excludes real movement modes`() {
-        assertTrue(SuperHitMode.PACKET.usesPacketTravel)
-        assertTrue(SuperHitMode.A_STAR.usesPacketTravel)
-        assertTrue(SuperHitMode.ADAPTIVE.usesPacketTravel)
-        assertTrue(SuperHitMode.PULSE.usesPacketTravel)
-        assertFalse(SuperHitMode.MOTION.usesPacketTravel)
-        assertFalse(SuperHitMode.SENTINEL.usesPacketTravel)
+        assertTrue(ReachHitMode.PACKET.usesPacketTravel)
+        assertTrue(ReachHitMode.A_STAR.usesPacketTravel)
+        assertTrue(ReachHitMode.ADAPTIVE.usesPacketTravel)
+        assertTrue(ReachHitMode.PULSE.usesPacketTravel)
+        assertFalse(ReachHitMode.MOTION.usesPacketTravel)
+        assertFalse(ReachHitMode.SENTINEL.usesPacketTravel)
     }
 
     @Test
     fun `adaptive mode halves rejected steps down to its configured minimum`() {
         assertEquals(
             listOf(6.0, 3.0, 1.5, 0.75),
-            calculateAdaptiveStepSizes(initialStep = 6.0, minimumStep = 0.75, retries = 3),
+            calculateReachHitAdaptiveStepSizes(initialStep = 6.0, minimumStep = 0.75, retries = 3),
         )
     }
 
@@ -230,7 +258,7 @@ class ModuleSuperHitTest {
     fun `adaptive mode attacks only after the server accepts a smaller step`() = runTest {
         val events = mutableListOf<String>()
 
-        val success = executeAdaptiveSuperHit(
+        val success = executeAdaptiveReachHit(
             stepSizes = listOf(6.0, 3.0, 1.5),
             attempt = { step ->
                 events += "attempt:$step"
@@ -251,7 +279,7 @@ class ModuleSuperHitTest {
     fun `adaptive mode recovers without attacking after every step is rejected`() = runTest {
         val events = mutableListOf<String>()
 
-        val success = executeAdaptiveSuperHit(
+        val success = executeAdaptiveReachHit(
             stepSizes = listOf(6.0, 3.0),
             attempt = { step ->
                 events += "attempt:$step"
@@ -276,35 +304,35 @@ class ModuleSuperHitTest {
 
         assertEquals(
             listOf(outward[1], outward[0], origin),
-            buildAStarReturnPath(origin, outward),
+            buildReachHitAStarReturnPath(origin, outward),
         )
     }
 
     @Test
-    fun `modern combat permits a charged SuperHit attack`() {
-        assertFalse(isSuperHitAttackReady(usesAttackCooldown = true, attackStrength = 0.5f))
-        assertTrue(isSuperHitAttackReady(usesAttackCooldown = true, attackStrength = 1.0f))
-        assertTrue(isSuperHitAttackReady(usesAttackCooldown = false, attackStrength = 0.0f))
+    fun `modern combat permits a charged Reach Hit attack`() {
+        assertFalse(isReachHitAttackReady(usesAttackCooldown = true, attackStrength = 0.5f))
+        assertTrue(isReachHitAttackReady(usesAttackCooldown = true, attackStrength = 1.0f))
+        assertTrue(isReachHitAttackReady(usesAttackCooldown = false, attackStrength = 0.0f))
     }
 
     @Test
     fun `tracer is hidden by default and only renders with a target`() {
-        assertFalse(shouldRenderSuperHitTracer(tracersEnabled = false, hasTarget = true))
-        assertFalse(shouldRenderSuperHitTracer(tracersEnabled = true, hasTarget = false))
-        assertTrue(shouldRenderSuperHitTracer(tracersEnabled = true, hasTarget = true))
+        assertFalse(shouldRenderReachHitTracer(tracersEnabled = false, hasTarget = true))
+        assertFalse(shouldRenderReachHitTracer(tracersEnabled = true, hasTarget = false))
+        assertTrue(shouldRenderReachHitTracer(tracersEnabled = true, hasTarget = true))
     }
 
     @Test
-    fun `SuperHit target range keeps its minimum exclusive and maximum inclusive`() {
-        assertFalse(isWithinSuperHitTargetRange(distanceSquared = 9.0, minRange = 3f, maxRange = 100f))
-        assertTrue(isWithinSuperHitTargetRange(distanceSquared = 9.01, minRange = 3f, maxRange = 100f))
-        assertTrue(isWithinSuperHitTargetRange(distanceSquared = 10_000.0, minRange = 3f, maxRange = 100f))
-        assertFalse(isWithinSuperHitTargetRange(distanceSquared = 10_000.01, minRange = 3f, maxRange = 100f))
+    fun `Reach Hit target range keeps its minimum exclusive and maximum inclusive`() {
+        assertFalse(isWithinReachHitTargetRange(distanceSquared = 9.0, minRange = 3f, maxRange = 100f))
+        assertTrue(isWithinReachHitTargetRange(distanceSquared = 9.01, minRange = 3f, maxRange = 100f))
+        assertTrue(isWithinReachHitTargetRange(distanceSquared = 10_000.0, minRange = 3f, maxRange = 100f))
+        assertFalse(isWithinReachHitTargetRange(distanceSquared = 10_000.01, minRange = 3f, maxRange = 100f))
     }
 
     @Test
-    fun `automatic SuperHit failures back off without delaying a different target`() {
-        val retryGate = SuperHitAutomaticRetryGate(retryDelayTicks = 10)
+    fun `automatic Reach Hit failures back off without delaying a different target`() {
+        val retryGate = ReachHitAutomaticRetryGate(retryDelayTicks = 10)
 
         assertTrue(retryGate.canAttempt(targetId = 7, currentTick = 100))
         retryGate.recordFailure(targetId = 7, currentTick = 100)
@@ -314,8 +342,8 @@ class ModuleSuperHitTest {
     }
 
     @Test
-    fun `automatic SuperHit retry gate resets after success or explicit clear`() {
-        val retryGate = SuperHitAutomaticRetryGate(retryDelayTicks = 10)
+    fun `automatic Reach Hit retry gate resets after success or explicit clear`() {
+        val retryGate = ReachHitAutomaticRetryGate(retryDelayTicks = 10)
 
         retryGate.recordFailure(targetId = 7, currentTick = 100)
         retryGate.recordSuccess()
@@ -330,7 +358,7 @@ class ModuleSuperHitTest {
     fun `sentinel destination clears the target hitbox toward the player`() {
         assertVec3Equals(
             Vec3(9.3, 64.0, 0.0),
-            calculateSuperHitDestination(
+            calculateReachHitDestination(
                 origin = Vec3.ZERO,
                 targetPosition = Vec3(10.0, 64.0, 0.0),
                 playerWidth = 0.6,
@@ -341,7 +369,7 @@ class ModuleSuperHitTest {
 
         assertVec3Equals(
             Vec3(9.3, 64.0, 9.3),
-            calculateSuperHitDestination(
+            calculateReachHitDestination(
                 origin = Vec3.ZERO,
                 targetPosition = Vec3(10.0, 64.0, 10.0),
                 playerWidth = 0.6,
@@ -357,7 +385,7 @@ class ModuleSuperHitTest {
         val target = Vec3(10.0, 64.0, 20.0)
         val events = mutableListOf<String>()
 
-        val outcome = executeRoundTripSuperHit(
+        val outcome = executeRoundTripReachHit(
             origin = origin,
             destination = target,
             stayTicks = 2,
@@ -384,7 +412,7 @@ class ModuleSuperHitTest {
         var attacked = false
         var teleportCalls = 0
 
-        val outcome = executeRoundTripSuperHit(
+        val outcome = executeRoundTripReachHit(
             origin = Vec3(1.0, 0.0, 0.0),
             destination = Vec3.ZERO,
             stayTicks = 2,
@@ -412,7 +440,7 @@ class ModuleSuperHitTest {
         val origin = Vec3(1.0, 0.0, 0.0)
         val events = mutableListOf<String>()
 
-        val outcome = executeRoundTripSuperHit(
+        val outcome = executeRoundTripReachHit(
             origin = origin,
             destination = Vec3.ZERO,
             stayTicks = 2,
@@ -435,7 +463,7 @@ class ModuleSuperHitTest {
     fun `sentinel returns immediately when the post-teleport attack is rejected`() = runTest {
         val events = mutableListOf<String>()
 
-        val outcome = executeRoundTripSuperHit(
+        val outcome = executeRoundTripReachHit(
             origin = Vec3(1.0, 0.0, 0.0),
             destination = Vec3.ZERO,
             stayTicks = 2,
@@ -461,7 +489,7 @@ class ModuleSuperHitTest {
     fun `sentinel preserves attack success when its return teleport fails`() = runTest {
         var teleportCalls = 0
 
-        val outcome = executeRoundTripSuperHit(
+        val outcome = executeRoundTripReachHit(
             origin = Vec3(1.0, 0.0, 0.0),
             destination = Vec3.ZERO,
             stayTicks = 0,
@@ -479,7 +507,6 @@ class ModuleSuperHitTest {
         assertFalse(outcome.returned)
         assertEquals(2, teleportCalls)
     }
-
 }
 
 private fun JsonObject.valueNames(choice: String): List<String> = getAsJsonObject(choice)
@@ -492,7 +519,7 @@ private fun JsonObject.setting(choice: String, setting: String) = getAsJsonObjec
     .single { it["name"].asString == setting }["value"]
 
 private fun legacyModeConfig(mode: String): JsonObject = JsonParser.parseString(
-    """{ "name": "SuperHit", "value": [{ "name": "Mode", "value": "$mode" }] }""",
+    """{ "name": "Hit", "value": [{ "name": "Mode", "value": "$mode" }] }""",
 ).asJsonObject
 
 private fun legacyMode(config: JsonObject): JsonObject = config["value"].asJsonArray

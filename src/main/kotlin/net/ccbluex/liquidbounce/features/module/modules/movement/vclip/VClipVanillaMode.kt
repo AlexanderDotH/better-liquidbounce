@@ -25,24 +25,24 @@ internal object VClipVanillaMode : VClipMovementMode("Vanilla") {
         target: VClipPosition,
         fallSafety: VClipFallSafetyContext,
     ): VClipClipResult {
-        val result = VClipPacketPlanner.vanilla(
-            origin = origin,
-            target = target,
+        val result = VClipVanillaProfile(
             paperBypass = paperBypass,
             fullPacket = fullPacket,
-            initialFallDistance = fallSafety.initialFallDistance,
-            safeFallDistance = fallSafety.safeFallDistance,
-        )
+        ).plan(VClipTransportRequest(
+            origin = origin,
+            target = target,
+            fallSafety = fallSafety,
+        ))
         val plan = (result as? VClipPacketPlanResult.Ready)?.steps
             ?: return VClipClipResult.FALL_PROTECTION_UNAVAILABLE
-        val completed = VClipPacketEmitter.sendPlayerPlan(
+        val emission = VClipPacketEmitter.sendPlayerPlan(
             plan,
             player.yRot,
             player.xRot,
             player.horizontalCollision,
             ModuleVClip::sendMovementPacket,
         )
-        if (!completed) {
+        if (!emission.completed) {
             return VClipClipResult.FALL_PROTECTION_UNAVAILABLE
         }
         applyLocalPosition(entity, target, resetMotion)

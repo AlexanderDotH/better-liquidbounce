@@ -33,7 +33,6 @@ import net.ccbluex.liquidbounce.features.module.modules.combat.ModuleAutoWeapon
 import net.ccbluex.liquidbounce.features.module.modules.combat.ModuleFightBot
 import net.ccbluex.liquidbounce.features.module.modules.combat.ModuleMaceKill
 import net.ccbluex.liquidbounce.features.module.modules.combat.ModuleSpearKill
-import net.ccbluex.liquidbounce.features.module.modules.combat.ModuleSuperHit
 import net.ccbluex.liquidbounce.features.module.modules.combat.lockedTarget
 import net.ccbluex.liquidbounce.features.module.modules.combat.selectKillAuraTargetForFightBot
 import net.ccbluex.liquidbounce.features.module.modules.combat.state
@@ -55,6 +54,7 @@ import net.ccbluex.liquidbounce.features.module.modules.combat.killaura.features
 import net.ccbluex.liquidbounce.features.module.modules.combat.killaura.features.KillAuraRange
 import net.ccbluex.liquidbounce.features.module.modules.combat.killaura.features.KillAuraRangeIndicator
 import net.ccbluex.liquidbounce.features.module.modules.misc.debugrecorder.modes.GenericDebugRecorder
+import net.ccbluex.liquidbounce.features.module.modules.player.ModuleReach
 import net.ccbluex.liquidbounce.features.module.modules.render.ModuleDebug
 import net.ccbluex.liquidbounce.features.module.modules.render.ModuleDebug.debugGeometry
 import net.ccbluex.liquidbounce.features.module.modules.render.ModuleDebug.debugParameter
@@ -142,9 +142,9 @@ object ModuleKillAura : ClientModule("KillAura", ModuleCategories.COMBAT) {
             range.interactionRange
         }
 
-    internal fun shouldUseSuperHitFor(target: LivingEntity): Boolean {
-        return GlobalSettingsCombat.delegateKillAuraAttacks && ModuleSuperHit.running &&
-            ModuleSuperHit.isTargetInConfiguredRange(target) &&
+    internal fun shouldUseReachHitFor(target: LivingEntity): Boolean {
+        return GlobalSettingsCombat.delegateKillAuraAttacks && ModuleReach.hit.running &&
+            ModuleReach.hit.isTargetInConfiguredRange(target) &&
             player.squaredBoxedDistanceTo(target) > extendedInteractionRange.sq()
     }
 
@@ -179,8 +179,8 @@ object ModuleKillAura : ClientModule("KillAura", ModuleCategories.COMBAT) {
                 ModuleSpearKill.isKillAuraIntegrationAvailable
             },
             spearKillTargetPossible = isDistantSpearKillTarget(target),
-            superHitAvailable = false,
-            superHitTargetPossible = false,
+            reachHitAvailable = false,
+            reachHitTargetPossible = false,
         )
 
     private fun isRemoteKillRouteTarget(target: LivingEntity): Boolean =
@@ -188,18 +188,18 @@ object ModuleKillAura : ClientModule("KillAura", ModuleCategories.COMBAT) {
 
     private fun delegatedAttackRotation(target: LivingEntity): Rotation? = when {
         isRemoteKillRouteTarget(target) -> player.rotation
-        shouldUseSuperHitFor(target) -> calculateKillAuraDelegatedAttackRotation(
+        shouldUseReachHitFor(target) -> calculateKillAuraDelegatedAttackRotation(
             eyes = player.eyePosition,
             targetBox = target.boundingBox,
         )
         else -> null
     }
 
-    private fun canDispatchSuperHit(target: LivingEntity, rotation: Rotation): Boolean =
+    private fun canDispatchReachHit(target: LivingEntity, rotation: Rotation): Boolean =
         isLookingAtEntity(
             toEntity = target,
             rotation = rotation,
-            range = ModuleSuperHit.maximumTargetRange.toDouble(),
+            range = ModuleReach.hit.maximumTargetRange.toDouble(),
             throughWallsRange = 0.0,
         ) != null
 
@@ -225,7 +225,7 @@ object ModuleKillAura : ClientModule("KillAura", ModuleCategories.COMBAT) {
         val trackedRoute = trackedTarget?.let { remoteKillRouteFor(it, requireArmed = false) }
         val trackedTargetOwnedByAnotherRoute = trackedTarget?.let { target ->
             target.squaredBoxedDistanceTo(player) <= extendedInteractionRange.sq() ||
-                trackedRoute == KillAuraAttackRoute.MACE_KILL || shouldUseSuperHitFor(target)
+                trackedRoute == KillAuraAttackRoute.MACE_KILL || shouldUseReachHitFor(target)
         } == true
         if (KillAuraSpearTargetSelectionSnapshot(
                 selectionEvaluated = targetSelectionEvaluated,
@@ -451,9 +451,9 @@ object ModuleKillAura : ClientModule("KillAura", ModuleCategories.COMBAT) {
         debugParameter("Target") { target.scoreboardName }
 
         val isInRange = isNormalAttackPossible(target, rotation)
-        val superHitTarget = target as? LivingEntity
-        val selectedRoute = determineAttackRoute(superHitTarget, rotation, isInRange)
-        val attackRoute = resolveMaceKillAttackRoute(selectedRoute, superHitTarget, rotation, isInRange)
+        val reachHitTarget = target as? LivingEntity
+        val selectedRoute = determineAttackRoute(reachHitTarget, rotation, isInRange)
+        val attackRoute = resolveMaceKillAttackRoute(selectedRoute, reachHitTarget, rotation, isInRange)
         debugParameter("Attack Route") { attackRoute }
         if (attackRoute.isRemoteKillRoute) {
             return
@@ -488,9 +488,9 @@ object ModuleKillAura : ClientModule("KillAura", ModuleCategories.COMBAT) {
                         attackEntity(target, SwingMode.DO_NOT_HIDE, attackKeepSprint)
                         true
                     },
-                    superHitAttack = {
-                        val livingTarget = superHitTarget ?: return@executeKillAuraAttack false
-                        ModuleSuperHit.tryAttack(
+                    reachHitAttack = {
+                        val livingTarget = reachHitTarget ?: return@executeKillAuraAttack false
+                        ModuleReach.hit.tryAttack(
                             livingTarget,
                             rotation,
                             attackKeepSprint,
@@ -514,7 +514,7 @@ object ModuleKillAura : ClientModule("KillAura", ModuleCategories.COMBAT) {
         }
     }
 
-    /** Launches MaceKill in this tick and resolves an ordinary/Spear/SuperHit fallback on rejection. */
+    /** Launches MaceKill in this tick and resolves an ordinary, SpearKill, or Reach Hit fallback. */
     private fun resolveMaceKillAttackRoute(
         selectedRoute: KillAuraAttackRoute,
         target: LivingEntity?,
@@ -525,7 +525,7 @@ object ModuleKillAura : ClientModule("KillAura", ModuleCategories.COMBAT) {
         launchMaceKill = { target?.let(ModuleMaceKill::requestKillAuraMaceKill) == true },
         fallbackRoute = {
             determineAttackRoute(
-                superHitTarget = target,
+                reachHitTarget = target,
                 rotation = rotation,
                 normalAttackPossible = normalAttackPossible,
                 allowMaceKill = false,
@@ -550,18 +550,18 @@ object ModuleKillAura : ClientModule("KillAura", ModuleCategories.COMBAT) {
     }
 
     private fun determineAttackRoute(
-        superHitTarget: LivingEntity?,
+        reachHitTarget: LivingEntity?,
         rotation: Rotation,
         normalAttackPossible: Boolean,
         allowMaceKill: Boolean = true,
     ): KillAuraAttackRoute {
-        val maceKillTargetPossible = allowMaceKill && superHitTarget != null &&
-            isMaceKillRouteTarget(superHitTarget)
-        val spearKillTargetPossible = !normalAttackPossible && superHitTarget != null &&
-            isDistantSpearKillTarget(superHitTarget)
-        val superHitTargetPossible = !normalAttackPossible && !maceKillTargetPossible &&
-            !spearKillTargetPossible && superHitTarget != null &&
-            shouldUseSuperHitFor(superHitTarget) && canDispatchSuperHit(superHitTarget, rotation)
+        val maceKillTargetPossible = allowMaceKill && reachHitTarget != null &&
+            isMaceKillRouteTarget(reachHitTarget)
+        val spearKillTargetPossible = !normalAttackPossible && reachHitTarget != null &&
+            isDistantSpearKillTarget(reachHitTarget)
+        val reachHitTargetPossible = !normalAttackPossible && !maceKillTargetPossible &&
+            !spearKillTargetPossible && reachHitTarget != null &&
+            shouldUseReachHitFor(reachHitTarget) && canDispatchReachHit(reachHitTarget, rotation)
 
         return selectKillAuraAttackRoute(
             delegateKillAuraAttacks = GlobalSettingsCombat.delegateKillAuraAttacks,
@@ -571,8 +571,8 @@ object ModuleKillAura : ClientModule("KillAura", ModuleCategories.COMBAT) {
             maceKillTargetPossible = maceKillTargetPossible,
             spearKillRunning = ModuleSpearKill.isKillAuraIntegrationArmed,
             spearKillTargetPossible = spearKillTargetPossible,
-            superHitAvailable = ModuleSuperHit.running,
-            superHitTargetPossible = superHitTargetPossible,
+            reachHitAvailable = ModuleReach.hit.running,
+            reachHitTargetPossible = reachHitTargetPossible,
         )
     }
 
@@ -618,8 +618,8 @@ object ModuleKillAura : ClientModule("KillAura", ModuleCategories.COMBAT) {
         val maximumRange = calculateKillAuraTargetingRange(
             delegateKillAuraAttacks = GlobalSettingsCombat.delegateKillAuraAttacks,
             normalMaximumRange = normalMaximumRange,
-            superHitAvailable = ModuleSuperHit.running,
-            superHitMaximumRange = ModuleSuperHit.maximumTargetRange,
+            reachHitAvailable = ModuleReach.hit.running,
+            reachHitMaximumRange = ModuleReach.hit.maximumTargetRange,
             spearKillRunning = ModuleSpearKill.isKillAuraIntegrationAvailable,
             spearKillMaximumRange = ModuleSpearKill.maximumTargetRange,
             maceKillRunning = ModuleMaceKill.isKillAuraIntegrationAvailable,
@@ -640,9 +640,9 @@ object ModuleKillAura : ClientModule("KillAura", ModuleCategories.COMBAT) {
             }
             .firstOrNull { entity ->
                 val remoteKillTarget = isRemoteKillRouteTarget(entity)
-                val delegatedSuperHitTarget = !remoteKillTarget && shouldUseSuperHitFor(entity)
-                if (!shouldUseKillAuraAimPipeline(remoteKillTarget, delegatedSuperHitTarget)) {
-                    return@firstOrNull remoteKillTarget || canDispatchSuperHit(
+                val delegatedReachHitTarget = !remoteKillTarget && shouldUseReachHitFor(entity)
+                if (!shouldUseKillAuraAimPipeline(remoteKillTarget, delegatedReachHitTarget)) {
+                    return@firstOrNull remoteKillTarget || canDispatchReachHit(
                         entity,
                         calculateKillAuraDelegatedAttackRotation(player.eyePosition, entity.boundingBox),
                     )
@@ -791,7 +791,7 @@ object ModuleKillAura : ClientModule("KillAura", ModuleCategories.COMBAT) {
     ): TargetingParameters? {
         if (!shouldUseKillAuraAimPipeline(
                 delegatedRemoteKillTarget = isRemoteKillRouteTarget(entity),
-                delegatedSuperHitTarget = shouldUseSuperHitFor(entity),
+                delegatedReachHitTarget = shouldUseReachHitFor(entity),
             )
         ) {
             return null
@@ -851,7 +851,7 @@ internal enum class KillAuraAttackRoute {
     NORMAL,
     MACE_KILL,
     SPEAR_KILL,
-    SUPER_HIT,
+    REACH_HIT,
 }
 
 internal val KillAuraAttackRoute.isRemoteKillRoute: Boolean
@@ -867,8 +867,8 @@ internal fun selectKillAuraAttackRoute(
     normalAttackPossible: Boolean,
     spearKillRunning: Boolean = false,
     spearKillTargetPossible: Boolean = false,
-    superHitAvailable: Boolean,
-    superHitTargetPossible: Boolean,
+    reachHitAvailable: Boolean,
+    reachHitTargetPossible: Boolean,
     heldRemoteWeapon: KillAuraRemoteWeapon = KillAuraRemoteWeapon.NONE,
     maceKillAvailable: Boolean = false,
     maceKillTargetPossible: Boolean = false,
@@ -880,15 +880,15 @@ internal fun selectKillAuraAttackRoute(
     maceKillTargetPossible = maceKillTargetPossible,
     spearKillAvailable = spearKillRunning,
     spearKillTargetPossible = spearKillTargetPossible,
-    superHitAvailable = superHitAvailable,
-    superHitTargetPossible = superHitTargetPossible,
+    reachHitAvailable = reachHitAvailable,
+    reachHitTargetPossible = reachHitTargetPossible,
 )
 
 internal fun calculateKillAuraTargetingRange(
     delegateKillAuraAttacks: Boolean,
     normalMaximumRange: Float,
-    superHitAvailable: Boolean,
-    superHitMaximumRange: Float,
+    reachHitAvailable: Boolean,
+    reachHitMaximumRange: Float,
     spearKillRunning: Boolean = false,
     spearKillMaximumRange: Float = 0f,
     maceKillRunning: Boolean = false,
@@ -898,7 +898,7 @@ internal fun calculateKillAuraTargetingRange(
 } else {
     maxOf(
         normalMaximumRange,
-        superHitMaximumRange.takeIf { superHitAvailable } ?: 0f,
+        reachHitMaximumRange.takeIf { reachHitAvailable } ?: 0f,
         spearKillMaximumRange.takeIf { spearKillRunning } ?: 0f,
         maceKillMaximumRange.takeIf { maceKillRunning } ?: 0f,
     )
@@ -907,7 +907,7 @@ internal fun calculateKillAuraTargetingRange(
 internal suspend fun executeKillAuraAttack(
     route: KillAuraAttackRoute,
     normalAttack: suspend () -> Boolean,
-    superHitAttack: suspend () -> Boolean,
+    reachHitAttack: suspend () -> Boolean,
     onSuccess: () -> Unit,
 ): Boolean {
     val success = when (route) {
@@ -915,7 +915,7 @@ internal suspend fun executeKillAuraAttack(
         KillAuraAttackRoute.NORMAL -> normalAttack()
         KillAuraAttackRoute.MACE_KILL,
         KillAuraAttackRoute.SPEAR_KILL -> false
-        KillAuraAttackRoute.SUPER_HIT -> superHitAttack()
+        KillAuraAttackRoute.REACH_HIT -> reachHitAttack()
     }
 
     if (success) {

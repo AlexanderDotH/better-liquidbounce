@@ -112,8 +112,8 @@ class MaceKillKillAuraLifecycleTest {
             maceKillTargetPossible = true,
             spearKillAvailable = true,
             spearKillTargetPossible = true,
-            superHitAvailable = true,
-            superHitTargetPossible = true,
+            reachHitAvailable = true,
+            reachHitTargetPossible = true,
         )
 
         val resolved = resolveKillAuraMaceLaunch(

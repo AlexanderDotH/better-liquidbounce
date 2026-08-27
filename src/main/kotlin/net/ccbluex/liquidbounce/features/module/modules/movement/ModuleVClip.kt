@@ -45,6 +45,7 @@ import net.ccbluex.liquidbounce.render.drawBlockSelection
 import net.ccbluex.liquidbounce.render.renderEnvironment
 import net.ccbluex.liquidbounce.utils.client.notification
 import net.ccbluex.liquidbounce.utils.kotlin.EventPriorityConvention.READ_FINAL_STATE
+import net.ccbluex.liquidbounce.utils.movement.remote.RemoteMovementOwnership
 import net.minecraft.network.protocol.game.ServerboundMovePlayerPacket
 import net.minecraft.network.protocol.game.ServerboundPlayerCommandPacket
 import net.minecraft.network.protocol.game.ServerboundPlayerInputPacket
@@ -217,7 +218,10 @@ object ModuleVClip : ClientModule(
         }
     }
 
-    private fun acceptsControlInput() = mc.gui.screen() == null
+    private fun acceptsControlInput() = acceptsVClipControlInput(
+        screenOpen = mc.gui.screen() != null,
+        remoteMovementOwned = RemoteMovementOwnership.active,
+    )
 
     private fun inputSuppression(): VClipInputSuppression {
         val smartLockActive = ModuleMiddleClickAction.isSmartVClipLockActive()
@@ -239,3 +243,6 @@ object ModuleVClip : ClientModule(
         get() = this == ServerboundPlayerCommandPacket.Action.START_RIDING_JUMP ||
             this == ServerboundPlayerCommandPacket.Action.STOP_RIDING_JUMP
 }
+
+internal fun acceptsVClipControlInput(screenOpen: Boolean, remoteMovementOwned: Boolean): Boolean =
+    !screenOpen && !remoteMovementOwned

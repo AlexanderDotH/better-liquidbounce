@@ -34,6 +34,7 @@ import net.ccbluex.liquidbounce.features.module.modules.player.Limit;
 import net.ccbluex.liquidbounce.features.module.modules.player.ModuleAntiExploit;
 import net.ccbluex.liquidbounce.features.module.modules.player.ModuleNoCapability;
 import net.ccbluex.liquidbounce.features.module.modules.player.ModuleNoRotateSet;
+import net.ccbluex.liquidbounce.features.module.modules.player.reach.interactable.ReachInteractableFeature;
 import net.ccbluex.liquidbounce.features.module.modules.render.playermodel.ServerPlayerModelStateTracker;
 import net.ccbluex.liquidbounce.utils.aiming.RotationManager;
 import net.ccbluex.liquidbounce.utils.aiming.data.Rotation;
@@ -258,12 +259,14 @@ public abstract class MixinClientPacketListener extends ClientCommonPacketListen
     private void injectPlayerPositionLook(
         ClientboundPlayerPositionPacket packet, CallbackInfo ci, @Local(name = "player") Player player) {
         SpearKillSetbackHook.beforeCorrection(packet, player);
+        ReachInteractableFeature.beforeCorrection(packet, player);
         rotationThreadLocal.set(new Rotation(player.getYRot(), player.getXRot(), true));
     }
 
     @Inject(method = "handleMovePlayer", at = @At("RETURN"))
     private void injectNoRotateSet(ClientboundPlayerPositionPacket packet, CallbackInfo ci, @Local(name = "player") Player player) {
         SpearKillSetbackHook.afterCorrection(packet, player);
+        ReachInteractableFeature.afterCorrection(packet, player);
         ServerPlayerModelStateTracker.correct(player.position(), player.getYRot(), player.getXRot());
 
         if (!ModuleNoRotateSet.INSTANCE.getRunning() || Minecraft.getInstance().gui.screen() instanceof LevelLoadingScreen) {

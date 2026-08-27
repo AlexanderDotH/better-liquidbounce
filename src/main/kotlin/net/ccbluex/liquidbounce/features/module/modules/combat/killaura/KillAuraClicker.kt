@@ -80,7 +80,7 @@ object KillAuraClicker : Clicker<ModuleKillAura>(
             if (target.hurtTime > 7) {
                 return false
             }
-            if (!shouldPredictKillAuraRangeExit(ModuleKillAura.shouldUseSuperHitFor(target))) {
+            if (!shouldPredictKillAuraRangeExit(ModuleKillAura.shouldUseReachHitFor(target))) {
                 return false
             }
 

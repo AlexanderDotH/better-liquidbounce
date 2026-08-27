@@ -45,8 +45,8 @@ internal fun selectKillAuraRemoteKillRoute(
     maceKillTargetPossible: Boolean,
     spearKillAvailable: Boolean,
     spearKillTargetPossible: Boolean,
-    superHitAvailable: Boolean,
-    superHitTargetPossible: Boolean,
+    reachHitAvailable: Boolean,
+    reachHitTargetPossible: Boolean,
 ): KillAuraAttackRoute = when {
     !delegateKillAuraAttacks -> if (normalAttackPossible) KillAuraAttackRoute.NORMAL else KillAuraAttackRoute.NONE
     heldRemoteWeapon == KillAuraRemoteWeapon.MACE && maceKillAvailable && maceKillTargetPossible ->
@@ -55,7 +55,7 @@ internal fun selectKillAuraRemoteKillRoute(
     heldRemoteWeapon == KillAuraRemoteWeapon.SPEAR && spearKillAvailable && spearKillTargetPossible ->
         KillAuraAttackRoute.SPEAR_KILL
     spearKillAvailable && spearKillTargetPossible -> KillAuraAttackRoute.SPEAR_KILL
-    superHitAvailable && superHitTargetPossible -> KillAuraAttackRoute.SUPER_HIT
+    reachHitAvailable && reachHitTargetPossible -> KillAuraAttackRoute.REACH_HIT
     else -> KillAuraAttackRoute.NONE
 }
 
@@ -75,8 +75,8 @@ internal fun selectKillAuraSpearKillRoute(
     normalAttackPossible: Boolean,
     spearKillRunning: Boolean,
     spearKillTargetPossible: Boolean,
-    superHitAvailable: Boolean,
-    superHitTargetPossible: Boolean,
+    reachHitAvailable: Boolean,
+    reachHitTargetPossible: Boolean,
 ): KillAuraAttackRoute = selectKillAuraRemoteKillRoute(
     delegateKillAuraAttacks = delegateKillAuraAttacks,
     normalAttackPossible = normalAttackPossible,
@@ -85,8 +85,8 @@ internal fun selectKillAuraSpearKillRoute(
     maceKillTargetPossible = false,
     spearKillAvailable = spearKillRunning,
     spearKillTargetPossible = spearKillTargetPossible,
-    superHitAvailable = superHitAvailable,
-    superHitTargetPossible = superHitTargetPossible,
+    reachHitAvailable = reachHitAvailable,
+    reachHitTargetPossible = reachHitTargetPossible,
 )
 
 /**
@@ -111,7 +111,7 @@ internal fun selectKillAuraRemoteKillSuppressionPolicy(
     KillAuraAttackRoute.MACE_KILL -> KillAuraSpearKillSuppressionPolicy.SUPPRESS_FOR_MACE_KILL
     KillAuraAttackRoute.SPEAR_KILL -> KillAuraSpearKillSuppressionPolicy.SUPPRESS_FOR_SPEAR_KILL
     KillAuraAttackRoute.NORMAL,
-    KillAuraAttackRoute.SUPER_HIT,
+    KillAuraAttackRoute.REACH_HIT,
     KillAuraAttackRoute.NONE,
     -> KillAuraSpearKillSuppressionPolicy.ALLOW_KILL_AURA
 }
@@ -138,7 +138,7 @@ internal fun selectKillAuraSuppressionRoute(
     else -> KillAuraAttackRoute.NONE
 }
 
-/** Keeps every ordinary-melee candidate ahead of distant remote-kill/SuperHit candidates. */
+/** Keeps every ordinary-melee candidate ahead of distant remote-kill and Reach Hit candidates. */
 internal fun killAuraAttackRoutePriority(
     squaredDistance: Double,
     squaredNormalRange: Double,
@@ -147,15 +147,15 @@ internal fun killAuraAttackRoutePriority(
 /** Delegated movement modules own their attack orientation; KillAura must not continuously aim for them. */
 internal fun shouldUseKillAuraAimPipeline(
     delegatedRemoteKillTarget: Boolean,
-    delegatedSuperHitTarget: Boolean,
-): Boolean = !delegatedRemoteKillTarget && !delegatedSuperHitTarget
+    delegatedReachHitTarget: Boolean,
+): Boolean = !delegatedRemoteKillTarget && !delegatedReachHitTarget
 
-/** A cheap, deterministic rotation used only when dispatching a delegated SuperHit attack. */
+/** A cheap, deterministic rotation used only when dispatching a delegated Reach Hit attack. */
 internal fun calculateKillAuraDelegatedAttackRotation(eyes: Vec3, targetBox: AABB): Rotation =
     Rotation.lookingAt(point = targetBox.center, from = eyes)
 
 /** KillAura's melee exit prediction is irrelevant and expensive for a teleport-owned attack. */
-internal fun shouldPredictKillAuraRangeExit(delegatedSuperHit: Boolean): Boolean = !delegatedSuperHit
+internal fun shouldPredictKillAuraRangeExit(delegatedReachHit: Boolean): Boolean = !delegatedReachHit
 
 /**
  * Overlaps SpearKill's vanilla charge with KillAura acquisition without blocking ordinary melee.

@@ -22,13 +22,15 @@ internal object VClipPacketEmitter {
         xRot: Float,
         horizontalCollision: Boolean,
         sendPacket: (ServerboundMovePlayerPacket) -> Boolean,
-    ): Boolean {
+    ): VClipPacketEmissionResult {
+        val deliveredPrefix = ArrayList<VClipPlayerPacketStep>(plan.size)
         for (step in plan) {
             if (!sendPacket(step.toPacket(yRot, xRot, horizontalCollision))) {
-                return false
+                return VClipPacketEmissionResult(plan.size, deliveredPrefix.toList())
             }
+            deliveredPrefix += step
         }
-        return true
+        return VClipPacketEmissionResult(plan.size, deliveredPrefix.toList())
     }
 
     fun sendVehiclePlan(
@@ -81,4 +83,24 @@ internal object VClipPacketEmitter {
     }
 
     private fun VClipPosition.toVec3() = Vec3(x, y, z)
+}
+
+/** The exact prefix accepted by the caller's final packet-delivery check. */
+internal data class VClipPacketEmissionResult(
+    val plannedStepCount: Int,
+    val deliveredPrefix: List<VClipPlayerPacketStep>,
+) {
+    init {
+        require(plannedStepCount >= 0) { "Planned VClip step count cannot be negative" }
+        require(deliveredPrefix.size <= plannedStepCount) { "Delivered VClip prefix cannot exceed its plan" }
+    }
+
+    val completed: Boolean
+        get() = deliveredPrefix.size == plannedStepCount
+
+    val attemptedStepCount: Int
+        get() = if (completed) plannedStepCount else deliveredPrefix.size + 1
+
+    fun confirmedPosition(origin: VClipPosition): VClipPosition =
+        deliveredPrefix.asReversed().firstNotNullOfOrNull(VClipPlayerPacketStep::position) ?: origin
 }

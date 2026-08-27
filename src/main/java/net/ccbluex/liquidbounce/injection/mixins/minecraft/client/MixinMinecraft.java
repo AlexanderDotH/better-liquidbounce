@@ -41,6 +41,7 @@ import net.ccbluex.liquidbounce.features.module.modules.movement.autododge.Modul
 import net.ccbluex.liquidbounce.features.module.modules.player.ModuleAutoBreak;
 import net.ccbluex.liquidbounce.features.module.modules.player.ModuleNoBlockInteract;
 import net.ccbluex.liquidbounce.features.module.modules.player.ModuleReach;
+import net.ccbluex.liquidbounce.features.module.modules.player.reach.interactable.ReachInteractableFeature;
 import net.ccbluex.liquidbounce.features.module.modules.render.ModuleFreeCam;
 import net.ccbluex.liquidbounce.features.module.modules.render.playermodel.ServerPlayerModelStateTracker;
 import net.ccbluex.liquidbounce.injection.mixins.minecraft.entity.MixinEntityAccessor;
@@ -297,11 +298,15 @@ public abstract class MixinMinecraft {
         }
     }
 
-    @Inject(method = "startUseItem", at = @At(value = "FIELD", target = "Lnet/minecraft/client/Minecraft;rightClickDelay:I", shift = At.Shift.AFTER, opcode = Opcodes.PUTFIELD))
+    @Inject(method = "startUseItem", at = @At(value = "FIELD", target = "Lnet/minecraft/client/Minecraft;rightClickDelay:I", shift = At.Shift.AFTER, opcode = Opcodes.PUTFIELD), cancellable = true)
     private void hookItemUseCooldown(CallbackInfo callbackInfo) {
         UseCooldownEvent useCooldownEvent = new UseCooldownEvent(rightClickDelay);
         EventManager.INSTANCE.callEvent(useCooldownEvent);
         rightClickDelay = useCooldownEvent.getCooldown();
+
+        if (ReachInteractableFeature.claimUse()) {
+            callbackInfo.cancel();
+        }
     }
 
     @Inject(method = "pickBlockOrEntity", at = @At("HEAD"), cancellable = true)

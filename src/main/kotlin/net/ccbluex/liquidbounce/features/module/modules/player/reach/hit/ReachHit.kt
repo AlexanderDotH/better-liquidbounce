@@ -16,14 +16,11 @@
  * You should have received a copy of the GNU General Public License
  * along with LiquidBounce. If not, see <https://www.gnu.org/licenses/>.
  */
-package net.ccbluex.liquidbounce.features.module.modules.combat
+package net.ccbluex.liquidbounce.features.module.modules.player.reach.hit
 
 import com.google.gson.JsonObject
-import kotlinx.coroutines.CoroutineName
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.NonCancellable
-import kotlinx.coroutines.withContext
-import net.ccbluex.liquidbounce.config.types.list.Tagged
+import net.ccbluex.liquidbounce.config.types.group.ToggleableValueGroup
+import net.ccbluex.liquidbounce.event.EventListener
 import net.ccbluex.liquidbounce.event.events.GameTickEvent
 import net.ccbluex.liquidbounce.event.events.KeybindIsPressedEvent
 import net.ccbluex.liquidbounce.event.events.PacketEvent
@@ -31,8 +28,6 @@ import net.ccbluex.liquidbounce.event.events.WorldRenderEvent
 import net.ccbluex.liquidbounce.event.handler
 import net.ccbluex.liquidbounce.event.tickHandler
 import net.ccbluex.liquidbounce.event.waitTicks
-import net.ccbluex.liquidbounce.features.module.ClientModule
-import net.ccbluex.liquidbounce.features.module.ModuleCategories
 import net.ccbluex.liquidbounce.features.module.modules.exploit.CubeCraftAutomationTransport
 import net.ccbluex.liquidbounce.features.module.modules.exploit.ModuleClickTp
 import net.ccbluex.liquidbounce.render.drawLine
@@ -52,12 +47,14 @@ import net.ccbluex.liquidbounce.utils.input.InputTracker.wasPressedRecently
 import net.ccbluex.liquidbounce.utils.math.bottomCenter
 import net.ccbluex.liquidbounce.utils.math.sq
 import net.ccbluex.liquidbounce.utils.movement.buildLinearTeleportPath
+import net.ccbluex.liquidbounce.utils.movement.remote.RemoteMovementOwnership
 import net.ccbluex.liquidbounce.utils.network.MovePacketType
 import net.ccbluex.liquidbounce.utils.network.sendPacketSilently
 import net.ccbluex.liquidbounce.utils.raytracing.findEntityInCrosshair
 import net.ccbluex.liquidbounce.utils.raytracing.hasLineOfSight
 import net.ccbluex.liquidbounce.utils.raytracing.isLookingAtEntity
 import net.ccbluex.liquidbounce.utils.render.TargetRenderer
+import net.minecraft.client.Minecraft
 import net.minecraft.core.BlockPos
 import net.minecraft.network.protocol.game.ClientboundPlayerPositionPacket
 import net.minecraft.network.protocol.game.ServerboundMovePlayerPacket
@@ -65,18 +62,19 @@ import net.minecraft.world.entity.LivingEntity
 import net.minecraft.world.phys.Vec3
 import kotlin.math.abs
 import kotlin.math.floor
-import kotlin.math.max
 
 /**
- * Hits entities at extended range using several packet travel profiles. Sentinel delegates
- * a verified temporary round trip to ClickTP and returns to the starting position.
+ * Optional Reach feature that hits entities at extended range using the former SuperHit travel profiles.
  */
 @Suppress("TooManyFunctions")
-object ModuleSuperHit : ClientModule("SuperHit", ModuleCategories.COMBAT, disableOnQuit = true), AStarPathBuilder {
+class ReachHit(
+    parent: EventListener?,
+    includeTargetRenderer: Boolean = Minecraft.getInstance() != null,
+) : ToggleableValueGroup(parent, "Hit", enabled = false), AStarPathBuilder {
 
-    private val modeConfiguration = SuperHitModeConfiguration(this)
+    private val modeConfiguration = ReachHitModeConfiguration(this)
     internal val modeChoice = tree(modeConfiguration.choice)
-    private val maxRange by float("MaxRange", 100f, 10f..150f).apply { tagBy(this) }
+    private val maxRange by float("MaxRange", 100f, 10f..150f)
     private val minRange by float("MinRange", 3.0f, 0f..6f)
     private val attackRange by float("AttackRange", 4.2f, 3f..5f)
     private val tracers by boolean("Tracers", false)
@@ -93,13 +91,12 @@ object ModuleSuperHit : ClientModule("SuperHit", ModuleCategories.COMBAT, disabl
     private var isExecuting = false
     private var setbackDetected = false
     private var executionGeneration = 0L
-    private val executionMode = SuperHitExecutionMode()
-    private val automaticRetryGate = SuperHitAutomaticRetryGate(SUPER_HIT_AUTOMATIC_RETRY_DELAY_TICKS)
-
-    private val aStarPathContext = Dispatchers.Default + CoroutineName("$name-AStar")
-
+    private val executionMode = ReachHitExecutionMode()
+    private val automaticRetryGate = ReachHitAutomaticRetryGate(REACH_HIT_AUTOMATIC_RETRY_DELAY_TICKS)
     init {
-        tree(TargetRenderer(this) { hoverTarget })
+        if (includeTargetRenderer) {
+            tree(TargetRenderer(this) { hoverTarget })
+        }
     }
 
     @Suppress("unused")
@@ -122,7 +119,6 @@ object ModuleSuperHit : ClientModule("SuperHit", ModuleCategories.COMBAT, disabl
             return@handler
         }
 
-        // Prevent vanilla air swing when SuperHit handles the far target
         event.isPressed = false
     }
 
@@ -163,8 +159,8 @@ object ModuleSuperHit : ClientModule("SuperHit", ModuleCategories.COMBAT, disabl
 
                 setbackDetected = true
                 desyncPlayerPosition = null
-                if (travelMode != SuperHitMode.ADAPTIVE) {
-                    chat(markAsError("Server setback detected - SuperHit failed!"))
+                if (travelMode != ReachHitMode.ADAPTIVE) {
+                    chat(markAsError("Server setback detected, Reach Hit failed!"))
                 }
             }
         }
@@ -172,7 +168,7 @@ object ModuleSuperHit : ClientModule("SuperHit", ModuleCategories.COMBAT, disabl
 
     @Suppress("unused")
     private val renderHandler = handler<WorldRenderEvent> { event ->
-        if (!shouldRenderSuperHitTracer(tracers, hoverTarget != null)) {
+        if (!shouldRenderReachHitTracer(tracers, hoverTarget != null)) {
             return@handler
         }
 
@@ -199,19 +195,18 @@ object ModuleSuperHit : ClientModule("SuperHit", ModuleCategories.COMBAT, disabl
 
     override fun prepareDeserialize(jsonObject: JsonObject) {
         super.prepareDeserialize(jsonObject)
-        migrateLegacySuperHitConfig(jsonObject)
+        migrateLegacyReachHitConfig(jsonObject)
     }
 
     internal val maximumTargetRange: Float
         get() = maxRange
 
-    internal fun isTargetInConfiguredRange(target: LivingEntity): Boolean {
-        return isWithinSuperHitTargetRange(
+    internal fun isTargetInConfiguredRange(target: LivingEntity): Boolean =
+        isWithinReachHitTargetRange(
             distanceSquared = player.squaredBoxedDistanceTo(target),
             minRange = minRange,
             maxRange = maxRange,
         )
-    }
 
     internal suspend fun tryAttack(
         target: LivingEntity,
@@ -227,53 +222,76 @@ object ModuleSuperHit : ClientModule("SuperHit", ModuleCategories.COMBAT, disabl
             return false
         }
 
-        isExecuting = true
-        setbackDetected = false
-        val travelMode = executionMode.capture(modeChoice.activeMode.travelMode)
-        val operationGeneration = executionGeneration
-        val origin = player.position()
-        val targetPos = target.position()
-
+        val movementLease = RemoteMovementOwnership.tryAcquire(REACH_HIT_MOVEMENT_OWNER) ?: return false
         var success = false
         try {
-            success = when (travelMode) {
-                SuperHitMode.PACKET -> executePacketHit(
-                    target, origin, targetPos, rotation, keepSprint, operationGeneration, travelMode
-                )
-                SuperHitMode.A_STAR -> executeAStarHit(
-                    target, origin, targetPos, rotation, keepSprint, operationGeneration
-                )
-                SuperHitMode.ADAPTIVE -> executeAdaptiveHit(
-                    target, origin, targetPos, rotation, keepSprint, operationGeneration
-                )
-                SuperHitMode.MOTION -> executeClickTpHit(
-                    target = target,
-                    origin = origin,
-                    targetPos = targetPos,
-                    rotation = rotation,
-                    keepSprint = keepSprint,
-                    operationGeneration = operationGeneration,
-                    transport = CubeCraftAutomationTransport.MOTION,
-                    stayTicks = 0,
-                )
-                SuperHitMode.PULSE -> executePacketHit(
-                    target, origin, targetPos, rotation, keepSprint, operationGeneration, travelMode
-                )
-                SuperHitMode.SENTINEL -> executeClickTpHit(
-                    target = target,
-                    origin = origin,
-                    targetPos = targetPos,
-                    rotation = rotation,
-                    keepSprint = keepSprint,
-                    operationGeneration = operationGeneration,
-                    transport = CubeCraftAutomationTransport.PACKET,
-                    stayTicks = modeConfiguration.sentinel.stayTicks,
-                )
-            }
+            isExecuting = true
+            setbackDetected = false
+            val travelMode = executionMode.capture(modeChoice.activeMode.travelMode)
+            val operationGeneration = executionGeneration
+            val origin = player.position()
+            val targetPos = target.position()
+
+            success = executeAttack(
+                target = target,
+                origin = origin,
+                targetPos = targetPos,
+                rotation = rotation,
+                keepSprint = keepSprint,
+                operationGeneration = operationGeneration,
+                travelMode = travelMode,
+            )
         } finally {
-            finishAttack(target.id, attemptTick, automatedByKillAura, success)
+            try {
+                finishAttack(target.id, attemptTick, automatedByKillAura, success)
+            } finally {
+                movementLease.close()
+            }
         }
         return success
+    }
+
+    private suspend fun executeAttack(
+        target: LivingEntity,
+        origin: Vec3,
+        targetPos: Vec3,
+        rotation: Rotation,
+        keepSprint: Boolean,
+        operationGeneration: Long,
+        travelMode: ReachHitMode,
+    ): Boolean = when (travelMode) {
+        ReachHitMode.PACKET -> executePacketHit(
+            target, origin, targetPos, rotation, keepSprint, operationGeneration, travelMode,
+        )
+        ReachHitMode.A_STAR -> executeAStarHit(
+            target, origin, targetPos, rotation, keepSprint, operationGeneration,
+        )
+        ReachHitMode.ADAPTIVE -> executeAdaptiveHit(
+            target, origin, targetPos, rotation, keepSprint, operationGeneration,
+        )
+        ReachHitMode.MOTION -> executeClickTpHit(
+            target = target,
+            origin = origin,
+            targetPos = targetPos,
+            rotation = rotation,
+            keepSprint = keepSprint,
+            operationGeneration = operationGeneration,
+            transport = CubeCraftAutomationTransport.MOTION,
+            stayTicks = 0,
+        )
+        ReachHitMode.PULSE -> executePacketHit(
+            target, origin, targetPos, rotation, keepSprint, operationGeneration, travelMode,
+        )
+        ReachHitMode.SENTINEL -> executeClickTpHit(
+            target = target,
+            origin = origin,
+            targetPos = targetPos,
+            rotation = rotation,
+            keepSprint = keepSprint,
+            operationGeneration = operationGeneration,
+            transport = CubeCraftAutomationTransport.PACKET,
+            stayTicks = modeConfiguration.sentinel.stayTicks,
+        )
     }
 
     private fun finishAttack(
@@ -286,12 +304,12 @@ object ModuleSuperHit : ClientModule("SuperHit", ModuleCategories.COMBAT, disabl
         isExecuting = false
         setbackDetected = false
         executionMode.clear()
-        if (automatedByKillAura) {
-            if (success) {
-                automaticRetryGate.recordSuccess()
-            } else {
-                automaticRetryGate.recordFailure(targetId, attemptTick)
-            }
+        if (!automatedByKillAura) return
+
+        if (success) {
+            automaticRetryGate.recordSuccess()
+        } else {
+            automaticRetryGate.recordFailure(targetId, attemptTick)
         }
     }
 
@@ -299,7 +317,6 @@ object ModuleSuperHit : ClientModule("SuperHit", ModuleCategories.COMBAT, disabl
         if (!running || isExecuting || !isAttackReady() || !isTargetInConfiguredRange(target)) {
             return false
         }
-
         if (!target.isAlive || target.isRemoved || !target.shouldBeAttacked()) {
             return false
         }
@@ -319,18 +336,16 @@ object ModuleSuperHit : ClientModule("SuperHit", ModuleCategories.COMBAT, disabl
         rotation: Rotation,
         keepSprint: Boolean,
         operationGeneration: Long,
-        travelMode: SuperHitMode,
+        travelMode: ReachHitMode,
     ): Boolean {
         if (!travel(origin, destination, rotation, travelMode)) {
             return false
         }
 
         val attacked = attackTarget(target, destination, keepSprint, operationGeneration)
-
         if (!setbackDetected) {
             travel(destination, origin, rotation, travelMode)
         }
-
         return attacked
     }
 
@@ -342,28 +357,25 @@ object ModuleSuperHit : ClientModule("SuperHit", ModuleCategories.COMBAT, disabl
         keepSprint: Boolean,
         operationGeneration: Long,
     ): Boolean {
-        val destination = calculateSuperHitDestination(
+        val destination = calculateReachHitDestination(
             origin = origin,
             targetPosition = targetPos,
             playerWidth = player.bbWidth.toDouble(),
             targetWidth = target.bbWidth.toDouble(),
         )
-        val outward = withContext(aStarPathContext) {
-            findPath(
-                start = BlockPos.containing(origin),
-                end = BlockPos.containing(destination),
-                maxCost = modeConfiguration.aStar.maxCost,
-            ).map { it.bottomCenter }
-        }
+        val outward = findPath(
+            start = BlockPos.containing(origin),
+            end = BlockPos.containing(destination),
+            maxCost = modeConfiguration.aStar.maxCost,
+        ).map { it.bottomCenter }
         if (outward.isEmpty() || !travelPath(outward, rotation, onGround = false)) {
             return false
         }
 
         val attacked = attackTarget(target, outward.last(), keepSprint, operationGeneration)
         if (!setbackDetected) {
-            travelPath(buildAStarReturnPath(origin, outward), rotation, onGround = false)
+            travelPath(buildReachHitAStarReturnPath(origin, outward), rotation, onGround = false)
         }
-
         return attacked
     }
 
@@ -375,19 +387,19 @@ object ModuleSuperHit : ClientModule("SuperHit", ModuleCategories.COMBAT, disabl
         keepSprint: Boolean,
         operationGeneration: Long,
     ): Boolean {
-        val destination = calculateSuperHitDestination(
+        val destination = calculateReachHitDestination(
             origin = origin,
             targetPosition = targetPos,
             playerWidth = player.bbWidth.toDouble(),
             targetWidth = target.bbWidth.toDouble(),
         )
-        val stepSizes = calculateAdaptiveStepSizes(
+        val stepSizes = calculateReachHitAdaptiveStepSizes(
             initialStep = modeConfiguration.adaptive.initialStep.toDouble(),
             minimumStep = modeConfiguration.adaptive.minimumStep.toDouble(),
             retries = modeConfiguration.adaptive.retries,
         )
 
-        return executeAdaptiveSuperHit(
+        return executeAdaptiveReachHit(
             stepSizes = stepSizes,
             attempt = { attemptStep ->
                 setbackDetected = false
@@ -409,7 +421,7 @@ object ModuleSuperHit : ClientModule("SuperHit", ModuleCategories.COMBAT, disabl
                 setbackDetected = false
                 desyncPlayerPosition = null
                 val current = player.position()
-                if (current.distanceToSqr(origin) > SENTINEL_HOME_DISTANCE_SQUARED) {
+                if (current.distanceToSqr(origin) > REACH_HIT_HOME_DISTANCE_SQUARED) {
                     val recovery = buildLinearTeleportPath(current, origin, stepSizes.last())
                     travelPath(recovery, rotation)
                 }
@@ -432,22 +444,25 @@ object ModuleSuperHit : ClientModule("SuperHit", ModuleCategories.COMBAT, disabl
         transport: CubeCraftAutomationTransport,
         stayTicks: Int,
     ): Boolean {
-        val destination = calculateSuperHitDestination(
+        val destination = calculateReachHitDestination(
             origin = origin,
             targetPosition = targetPos,
             playerWidth = player.bbWidth.toDouble(),
             targetWidth = target.bbWidth.toDouble(),
         )
 
-        var outcome = SentinelSuperHitOutcome.NOT_STARTED
-        val sessionStarted = ModuleClickTp.runCubeCraftAutomationSession(transport) { teleport ->
-            outcome = executeRoundTripSuperHit(
+        var outcome = ReachHitRoundTripOutcome.NOT_STARTED
+        val sessionStarted = ModuleClickTp.runCubeCraftAutomationSession(
+            transport = transport,
+            inheritedMovementOwner = REACH_HIT_MOVEMENT_OWNER,
+        ) { teleport ->
+            outcome = executeRoundTripReachHit(
                 origin = origin,
                 destination = destination,
                 stayTicks = stayTicks,
                 teleport = teleport,
                 shouldRecover = {
-                    player.position().distanceToSqr(origin) > SENTINEL_HOME_DISTANCE_SQUARED
+                    player.position().distanceToSqr(origin) > REACH_HIT_HOME_DISTANCE_SQUARED
                 },
                 synchronizeRotation = {
                     if (isExecutionActive(operationGeneration)) {
@@ -461,14 +476,11 @@ object ModuleSuperHit : ClientModule("SuperHit", ModuleCategories.COMBAT, disabl
             )
         }
 
-        if (!sessionStarted) {
-            return false
-        }
-        if (!outcome.returned && player.position().distanceToSqr(origin) > SENTINEL_HOME_DISTANCE_SQUARED) {
+        if (!sessionStarted) return false
+        if (!outcome.returned && player.position().distanceToSqr(origin) > REACH_HIT_HOME_DISTANCE_SQUARED) {
             val transportName = if (transport == CubeCraftAutomationTransport.MOTION) "Motion" else "Sentinel"
-            chat(markAsError("$transportName return failed - use ClickTP or reconnect to resync."))
+            chat(markAsError("$transportName return failed, use ClickTP or reconnect to resync."))
         }
-
         return outcome.attacked
     }
 
@@ -491,14 +503,11 @@ object ModuleSuperHit : ClientModule("SuperHit", ModuleCategories.COMBAT, disabl
         return true
     }
 
-    private fun isAttackTargetValid(target: LivingEntity, operationGeneration: Long): Boolean {
-        return isExecutionActive(operationGeneration) && target.isAlive && !target.isRemoved &&
-            target.shouldBeAttacked()
-    }
+    private fun isAttackTargetValid(target: LivingEntity, operationGeneration: Long): Boolean =
+        isExecutionActive(operationGeneration) && target.isAlive && !target.isRemoved && target.shouldBeAttacked()
 
-    private fun isExecutionActive(operationGeneration: Long): Boolean {
-        return running && isExecuting && !setbackDetected && executionGeneration == operationGeneration
-    }
+    private fun isExecutionActive(operationGeneration: Long): Boolean =
+        running && isExecuting && !setbackDetected && executionGeneration == operationGeneration
 
     private fun sendRotation(rotation: Rotation) {
         sendPacketSilently(MovePacketType.FULL.generatePacket().apply {
@@ -511,7 +520,7 @@ object ModuleSuperHit : ClientModule("SuperHit", ModuleCategories.COMBAT, disabl
         })
     }
 
-    private fun isAttackReady() = isSuperHitAttackReady(
+    private fun isAttackReady() = isReachHitAttackReady(
         usesAttackCooldown = player.hasCooldown,
         attackStrength = player.getAttackStrengthScale(0.5f),
     )
@@ -525,7 +534,6 @@ object ModuleSuperHit : ClientModule("SuperHit", ModuleCategories.COMBAT, disabl
         if (!entity.shouldBeAttacked() || distanceSq <= minRange.sq() || distanceSq > maxRange.sq()) {
             return null
         }
-
         return entity.takeIf { hasLineOfSight(camera.eyePosition, hitResult.location, camera) }
     }
 
@@ -533,45 +541,36 @@ object ModuleSuperHit : ClientModule("SuperHit", ModuleCategories.COMBAT, disabl
         from: Vec3,
         to: Vec3,
         rotation: Rotation,
-        travelMode: SuperHitMode,
-    ): Boolean {
-        return when (travelMode) {
-            SuperHitMode.PACKET -> travelImmediately(from, to, rotation)
-            SuperHitMode.PULSE -> travelWithDelay(from, to, rotation)
-            SuperHitMode.A_STAR, SuperHitMode.ADAPTIVE, SuperHitMode.MOTION, SuperHitMode.SENTINEL -> false
-        }
+        travelMode: ReachHitMode,
+    ): Boolean = when (travelMode) {
+        ReachHitMode.PACKET -> travelImmediately(from, to, rotation)
+        ReachHitMode.PULSE -> travelWithDelay(from, to, rotation)
+        ReachHitMode.A_STAR, ReachHitMode.ADAPTIVE, ReachHitMode.MOTION, ReachHitMode.SENTINEL -> false
     }
 
     private fun travelImmediately(from: Vec3, to: Vec3, rotation: Rotation): Boolean {
-        if (setbackDetected) {
-            return false
-        }
+        if (setbackDetected) return false
 
-        val steps = buildSuperHitTravelPath(
-            SuperHitMode.PACKET,
+        val steps = buildReachHitTravelPath(
+            ReachHitMode.PACKET,
             from,
             to,
             modeConfiguration.packet.stepSize.toDouble(),
         )
-        if (steps.isEmpty()) {
-            return false
-        }
+        if (steps.isEmpty()) return false
 
         var previous = from
         for (step in steps) {
-            if (setbackDetected) {
-                return false
-            }
+            if (setbackDetected) return false
             travelSegment(previous, step, rotation)
             previous = step
         }
-
         return !setbackDetected
     }
 
     private suspend fun travelWithDelay(from: Vec3, to: Vec3, rotation: Rotation): Boolean {
-        val steps = buildSuperHitTravelPath(
-            SuperHitMode.PULSE,
+        val steps = buildReachHitTravelPath(
+            ReachHitMode.PULSE,
             from,
             to,
             modeConfiguration.pulse.stepSize.toDouble(),
@@ -586,16 +585,13 @@ object ModuleSuperHit : ClientModule("SuperHit", ModuleCategories.COMBAT, disabl
         onGround: Boolean = player.onGround(),
     ): Boolean {
         for ((index, step) in path.withIndex()) {
-            if (setbackDetected) {
-                return false
-            }
+            if (setbackDetected) return false
 
             sendPosition(step, rotation, onGround)
             if (delayTicks > 0 && index < path.lastIndex) {
                 waitTicks(delayTicks)
             }
         }
-
         return !setbackDetected
     }
 
@@ -603,7 +599,6 @@ object ModuleSuperHit : ClientModule("SuperHit", ModuleCategories.COMBAT, disabl
         val deltaX = to.x - from.x
         val deltaY = to.y - from.y
         val deltaZ = to.z - from.z
-
         val times = (floor((abs(deltaX) + abs(deltaY) + abs(deltaZ)) / 10) - 1).toInt().coerceAtLeast(0)
         val packetToSend = MovePacketType.FULL
 
@@ -626,7 +621,6 @@ object ModuleSuperHit : ClientModule("SuperHit", ModuleCategories.COMBAT, disabl
             xRot = rotation.pitch
             onGround = player.onGround()
         })
-
         desyncPlayerPosition = to
     }
 
@@ -639,196 +633,6 @@ object ModuleSuperHit : ClientModule("SuperHit", ModuleCategories.COMBAT, disabl
             xRot = rotation.pitch
             this.onGround = onGround
         })
-
         desyncPlayerPosition = position
     }
-
 }
-
-internal class SuperHitExecutionMode {
-    var current: SuperHitMode? = null
-        private set
-
-    fun capture(configuredMode: SuperHitMode): SuperHitMode {
-        check(current == null) { "A SuperHit execution mode is already captured" }
-        current = configuredMode
-        return configuredMode
-    }
-
-    fun clear() {
-        current = null
-    }
-}
-
-/** Prevents automatic failed routes from being recomputed on every KillAura click. */
-internal class SuperHitAutomaticRetryGate(private val retryDelayTicks: Int) {
-    private var failedTargetId: Int? = null
-    private var retryAtTick = 0
-
-    init {
-        require(retryDelayTicks > 0) { "retryDelayTicks must be positive" }
-    }
-
-    fun canAttempt(targetId: Int, currentTick: Int): Boolean =
-        failedTargetId != targetId || currentTick >= retryAtTick
-
-    fun recordFailure(targetId: Int, currentTick: Int) {
-        failedTargetId = targetId
-        retryAtTick = currentTick + retryDelayTicks
-    }
-
-    fun recordSuccess() = clear()
-
-    fun clear() {
-        failedTargetId = null
-        retryAtTick = 0
-    }
-}
-
-internal enum class SuperHitMode(
-    override val tag: String,
-    override val tagAliases: List<String> = emptyList(),
-) : Tagged {
-    PACKET("Packet", listOf("Direct", "SinglePacket")),
-    A_STAR("AStar"),
-    ADAPTIVE("Adaptive"),
-    MOTION("Motion"),
-    PULSE("Pulse"),
-    SENTINEL("Sentinel", listOf("Cubecraft", "Cube Craft"));
-
-    val usesPacketTravel: Boolean
-        get() = this == PACKET || this == A_STAR || this == ADAPTIVE || this == PULSE
-}
-
-internal fun buildSuperHitTravelPath(
-    mode: SuperHitMode,
-    from: Vec3,
-    to: Vec3,
-    stepSize: Double,
-): List<Vec3> = when (mode) {
-    SuperHitMode.PACKET, SuperHitMode.ADAPTIVE, SuperHitMode.PULSE ->
-        buildLinearTeleportPath(from, to, stepSize)
-    SuperHitMode.A_STAR, SuperHitMode.MOTION, SuperHitMode.SENTINEL -> emptyList()
-}
-
-internal fun calculateAdaptiveStepSizes(
-    initialStep: Double,
-    minimumStep: Double,
-    retries: Int,
-): List<Double> {
-    require(initialStep > 0.0) { "initialStep must be positive" }
-    require(minimumStep > 0.0) { "minimumStep must be positive" }
-    require(retries >= 0) { "retries must not be negative" }
-
-    val effectiveMinimum = minimumStep.coerceAtMost(initialStep)
-    var step = initialStep
-    return List(retries + 1) {
-        val current = step
-        step = (step / 2.0).coerceAtLeast(effectiveMinimum)
-        current
-    }
-}
-
-internal suspend fun executeAdaptiveSuperHit(
-    stepSizes: List<Double>,
-    attempt: suspend (Double) -> Boolean,
-    onAccepted: suspend (Double) -> Boolean,
-    onExhausted: suspend () -> Unit,
-): Boolean {
-    require(stepSizes.isNotEmpty()) { "stepSizes must not be empty" }
-
-    for (step in stepSizes) {
-        if (attempt(step)) {
-            return onAccepted(step)
-        }
-    }
-
-    onExhausted()
-    return false
-}
-
-internal fun buildAStarReturnPath(origin: Vec3, outward: List<Vec3>): List<Vec3> {
-    return outward.dropLast(1).asReversed() + origin
-}
-
-internal fun isSuperHitAttackReady(usesAttackCooldown: Boolean, attackStrength: Float): Boolean {
-    return !usesAttackCooldown || attackStrength > SUPER_HIT_MIN_ATTACK_STRENGTH
-}
-
-internal fun shouldRenderSuperHitTracer(tracersEnabled: Boolean, hasTarget: Boolean): Boolean {
-    return tracersEnabled && hasTarget
-}
-
-internal fun isWithinSuperHitTargetRange(
-    distanceSquared: Double,
-    minRange: Float,
-    maxRange: Float,
-): Boolean {
-    return distanceSquared > minRange.sq() && distanceSquared <= maxRange.sq()
-}
-
-internal fun calculateSuperHitDestination(
-    origin: Vec3,
-    targetPosition: Vec3,
-    playerWidth: Double,
-    targetWidth: Double,
-): Vec3 {
-    require(playerWidth >= 0.0) { "Player width must not be negative" }
-    require(targetWidth >= 0.0) { "Target width must not be negative" }
-
-    val towardOrigin = Vec3(origin.x - targetPosition.x, 0.0, origin.z - targetPosition.z)
-    val direction = if (towardOrigin.lengthSqr() > SUPER_HIT_DIRECTION_EPSILON) {
-        towardOrigin.normalize()
-    } else {
-        Vec3(1.0, 0.0, 0.0)
-    }
-    val collisionClearance = (playerWidth + targetWidth) / 2.0 + SUPER_HIT_COLLISION_PADDING
-    val axisProjection = max(abs(direction.x), abs(direction.z))
-    val clearance = collisionClearance / axisProjection
-
-    return targetPosition.add(direction.scale(clearance))
-}
-
-internal suspend fun executeRoundTripSuperHit(
-    origin: Vec3,
-    destination: Vec3,
-    stayTicks: Int,
-    teleport: suspend (Vec3) -> Boolean,
-    shouldRecover: () -> Boolean,
-    synchronizeRotation: () -> Unit,
-    attack: () -> Boolean,
-    wait: suspend (Int) -> Unit,
-): SentinelSuperHitOutcome {
-    require(stayTicks >= 0) { "stayTicks must not be negative" }
-
-    if (!teleport(destination)) {
-        val recovered = shouldRecover() && withContext(NonCancellable) { teleport(origin) }
-        return SentinelSuperHitOutcome(attacked = false, returned = recovered)
-    }
-
-    var attacked = false
-    var returned = false
-    try {
-        synchronizeRotation()
-        attacked = attack()
-        if (attacked && stayTicks > 0) {
-            wait(stayTicks)
-        }
-    } finally {
-        returned = withContext(NonCancellable) { teleport(origin) }
-    }
-
-    return SentinelSuperHitOutcome(attacked = attacked, returned = returned)
-}
-
-internal data class SentinelSuperHitOutcome(val attacked: Boolean, val returned: Boolean) {
-    companion object {
-        val NOT_STARTED = SentinelSuperHitOutcome(attacked = false, returned = false)
-    }
-}
-
-private const val SUPER_HIT_MIN_ATTACK_STRENGTH = 0.9f
-private const val SUPER_HIT_AUTOMATIC_RETRY_DELAY_TICKS = 10
-private const val SUPER_HIT_COLLISION_PADDING = 0.1
-private const val SUPER_HIT_DIRECTION_EPSILON = 1.0E-9
-private const val SENTINEL_HOME_DISTANCE_SQUARED = 4.0

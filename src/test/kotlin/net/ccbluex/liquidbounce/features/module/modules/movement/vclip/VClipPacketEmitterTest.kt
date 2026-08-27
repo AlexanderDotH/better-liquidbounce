@@ -34,7 +34,7 @@ class VClipPacketEmitterTest {
         )
         val sent = mutableListOf<ServerboundMovePlayerPacket>()
 
-        val completed = VClipPacketEmitter.sendPlayerPlan(
+        val result = VClipPacketEmitter.sendPlayerPlan(
             plan = plan,
             yRot = 72.5f,
             xRot = -18.25f,
@@ -42,7 +42,9 @@ class VClipPacketEmitterTest {
             sendPacket = sent::add,
         )
 
-        assertTrue(completed)
+        assertTrue(result.completed)
+        assertEquals(plan, result.deliveredPrefix)
+        assertEquals(target, result.confirmedPosition(origin))
         assertEquals(3, sent.size)
         assertInstanceOf(ServerboundMovePlayerPacket.StatusOnly::class.java, sent[0])
         assertInstanceOf(ServerboundMovePlayerPacket.Pos::class.java, sent[1])
@@ -67,7 +69,7 @@ class VClipPacketEmitterTest {
         )
         val sent = mutableListOf<ServerboundMovePlayerPacket>()
 
-        val completed = VClipPacketEmitter.sendPlayerPlan(
+        val result = VClipPacketEmitter.sendPlayerPlan(
             plan = plan,
             yRot = 0.0f,
             xRot = 0.0f,
@@ -77,9 +79,36 @@ class VClipPacketEmitterTest {
             sent.size < 2
         }
 
-        assertFalse(completed)
+        assertFalse(result.completed)
+        assertEquals(plan.take(1), result.deliveredPrefix)
+        assertEquals(checkpoint, result.confirmedPosition(origin))
+        assertEquals(2, result.attemptedStepCount)
         assertEquals(2, sent.size)
         assertPosition(target, sent.last())
+    }
+
+    @Test
+    fun `delivered status primer does not advance the confirmed position`() {
+        val plan = listOf(
+            VClipPlayerPacketStep(VClipPlayerPacketShape.STATUS_ONLY, null, onGround = false),
+            VClipPlayerPacketStep(VClipPlayerPacketShape.POSITION, target, onGround = false),
+        )
+        var attempts = 0
+
+        val result = VClipPacketEmitter.sendPlayerPlan(
+            plan = plan,
+            yRot = 0.0f,
+            xRot = 0.0f,
+            horizontalCollision = false,
+        ) {
+            attempts++
+            attempts == 1
+        }
+
+        assertFalse(result.completed)
+        assertEquals(plan.take(1), result.deliveredPrefix)
+        assertEquals(origin, result.confirmedPosition(origin))
+        assertEquals(2, result.attemptedStepCount)
     }
 
     @Test

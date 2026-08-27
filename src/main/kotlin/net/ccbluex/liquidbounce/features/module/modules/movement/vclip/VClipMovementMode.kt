@@ -15,11 +15,6 @@ import net.ccbluex.liquidbounce.config.types.group.ModeValueGroup
 import net.ccbluex.liquidbounce.features.module.modules.movement.ModuleVClip
 import net.minecraft.world.entity.Entity
 
-internal data class VClipFallSafetyContext(
-    val initialFallDistance: Double,
-    val safeFallDistance: Double,
-)
-
 internal enum class VClipClipResult {
     COMPLETED,
     FALL_PROTECTION_UNAVAILABLE,

@@ -56,7 +56,6 @@ internal object VClipPacketPlanner {
 
     private const val PAPER_DISTANCE_PER_PACKET = 10.0
     private const val PACKET_JUMP_Y_OFFSET = 1.0E-9
-    private const val MAX_FOLIA_MOVEMENT_PACKETS = 5
     private const val VCLIP_ON_GROUND = true
 
     fun vanilla(
@@ -168,8 +167,9 @@ internal object VClipPacketPlanner {
     }
 
     private fun requireFoliaPacketCount(movementPackets: Int) {
-        require(movementPackets in 1..MAX_FOLIA_MOVEMENT_PACKETS) {
-            "Folia movement packets must stay within the researched 1..5 window"
+        require(movementPackets in VClipFoliaProfile.MOVEMENT_PACKETS_RANGE) {
+            "Folia movement packets must stay within the researched " +
+                "${VClipFoliaProfile.MOVEMENT_PACKETS_RANGE} window"
         }
     }
 }

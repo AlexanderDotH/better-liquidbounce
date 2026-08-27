@@ -15,7 +15,11 @@ import net.minecraft.world.entity.Entity
 
 internal object VClipFoliaMode : VClipMovementMode("Folia") {
 
-    private val movementPackets by int("MovementPackets", 5, 1..5)
+    private val movementPackets by int(
+        "MovementPackets",
+        VClipFoliaProfile.DEFAULT_MOVEMENT_PACKETS,
+        VClipFoliaProfile.MOVEMENT_PACKETS_RANGE,
+    )
     private val fullPacket by boolean("FullPacket", false)
     private val resetMotion by boolean("ResetMotion", true)
 
@@ -25,14 +29,14 @@ internal object VClipFoliaMode : VClipMovementMode("Folia") {
         target: VClipPosition,
         fallSafety: VClipFallSafetyContext,
     ): VClipClipResult {
-        val result = VClipPacketPlanner.folia(
-            origin = origin,
-            target = target,
+        val result = VClipFoliaProfile(
             movementPackets = movementPackets,
             fullPacket = fullPacket,
-            initialFallDistance = fallSafety.initialFallDistance,
-            safeFallDistance = fallSafety.safeFallDistance,
-        )
+        ).plan(VClipTransportRequest(
+            origin = origin,
+            target = target,
+            fallSafety = fallSafety,
+        ))
         val plan = (result as? VClipPacketPlanResult.Ready)?.steps
             ?: return VClipClipResult.FALL_PROTECTION_UNAVAILABLE
 

@@ -20,6 +20,8 @@ package net.ccbluex.liquidbounce.features.module.modules.player
 
 import net.ccbluex.liquidbounce.features.module.ClientModule
 import net.ccbluex.liquidbounce.features.module.ModuleCategories
+import net.ccbluex.liquidbounce.features.module.modules.player.reach.hit.ReachHit
+import net.ccbluex.liquidbounce.features.module.modules.player.reach.interactable.ReachInteractableFeature
 import net.ccbluex.liquidbounce.utils.range.RangeValueGroup
 
 /**
@@ -30,7 +32,9 @@ import net.ccbluex.liquidbounce.utils.range.RangeValueGroup
  * @see net.ccbluex.liquidbounce.injection.mixins.minecraft.entity.MixinPlayer
  * @see net.ccbluex.liquidbounce.injection.mixins.minecraft.item.MixinAttackRange
  */
-object ModuleReach : ClientModule("Reach", ModuleCategories.PLAYER) {
+object ModuleReach : ClientModule("Reach", ModuleCategories.PLAYER, aliases = listOf("SuperHit")) {
     val entity = tree(RangeValueGroup("Entity", 1f, 0f))
     val blockRangeIncrease by float("BlockRangeIncrease", 0.5f, 0f..64f)
+    internal val hit = tree(ReachHit(this))
+    internal val interactable = tree(ReachInteractableFeature(this))
 }
