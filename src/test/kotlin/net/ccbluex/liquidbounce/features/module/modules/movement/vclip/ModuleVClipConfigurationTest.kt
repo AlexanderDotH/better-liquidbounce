@@ -67,6 +67,13 @@ class ModuleVClipConfigurationTest {
     }
 
     @Test
+    fun `Folia exposes no forward clipping control`() {
+        val folia = ModuleVClip.mode("Folia")
+
+        assertFalse(folia.inner.any { it.name == "Forward" })
+    }
+
+    @Test
     fun `VClip exposes bedrock safety as a default-on ClickGUI checkbox`() {
         val moduleJson = interopGson.toJsonTree(ModuleVClip).asJsonObject
         val safety = moduleJson.getAsJsonArray("value")
