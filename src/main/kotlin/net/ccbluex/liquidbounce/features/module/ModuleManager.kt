@@ -177,6 +177,7 @@ import net.ccbluex.liquidbounce.features.module.modules.player.ModuleEagle
 import net.ccbluex.liquidbounce.features.module.modules.player.ModuleFastExp
 import net.ccbluex.liquidbounce.features.module.modules.player.ModuleFastUse
 import net.ccbluex.liquidbounce.features.module.modules.player.ModuleNoBlockInteract
+import net.ccbluex.liquidbounce.features.module.modules.player.ModuleNoCapability
 import net.ccbluex.liquidbounce.features.module.modules.player.ModuleNoEntityInteract
 import net.ccbluex.liquidbounce.features.module.modules.player.ModuleNoRotateSet
 import net.ccbluex.liquidbounce.features.module.modules.player.ModuleNoSlotSet
@@ -631,6 +632,7 @@ object ModuleManager : EventListener, Collection<ClientModule> by modules {
             ModuleFastUse,
             ModuleInventoryCleaner,
             ModuleNoBlockInteract,
+            ModuleNoCapability,
             ModuleNoEntityInteract,
             ModuleNoFall,
             ModuleNoRotateSet,

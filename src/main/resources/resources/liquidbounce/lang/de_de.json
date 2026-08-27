@@ -820,6 +820,7 @@
   "liquidbounce.module.nameProtect.description": "Versteckt den tatsächlichen Benutzernamen des Spielers auf der Clientseite (nützlich für Videos).",
   "liquidbounce.module.nametags.description": "Verbessert die Sichtbarkeit der Nametags des Spielers und zeigt zusätzliche Informationen an.",
   "liquidbounce.module.noBob.description": "Deaktiviert den Bewegungs-Wackeleffekt.",
+  "liquidbounce.module.noCapability.description": "Entfernt vom Server gewährte Vanilla-Flugfähigkeiten, ohne deine anderen Fähigkeiten zu verändern.",
   "liquidbounce.module.noClip.description": "Ermöglicht dir, durch Blöcke zu bewegen (lass zuerst einen Sandblock auf deinen Kopf fallen).",
   "liquidbounce.module.noClip.messages.setbackDetected": "Du wurdest vom Server zurückgeworfen! Stell sicher, dass du bereits innerhalb eines Blocks stehst.",
   "liquidbounce.module.noFOV.description": "Verhindert, dass sich das Sichtfeld während der Bewegung ändert.",

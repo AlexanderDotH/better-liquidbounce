@@ -32,6 +32,7 @@ import net.ccbluex.liquidbounce.features.module.modules.exploit.disabler.disable
 import net.ccbluex.liquidbounce.features.module.modules.misc.betterchat.ModuleBetterChat;
 import net.ccbluex.liquidbounce.features.module.modules.player.Limit;
 import net.ccbluex.liquidbounce.features.module.modules.player.ModuleAntiExploit;
+import net.ccbluex.liquidbounce.features.module.modules.player.ModuleNoCapability;
 import net.ccbluex.liquidbounce.features.module.modules.player.ModuleNoRotateSet;
 import net.ccbluex.liquidbounce.features.module.modules.render.playermodel.ServerPlayerModelStateTracker;
 import net.ccbluex.liquidbounce.utils.aiming.RotationManager;
@@ -238,6 +239,15 @@ public abstract class MixinClientPacketListener extends ClientCommonPacketListen
 
         if (packet.getHealth() == 0) {
             EventManager.INSTANCE.callEvent(DeathEvent.INSTANCE);
+        }
+    }
+
+    @Inject(method = "handlePlayerAbilities", at = @At("RETURN"))
+    private void suppressServerGrantedFlight(ClientboundPlayerAbilitiesPacket packet, CallbackInfo ci) {
+        LocalPlayer player = this.minecraft.player;
+
+        if (player != null) {
+            ModuleNoCapability.onServerAbilitiesApplied(packet, player.getAbilities());
         }
     }
 
