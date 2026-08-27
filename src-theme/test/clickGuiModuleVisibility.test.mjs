@@ -19,3 +19,21 @@ test("modules with only the Hidden setting can open in both ClickGUI themes", ()
         assert.doesNotMatch(module, /setting\.name !== "Hidden"|v\.name !== "Hidden"/);
     }
 });
+
+test("module summaries count Hidden as an interop-visible setting", () => {
+    const moduleFunctions = readFileSync(
+        new URL(
+            "../../src/main/kotlin/net/ccbluex/liquidbounce/integration/interop/protocol/rest/v1/client/ModuleFunctions.kt",
+            import.meta.url,
+        ),
+        "utf8",
+    );
+    const hasSettings = moduleFunctions.match(
+        /val hasSettings = inner\.any \{ value ->[\s\S]*?\n    \}/,
+    )?.[0];
+
+    assert.ok(hasSettings);
+    assert.match(hasSettings, /value\.name != "Bind"/);
+    assert.match(hasSettings, /!value\.notAnOption/);
+    assert.doesNotMatch(hasSettings, /checkIfInclude\(\)/);
+});

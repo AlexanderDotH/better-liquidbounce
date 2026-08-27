@@ -99,3 +99,18 @@ test("panel-level module events are not duplicated by every Modern module row", 
     assert.match(panel, /listen\("moduleToggle"/);
     assert.doesNotMatch(module, /listen\("moduleToggle"/);
 });
+
+test("panel scrolling keeps transient position outside reactive panel state", () => {
+    const panel = read("themes/modern/ModernPanel.svelte");
+    const handler = panel.match(
+        /function handleModulesScroll\(\): void \{[\s\S]*?\n    \}/,
+    )?.[0];
+
+    assert.ok(handler);
+    assert.match(handler, /currentScrollTop\s*=\s*modulesElement\.scrollTop/);
+    assert.doesNotMatch(handler, /panelState\.scrollTop\s*=/);
+    assert.match(panel, /scrollTop:\s*currentScrollTop/);
+    assert.match(panel, /class:scrolling/);
+    assert.match(handler, /scrolling\s*=\s*true/);
+    assert.match(handler, /descriptionStore\.set\(null\)/);
+});

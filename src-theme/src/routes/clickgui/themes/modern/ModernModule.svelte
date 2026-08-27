@@ -390,6 +390,9 @@
     position: relative;
     color: var(--clickgui-text-dimmed-color);
     border-bottom: 1px solid rgba(255, 255, 255, 0.055);
+    pointer-events: var(--modern-module-pointer-events, auto);
+    content-visibility: auto;
+    contain-intrinsic-block-size: auto 42px;
   }
 
   .module.revealed {

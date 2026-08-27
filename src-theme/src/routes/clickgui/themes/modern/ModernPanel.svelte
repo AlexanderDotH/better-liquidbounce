@@ -5,6 +5,7 @@
     import {setItem} from "../../../../integration/persistent_storage";
     import {listen} from "../../../../integration/ws";
     import {
+        description as descriptionStore,
         gridSize,
         highlightModuleName,
         maxPanelZIndex,
@@ -48,6 +49,8 @@
         shiftKey: boolean;
     }
 
+    const MODERN_SCROLL_SETTLE_MS = 160;
+
     let {
         category,
         modules,
@@ -60,6 +63,7 @@
     const loadedPanelState = loadPanelState();
     const initialViewport = readLogicalViewport();
     let panelState = $state<ModernPanelState>(loadedPanelState);
+    let currentScrollTop = loadedPanelState.scrollTop;
     let viewport = $state<LogicalViewport>(initialViewport);
     let visiblePanelPosition = $state<ModernPanelPosition>(
         clampModernPanelPosition(loadedPanelState, initialViewport),
@@ -77,6 +81,7 @@
     let observedResetVersion: number | null = null;
     let moving = $state(false);
     let resetting = $state(false);
+    let scrolling = $state(false);
     let maximumModulesHeight = $derived(Math.max(
         0,
         viewport.height
@@ -139,7 +144,7 @@
 
     onMount(async () => {
         await tick();
-        modulesElement.scrollTop = panelState.scrollTop;
+        modulesElement.scrollTop = currentScrollTop;
     });
 
     onDestroy(() => {
@@ -183,6 +188,9 @@
             scrollSaveTimeout = null;
         }
 
+        currentScrollTop = nextInitialState.scrollTop;
+        scrolling = false;
+
         if (resetAnimationTimeout !== null) {
             clearTimeout(resetAnimationTimeout);
         }
@@ -198,7 +206,7 @@
 
         void tick().then(() => {
             if (modulesElement) {
-                modulesElement.scrollTop = 0;
+                modulesElement.scrollTop = currentScrollTop;
             }
         });
     }
@@ -340,7 +348,12 @@
     }
 
     function handleModulesScroll(): void {
-        panelState.scrollTop = modulesElement.scrollTop;
+        currentScrollTop = modulesElement.scrollTop;
+
+        if (!scrolling) {
+            scrolling = true;
+            descriptionStore.set(null);
+        }
 
         if (scrollSaveTimeout !== null) {
             clearTimeout(scrollSaveTimeout);
@@ -348,8 +361,9 @@
 
         scrollSaveTimeout = window.setTimeout(() => {
             scrollSaveTimeout = null;
+            scrolling = false;
             savePanelState();
-        }, 300);
+        }, MODERN_SCROLL_SETTLE_MS);
     }
 
     function handleWindowResize(): void {
@@ -390,7 +404,12 @@
     }
 
     function savePanelState(): void {
-        void setItem(storageKey, JSON.stringify($state.snapshot(panelState)))
+        const state = {
+            ...$state.snapshot(panelState),
+            scrollTop: currentScrollTop,
+        };
+
+        void setItem(storageKey, JSON.stringify(state))
             .catch(error => {
                 console.warn(`Failed to persist Modern panel "${category}"`, error);
             });
@@ -456,6 +475,7 @@
     <div
             class="modules"
             class:expanded={panelState.expanded}
+            class:scrolling
             aria-hidden={!panelState.expanded}
             inert={!panelState.expanded}
             bind:this={modulesElement}
@@ -681,12 +701,20 @@
   }
 
   .modules {
+    --modern-module-pointer-events: auto;
+
     max-height: 0;
     overflow-x: hidden;
     overflow-y: auto;
     overscroll-behavior: contain;
+    contain: layout paint style;
+    will-change: scroll-position;
     opacity: 0;
     background: var(--modern-surface-panel-body, rgba(8, 10, 14, 0.2));
+  }
+
+  .modules.scrolling {
+    --modern-module-pointer-events: none;
   }
 
   .modules.expanded {

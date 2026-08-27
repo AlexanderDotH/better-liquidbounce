@@ -105,6 +105,25 @@ test("large panels animate only the leading module rows", () => {
     );
 });
 
+test("scrolling panels isolate paint and skip offscreen module rows", () => {
+    const panel = read("ModernPanel.svelte");
+    const module = read("ModernModule.svelte");
+    const modulesBlock = cssBlock(panel, ".modules");
+    const scrollingBlock = cssBlock(panel, ".modules.scrolling");
+    const moduleBlock = cssBlock(module, ".module");
+
+    assert.match(modulesBlock, /contain:\s*layout paint style/);
+    assert.match(modulesBlock, /will-change:\s*scroll-position/);
+    assert.match(modulesBlock, /--modern-module-pointer-events:\s*auto/);
+    assert.match(scrollingBlock, /--modern-module-pointer-events:\s*none/);
+    assert.match(
+        moduleBlock,
+        /pointer-events:\s*var\(--modern-module-pointer-events,\s*auto\)/,
+    );
+    assert.match(moduleBlock, /content-visibility:\s*auto/);
+    assert.match(moduleBlock, /contain-intrinsic-block-size:\s*auto 42px/);
+});
+
 test("command, search, and settings surfaces expose purposeful motion cues", () => {
     const command = read("ModernCommandBar.svelte");
     const search = read("ModernSearch.svelte");

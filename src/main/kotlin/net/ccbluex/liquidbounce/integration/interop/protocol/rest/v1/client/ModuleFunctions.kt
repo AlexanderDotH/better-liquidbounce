@@ -49,7 +49,7 @@ import org.apache.commons.io.input.CharSequenceReader
 
 private fun ClientModule.toJsonObject() = JsonObject().apply {
     val hasSettings = inner.any { value ->
-        value.name != "Bind" && !value.notAnOption && value.checkIfInclude()
+        value.name != "Bind" && !value.notAnOption
     }
 
     addProperty("name", name)
