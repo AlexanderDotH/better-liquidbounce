@@ -21,8 +21,10 @@
 package net.ccbluex.liquidbounce.utils.network
 
 import net.ccbluex.liquidbounce.config.types.list.Tagged
+import net.ccbluex.liquidbounce.event.EventManager
 import net.ccbluex.liquidbounce.event.TickLoopTaskExecutor
 import net.ccbluex.liquidbounce.event.events.PacketEvent
+import net.ccbluex.liquidbounce.event.events.SilentPacketSendEvent
 import net.ccbluex.liquidbounce.event.events.TransferOrigin
 import net.ccbluex.liquidbounce.features.module.modules.combat.crystalaura.SwitchMode
 import net.ccbluex.liquidbounce.features.module.modules.misc.ModulePacketLogger
@@ -242,7 +244,14 @@ fun MultiPlayerGameMode.useItem(
 fun handlePacket(packet: Packet<*>) =
     runCatching { (packet as Packet<ClientGamePacketListener>).handle(mc.connection!!) }
 
-fun sendPacketSilently(packet: Packet<*>) {
+fun sendPacketSilently(packet: Packet<*>, bypassSilentPacketEvent: Boolean = false) {
+    if (!bypassSilentPacketEvent) {
+        val silentPacketEvent = EventManager.callEvent(SilentPacketSendEvent(packet))
+        if (silentPacketEvent.isCancelled) {
+            return
+        }
+    }
+
     // hack fix for the packet handler not being called on Rotation Manager for tracking
     val packetEvent = PacketEvent(TransferOrigin.OUTGOING, packet, false)
     RotationManager.packetHandler.handler.accept(packetEvent)

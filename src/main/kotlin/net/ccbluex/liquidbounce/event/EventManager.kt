@@ -126,6 +126,7 @@ import net.ccbluex.liquidbounce.event.events.SelectHotbarSlotSilentlyEvent
 import net.ccbluex.liquidbounce.event.events.ServerConnectEvent
 import net.ccbluex.liquidbounce.event.events.ServerPingedEvent
 import net.ccbluex.liquidbounce.event.events.SessionEvent
+import net.ccbluex.liquidbounce.event.events.SilentPacketSendEvent
 import net.ccbluex.liquidbounce.event.events.SpaceSeperatedNamesChangeEvent
 import net.ccbluex.liquidbounce.event.events.SprintEvent
 import net.ccbluex.liquidbounce.event.events.TagEntityEvent
@@ -218,6 +219,7 @@ internal val ALL_EVENT_CLASSES: Array<Class<out Event>> = arrayOf(
     FluidPushEvent::class.java,
     PipelineEvent::class.java,
     PacketEvent::class.java,
+    SilentPacketSendEvent::class.java,
     ClientStartEvent::class.java,
     ClientShutdownEvent::class.java,
     ClientLanguageChangedEvent::class.java,

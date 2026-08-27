@@ -33,6 +33,9 @@ class PipelineEvent(val channelPipeline: ChannelPipeline, val local: Boolean) : 
 @Tag("packet")
 class PacketEvent(val origin: TransferOrigin, val packet: Packet<*>, val original: Boolean = true) : CancellableEvent()
 
+@Tag("silentPacketSend")
+class SilentPacketSendEvent(val packet: Packet<*>) : CancellableEvent()
+
 @Tag("queuePacket")
 class BlinkPacketEvent(
     val packet: Packet<*>?,
