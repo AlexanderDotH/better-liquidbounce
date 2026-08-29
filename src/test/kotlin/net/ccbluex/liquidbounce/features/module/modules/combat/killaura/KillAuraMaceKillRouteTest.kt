@@ -52,8 +52,8 @@ class KillAuraMaceKillRouteTest {
                 maceKillTargetPossible = true,
                 spearKillAvailable = true,
                 spearKillTargetPossible = true,
-                superHitAvailable = true,
-                superHitTargetPossible = true,
+                reachHitAvailable = true,
+                reachHitTargetPossible = true,
             ),
         )
     }
@@ -70,8 +70,8 @@ class KillAuraMaceKillRouteTest {
                 maceKillTargetPossible = false,
                 spearKillAvailable = true,
                 spearKillTargetPossible = true,
-                superHitAvailable = true,
-                superHitTargetPossible = true,
+                reachHitAvailable = true,
+                reachHitTargetPossible = true,
             ),
         )
     }
@@ -100,8 +100,8 @@ class KillAuraMaceKillRouteTest {
                 maceKillTargetPossible = true,
                 spearKillRunning = true,
                 spearKillTargetPossible = true,
-                superHitAvailable = true,
-                superHitTargetPossible = true,
+                reachHitAvailable = true,
+                reachHitTargetPossible = true,
             ),
         )
     }
@@ -113,7 +113,7 @@ class KillAuraMaceKillRouteTest {
             selectRemoteRoute(heldRemoteWeapon = KillAuraRemoteWeapon.NONE),
         )
         assertEquals(
-            KillAuraAttackRoute.SUPER_HIT,
+            KillAuraAttackRoute.REACH_HIT,
             selectRemoteRoute(
                 heldRemoteWeapon = KillAuraRemoteWeapon.NONE,
                 spearKillAvailable = false,
@@ -131,7 +131,7 @@ class KillAuraMaceKillRouteTest {
             ),
         )
         assertEquals(
-            KillAuraAttackRoute.SUPER_HIT,
+            KillAuraAttackRoute.REACH_HIT,
             selectRemoteRoute(
                 heldRemoteWeapon = KillAuraRemoteWeapon.SPEAR,
                 spearKillTargetPossible = false,
@@ -151,8 +151,8 @@ class KillAuraMaceKillRouteTest {
                 maceKillTargetPossible = true,
                 spearKillAvailable = false,
                 spearKillTargetPossible = false,
-                superHitAvailable = false,
-                superHitTargetPossible = false,
+                reachHitAvailable = false,
+                reachHitTargetPossible = false,
             ),
         )
     }
@@ -169,8 +169,8 @@ class KillAuraMaceKillRouteTest {
                 maceKillTargetPossible = false,
                 spearKillAvailable = false,
                 spearKillTargetPossible = false,
-                superHitAvailable = false,
-                superHitTargetPossible = false,
+                reachHitAvailable = false,
+                reachHitTargetPossible = false,
             ),
         )
     }
@@ -187,8 +187,8 @@ class KillAuraMaceKillRouteTest {
                 maceKillTargetPossible = true,
                 spearKillAvailable = true,
                 spearKillTargetPossible = true,
-                superHitAvailable = true,
-                superHitTargetPossible = true,
+                reachHitAvailable = true,
+                reachHitTargetPossible = true,
             ),
         )
     }
@@ -257,8 +257,8 @@ class KillAuraMaceKillRouteTest {
             calculateKillAuraTargetingRange(
                 delegateKillAuraAttacks = false,
                 normalMaximumRange = 7f,
-                superHitAvailable = false,
-                superHitMaximumRange = 100f,
+                reachHitAvailable = false,
+                reachHitMaximumRange = 100f,
                 maceKillRunning = true,
                 maceKillMaximumRange = 400f,
             ),
@@ -268,8 +268,8 @@ class KillAuraMaceKillRouteTest {
             calculateKillAuraTargetingRange(
                 delegateKillAuraAttacks = true,
                 normalMaximumRange = 7f,
-                superHitAvailable = true,
-                superHitMaximumRange = 100f,
+                reachHitAvailable = true,
+                reachHitMaximumRange = 100f,
                 spearKillRunning = true,
                 spearKillMaximumRange = 300f,
                 maceKillRunning = true,
@@ -281,8 +281,8 @@ class KillAuraMaceKillRouteTest {
             calculateKillAuraTargetingRange(
                 delegateKillAuraAttacks = true,
                 normalMaximumRange = 7f,
-                superHitAvailable = true,
-                superHitMaximumRange = 100f,
+                reachHitAvailable = true,
+                reachHitMaximumRange = 100f,
                 spearKillRunning = true,
                 spearKillMaximumRange = 300f,
                 maceKillRunning = false,
@@ -298,7 +298,7 @@ class KillAuraMaceKillRouteTest {
         val success = executeKillAuraAttack(
             route = KillAuraAttackRoute.MACE_KILL,
             normalAttack = { error("normal attack must remain suppressed") },
-            superHitAttack = { error("SuperHit must remain suppressed") },
+            reachHitAttack = { error("Reach Hit must remain suppressed") },
             onSuccess = { successfulAttacks++ },
         )
 
@@ -358,7 +358,7 @@ class KillAuraMaceKillRouteTest {
             KillAuraAttackRoute.NONE,
             KillAuraAttackRoute.NORMAL,
             KillAuraAttackRoute.SPEAR_KILL,
-            KillAuraAttackRoute.SUPER_HIT,
+            KillAuraAttackRoute.REACH_HIT,
         ).forEach { route ->
             assertFalse(
                 dispatchKillAuraRemoteKillRoute(route) {
@@ -382,7 +382,7 @@ class KillAuraMaceKillRouteTest {
         maceKillTargetPossible = maceKillTargetPossible,
         spearKillAvailable = spearKillAvailable,
         spearKillTargetPossible = spearKillTargetPossible,
-        superHitAvailable = true,
-        superHitTargetPossible = true,
+        reachHitAvailable = true,
+        reachHitTargetPossible = true,
     )
 }

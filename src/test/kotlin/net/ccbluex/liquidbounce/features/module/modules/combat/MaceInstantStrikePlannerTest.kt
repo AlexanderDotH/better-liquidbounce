@@ -87,6 +87,38 @@ class MaceInstantStrikePlannerTest {
         assertEquals(MaceInstantStrikePlanResult.NoUsableHeight, result)
     }
 
+    @Test
+    fun `post attack reset rises before grounding so a rejected Instant hit cannot deal fall damage`() {
+        val endpoint = Vec3(10.0, 70.0, -5.0)
+        val endpointBoundingBox = AABB(9.7, 70.0, -5.3, 10.3, 71.8, -4.7)
+        val checkedRises = mutableListOf<Double>()
+        val result = MacePostAttackFallResetPlanner.plan(
+            MacePostAttackFallResetRequest(endpoint, endpointBoundingBox),
+        ) { box ->
+            checkedRises += box.minY - endpointBoundingBox.minY
+            box.minY <= endpointBoundingBox.minY + 0.03125
+        }
+
+        val plan = assertInstanceOf(MacePostAttackFallResetPlanResult.Ready::class.java, result).plan
+        assertEquals(listOf(0.0625, 0.03125), checkedRises)
+        assertEquals(0.03125, plan.rise)
+        assertEquals(
+            listOf(
+                MaceInstantStrikePacket.Position(endpoint.add(0.0, 0.03125, 0.0), onGround = false),
+                MaceInstantStrikePacket.Position(endpoint, onGround = true),
+            ),
+            plan.packets,
+        )
+        assertEquals(
+            0,
+            countSimulatedFallDamage(
+                startingY = endpoint.y,
+                initialFallDistance = 170.0,
+                packets = plan.packets,
+            ),
+        )
+    }
+
     private fun request(
         maximumFallHeight: Int,
         endpointOnGround: Boolean = false,
@@ -97,5 +129,24 @@ class MaceInstantStrikePlannerTest {
         maximumFallHeight = maximumFallHeight,
         endpointOnGround = endpointOnGround,
     )
+
+    /** Mirrors the vanilla 26.2 move-handler order relevant to the reset contract. */
+    private fun countSimulatedFallDamage(
+        startingY: Double,
+        initialFallDistance: Double,
+        packets: List<MaceInstantStrikePacket.Position>,
+    ): Int {
+        var y = startingY
+        var fallDistance = initialFallDistance
+        var damageEvents = 0
+        packets.forEach { packet ->
+            val movementY = packet.position.y - y
+            if (movementY < 0.0) fallDistance -= movementY
+            if (packet.onGround && fallDistance > 3.0) damageEvents++
+            if (packet.onGround || movementY > 0.0) fallDistance = 0.0
+            y = packet.position.y
+        }
+        return damageEvents
+    }
 
 }

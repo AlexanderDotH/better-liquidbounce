@@ -27,7 +27,7 @@ import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 
-class ModuleKillAuraSuperHitTest {
+class ModuleKillAuraReachHitTest {
 
     @Test
     fun `normal KillAura attack wins when both routes are available`() {
@@ -38,14 +38,14 @@ class ModuleKillAuraSuperHitTest {
                 normalAttackPossible = true,
                 spearKillRunning = true,
                 spearKillTargetPossible = true,
-                superHitAvailable = true,
-                superHitTargetPossible = true,
+                reachHitAvailable = true,
+                reachHitTargetPossible = true,
             ),
         )
     }
 
     @Test
-    fun `SpearKill owns a distant target before SuperHit`() {
+    fun `SpearKill owns a distant target before Reach Hit`() {
         assertEquals(
             KillAuraAttackRoute.SPEAR_KILL,
             selectKillAuraAttackRoute(
@@ -53,19 +53,19 @@ class ModuleKillAuraSuperHitTest {
                 normalAttackPossible = false,
                 spearKillRunning = true,
                 spearKillTargetPossible = true,
-                superHitAvailable = true,
-                superHitTargetPossible = true,
+                reachHitAvailable = true,
+                reachHitTargetPossible = true,
             ),
         )
         assertEquals(
-            KillAuraAttackRoute.SUPER_HIT,
+            KillAuraAttackRoute.REACH_HIT,
             selectKillAuraAttackRoute(
                 delegateKillAuraAttacks = true,
                 normalAttackPossible = false,
                 spearKillRunning = false,
                 spearKillTargetPossible = true,
-                superHitAvailable = true,
-                superHitTargetPossible = true,
+                reachHitAvailable = true,
+                reachHitTargetPossible = true,
             ),
         )
     }
@@ -79,21 +79,21 @@ class ModuleKillAuraSuperHitTest {
                 normalAttackPossible = false,
                 spearKillRunning = true,
                 spearKillTargetPossible = true,
-                superHitAvailable = true,
-                superHitTargetPossible = true,
+                reachHitAvailable = true,
+                reachHitTargetPossible = true,
             ),
         )
     }
 
     @Test
-    fun `distant target uses SuperHit only while its integration is available`() {
+    fun `distant target uses Reach Hit only while its integration is available`() {
         assertEquals(
-            KillAuraAttackRoute.SUPER_HIT,
+            KillAuraAttackRoute.REACH_HIT,
             selectKillAuraAttackRoute(
                 delegateKillAuraAttacks = true,
                 normalAttackPossible = false,
-                superHitAvailable = true,
-                superHitTargetPossible = true,
+                reachHitAvailable = true,
+                reachHitTargetPossible = true,
             ),
         )
         assertEquals(
@@ -101,8 +101,8 @@ class ModuleKillAuraSuperHitTest {
             selectKillAuraAttackRoute(
                 delegateKillAuraAttacks = true,
                 normalAttackPossible = false,
-                superHitAvailable = false,
-                superHitTargetPossible = true,
+                reachHitAvailable = false,
+                reachHitTargetPossible = true,
             ),
         )
         assertEquals(
@@ -110,14 +110,14 @@ class ModuleKillAuraSuperHitTest {
             selectKillAuraAttackRoute(
                 delegateKillAuraAttacks = true,
                 normalAttackPossible = false,
-                superHitAvailable = true,
-                superHitTargetPossible = false,
+                reachHitAvailable = true,
+                reachHitTargetPossible = false,
             ),
         )
     }
 
     @Test
-    fun `SuperHit expands acquisition range only while its integration is available`() {
+    fun `Reach Hit expands acquisition range only while its integration is available`() {
         assertEquals(7f, calculateKillAuraTargetingRange(false, 7f, true, 100f, true, 500f))
         assertEquals(7f, calculateKillAuraTargetingRange(true, 7f, false, 100f))
         assertEquals(100f, calculateKillAuraTargetingRange(true, 7f, true, 100f))
@@ -130,12 +130,12 @@ class ModuleKillAuraSuperHitTest {
         assertTrue(shouldUseKillAuraAimPipeline(false, false))
         assertFalse(shouldUseKillAuraAimPipeline(true, false))
         assertFalse(shouldUseKillAuraAimPipeline(false, true))
-        assertTrue(shouldPredictKillAuraRangeExit(delegatedSuperHit = false))
-        assertFalse(shouldPredictKillAuraRangeExit(delegatedSuperHit = true))
+        assertTrue(shouldPredictKillAuraRangeExit(delegatedReachHit = false))
+        assertFalse(shouldPredictKillAuraRangeExit(delegatedReachHit = true))
     }
 
     @Test
-    fun `SuperHit dispatch uses a stable center rotation without pitching vertically`() {
+    fun `Reach Hit dispatch uses stable center rotation without pitching vertically`() {
         val rotation = calculateKillAuraDelegatedAttackRotation(
             eyes = Vec3(0.0, 65.62, 0.0),
             targetBox = AABB(9.7, 64.0, -0.3, 10.3, 65.8, 0.3),
@@ -152,7 +152,7 @@ class ModuleKillAuraSuperHitTest {
         val success = executeKillAuraAttack(
             route = KillAuraAttackRoute.SPEAR_KILL,
             normalAttack = { error("normal attack must remain suppressed") },
-            superHitAttack = { error("SuperHit must remain suppressed") },
+            reachHitAttack = { error("Reach Hit must remain suppressed") },
             onSuccess = { successfulAttacks++ },
         )
 
@@ -161,19 +161,19 @@ class ModuleKillAuraSuperHitTest {
     }
 
     @Test
-    fun `failed SuperHit does not fall back or run success bookkeeping`() = runTest {
+    fun `failed Reach Hit does not fall back or run success bookkeeping`() = runTest {
         var normalAttacks = 0
-        var superHitAttacks = 0
+        var reachHitAttacks = 0
         var successfulAttacks = 0
 
         val success = executeKillAuraAttack(
-            route = KillAuraAttackRoute.SUPER_HIT,
+            route = KillAuraAttackRoute.REACH_HIT,
             normalAttack = {
                 normalAttacks++
                 true
             },
-            superHitAttack = {
-                superHitAttacks++
+            reachHitAttack = {
+                reachHitAttacks++
                 false
             },
             onSuccess = { successfulAttacks++ },
@@ -181,7 +181,7 @@ class ModuleKillAuraSuperHitTest {
 
         assertFalse(success)
         assertEquals(0, normalAttacks)
-        assertEquals(1, superHitAttacks)
+        assertEquals(1, reachHitAttacks)
         assertEquals(0, successfulAttacks)
     }
 
@@ -192,7 +192,7 @@ class ModuleKillAuraSuperHitTest {
         val success = executeKillAuraAttack(
             route = KillAuraAttackRoute.NORMAL,
             normalAttack = { true },
-            superHitAttack = { error("SuperHit must not run for a normal target") },
+            reachHitAttack = { error("Reach Hit must not run for a normal target") },
             onSuccess = { successfulAttacks++ },
         )
 

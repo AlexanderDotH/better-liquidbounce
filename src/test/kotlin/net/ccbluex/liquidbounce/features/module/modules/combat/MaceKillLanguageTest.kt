@@ -85,7 +85,7 @@ class MaceKillLanguageTest {
                 assertTrue(fightBot.contains(term), "FightBot: $term")
             }
             val delegation = locale["liquidbounce.settings.combat.delegateKillAuraAttacks.description"].asString
-            listOf("MaceKill", "SpearKill", "SuperHit").forEach { term ->
+            listOf("MaceKill", "SpearKill", "Reach Hit").forEach { term ->
                 assertTrue(delegation.contains(term), "DelegateKillAuraAttacks: $term")
             }
             val routing = locale["$MACE_KILL_PREFIX.movement.packet.routing.description"].asString

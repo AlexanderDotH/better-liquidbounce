@@ -27,7 +27,7 @@ class FightBotLanguageTest {
             assertFalse(translations.has("liquidbounce.module.killAura.fightBot.extendedDescription"), locale)
 
             val extendedDescription = translations["liquidbounce.module.fightBot.extendedDescription"].asString
-            listOf("Nearest", "KillAura", "SpearKill", "SuperHit", "HeldOrHotbar").forEach { term ->
+            listOf("Nearest", "KillAura", "SpearKill", "Reach Hit", "HeldOrHotbar").forEach { term ->
                 assertTrue(extendedDescription.contains(term), "$locale: $term")
             }
         }

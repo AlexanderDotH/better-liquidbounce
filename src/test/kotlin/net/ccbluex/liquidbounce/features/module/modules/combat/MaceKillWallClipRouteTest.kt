@@ -21,6 +21,22 @@ import org.junit.jupiter.api.Test
 class MaceKillWallClipRouteTest {
 
     @Test
+    fun `Instant uses a clear collision route before experimental clipping`() {
+        val calls = mutableListOf<String>()
+
+        val selected = selectMaceKillRoutePlan(
+            routingMode = MaceKillRoutingMode.INSTANT,
+            directPlan = { calls += "direct"; "direct" },
+            aStarPlan = { error("AStar must not run for Instant") },
+            vanillaVClipPlan = { error("Vanilla VClip must not replace a clear Instant route") },
+            wallClipPlan = { error("ClipReach must not replace a clear Instant route") },
+        )
+
+        assertEquals("direct", selected)
+        assertEquals(listOf("direct"), calls)
+    }
+
+    @Test
     fun `Direct keeps the accelerated collision route before using wall clip`() {
         val calls = mutableListOf<String>()
 
