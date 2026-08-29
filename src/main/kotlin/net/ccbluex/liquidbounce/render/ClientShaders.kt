@@ -143,6 +143,9 @@ sealed class ClientShaders(val type: ShaderType) : ShaderSource {
         val EspOutlineComposite = "esp_outline_composite"("shaders/esp/outline_composite.frag")
 
         @JvmField
+        val EspChamsComposite = "esp_chams_composite"("shaders/esp/chams_composite.frag")
+
+        @JvmField
         val RoundedRect = "rounded_rect"("shaders/circle/rounded_rect.fsh")
 
         @JvmField

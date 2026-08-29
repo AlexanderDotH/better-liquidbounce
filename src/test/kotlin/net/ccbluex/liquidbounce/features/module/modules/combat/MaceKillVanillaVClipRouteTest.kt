@@ -68,7 +68,7 @@ class MaceKillVanillaVClipRouteTest {
     fun `every remote route reaches bounded Vanilla VClip before ClipReach fallback`() {
         assertRoutePlanOrder(MaceKillRoutingMode.DIRECT, listOf("direct", "vclip"))
         assertRoutePlanOrder(MaceKillRoutingMode.A_STAR, listOf("astar", "vclip"))
-        assertRoutePlanOrder(MaceKillRoutingMode.INSTANT, listOf("vclip"))
+        assertRoutePlanOrder(MaceKillRoutingMode.INSTANT, listOf("direct", "vclip"))
 
         val motionCalls = mutableListOf<String>()
         assertEquals(

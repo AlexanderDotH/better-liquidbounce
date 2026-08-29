@@ -65,10 +65,8 @@ internal fun resolveInteractableGoalStances(
         "Interaction range must be finite and positive"
     }
     val radius = ceil(interactionRange).toInt()
-    val targetCenter = Vec3.atCenterOf(targetNode)
     return candidateNodes(targetNode, radius)
         .map { node -> InteractableRouteStance(node, node.stancePosition()) }
-        .filter { it.position.distanceTo(targetCenter) <= interactionRange }
         .filter { canStand(it.node) && canInteract(it.node) }
         .sortedWith(compareBy<InteractableRouteStance> { it.position.distanceToSqr(origin) }
         .thenBy { it.node.asLong() })
@@ -149,6 +147,7 @@ private class MinecraftControllerRouteTask(
         when (val result = InteractableRouteCompiler.compile(
             plan,
             settings.routing.stepDistance,
+            settings.surfaceFallback.maxClipDistance.toDouble(),
             settings.surfaceFallback.transport,
             fallSafety,
         )) {
@@ -157,6 +156,8 @@ private class MinecraftControllerRouteTask(
                 InteractableRenderSnapshot.Route(plan.renderSnapshot),
             )
             InteractableRouteCompileResult.VClipUnavailable -> ControllerRouteProgress.Failed("VCLIP_UNAVAILABLE")
+            InteractableRouteCompileResult.VClipDistanceExceeded ->
+                ControllerRouteProgress.Failed(InteractableRouteFailure.CLIP_DISTANCE_EXCEEDED.name)
         }
 }
 
@@ -200,17 +201,22 @@ private class MinecraftInteractableRouteWorld(
     override fun isBedrock(position: BlockPos): Boolean = level.getBlockState(position).block === Blocks.BEDROCK
 
     override fun isSegmentClear(from: Vec3, to: Vec3): Boolean {
-        val distance = from.distanceTo(to)
-        val samples = ceil(distance / SWEEP_SAMPLE_DISTANCE).toInt().coerceAtLeast(1)
-        val collisionFree = (0..samples).all { index ->
-            val point = from.lerp(to, index.toDouble() / samples)
-            val node = BlockPos.containing(point)
-            isLoaded(node) && isPassableAt(point)
-        }
+        val sweep = listOf(from) + interactableSweepWaypoints(from, to)
+        val collisionFree = sweep.zipWithNext().all { (start, end) -> isCollisionFreeSegment(start, end) }
         if (!collisionFree) return false
         if (from.y != to.y) return isSupportedAt(from) && isSupportedAt(to)
+        val distance = from.distanceTo(to)
+        val samples = ceil(distance / SWEEP_SAMPLE_DISTANCE).toInt().coerceAtLeast(1)
         return (0..samples).all { index ->
             isSupportedAt(from.lerp(to, index.toDouble() / samples))
+        }
+    }
+
+    private fun isCollisionFreeSegment(from: Vec3, to: Vec3): Boolean {
+        val samples = ceil(from.distanceTo(to) / SWEEP_SAMPLE_DISTANCE).toInt().coerceAtLeast(1)
+        return (0..samples).all { index ->
+            val point = from.lerp(to, index.toDouble() / samples)
+            isLoaded(BlockPos.containing(point)) && isPassableAt(point)
         }
     }
 
@@ -247,11 +253,7 @@ private class MinecraftInteractableGoalWorld(
 
     private fun canInteractBlock(eyes: Vec3, position: BlockPos): Boolean {
         val initial = target.initialHitLocation.let { Vec3(it.x, it.y, it.z) }
-        return sequenceOf(initial, Vec3.atCenterOf(position)).any { point ->
-            eyes.distanceTo(point) <= interactionRange &&
-                level.clip(eyes, point, ClipContext.Block.OUTLINE, ClipContext.Fluid.NONE, player)
-                    .let { it.type == HitResult.Type.BLOCK && it.blockPos == position }
-        }
+        return resolveInteractableBlockHit(level, player, position, initial, eyes, interactionRange) != null
     }
 
     private fun canInteractEntity(eyes: Vec3, entity: Entity?): Boolean {
@@ -264,20 +266,45 @@ private class MinecraftInteractableGoalWorld(
     }
 }
 
-private fun InteractableSettingsSnapshot.toRouteSettings() = InteractableRouteSettings(
-    allowDiagonal = routing.diagonal,
-    maxCost = routing.maxCost.toDouble(),
-    maxIterations = (routing.nodesPerTick.toLong() * routeTimeoutTicks.toLong())
-        .coerceIn(1L, Int.MAX_VALUE.toLong()).toInt(),
-    lineOfSightShortcuts = routing.lineOfSightShortcuts,
-    surfaceFallback = surfaceFallback.enabled,
-    maxRise = surfaceFallback.maxRise,
-    horizontalSearch = surfaceFallback.horizontalSearch,
-    protectBedrock = surfaceFallback.doNotClipAroundBedrock,
-)
+internal fun resolveInteractableBlockHit(
+    level: net.minecraft.client.multiplayer.ClientLevel,
+    player: Entity,
+    position: BlockPos,
+    initialHit: Vec3,
+    eyes: Vec3,
+    interactionRange: Double,
+): net.minecraft.world.phys.BlockHitResult? {
+    val state = level.getBlockState(position)
+    val outline = interactionOutlinePoints(position, state.getShape(level, position).toAabbs())
+    return sequenceOf(initialHit, Vec3.atCenterOf(position)).plus(outline)
+        .distinct()
+        .filter { eyes.distanceTo(it) <= interactionRange }
+        .map { point -> level.clip(eyes, point, ClipContext.Block.OUTLINE, ClipContext.Fluid.NONE, player) }
+        .firstOrNull { it.type == HitResult.Type.BLOCK && it.blockPos == position }
+}
+
+private fun InteractableSettingsSnapshot.toRouteSettings(): InteractableRouteSettings {
+    val maxIterations = (routing.nodesPerTick.toLong() * routeTimeoutTicks.toLong())
+        .coerceIn(1L, Int.MAX_VALUE.toLong()).toInt()
+    val directMaxIterations = (routing.nodesPerTick.toLong() * DIRECT_PROBE_TICKS)
+        .coerceIn(1L, maxIterations.toLong()).toInt()
+    return InteractableRouteSettings(
+        allowDiagonal = routing.diagonal,
+        maxCost = routing.maxCost.toDouble(),
+        maxIterations = maxIterations,
+        directMaxIterations = directMaxIterations,
+        lineOfSightShortcuts = routing.lineOfSightShortcuts,
+        surfaceFallback = surfaceFallback.enabled,
+        maxRise = surfaceFallback.maxRise,
+        horizontalSearch = surfaceFallback.horizontalSearch,
+        protectBedrock = surfaceFallback.doNotClipAroundBedrock,
+        maxClipDistance = surfaceFallback.maxClipDistance,
+    )
+}
 
 private fun BlockPos.stancePosition() = Vec3(x + 0.5, y.toDouble(), z + 0.5)
 
 private const val SUPPORT_DEPTH = 0.05
 private const val COLLISION_EPSILON = 1.0E-7
 private const val SWEEP_SAMPLE_DISTANCE = 0.25
+private const val DIRECT_PROBE_TICKS = 20L

@@ -30,6 +30,7 @@ import net.ccbluex.liquidbounce.utils.block.bed.BedBlockTracker
 import net.ccbluex.liquidbounce.utils.block.getCenterDistanceSquaredEyes
 import net.ccbluex.liquidbounce.utils.block.stateOrEmpty
 import net.ccbluex.liquidbounce.utils.client.SilentHotbar
+import net.ccbluex.liquidbounce.utils.client.SilentHotbarSelectionPolicy
 import net.ccbluex.liquidbounce.utils.collection.Filter
 import net.ccbluex.liquidbounce.utils.collection.blockSortedSetOf
 import net.ccbluex.liquidbounce.utils.combat.CombatManager
@@ -42,11 +43,31 @@ import net.ccbluex.liquidbounce.utils.inventory.findBestToolToMineBlock
 import net.ccbluex.liquidbounce.utils.item.getEnchantment
 import net.ccbluex.liquidbounce.utils.math.sq
 import net.minecraft.core.BlockPos
+import net.minecraft.world.entity.player.Inventory
 import net.minecraft.world.item.ItemStack
 import net.minecraft.world.item.enchantment.Enchantments
 import net.minecraft.world.level.block.Blocks
 import net.minecraft.world.level.block.state.BlockState
 import java.util.function.BiPredicate
+
+internal fun selectAutoToolInventorySwapTarget(
+    selectionPolicy: SilentHotbarSelectionPolicy,
+    visibleSlot: Int,
+    serverSlot: Int,
+    emptySlots: List<Int>,
+): Int {
+    require(Inventory.isHotbarSlot(visibleSlot)) { "Invalid visible hotbar slot: $visibleSlot" }
+    require(Inventory.isHotbarSlot(serverSlot)) { "Invalid server hotbar slot: $serverSlot" }
+
+    val preserveVisibleSlot = selectionPolicy.shouldKeepClientSlotVisible
+    emptySlots.firstOrNull { !preserveVisibleSlot || it != visibleSlot }?.let { return it }
+
+    if (!preserveVisibleSlot || serverSlot != visibleSlot) {
+        return serverSlot
+    }
+
+    return (visibleSlot + 1) % Inventory.SELECTION_SIZE
+}
 
 /**
  * AutoTool module
@@ -60,6 +81,44 @@ object ModuleAutoTool : ClientModule("AutoTool", ModuleCategories.WORLD) {
             DynamicSelectMode,
             arrayOf(DynamicSelectMode, StaticSelectMode)
         )
+
+    private val switchMode = choices(
+        "SwitchMode",
+        NormalSwitchMode,
+        arrayOf(NormalSwitchMode, PacketSwitchMode),
+    )
+
+    private sealed class AutoToolSwitchMode(
+        name: String,
+        val selectionPolicy: SilentHotbarSelectionPolicy,
+    ) : Mode(name) {
+        final override val parent: ModeValueGroup<*>
+            get() = switchMode
+
+        fun select(slot: HotbarItemSlot) {
+            SilentHotbar.selectSlotSilently(ModuleAutoTool, slot, swapPreviousDelay, selectionPolicy)
+        }
+
+        open fun resetActiveSelection() = Unit
+    }
+
+    private object NormalSwitchMode : AutoToolSwitchMode(
+        "Normal",
+        SilentHotbarSelectionPolicy.STANDARD,
+    )
+
+    private object PacketSwitchMode : AutoToolSwitchMode(
+        "Packet",
+        SilentHotbarSelectionPolicy.SERVER_ONLY,
+    ) {
+        override fun resetActiveSelection() {
+            SilentHotbar.resetSlot(ModuleAutoTool)
+        }
+
+        override fun disable() {
+            resetActiveSelection()
+        }
+    }
 
     sealed class ToolSelectorMode(name: String) : Mode(name) {
         final override val parent: ModeValueGroup<*>
@@ -84,6 +143,20 @@ object ModuleAutoTool : ClientModule("AutoTool", ModuleCategories.WORLD) {
                 owner = this,
                 inventoryConstraints = inventoryConstraints,
                 swapDelayProvider = { swapPreviousDelay },
+                anchorHotbarSlotResolver = {
+                    val emptySlots = Slots.Hotbar.asSequence()
+                        .filter { it.itemStack.isEmpty }
+                        .mapNotNull { it.hotbarIndex }
+                        .toList()
+                    val targetSlot = selectAutoToolInventorySwapTarget(
+                        selectionPolicy = switchMode.activeMode.selectionPolicy,
+                        visibleSlot = SilentHotbar.visualSlot,
+                        serverSlot = SilentHotbar.serversideSlot,
+                        emptySlots = emptySlots,
+                    )
+
+                    Slots.Hotbar[targetSlot]
+                },
             )
 
             override fun onDisabled() {
@@ -203,6 +276,8 @@ object ModuleAutoTool : ClientModule("AutoTool", ModuleCategories.WORLD) {
 
     @Suppress("unused")
     private val handleCancelBlockBreaking = handler<CancelBlockBreakingEvent> {
+        switchMode.activeMode.resetActiveSelection()
+
         if (isInventoryConsidered) {
             DynamicSelectMode.ConsiderInventory.onNoTool()
         }
@@ -215,6 +290,8 @@ object ModuleAutoTool : ClientModule("AutoTool", ModuleCategories.WORLD) {
             || cancelDueToNotSneaking
             || RequireNearBed.enabled && !RequireNearBed.matches()
         ) {
+            switchMode.activeMode.resetActiveSelection()
+
             if (isInventoryConsidered) {
                 DynamicSelectMode.ConsiderInventory.onNoTool()
             }
@@ -223,7 +300,7 @@ object ModuleAutoTool : ClientModule("AutoTool", ModuleCategories.WORLD) {
 
         val blockState = pos.stateOrEmpty
         val slot = toolSelector.activeMode.getTool(blockState) ?: return
-        SilentHotbar.selectSlotSilently(this, slot, swapPreviousDelay)
+        switchMode.activeMode.select(slot)
     }
 
     override fun onDisabled() {

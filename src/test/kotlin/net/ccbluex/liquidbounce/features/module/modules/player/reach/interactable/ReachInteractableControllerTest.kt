@@ -271,6 +271,7 @@ private fun settings(nodesPerTick: Int = 750) = InteractableSettingsSnapshot(
         enabled = true,
         maxRise = 128,
         horizontalSearch = 48,
+        maxClipDistance = 30,
         doNotClipAroundBedrock = true,
         transport = InteractableVClipSettings.Vanilla(false, false),
     ),

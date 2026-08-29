@@ -104,8 +104,9 @@ class ReachInteractableFeature(parent: EventListener) : ToggleableValueGroup(
 
     @Suppress("unused")
     private val finalPacketHandler = handler<PacketEvent>(priority = Short.MIN_VALUE) { event ->
-        if (!runtimeDelegate.isInitialized() || !runtime.active) return@handler
-        runtime.onContainerPacket(event)
+        if (!runtimeDelegate.isInitialized()) return@handler
+        runtime.captureContainerPacket(event)
+        if (!runtime.active) return@handler
         runtime.rewriteOrConfirmOutgoing(event)
     }
 
@@ -323,6 +324,7 @@ internal class InteractableSurfaceFallbackConfiguration(parent: EventListener) :
 ) {
     private val maxRise by int("MaxRise", 128, 1..384, "blocks")
     private val horizontalSearch by int("HorizontalSearch", 48, 1..128, "blocks")
+    private val maxClipDistance by int("MaxClipDistance", 30, 4..30, "blocks")
     private val doNotClipAroundBedrock by boolean("DoNotClipAroundBedrock", true)
     private val transportConfiguration = InteractableVClipConfiguration(this)
     private val transport = tree(transportConfiguration.choice)
@@ -331,6 +333,7 @@ internal class InteractableSurfaceFallbackConfiguration(parent: EventListener) :
         enabled = enabled,
         maxRise = maxRise,
         horizontalSearch = horizontalSearch,
+        maxClipDistance = maxClipDistance,
         doNotClipAroundBedrock = doNotClipAroundBedrock,
         transport = transportConfiguration.capture(),
     )
@@ -411,6 +414,7 @@ internal data class InteractableSurfaceFallbackSettings(
     val enabled: Boolean,
     val maxRise: Int,
     val horizontalSearch: Int,
+    val maxClipDistance: Int,
     val doNotClipAroundBedrock: Boolean,
     val transport: InteractableVClipSettings,
 )

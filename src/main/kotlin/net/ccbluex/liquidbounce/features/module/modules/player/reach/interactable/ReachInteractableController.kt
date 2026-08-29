@@ -35,6 +35,7 @@ internal interface ControllerMovementLease : AutoCloseable {
 internal interface ControllerTargetPort<T : Any> {
     fun acquire(settings: InteractableSettingsSnapshot): ControllerTargetResult<T>
     fun validate(target: T): Boolean
+    fun validateWhileHolding(target: T): Boolean = validate(target)
 }
 
 internal sealed interface ControllerTargetResult<out T : Any> {
@@ -174,7 +175,9 @@ internal class ReachInteractableController<T : Any, R : Any, S : Any>(
         releaseIfIdle()
     }
 
-    fun validateTarget(): Boolean = lockedTarget?.let(targets::validate) == true
+    fun validateTarget(allowInteractionStateChange: Boolean = false): Boolean = lockedTarget?.let { target ->
+        if (allowInteractionStateChange) targets.validateWhileHolding(target) else targets.validate(target)
+    } == true
 
     fun abort(cause: InteractableSessionCause, tick: Int) {
         clearPlanning()
@@ -218,4 +221,7 @@ private fun InteractableSettingsSnapshot.toSessionSettings() = InteractableSessi
     openTimeoutTicks = openTimeoutTicks,
     routeTimeoutTicks = routeTimeoutTicks,
     holdTimeoutTicks = holdTimeoutTicks,
+    endpointVerifyTicks = ENDPOINT_VERIFY_TICKS,
 )
+
+private const val ENDPOINT_VERIFY_TICKS = 2

@@ -26,6 +26,7 @@ internal class CachedInteractableRouteWorld(
     private val surface = HashMap<BlockPos, Boolean>()
     private val bedrock = HashMap<BlockPos, Boolean>()
     private val segments = HashMap<RouteSegmentKey, Boolean>()
+    private val verticalClips = HashMap<VerticalClipKey, InteractableVerticalClipCheck>()
 
     fun isWithinBuildHeight(y: Int): Boolean = buildHeight.getOrPut(y) {
         delegate.isWithinBuildHeight(y)
@@ -54,11 +55,46 @@ internal class CachedInteractableRouteWorld(
     fun isSegmentClearBothWays(from: Vec3, to: Vec3): Boolean =
         isSegmentClear(from, to) && isSegmentClear(to, from)
 
+    fun checkVerticalClip(
+        from: BlockPos,
+        to: BlockPos,
+        protectBedrock: Boolean,
+    ): InteractableVerticalClipCheck = verticalClips.getOrPut(VerticalClipKey(from, to, protectBedrock)) {
+        inspectVerticalClip(from, to, protectBedrock)
+    }
+
+    private fun inspectVerticalClip(
+        from: BlockPos,
+        to: BlockPos,
+        protectBedrock: Boolean,
+    ): InteractableVerticalClipCheck {
+        for (y in minOf(from.y, to.y)..maxOf(from.y, to.y)) {
+            if (!isWithinBuildHeight(y)) return InteractableVerticalClipCheck.BUILD_HEIGHT
+            val position = BlockPos(from.x, y, from.z)
+            if (!isLoaded(position)) return InteractableVerticalClipCheck.UNLOADED
+            if (protectBedrock && isBedrock(position)) return InteractableVerticalClipCheck.BEDROCK
+        }
+        return InteractableVerticalClipCheck.CLEAR
+    }
+
     private fun isSegmentClear(from: Vec3, to: Vec3): Boolean = segments.getOrPut(RouteSegmentKey(from, to)) {
         delegate.isSegmentClear(from, to)
     }
 
     private data class RouteSegmentKey(val from: Vec3, val to: Vec3)
+
+    private data class VerticalClipKey(
+        val from: BlockPos,
+        val to: BlockPos,
+        val protectBedrock: Boolean,
+    )
+}
+
+internal enum class InteractableVerticalClipCheck {
+    CLEAR,
+    UNLOADED,
+    BUILD_HEIGHT,
+    BEDROCK,
 }
 
 private fun BlockPos.immutableCopy() = BlockPos(x, y, z)

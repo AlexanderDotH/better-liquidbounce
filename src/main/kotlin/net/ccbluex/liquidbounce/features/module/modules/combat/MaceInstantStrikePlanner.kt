@@ -54,6 +54,22 @@ sealed interface MaceInstantStrikePlanResult {
     data object NoUsableHeight : MaceInstantStrikePlanResult
 }
 
+internal data class MacePostAttackFallResetRequest(
+    val endpoint: Vec3,
+    val endpointBoundingBox: AABB,
+)
+
+internal data class MacePostAttackFallResetPlan(
+    val rise: Double,
+    val packets: List<MaceInstantStrikePacket.Position>,
+)
+
+internal sealed interface MacePostAttackFallResetPlanResult {
+    data class Ready(val plan: MacePostAttackFallResetPlan) : MacePostAttackFallResetPlanResult
+
+    data object NoUsableRise : MacePostAttackFallResetPlanResult
+}
+
 /**
  * Builds the movement spoof that must be delivered immediately before the accepted mace attack.
  *
@@ -109,5 +125,55 @@ object MaceInstantStrikePlanner {
     private const val LONG_HEIGHT_THRESHOLD = 10
     private const val HEIGHT_PER_PRIMING_PACKET = 10.0
     private const val SHORT_HEIGHT_PRIMING_PACKETS = 2
+
+}
+
+/**
+ * Clears a possibly unconsumed smash fall distance only after the attack packet was sent.
+ *
+ * Minecraft 26.2 resets server fall distance after accepted upward movement. The following tiny
+ * grounded descent can therefore restore the exact endpoint without turning a rejected hit into
+ * fall damage for the attacker.
+ */
+internal object MacePostAttackFallResetPlanner {
+
+    fun plan(
+        request: MacePostAttackFallResetRequest,
+        isCollisionFree: (AABB) -> Boolean,
+    ): MacePostAttackFallResetPlanResult {
+        if (!request.hasFiniteCoordinates()) return MacePostAttackFallResetPlanResult.NoUsableRise
+        val rise = POST_ATTACK_RESET_RISE_CANDIDATES.firstOrNull { candidate ->
+            isCollisionFree(request.endpointBoundingBox.move(0.0, candidate, 0.0))
+        } ?: return MacePostAttackFallResetPlanResult.NoUsableRise
+
+        return MacePostAttackFallResetPlanResult.Ready(
+            MacePostAttackFallResetPlan(
+                rise = rise,
+                packets = listOf(
+                    MaceInstantStrikePacket.Position(
+                        request.endpoint.add(0.0, rise, 0.0),
+                        onGround = false,
+                    ),
+                    MaceInstantStrikePacket.Position(request.endpoint, onGround = true),
+                ),
+            ),
+        )
+    }
+
+    private fun MacePostAttackFallResetRequest.hasFiniteCoordinates(): Boolean =
+        endpoint.x.isFinite() && endpoint.y.isFinite() && endpoint.z.isFinite() &&
+            endpointBoundingBox.minX.isFinite() && endpointBoundingBox.minY.isFinite() &&
+            endpointBoundingBox.minZ.isFinite() && endpointBoundingBox.maxX.isFinite() &&
+            endpointBoundingBox.maxY.isFinite() && endpointBoundingBox.maxZ.isFinite()
+
+    private val POST_ATTACK_RESET_RISE_CANDIDATES = doubleArrayOf(
+        1.0 / 16.0,
+        1.0 / 32.0,
+        1.0 / 64.0,
+        1.0 / 128.0,
+        1.0 / 256.0,
+        1.0 / 512.0,
+        1.0 / 1024.0,
+    )
 
 }

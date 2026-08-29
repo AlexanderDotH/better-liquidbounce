@@ -113,6 +113,7 @@ import net.ccbluex.liquidbounce.features.module.modules.misc.ModuleMiddleClickAc
 import net.ccbluex.liquidbounce.features.module.modules.misc.ModuleNotifier
 import net.ccbluex.liquidbounce.features.module.modules.misc.ModulePacketLogger
 import net.ccbluex.liquidbounce.features.module.modules.misc.ModulePlayerPositionLogger
+import net.ccbluex.liquidbounce.features.module.modules.misc.ModuleSafeActions
 import net.ccbluex.liquidbounce.features.module.modules.misc.ModuleSpammer
 import net.ccbluex.liquidbounce.features.module.modules.misc.ModuleTargetLock
 import net.ccbluex.liquidbounce.features.module.modules.misc.ModuleTeams
@@ -266,6 +267,7 @@ import net.ccbluex.liquidbounce.features.module.modules.world.ModuleGroundSpoof
 import net.ccbluex.liquidbounce.features.module.modules.world.ModuleHoleFiller
 import net.ccbluex.liquidbounce.features.module.modules.world.ModuleLiquidFiller
 import net.ccbluex.liquidbounce.features.module.modules.world.ModuleLiquidPlace
+import net.ccbluex.liquidbounce.features.module.modules.world.ModuleLitematica
 import net.ccbluex.liquidbounce.features.module.modules.world.ModuleNoInterpolation
 import net.ccbluex.liquidbounce.features.module.modules.world.ModuleNoSlowBreak
 import net.ccbluex.liquidbounce.features.module.modules.world.ModuleProjectilePuncher
@@ -564,6 +566,7 @@ object ModuleManager : EventListener, Collection<ClientModule> by modules {
             ModuleFlagCheck,
             ModulePacketLogger,
             ModulePlayerPositionLogger,
+            ModuleSafeActions,
             ModuleDebugRecorder,
             ModuleAntiCheatDetect,
             ModulePlayerCheatDetector,
@@ -719,6 +722,7 @@ object ModuleManager : EventListener, Collection<ClientModule> by modules {
             ModuleNoSlowBreak,
             ModuleLiquidFiller,
             ModuleLiquidPlace,
+            ModuleLitematica,
             ModuleProjectilePuncher,
             ModuleScaffold,
             ModuleTimer,

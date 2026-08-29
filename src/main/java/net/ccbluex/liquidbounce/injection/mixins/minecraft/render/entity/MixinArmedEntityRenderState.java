@@ -23,6 +23,7 @@ import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
 import com.llamalad7.mixinextras.sugar.Local;
 import net.ccbluex.liquidbounce.features.module.modules.combat.ModuleSwordBlock;
+import net.ccbluex.liquidbounce.utils.client.SilentHotbar;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.entity.state.ArmedEntityRenderState;
 import net.minecraft.world.entity.HumanoidArm;
@@ -41,6 +42,14 @@ public abstract class MixinArmedEntityRenderState {
         at = @At(value = "INVOKE", target = "Lnet/minecraft/world/entity/LivingEntity;getItemHeldByArm(Lnet/minecraft/world/entity/HumanoidArm;)Lnet/minecraft/world/item/ItemStack;")
     )
     private static ItemStack hideOffhandShield(LivingEntity entity, HumanoidArm arm, Operation<ItemStack> original, @Local(argsOnly = true, name = "state") ArmedEntityRenderState reusedState) {
+        var localPlayer = Minecraft.getInstance().player;
+        if (entity == localPlayer
+            && arm == reusedState.mainArm
+            && SilentHotbar.INSTANCE.getShouldKeepClientSlotVisible()
+        ) {
+            return localPlayer.getInventory().getNonEquipmentItems().get(SilentHotbar.INSTANCE.getVisualSlot());
+        }
+
         if (entity == Minecraft.getInstance().player
             && ModuleSwordBlock.INSTANCE.getApplyToThirdPersonView()
             && ModuleSwordBlock.INSTANCE.shouldHideOffhand()

@@ -160,11 +160,18 @@ class InteractableTargetResolverTest {
     }
 
     @Test
-    fun `occluded out-of-range misses and unavailable worlds are rejected`() {
-        assertRejected(
-            InteractableTargetRejection.OCCLUDED,
+    fun `occluded block menu providers continue to route plausibility while entities stay visible only`() {
+        assertIs<InteractableTargetResolution.Acquired>(
             resolverFor(blockHit(visible = false)).acquire(request()),
         )
+        assertRejected(
+            InteractableTargetRejection.OCCLUDED,
+            resolverFor(entityHit(visible = false)).acquire(request()),
+        )
+    }
+
+    @Test
+    fun `out-of-range misses and unavailable worlds are rejected`() {
         assertRejected(
             InteractableTargetRejection.OUT_OF_RANGE,
             resolverFor(blockHit(distanceSquared = 257.0 * 257.0)).acquire(request(maxRange = 256.0)),
@@ -177,6 +184,25 @@ class InteractableTargetResolverTest {
             InteractableTargetRejection.WORLD_UNAVAILABLE,
             resolverFor(InteractableRayHit.WorldUnavailable).acquire(request()),
         )
+    }
+
+    @Test
+    fun `through-wall ray skips ordinary walls but retains menu blocks and blocked chests`() {
+        assertEquals(false, isPotentialOccludedMenuTarget(
+            hasMenuProvider = false,
+            opensMenuWithoutProvider = false,
+            isChest = false,
+        ))
+        assertEquals(true, isPotentialOccludedMenuTarget(
+            hasMenuProvider = true,
+            opensMenuWithoutProvider = false,
+            isChest = false,
+        ))
+        assertEquals(true, isPotentialOccludedMenuTarget(
+            hasMenuProvider = false,
+            opensMenuWithoutProvider = false,
+            isChest = true,
+        ))
     }
 
     @Test
@@ -194,6 +220,10 @@ class InteractableTargetResolverTest {
             identity = hit.observation.identity?.copy(stateKey = InteractableBlockStateKey(99)),
         )
         assertInvalid(InteractableTargetRejection.TARGET_CHANGED, resolver.validate(lock))
+        assertEquals(
+            InteractableTargetValidation.Valid,
+            resolver.validate(lock, allowInteractionStateChange = true),
+        )
 
         world.observation = hit.observation.copy(blocked = true, menuProviderAvailable = false)
         assertInvalid(InteractableTargetRejection.BLOCKED, resolver.validate(lock))
@@ -220,6 +250,11 @@ class InteractableTargetResolverTest {
         assertInvalid(InteractableTargetRejection.TARGET_REMOVED, resolver.validate(lock))
 
         world.observation = hit.observation.copy(uuid = UUID.randomUUID())
+        assertInvalid(InteractableTargetRejection.TARGET_CHANGED, resolver.validate(lock))
+
+        world.observation = hit.observation.copy(
+            position = InteractableTargetPoint(21.0, 65.0, 20.0),
+        )
         assertInvalid(InteractableTargetRejection.TARGET_CHANGED, resolver.validate(lock))
 
         world.observation = InteractableTargetObservation.Missing
@@ -276,6 +311,7 @@ class InteractableTargetResolverTest {
         removed: Boolean = false,
         loaded: Boolean = true,
         insideWorldBorder: Boolean = true,
+        visible: Boolean = true,
     ): InteractableRayHit.Entity {
         return InteractableRayHit.Entity(
             observation = InteractableTargetObservation.Entity(
@@ -285,10 +321,11 @@ class InteractableTargetResolverTest {
                 removed = removed,
                 loaded = loaded,
                 insideWorldBorder = insideWorldBorder,
+                position = InteractableTargetPoint(20.0, 65.0, 20.0),
             ),
             hitLocation = InteractableTargetPoint(20.0, 65.0, 20.0),
             distanceSquared = 200.0,
-            visible = true,
+            visible = visible,
         )
     }
 

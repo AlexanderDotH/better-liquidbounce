@@ -20,6 +20,8 @@ internal class InteractableRouteSearchDiagnostics {
     var sawUnloadedWorld = false
     var exceededHorizontalSearch = false
     var exceededMaxRise = false
+    var sawBedrock = false
+    var sawBuildHeight = false
 }
 
 internal class InteractableRouteSearchContext(
@@ -49,6 +51,17 @@ internal class InteractableRouteSearchContext(
         start -> startPosition
         else -> goalPositions[node] ?: node.routePosition()
     }
+
+    fun caveSegments(
+        result: IncrementalAStarResult.Ready,
+        compact: Boolean,
+    ): List<InteractableRouteSegment>? = buildInteractableCaveSegments(
+        result = result,
+        startPosition = startPosition,
+        goalPosition = goalPositions[result.goal] ?: result.goal.routePosition(),
+        compact = compact,
+        world = world,
+    )
 }
 
 internal class InteractableRouteSearchFactory(
@@ -65,6 +78,8 @@ internal class InteractableRouteSearchFactory(
         candidateAllowed: (BlockPos, InteractableRouteSearchDiagnostics) -> Boolean = { _, _ -> true },
         isGoal: (BlockPos) -> Boolean = goalPositions::containsKey,
         heuristic: (BlockPos) -> Double = goalHeuristic(goalPositions.keys),
+        verticalClipDistance: Int = 0,
+        maxIterations: Int = settings.maxIterations,
     ): InteractableRouteSearchContext {
         lateinit var context: InteractableRouteSearchContext
         val search = IncrementalInteractableAStar(
@@ -77,11 +92,12 @@ internal class InteractableRouteSearchFactory(
                     diagnostics = diagnostics,
                     requireSurface = requireSurface,
                     candidateAllowed = candidateAllowed,
+                    verticalClipDistance = verticalClipDistance,
                 )
             },
             heuristic = heuristic,
             maxCost = settings.maxCost,
-            maxIterations = settings.maxIterations,
+            maxIterations = maxIterations,
         )
         context = InteractableRouteSearchContext(
             search = search,
@@ -114,6 +130,7 @@ internal class InteractableRouteSearchFactory(
         diagnostics: InteractableRouteSearchDiagnostics,
         requireSurface: Boolean,
         candidateAllowed: (BlockPos, InteractableRouteSearchDiagnostics) -> Boolean,
+        verticalClipDistance: Int,
     ): List<InteractableRouteEdge> = buildList {
         for ((x, z) in horizontalDirections(settings.allowDiagonal)) {
             for (y in VERTICAL_OFFSETS) {
@@ -128,6 +145,44 @@ internal class InteractableRouteSearchFactory(
                 )?.let(::add)
             }
         }
+        if (verticalClipDistance > 0 && !requireSurface) {
+            addAll(verticalClipEdges(position, diagnostics, candidateAllowed, verticalClipDistance))
+        }
+    }
+
+    private fun verticalClipEdges(
+        position: BlockPos,
+        diagnostics: InteractableRouteSearchDiagnostics,
+        candidateAllowed: (BlockPos, InteractableRouteSearchDiagnostics) -> Boolean,
+        maximumDistance: Int,
+    ): List<InteractableRouteEdge> = buildList {
+        for (distance in MINIMUM_CLIP_DISTANCE..maximumDistance) {
+            verticalClipEdgeOrNull(position, distance, diagnostics, candidateAllowed)?.let(::add)
+            verticalClipEdgeOrNull(position, -distance, diagnostics, candidateAllowed)?.let(::add)
+        }
+    }
+
+    private fun verticalClipEdgeOrNull(
+        from: BlockPos,
+        yOffset: Int,
+        diagnostics: InteractableRouteSearchDiagnostics,
+        candidateAllowed: (BlockPos, InteractableRouteSearchDiagnostics) -> Boolean,
+    ): InteractableRouteEdge? {
+        val candidate = BlockPos(from.x, from.y + yOffset, from.z)
+        if (!candidateAllowed(candidate, diagnostics) || !isTraversable(candidate, diagnostics)) return null
+        val check = world.checkVerticalClip(from, candidate, settings.protectBedrock)
+        when (check) {
+            InteractableVerticalClipCheck.CLEAR -> Unit
+            InteractableVerticalClipCheck.UNLOADED -> diagnostics.sawUnloadedWorld = true
+            InteractableVerticalClipCheck.BUILD_HEIGHT -> diagnostics.sawBuildHeight = true
+            InteractableVerticalClipCheck.BEDROCK -> diagnostics.sawBedrock = true
+        }
+        if (check != InteractableVerticalClipCheck.CLEAR) return null
+        return InteractableRouteEdge(
+            node = candidate,
+            cost = abs(yOffset).toDouble(),
+            kind = InteractableRouteEdgeKind.VERTICAL_CLIP,
+        )
     }
 
     private fun routeEdgeOrNull(
@@ -212,10 +267,28 @@ internal fun mapInteractableSearchFailure(
     IncrementalAStarFailure.MAX_COST -> InteractableRouteFailure.MAX_COST_EXCEEDED
     IncrementalAStarFailure.MAX_ITERATIONS -> InteractableRouteFailure.MAX_ITERATIONS_EXCEEDED
     IncrementalAStarFailure.NO_PATH -> when {
+        diagnostics.sawBedrock -> InteractableRouteFailure.BEDROCK_BLOCKED
+        diagnostics.sawBuildHeight -> InteractableRouteFailure.BUILD_HEIGHT_LIMIT
         diagnostics.sawUnloadedWorld -> InteractableRouteFailure.UNLOADED_WORLD
         diagnostics.exceededHorizontalSearch -> InteractableRouteFailure.HORIZONTAL_SEARCH_EXCEEDED
         diagnostics.exceededMaxRise -> InteractableRouteFailure.MAX_RISE_EXCEEDED
         else -> noPath
+    }
+}
+
+internal fun InteractableRouteSearchFactory.caveCandidateAllowed(
+    origin: BlockPos,
+    goals: List<InteractableRouteStance>,
+    settings: InteractableRouteSettings,
+): (BlockPos, InteractableRouteSearchDiagnostics) -> Boolean {
+    val maximumY = maxOf(origin.y, goals.maxOf { it.node.y }) + settings.maxRise
+    return { candidate, diagnostics ->
+        if (candidate.y <= maximumY) {
+            true
+        } else {
+            if (isTraversable(candidate, diagnostics)) diagnostics.exceededMaxRise = true
+            false
+        }
     }
 }
 
@@ -248,4 +321,5 @@ private fun Vec3.sameRoutePoint(other: Vec3): Boolean = distanceToSqr(other) <= 
 private val CARDINAL_DIRECTIONS = arrayOf(-1 to 0, 1 to 0, 0 to -1, 0 to 1)
 private val DIAGONAL_DIRECTIONS = arrayOf(-1 to -1, 1 to -1, -1 to 1, 1 to 1)
 private val VERTICAL_OFFSETS = intArrayOf(0, 1, -1)
+private const val MINIMUM_CLIP_DISTANCE = 2
 private const val ROUTE_POINT_EPSILON_SQUARED = 1.0E-12

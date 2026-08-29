@@ -19,17 +19,23 @@ internal data class InteractableRouteSettings(
     val allowDiagonal: Boolean,
     val maxCost: Double,
     val maxIterations: Int,
+    val directMaxIterations: Int,
     val lineOfSightShortcuts: Boolean,
     val surfaceFallback: Boolean,
     val maxRise: Int,
     val horizontalSearch: Int,
     val protectBedrock: Boolean,
+    val maxClipDistance: Int,
 ) {
     init {
         require(maxCost.isFinite() && maxCost > 0.0) { "maxCost must be finite and positive" }
         require(maxIterations > 0) { "maxIterations must be positive" }
+        require(directMaxIterations in 1..maxIterations) {
+            "directMaxIterations must be positive and no greater than maxIterations"
+        }
         require(maxRise > 0) { "maxRise must be positive" }
         require(horizontalSearch > 0) { "horizontalSearch must be positive" }
+        require(maxClipDistance > 0) { "maxClipDistance must be positive" }
     }
 }
 
@@ -68,6 +74,7 @@ internal class InteractableRouteRequest(
 
 internal enum class InteractableRoutePlanningPhase {
     DIRECT,
+    CAVE_CLIP,
     CAVE_EGRESS,
     SURFACE_ANCHOR_SCAN,
     SURFACE_TRAVERSE,
@@ -86,6 +93,7 @@ internal enum class InteractableRouteFailure {
     HORIZONTAL_SEARCH_EXCEEDED,
     BUILD_HEIGHT_LIMIT,
     BEDROCK_BLOCKED,
+    CLIP_DISTANCE_EXCEEDED,
     NO_SURFACE_ROUTE,
 }
 
@@ -109,11 +117,13 @@ internal interface InteractableRouteTask {
 
 internal enum class InteractableRouteKind {
     DIRECT,
+    CAVE_CLIP,
     SURFACE,
 }
 
 internal enum class InteractableRoutePathKind {
     DIRECT,
+    CAVE_TRAVERSE,
     CAVE_EGRESS,
     SURFACE_TRAVERSE,
 }
@@ -222,6 +232,12 @@ internal class InteractableRoutePlan(
                     (outboundSegments.single() as? InteractableRouteSegment.Path)?.kind ==
                     InteractableRoutePathKind.DIRECT,
             ) { "A direct plan must contain one direct path" }
+
+            InteractableRouteKind.CAVE_CLIP -> require(
+                outboundSegments.any { it is InteractableRouteSegment.VerticalClip } &&
+                    outboundSegments.filterIsInstance<InteractableRouteSegment.Path>()
+                        .all { it.kind == InteractableRoutePathKind.CAVE_TRAVERSE },
+            ) { "A cave clip plan must contain a vertical clip and only cave traversal paths" }
 
             InteractableRouteKind.SURFACE -> require(
                 outboundSegments.size == 3 &&

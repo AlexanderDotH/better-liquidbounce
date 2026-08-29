@@ -22,6 +22,7 @@ import dev.detekt.gradle.DetektCreateBaselineTask
 import groovy.json.JsonOutput
 import org.gradle.api.artifacts.ModuleDependency
 import org.gradle.api.tasks.PathSensitivity
+import org.gradle.api.tasks.testing.Test
 import org.gradle.jvm.tasks.Jar
 import org.gradle.kotlin.dsl.support.listFilesOrdered
 
@@ -47,6 +48,11 @@ val seedFindingUnrelocated = configurations.create("seedFindingUnrelocated") {
     isCanBeConsumed = false
     isCanBeResolved = true
     isTransitive = false
+}
+val litematicaIntegrationTestRuntime = configurations.create("litematicaIntegrationTestRuntime") {
+    isCanBeConsumed = false
+    isCanBeResolved = true
+    isTransitive = true
 }
 
 jij.excludeProvidedLibs()
@@ -151,6 +157,12 @@ dependencies {
 
     // Optional Distant Horizons integration. Keep the API off the runtime/JIJ path so DH remains optional.
     compileOnly("maven.modrinth:DistantHorizonsApi:7.0.0")
+
+    // Optional Litematica integration. These verified 26.2 APIs must never enter the runtime or JIJ artifact.
+    compileOnly(libs.litematica)
+    compileOnly(libs.malilib)
+    add(litematicaIntegrationTestRuntime.name, libs.litematica)
+    add(litematicaIntegrationTestRuntime.name, libs.malilib)
 
     // Baritone 26.2 API build pinned to upstream commit 2991d9218050707df9c8daca5efd371091a92d36.
     // Keep it as an intact nested Fabric mod: its metadata, mixins and reflective provider must not be relocated.
@@ -389,7 +401,9 @@ tasks.withType<JavaCompile>().configureEach {
 }
 
 tasks.test {
-    useJUnitPlatform()
+    useJUnitPlatform {
+        excludeTags("litematica-integration")
+    }
     // Prevent macOS AWT from starting a native window session during font tests.
     systemProperty("java.awt.headless", "true")
     systemProperty(
@@ -410,6 +424,37 @@ tasks.test {
             runtimeClasspath.from(configurations.testRuntimeClasspath)
         }
     )
+}
+
+val litematicaIntegrationTest by tasks.registering(Test::class) {
+    group = "verification"
+    description = "Verifies the optional adapter against the exact supported Litematica and MaLiLib artifacts."
+    testClassesDirs = sourceSets.test.get().output.classesDirs
+    classpath = sourceSets.test.get().runtimeClasspath + litematicaIntegrationTestRuntime
+    useJUnitPlatform {
+        includeTags("litematica-integration")
+    }
+    systemProperty("java.awt.headless", "true")
+    systemProperty(
+        "fabric.debug.disableModIds",
+        arrayOf(
+            "immediatelyfast",
+            "org_jetbrains_kotlin_kotlin-reflect",
+            "org_jetbrains_kotlin_kotlin-stdlib",
+            "org_jetbrains_kotlin_kotlin-stdlib-jdk7",
+            "org_jetbrains_kotlin_kotlin-stdlib-jdk8",
+        ).joinToString(","),
+    )
+    jvmArgumentProviders.add(
+        objects.newInstance<FabricSystemLibrariesArgumentProvider>().apply {
+            runtimeClasspath.from(configurations.testRuntimeClasspath)
+        }
+    )
+    shouldRunAfter(tasks.test)
+}
+
+tasks.check {
+    dependsOn(litematicaIntegrationTest)
 }
 
 // Detekt check

@@ -52,8 +52,21 @@ private class IncrementalInteractableRouteTask(
         var expandedThisAdvance = 0
         while (remaining > 0 && terminal == null) {
             when (state) {
-                TaskState.INITIAL -> initializeDirectSearch()
+                TaskState.INITIAL -> when (val direct = phases.directSearch()) {
+                    is InteractableDirectSearchStart.Failed -> finish(
+                        InteractableRouteProgress.Failed(direct.reason),
+                    )
+                    is InteractableDirectSearchStart.Ready -> {
+                        validGoals = direct.goals
+                        searchContext = direct.search
+                        state = TaskState.DIRECT
+                    }
+                }
                 TaskState.DIRECT -> advanceDirect(remaining).also {
+                    remaining -= it
+                    expandedThisAdvance += it
+                }
+                TaskState.CAVE_CLIP -> advanceCaveClip(remaining).also {
                     remaining -= it
                     expandedThisAdvance += it
                 }
@@ -88,17 +101,6 @@ private class IncrementalInteractableRouteTask(
         finish(InteractableRouteProgress.Failed(InteractableRouteFailure.CANCELLED))
     }
 
-    private fun initializeDirectSearch() {
-        when (val direct = phases.directSearch()) {
-            is InteractableDirectSearchStart.Failed -> finish(InteractableRouteProgress.Failed(direct.reason))
-            is InteractableDirectSearchStart.Ready -> {
-                validGoals = direct.goals
-                searchContext = direct.search
-                state = TaskState.DIRECT
-            }
-        }
-    }
-
     private fun advanceDirect(budget: Int): Int = advanceSearch(budget) { context, result ->
         when (result) {
             is IncrementalAStarResult.Ready -> phases.directPlan(context, result)?.let { plan ->
@@ -115,7 +117,7 @@ private class IncrementalInteractableRouteTask(
     }
 
     private fun handleDirectFailure(reason: InteractableRouteFailure) {
-        if (reason != InteractableRouteFailure.NO_DIRECT_ROUTE) {
+        if (reason !in SURFACE_FALLBACK_DIRECT_FAILURES) {
             finish(InteractableRouteProgress.Failed(reason))
             return
         }
@@ -131,8 +133,32 @@ private class IncrementalInteractableRouteTask(
             finish(InteractableRouteProgress.Failed(reason))
             return
         }
-        searchContext = phases.caveEgressSearch()
-        state = TaskState.CAVE_EGRESS
+        searchContext = phases.caveClipSearch()
+        state = TaskState.CAVE_CLIP
+    }
+
+    private fun advanceCaveClip(budget: Int): Int = advanceSearch(budget) { context, result ->
+        when (result) {
+            is IncrementalAStarResult.Ready -> phases.caveClipPlan(context, result)?.let { plan ->
+                finish(InteractableRouteProgress.Ready(plan))
+            } ?: run {
+                searchContext = phases.caveEgressSearch()
+                state = TaskState.CAVE_EGRESS
+            }
+            is IncrementalAStarResult.Failed -> {
+                searchContext = phases.caveEgressSearch()
+                state = TaskState.CAVE_EGRESS
+            }
+        }
+    }
+
+    private companion object {
+        val SURFACE_FALLBACK_DIRECT_FAILURES = setOf(
+            InteractableRouteFailure.NO_DIRECT_ROUTE,
+            InteractableRouteFailure.UNLOADED_WORLD,
+            InteractableRouteFailure.MAX_COST_EXCEEDED,
+            InteractableRouteFailure.MAX_ITERATIONS_EXCEEDED,
+        )
     }
 
     private fun advanceCaveEgress(budget: Int): Int = advanceSearch(budget) { context, result ->
@@ -230,6 +256,7 @@ private class IncrementalInteractableRouteTask(
     private enum class TaskState {
         INITIAL,
         DIRECT,
+        CAVE_CLIP,
         CAVE_EGRESS,
         SURFACE_ANCHORS,
         SURFACE_TRAVERSE,
@@ -238,6 +265,7 @@ private class IncrementalInteractableRouteTask(
         val phase: InteractableRoutePlanningPhase
             get() = when (this) {
                 INITIAL, DIRECT -> InteractableRoutePlanningPhase.DIRECT
+                CAVE_CLIP -> InteractableRoutePlanningPhase.CAVE_CLIP
                 CAVE_EGRESS -> InteractableRoutePlanningPhase.CAVE_EGRESS
                 SURFACE_ANCHORS -> InteractableRoutePlanningPhase.SURFACE_ANCHOR_SCAN
                 SURFACE_TRAVERSE -> InteractableRoutePlanningPhase.SURFACE_TRAVERSE

@@ -17,10 +17,16 @@ import java.util.PriorityQueue
 internal data class InteractableRouteEdge(
     val node: BlockPos,
     val cost: Double,
+    val kind: InteractableRouteEdgeKind = InteractableRouteEdgeKind.WALK,
 ) {
     init {
         require(cost.isFinite() && cost > 0.0) { "A route edge cost must be finite and positive" }
     }
+}
+
+internal enum class InteractableRouteEdgeKind {
+    WALK,
+    VERTICAL_CLIP,
 }
 
 internal enum class IncrementalAStarFailure {
@@ -30,7 +36,11 @@ internal enum class IncrementalAStarFailure {
 }
 
 internal sealed interface IncrementalAStarResult {
-    data class Ready(val nodes: List<BlockPos>, val goal: BlockPos) : IncrementalAStarResult
+    data class Ready(
+        val nodes: List<BlockPos>,
+        val edgeKinds: List<InteractableRouteEdgeKind>,
+        val goal: BlockPos,
+    ) : IncrementalAStarResult
     data class Failed(val reason: IncrementalAStarFailure) : IncrementalAStarResult
 }
 
@@ -54,7 +64,7 @@ internal class IncrementalInteractableAStar(
     private val frontier = PriorityQueue(OPEN_NODE_ORDER)
     private val costs = HashMap<BlockPos, Double>()
     private val expandedCosts = HashMap<BlockPos, Double>()
-    private val previous = HashMap<BlockPos, BlockPos>()
+    private val previous = HashMap<BlockPos, PreviousStep>()
     private var nextOrder = 0L
     private var hitCostLimit = false
     private var terminal: IncrementalAStarResult? = null
@@ -87,7 +97,7 @@ internal class IncrementalInteractableAStar(
             totalExpanded++
 
             if (isGoal(current.node)) {
-                terminal = IncrementalAStarResult.Ready(reconstruct(current.node), current.node)
+                terminal = reconstruct(current.node)
                 break
             }
 
@@ -108,7 +118,7 @@ internal class IncrementalInteractableAStar(
             if (candidateCost >= costs.getOrDefault(edge.node, Double.POSITIVE_INFINITY)) continue
 
             costs[edge.node] = candidateCost
-            previous[edge.node] = current.node
+            previous[edge.node] = PreviousStep(current.node, edge.kind)
             enqueue(edge.node, candidateCost)
         }
     }
@@ -132,13 +142,19 @@ internal class IncrementalInteractableAStar(
         return null
     }
 
-    private fun reconstruct(goal: BlockPos): List<BlockPos> = buildList {
+    private fun reconstruct(goal: BlockPos): IncrementalAStarResult.Ready {
+        val nodes = ArrayList<BlockPos>()
+        val edgeKinds = ArrayList<InteractableRouteEdgeKind>()
         var current: BlockPos? = goal
         while (current != null) {
-            add(current)
-            current = previous[current]
+            nodes += current
+            val step = previous[current]
+            if (step != null) edgeKinds += step.kind
+            current = step?.node
         }
-        reverse()
+        nodes.reverse()
+        edgeKinds.reverse()
+        return IncrementalAStarResult.Ready(nodes, edgeKinds, goal)
     }
 
     private fun fail(reason: IncrementalAStarFailure) {
@@ -157,6 +173,11 @@ internal class IncrementalInteractableAStar(
         val cost: Double,
         val estimate: Double,
         val order: Long,
+    )
+
+    private data class PreviousStep(
+        val node: BlockPos,
+        val kind: InteractableRouteEdgeKind,
     )
 
     private companion object {

@@ -33,7 +33,23 @@ class InteractableGoalStanceResolverTest {
         )
 
         assertEquals(listOf(BlockPos(2, 64, 0)), stances.map { it.node })
-        assertTrue(stances.all { stance -> stance.position.distanceTo(Vec3(4.5, 64.5, 0.5)) <= 4.5 })
+        assertTrue(stances.all { stance -> accepted.contains(stance.node) })
+    }
+
+    @Test
+    fun `eye-to-outline validation can retain a stance beyond block-center range`() {
+        val target = BlockPos(0, 64, 0)
+        val nearFaceStance = BlockPos(5, 64, 0)
+
+        val stances = resolveInteractableGoalStances(
+            targetNode = target,
+            origin = Vec3.ZERO,
+            interactionRange = 4.5,
+            canStand = { it == nearFaceStance },
+            canInteract = { it == nearFaceStance },
+        )
+
+        assertEquals(listOf(nearFaceStance), stances.map { it.node })
     }
 
     @Test

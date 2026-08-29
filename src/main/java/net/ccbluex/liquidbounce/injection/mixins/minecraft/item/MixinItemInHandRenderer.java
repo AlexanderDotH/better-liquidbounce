@@ -187,6 +187,11 @@ public abstract class MixinItemInHandRenderer {
 
     @ModifyExpressionValue(method = "tick", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/player/LocalPlayer;getMainHandItem()Lnet/minecraft/world/item/ItemStack;"))
     private ItemStack injectSilentHotbar(ItemStack original) {
+        if (SilentHotbar.INSTANCE.getShouldKeepClientSlotVisible()) {
+            // noinspection DataFlowIssue
+            return minecraft.player.getInventory().getNonEquipmentItems().get(SilentHotbar.INSTANCE.getVisualSlot());
+        }
+
         if (ModuleSilentHotbar.INSTANCE.getRunning()) {
             // noinspection DataFlowIssue
             return minecraft.player.getInventory().getNonEquipmentItems().get(SilentHotbar.INSTANCE.getClientsideSlot());
@@ -197,7 +202,8 @@ public abstract class MixinItemInHandRenderer {
 
     @ModifyExpressionValue(method = "tick", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/player/LocalPlayer;getItemSwapScale(F)F"))
     private float injectSilentHotbarNoCooldown(float original) {
-        if (ModuleSilentHotbar.INSTANCE.getRunning() && ModuleSilentHotbar.INSTANCE.getNoCooldownProgress() && SilentHotbar.INSTANCE.isSlotModified()) {
+        if (SilentHotbar.INSTANCE.getShouldKeepClientSlotVisible() ||
+            (ModuleSilentHotbar.INSTANCE.getRunning() && ModuleSilentHotbar.INSTANCE.getNoCooldownProgress() && SilentHotbar.INSTANCE.isSlotModified())) {
             return 1f;
         }
 

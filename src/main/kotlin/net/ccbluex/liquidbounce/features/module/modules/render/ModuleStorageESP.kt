@@ -40,8 +40,12 @@ import net.ccbluex.liquidbounce.render.drawLine
 import net.ccbluex.liquidbounce.render.drawLines
 import net.ccbluex.liquidbounce.render.engine.esp.EspGlowStyle
 import net.ccbluex.liquidbounce.render.engine.esp.EspGlowStyleConfig
+import net.ccbluex.liquidbounce.render.engine.esp.EspChamsStyle
+import net.ccbluex.liquidbounce.render.engine.esp.EspChamsStyleConfig
 import net.ccbluex.liquidbounce.render.engine.esp.EspOutlineStyle
 import net.ccbluex.liquidbounce.render.engine.esp.EspOutlineStyleConfig
+import net.ccbluex.liquidbounce.render.engine.esp.StorageShaderEffect
+import net.ccbluex.liquidbounce.render.engine.esp.StorageShaderMaskPolicy
 import net.ccbluex.liquidbounce.render.engine.type.Color4b
 import net.ccbluex.liquidbounce.render.engine.type.Vec3f
 import net.ccbluex.liquidbounce.render.getDynamicTransformsUniform
@@ -93,7 +97,7 @@ import java.awt.Color
 
 object ModuleStorageESP : ClientModule("StorageESP", ModuleCategories.RENDER, aliases = listOf("ChestESP")) {
 
-    private val modes = choices("Mode", GlowMode, arrayOf(BoxMode, OutlineMode, GlowMode))
+    internal val modes = choices("Mode", GlowMode, arrayOf(BoxMode, OutlineMode, GlowMode, ChamsMode))
 
     sealed class ChestType(name: String, defaultColor: Color4b) : ToggleableValueGroup(this, name, enabled = true) {
         val color by color("Color", defaultColor).onChanged {
@@ -296,7 +300,10 @@ object ModuleStorageESP : ClientModule("StorageESP", ModuleCategories.RENDER, al
 
     }
 
-    sealed class ShaderMode(name: String) : Mode(name) {
+    sealed class ShaderMode(
+        name: String,
+        private val effect: StorageShaderEffect,
+    ) : Mode(name) {
         private val dirtyFlag = atomic(true)
 
         private val renderState = CachedMeshStorage("${ModuleStorageESP.name} $name")
@@ -345,7 +352,9 @@ object ModuleStorageESP : ClientModule("StorageESP", ModuleCategories.RENDER, al
             ) { pose, origin ->
                 // non-model blocks are already processed by WorldRenderer where we injected code which renders
                 // their outline
-                for (mergedShape in collectTrackedBlockShapes { it.renderShape != RenderShape.MODEL }) {
+                for (mergedShape in collectTrackedBlockShapes { state ->
+                    !StorageShaderMaskPolicy.requiresCachedGeometry(state.renderShape, effect)
+                }) {
                     pose.withPush {
                         translate(mergedShape.blockPos, origin)
                         addShapeFaces(last().pose(), mergedShape.shape, mergedShape.key.color)
@@ -355,17 +364,24 @@ object ModuleStorageESP : ClientModule("StorageESP", ModuleCategories.RENDER, al
         }
     }
 
-    object GlowMode : ShaderMode("Glow") {
+    object GlowMode : ShaderMode("Glow", StorageShaderEffect.GLOW) {
         private val styleConfig = EspGlowStyleConfig(this)
 
         internal val style: EspGlowStyle
             get() = styleConfig.style
     }
 
-    object OutlineMode : ShaderMode("Outline") {
+    object OutlineMode : ShaderMode("Outline", StorageShaderEffect.OUTLINE) {
         private val styleConfig = EspOutlineStyleConfig(this)
 
         internal val style: EspOutlineStyle
+            get() = styleConfig.style
+    }
+
+    object ChamsMode : ShaderMode("Chams", StorageShaderEffect.CHAMS) {
+        private val styleConfig = EspChamsStyleConfig(this)
+
+        internal val style: EspChamsStyle
             get() = styleConfig.style
     }
 
@@ -469,6 +485,7 @@ object ModuleStorageESP : ClientModule("StorageESP", ModuleCategories.RENDER, al
     private fun markDirtyForModes() {
         GlowMode.markDirty()
         OutlineMode.markDirty()
+        ChamsMode.markDirty()
         BoxMode.markDirty()
     }
 

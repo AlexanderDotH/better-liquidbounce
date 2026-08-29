@@ -47,6 +47,7 @@ internal class InteractableSurfaceAnchorScanner(
     private var sawUnloaded = false
     private var sawBuildHeight = false
     private var sawBedrock = false
+    private var sawClipDistance = false
     private var terminal: InteractableSurfaceAnchorResult? = null
 
     fun advance(expansionBudget: Int): InteractableSurfaceAnchorAdvance {
@@ -89,6 +90,11 @@ internal class InteractableSurfaceAnchorScanner(
             return 1
         }
         if (world.isPassable(candidate) && world.isSupported(candidate) && world.isSurface(candidate)) {
+            if (scanY - goal.node.y > settings.maxClipDistance) {
+                sawClipDistance = true
+                finishGoal()
+                return 1
+            }
             pendingAnchor = InteractableSurfaceAnchor(
                 node = candidate,
                 position = Vec3(goal.position.x, scanY.toDouble(), goal.position.z),
@@ -139,6 +145,7 @@ internal class InteractableSurfaceAnchorScanner(
             sawBedrock -> InteractableRouteFailure.BEDROCK_BLOCKED
             sawUnloaded -> InteractableRouteFailure.UNLOADED_WORLD
             sawBuildHeight -> InteractableRouteFailure.BUILD_HEIGHT_LIMIT
+            sawClipDistance -> InteractableRouteFailure.CLIP_DISTANCE_EXCEEDED
             else -> InteractableRouteFailure.NO_SURFACE
         }
         return InteractableSurfaceAnchorResult.Failed(reason)

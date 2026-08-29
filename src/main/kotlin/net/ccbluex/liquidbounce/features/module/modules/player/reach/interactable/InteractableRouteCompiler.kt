@@ -38,9 +38,12 @@ import kotlin.math.ceil
 /** Packet shape captured by a session route before live yaw and collision flags are available. */
 internal sealed interface InteractablePacketInstruction {
     val onGround: Boolean
+    val transportBurstId: Int?
+        get() = null
 
     data class Status(
         override val onGround: Boolean,
+        override val transportBurstId: Int? = null,
     ) : InteractablePacketInstruction
 
     data class Position(
@@ -49,6 +52,7 @@ internal sealed interface InteractablePacketInstruction {
         override val onGround: Boolean,
         val collisionChecked: Boolean = true,
         val requiresStandableEndpoint: Boolean = false,
+        override val transportBurstId: Int? = null,
     ) : InteractablePacketInstruction
 }
 
@@ -58,6 +62,7 @@ internal sealed interface InteractableRouteCompileResult {
     ) : InteractableRouteCompileResult
 
     data object VClipUnavailable : InteractableRouteCompileResult
+    data object VClipDistanceExceeded : InteractableRouteCompileResult
 }
 
 /** Converts a transport-neutral A* plan into delivery-confirmed packets and per-step exact inverses. */
@@ -66,13 +71,18 @@ internal object InteractableRouteCompiler {
     fun compile(
         plan: InteractableRoutePlan,
         stepDistance: Double,
+        maximumVClipDistance: Double,
         vClip: InteractableVClipSettings,
         fallSafety: VClipFallSafetyContext,
     ): InteractableRouteCompileResult {
         require(stepDistance.isFinite() && stepDistance > 0.0) { "Step distance must be finite and positive" }
+        require(maximumVClipDistance.isFinite() && maximumVClipDistance > 0.0) {
+            "Maximum VClip distance must be finite and positive"
+        }
         val profile = vClip.toProfile()
         val steps = ArrayList<InteractableRouteStep<InteractablePacketInstruction>>()
         var confirmedPosition = plan.origin
+        var nextTransportBurstId = 1
 
         for (segment in plan.outboundSegments) {
             when (segment) {
@@ -82,7 +92,15 @@ internal object InteractableRouteCompiler {
                     confirmedPosition = compiled.lastOrNull()?.outbound?.confirmedPosition ?: confirmedPosition
                 }
                 is InteractableRouteSegment.VerticalClip -> {
-                    val compiled = compileVerticalClip(segment, profile, fallSafety)
+                    if (kotlin.math.abs(segment.to.y - segment.from.y) > maximumVClipDistance) {
+                        return InteractableRouteCompileResult.VClipDistanceExceeded
+                    }
+                    val compiled = compileVerticalClip(
+                        segment,
+                        profile,
+                        fallSafety,
+                        nextTransportBurstId++,
+                    )
                         ?: return InteractableRouteCompileResult.VClipUnavailable
                     steps += compiled
                     confirmedPosition = segment.to
@@ -128,6 +146,7 @@ internal object InteractableRouteCompiler {
         segment: InteractableRouteSegment.VerticalClip,
         profile: VClipTransportProfile,
         fallSafety: VClipFallSafetyContext,
+        transportBurstId: Int,
     ): List<InteractableRouteStep<InteractablePacketInstruction>>? {
         val ready = profile.plan(segment.request(fallSafety)) as? VClipPacketPlanResult.Ready ?: return null
         val result = ArrayList<InteractableRouteStep<InteractablePacketInstruction>>(ready.steps.size)
@@ -137,11 +156,20 @@ internal object InteractableRouteCompiler {
             val inverse = if (confirmed.samePosition(previous)) {
                 emptyList()
             } else {
-                compileVClipInverse(profile, confirmed, previous, fallSafety.safeFallDistance) ?: return null
+                compileVClipInverse(
+                    profile,
+                    confirmed,
+                    previous,
+                    fallSafety.safeFallDistance,
+                    transportBurstId,
+                ) ?: return null
             }
             result += InteractableRouteStep(
                 outbound = InteractableMovement(
-                    packetStep.toInstruction(requiresStandableEndpoint = confirmed.samePosition(segment.to)),
+                    packetStep.toInstruction(
+                        requiresStandableEndpoint = confirmed.samePosition(segment.to),
+                        transportBurstId = transportBurstId,
+                    ),
                     confirmed,
                 ),
                 inverse = inverse,
@@ -156,6 +184,7 @@ internal object InteractableRouteCompiler {
         from: Vec3,
         to: Vec3,
         safeFallDistance: Double,
+        transportBurstId: Int,
     ): List<InteractableMovement<InteractablePacketInstruction>>? {
         val request = VClipTransportRequest(
             origin = from.toVClipPosition(),
@@ -167,7 +196,10 @@ internal object InteractableRouteCompiler {
         return ready.steps.map { packetStep ->
             confirmed = packetStep.position?.toVec3()?.normalizeEndpoint(to) ?: confirmed
             InteractableMovement(
-                packetStep.toInstruction(requiresStandableEndpoint = confirmed.samePosition(to)),
+                packetStep.toInstruction(
+                    requiresStandableEndpoint = confirmed.samePosition(to),
+                    transportBurstId = transportBurstId,
+                ),
                 confirmed,
             )
         }.takeIf { confirmed.samePosition(to) }
@@ -209,14 +241,16 @@ private fun InteractableRouteSegment.VerticalClip.request(fallSafety: VClipFallS
 
 private fun VClipPlayerPacketStep.toInstruction(
     requiresStandableEndpoint: Boolean,
+    transportBurstId: Int,
 ): InteractablePacketInstruction = when (shape) {
-    VClipPlayerPacketShape.STATUS_ONLY -> InteractablePacketInstruction.Status(onGround)
+    VClipPlayerPacketShape.STATUS_ONLY -> InteractablePacketInstruction.Status(onGround, transportBurstId)
     VClipPlayerPacketShape.POSITION -> InteractablePacketInstruction.Position(
         requireNotNull(position).toVec3(),
         fullPacket = false,
         onGround = onGround,
         collisionChecked = false,
         requiresStandableEndpoint = requiresStandableEndpoint,
+        transportBurstId = transportBurstId,
     )
     VClipPlayerPacketShape.FULL -> InteractablePacketInstruction.Position(
         requireNotNull(position).toVec3(),
@@ -224,6 +258,7 @@ private fun VClipPlayerPacketStep.toInstruction(
         onGround = onGround,
         collisionChecked = false,
         requiresStandableEndpoint = requiresStandableEndpoint,
+        transportBurstId = transportBurstId,
     )
 }
 

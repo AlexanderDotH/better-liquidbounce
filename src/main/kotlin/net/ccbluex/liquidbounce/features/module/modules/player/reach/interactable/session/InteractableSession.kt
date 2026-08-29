@@ -99,6 +99,9 @@ internal class InteractableSession<T : Any, P : Any> {
     }
 
     /** Binds exactly one route instruction to the packet object that will carry it. */
+    fun nextMovement(): InteractableMovement<P>? =
+        movementQueue.firstOrNull()?.movement.takeIf { pendingMovement == null && state.acceptsMovement() }
+
     fun prepareMovement(packetIdentity: Any): InteractableMovement<P>? {
         if (pendingMovement != null || !state.acceptsMovement()) return null
         val queued = movementQueue.firstOrNull() ?: return null
@@ -126,6 +129,20 @@ internal class InteractableSession<T : Any, P : Any> {
         confirmedPosition = pending.queuedMovement.movement.confirmedPosition
         val effects = movementCommitted(tick)
         return InteractableMovementConfirmation(matchedPacket = true, committed = true, effects = effects)
+    }
+
+    fun rejectMovement(
+        packetIdentity: Any,
+        disposition: InteractablePacketDisposition,
+        cause: InteractableSessionCause,
+        tick: Int,
+    ): List<InteractableSessionEffect> {
+        require(disposition != InteractablePacketDisposition.DELIVERED) {
+            "Delivered interactable movement must be confirmed instead of rejected"
+        }
+        val confirmation = confirmMovement(packetIdentity, disposition, tick)
+        if (!confirmation.matchedPacket || confirmation.committed) return emptyList()
+        return abort(cause, tick)
     }
 
     fun claimOpenedContainer(containerId: Int, tick: Int): Boolean {
@@ -254,8 +271,12 @@ internal class InteractableSession<T : Any, P : Any> {
             return emptyList()
         }
 
-        state = InteractableSessionState.Opening(attemptsSent = 1, attemptStartedTick = tick)
-        return listOf(InteractableSessionEffect.OpenAttempt(1))
+        val verificationTicks = capturedSettings().endpointVerifyTicks
+        state = InteractableSessionState.Opening(
+            attemptsSent = if (verificationTicks == 0) 1 else 0,
+            attemptStartedTick = tick,
+        )
+        return if (verificationTicks == 0) listOf(InteractableSessionEffect.OpenAttempt(1)) else emptyList()
     }
 
     private fun commitReturn(current: InteractableSessionState.Returning): List<InteractableSessionEffect> {
@@ -281,13 +302,32 @@ internal class InteractableSession<T : Any, P : Any> {
         tick: Int,
     ): List<InteractableSessionEffect> {
         val settings = capturedSettings()
+        if (current.attemptsSent == 0) return tickEndpointVerification(current, tick, settings)
         if (!hasElapsed(current.attemptStartedTick, tick, settings.openTimeoutTicks)) return emptyList()
-        if (current.attemptsSent <= settings.openRetries) {
-            val nextAttempt = current.attemptsSent + 1
-            state = current.copy(attemptsSent = nextAttempt, attemptStartedTick = tick)
-            return listOf(InteractableSessionEffect.OpenAttempt(nextAttempt))
+        return if (current.attemptsSent <= settings.openRetries) {
+            nextOpenAttempt(current, tick)
+        } else {
+            beginRecovery(InteractableSessionCause.OPEN_TIMEOUT, tick)
         }
-        return beginRecovery(InteractableSessionCause.OPEN_TIMEOUT, tick)
+    }
+
+    private fun tickEndpointVerification(
+        current: InteractableSessionState.Opening,
+        tick: Int,
+        settings: InteractableSessionSettings,
+    ): List<InteractableSessionEffect> {
+        if (!hasElapsed(current.attemptStartedTick, tick, settings.endpointVerifyTicks)) return emptyList()
+        state = current.copy(attemptsSent = 1, attemptStartedTick = tick)
+        return listOf(InteractableSessionEffect.OpenAttempt(1))
+    }
+
+    private fun nextOpenAttempt(
+        current: InteractableSessionState.Opening,
+        tick: Int,
+    ): List<InteractableSessionEffect> {
+        val nextAttempt = current.attemptsSent + 1
+        state = current.copy(attemptsSent = nextAttempt, attemptStartedTick = tick)
+        return listOf(InteractableSessionEffect.OpenAttempt(nextAttempt))
     }
 
     private fun tickHolding(
@@ -318,8 +358,12 @@ internal class InteractableSession<T : Any, P : Any> {
             )) {
             return emptyList()
         }
-        state = current.copy(timeoutReported = true)
-        return listOf(InteractableSessionEffect.RecoveryStalled(current.cause))
+        val position = requireNotNull(confirmedPosition)
+        clearActiveSession(position)
+        return listOf(
+            InteractableSessionEffect.AcceptCorrectionLocally(position),
+            InteractableSessionEffect.ReleaseMovementLease(InteractableSessionCause.RESYNC_REQUIRED),
+        )
     }
 
     private fun beginReturn(

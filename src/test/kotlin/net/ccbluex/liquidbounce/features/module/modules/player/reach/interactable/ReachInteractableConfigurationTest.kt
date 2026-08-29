@@ -60,6 +60,7 @@ class ReachInteractableConfigurationTest {
         assertTrue(surfaceFallback.enabled)
         assertEquals(128, surfaceFallback.setting("MaxRise").get())
         assertEquals(48, surfaceFallback.setting("HorizontalSearch").get())
+        surfaceFallback.setting("MaxClipDistance").assertRanged(30, 4, 30)
         assertEquals(true, surfaceFallback.setting("DoNotClipAroundBedrock").get())
 
         val vClip = surfaceFallback.group("VClip") as ModeValueGroup<*>

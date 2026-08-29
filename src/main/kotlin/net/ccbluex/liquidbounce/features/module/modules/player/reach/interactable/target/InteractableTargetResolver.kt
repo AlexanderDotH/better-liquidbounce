@@ -40,11 +40,14 @@ internal class InteractableTargetResolver(
         }
     }
 
-    fun validate(lock: InteractableTargetLock): InteractableTargetValidation {
+    fun validate(
+        lock: InteractableTargetLock,
+        allowInteractionStateChange: Boolean = false,
+    ): InteractableTargetValidation {
         return when (val observation = worldAdapter.observe(lock)) {
             InteractableTargetObservation.Missing -> InteractableTargetRejection.TARGET_MISSING.invalid()
             InteractableTargetObservation.WorldUnavailable -> InteractableTargetRejection.WORLD_UNAVAILABLE.invalid()
-            is InteractableTargetObservation.Block -> validateBlock(lock, observation)
+            is InteractableTargetObservation.Block -> validateBlock(lock, observation, allowInteractionStateChange)
             is InteractableTargetObservation.Entity -> validateEntity(lock, observation)
         }
     }
@@ -54,7 +57,8 @@ internal class InteractableTargetResolver(
         hit: InteractableRayHit.Block,
     ): InteractableTargetResolution {
         val observation = hit.observation
-        val rejection = hit.candidateRejection(request.maxRange) ?: observation.blockRejection()
+        val rejection = hit.candidateRejection(request.maxRange, requireVisibility = false) ?:
+            observation.blockRejection()
         rejection?.let { return it.rejected() }
         val identity = requireNotNull(observation.identity)
         if (!request.blockFilter.allows(identity.blockKey)) {
@@ -69,7 +73,7 @@ internal class InteractableTargetResolver(
         hit: InteractableRayHit.Entity,
     ): InteractableTargetResolution {
         val observation = hit.observation
-        val rejection = hit.candidateRejection(request.maxRange) ?: when {
+        val rejection = hit.candidateRejection(request.maxRange, requireVisibility = true) ?: when {
             !observation.kind.isSupportedContainerVehicle -> InteractableTargetRejection.UNSUPPORTED_ENTITY
             !request.containerVehicles -> InteractableTargetRejection.CONTAINER_VEHICLES_DISABLED
             else -> observation.entityRejection()
@@ -81,11 +85,15 @@ internal class InteractableTargetResolver(
     private fun validateBlock(
         lock: InteractableTargetLock,
         observation: InteractableTargetObservation.Block,
+        allowInteractionStateChange: Boolean,
     ): InteractableTargetValidation {
         val blockLock = lock as? InteractableTargetLock.Block
             ?: return InteractableTargetRejection.TARGET_CHANGED.invalid()
         observation.persistentBlockRejection()?.let { return it.invalid() }
-        if (observation.position != blockLock.position || observation.identity != blockLock.identity) {
+        val identity = requireNotNull(observation.identity)
+        if (observation.position != blockLock.position || identity.blockKey != blockLock.identity.blockKey ||
+            !allowInteractionStateChange && identity.stateKey != blockLock.identity.stateKey
+        ) {
             return InteractableTargetRejection.TARGET_CHANGED.invalid()
         }
         observation.menuRejection()?.let { return it.invalid() }
@@ -99,12 +107,23 @@ internal class InteractableTargetResolver(
         val entityLock = lock as? InteractableTargetLock.ContainerVehicle
             ?: return InteractableTargetRejection.TARGET_CHANGED.invalid()
         observation.entityRejection()?.let { return it.invalid() }
-        if (observation.uuid != entityLock.uuid || observation.kind != entityLock.kind) {
+        if (observation.uuid != entityLock.uuid || observation.kind != entityLock.kind ||
+            observation.position.distanceSquaredTo(entityLock.position) > ENTITY_LOCK_DISTANCE_SQUARED
+        ) {
             return InteractableTargetRejection.TARGET_CHANGED.invalid()
         }
         return InteractableTargetValidation.Valid
     }
 }
+
+private fun InteractableTargetPoint.distanceSquaredTo(other: InteractableTargetPoint): Double {
+    val xDistance = x - other.x
+    val yDistance = y - other.y
+    val zDistance = z - other.z
+    return xDistance * xDistance + yDistance * yDistance + zDistance * zDistance
+}
+
+private const val ENTITY_LOCK_DISTANCE_SQUARED = 0.25 * 0.25
 
 private fun InteractableTargetRequest.preRaycastRejection(): InteractableTargetRejection? {
     if (normalInteractionAvailable) return InteractableTargetRejection.NORMAL_INTERACTION_PRIORITY
@@ -117,8 +136,11 @@ private fun InteractableTargetRequest.preRaycastRejection(): InteractableTargetR
     return null
 }
 
-private fun InteractableRayHit.Candidate.candidateRejection(maxRange: Double): InteractableTargetRejection? {
-    if (!visible) return InteractableTargetRejection.OCCLUDED
+private fun InteractableRayHit.Candidate.candidateRejection(
+    maxRange: Double,
+    requireVisibility: Boolean,
+): InteractableTargetRejection? {
+    if (requireVisibility && !visible) return InteractableTargetRejection.OCCLUDED
     if (!hitLocation.isFinite || !distanceSquared.isFinite() || distanceSquared < 0.0) {
         return InteractableTargetRejection.INVALID_TARGET
     }

@@ -34,6 +34,7 @@ class InteractableRouteCompilerTest {
         val route = (InteractableRouteCompiler.compile(
             plan,
             stepDistance = 9.5,
+            maximumVClipDistance = 30.0,
             vClip = InteractableVClipSettings.Vanilla(false, false),
             fallSafety = VClipFallSafetyContext(0.0, 3.0),
         ) as InteractableRouteCompileResult.Ready).route
@@ -55,6 +56,7 @@ class InteractableRouteCompilerTest {
         val result = InteractableRouteCompiler.compile(
             plan = plan,
             stepDistance = 9.5,
+            maximumVClipDistance = 30.0,
             vClip = InteractableVClipSettings.Vanilla(false, false),
             fallSafety = VClipFallSafetyContext(0.0, 3.0),
         )
@@ -91,13 +93,16 @@ class InteractableRouteCompilerTest {
         val result = InteractableRouteCompiler.compile(
             plan = plan,
             stepDistance = 9.5,
+            maximumVClipDistance = 30.0,
             vClip = InteractableVClipSettings.Folia(movementPackets = 5, fullPacket = false),
             fallSafety = VClipFallSafetyContext(0.0, 3.0),
         )
 
         val route = (result as InteractableRouteCompileResult.Ready).route
         assertEquals(target, route.endpoint)
-        assertTrue(route.steps.any { it.outbound.payload is InteractablePacketInstruction.Status })
+        val vClipPackets = route.steps.filter { it.outbound.payload.transportBurstId != null }
+        assertTrue(vClipPackets.any { it.outbound.payload is InteractablePacketInstruction.Status })
+        assertEquals(1, vClipPackets.map { it.outbound.payload.transportBurstId }.distinct().size)
         val targetPackets = route.steps.map { it.outbound }.filter { it.confirmedPosition == target }
         assertTrue(targetPackets.isNotEmpty())
         assertTrue(targetPackets.all {
@@ -105,6 +110,10 @@ class InteractableRouteCompilerTest {
         })
         val exactReturn = route.exactReturnForPrefix(route.steps.size)
         assertEquals(origin, exactReturn.last().confirmedPosition)
+        assertEquals(
+            1,
+            exactReturn.mapNotNull { it.payload.transportBurstId }.distinct().size,
+        )
         assertTrue(exactReturn.filter { it.confirmedPosition == anchor }.all {
             (it.payload as InteractablePacketInstruction.Position).requiresStandableEndpoint
         })
@@ -137,10 +146,51 @@ class InteractableRouteCompilerTest {
         val result = InteractableRouteCompiler.compile(
             plan = plan,
             stepDistance = 9.5,
+            maximumVClipDistance = 30.0,
             vClip = InteractableVClipSettings.Folia(movementPackets = 1, fullPacket = false),
             fallSafety = VClipFallSafetyContext(0.0, 0.0),
         )
 
         assertEquals(InteractableRouteCompileResult.VClipUnavailable, result)
+    }
+
+    @Test
+    fun `compiler refuses a vertical clip beyond the captured reliability limit`() {
+        val origin = Vec3(0.5, 70.0, 0.5)
+        val target = Vec3(0.5, 0.0, 0.5)
+        val plan = InteractableRoutePlan(
+            InteractableRouteKind.CAVE_CLIP,
+            listOf(InteractableRouteSegment.VerticalClip(origin, target)),
+        )
+
+        val result = InteractableRouteCompiler.compile(
+            plan = plan,
+            stepDistance = 9.5,
+            maximumVClipDistance = 30.0,
+            vClip = InteractableVClipSettings.Vanilla(false, false),
+            fallSafety = VClipFallSafetyContext(0.0, 3.0),
+        )
+
+        assertEquals(InteractableRouteCompileResult.VClipDistanceExceeded, result)
+    }
+
+    @Test
+    fun `compiler accepts a vertical clip exactly at the captured reliability limit`() {
+        val origin = Vec3(0.5, 60.0, 0.5)
+        val target = Vec3(0.5, 30.0, 0.5)
+        val plan = InteractableRoutePlan(
+            InteractableRouteKind.CAVE_CLIP,
+            listOf(InteractableRouteSegment.VerticalClip(origin, target)),
+        )
+
+        val result = InteractableRouteCompiler.compile(
+            plan = plan,
+            stepDistance = 9.5,
+            maximumVClipDistance = 30.0,
+            vClip = InteractableVClipSettings.Vanilla(false, false),
+            fallSafety = VClipFallSafetyContext(0.0, 3.0),
+        )
+
+        assertInstanceOf(InteractableRouteCompileResult.Ready::class.java, result)
     }
 }

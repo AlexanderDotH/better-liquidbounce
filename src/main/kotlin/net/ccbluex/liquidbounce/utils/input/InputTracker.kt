@@ -22,6 +22,7 @@ package net.ccbluex.liquidbounce.utils.input
 import com.mojang.blaze3d.platform.InputConstants
 import it.unimi.dsi.fastutil.ints.Int2LongOpenHashMap
 import net.ccbluex.liquidbounce.event.EventListener
+import net.ccbluex.liquidbounce.event.events.KeyboardKeyEvent
 import net.ccbluex.liquidbounce.event.events.MouseButtonEvent
 import net.ccbluex.liquidbounce.event.handler
 import net.minecraft.client.KeyMapping
@@ -52,6 +53,7 @@ object InputTracker : EventListener {
      * Map key is the InputConstants key code, value is the timestamp.
      */
     private val keyLastPressed = Int2LongOpenHashMap()
+    private val scanCodeLastPressed = Int2LongOpenHashMap()
 
     /**
      * Extension property that checks if a key binding is pressed on either the keyboard or mouse.
@@ -87,6 +89,7 @@ object InputTracker : EventListener {
     fun KeyMapping.wasPressedRecently(withinMs: Long): Boolean {
         return when (this.key.type) {
             InputConstants.Type.KEYSYM -> wasKeyPressedRecently(this.key.value, withinMs)
+            InputConstants.Type.SCANCODE -> wasScanCodePressedRecently(this.key.value, withinMs)
             InputConstants.Type.MOUSE -> wasMouseButtonPressedRecently(this.key.value, withinMs)
             else -> false
         }
@@ -101,6 +104,7 @@ object InputTracker : EventListener {
         get() {
             return when (this.key.type) {
                 InputConstants.Type.KEYSYM -> getTimeSinceKeyPress(this.key.value)
+                InputConstants.Type.SCANCODE -> getTimeSinceScanCodePress(this.key.value)
                 InputConstants.Type.MOUSE -> getTimeSinceMousePress(this.key.value)
                 else -> Long.MAX_VALUE
             }
@@ -118,6 +122,22 @@ object InputTracker : EventListener {
         if (event.isPressed) {
             mouseLastPressed[event.button] = System.currentTimeMillis()
         }
+    }
+
+    @Suppress("unused")
+    private val handleKeyboardAction = handler<KeyboardKeyEvent> { event ->
+        if (event.isPressed) {
+            recordKeyboardPress(event.keyCode)
+            recordScanCodePress(event.scanCode)
+        }
+    }
+
+    internal fun recordKeyboardPress(keyCode: Int, timestamp: Long = System.currentTimeMillis()) {
+        keyLastPressed[keyCode] = timestamp
+    }
+
+    internal fun recordScanCodePress(scanCode: Int, timestamp: Long = System.currentTimeMillis()) {
+        scanCodeLastPressed[scanCode] = timestamp
     }
 
     /**
@@ -157,14 +177,17 @@ object InputTracker : EventListener {
 
     /**
      * Checks if the specified keyboard key was pressed recently.
-     * Note: This requires manual tracking via updateKeyPress() since we don't have a keyboard event handler.
-     *
      * @param keyCode The InputConstants key code.
      * @param withinMs The time window in milliseconds to check within.
      * @return True if the key was pressed within the specified time, false otherwise.
      */
     fun wasKeyPressedRecently(keyCode: Int, withinMs: Long): Boolean {
         val lastPressed = keyLastPressed[keyCode]
+        return lastPressed > 0 && (System.currentTimeMillis() - lastPressed) <= withinMs
+    }
+
+    fun wasScanCodePressedRecently(scanCode: Int, withinMs: Long): Boolean {
+        val lastPressed = scanCodeLastPressed[scanCode]
         return lastPressed > 0 && (System.currentTimeMillis() - lastPressed) <= withinMs
     }
 
@@ -181,6 +204,11 @@ object InputTracker : EventListener {
         } else {
             Long.MAX_VALUE
         }
+    }
+
+    fun getTimeSinceScanCodePress(scanCode: Int): Long {
+        val lastPressed = scanCodeLastPressed[scanCode]
+        return if (lastPressed > 0) System.currentTimeMillis() - lastPressed else Long.MAX_VALUE
     }
 
 }

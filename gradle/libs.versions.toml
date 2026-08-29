@@ -48,6 +48,9 @@ latticg = "1.07"
 modmenu = "20.0.0-beta.4"
 exploit_preventer_api = "1.0.0"
 exploit_preventer_mod = "1.1.0+26.2"
+# Optional Litematica integration, pinned to the verified Minecraft 26.2 Modrinth artifacts.
+litematica = "jzraAo7b" # 0.28.4
+malilib = "xKxhjDJ2" # 0.29.3, last compatible release before MaLiLib requires Litematica 0.28.5
 sodium = "mc26.2-0.9.0-fabric"
 lithium = "mc26.2-0.25.0-fabric"
 viafabricplus = "4.6.1"
@@ -133,6 +136,8 @@ ktor-serialization-gson = { group = "io.ktor", name = "ktor-serialization-gson",
 
 # mods
 modmenu = { group = "maven.modrinth", name = "modmenu", version.ref = "modmenu" }
+litematica = { group = "maven.modrinth", name = "bEpr0Arc", version.ref = "litematica" }
+malilib = { group = "maven.modrinth", name = "GcWjdA9I", version.ref = "malilib" }
 sodium = { group = "maven.modrinth", name = "sodium", version.ref = "sodium" }
 lithium = { group = "maven.modrinth", name = "lithium", version.ref = "lithium" }
 vfp-api = { group = "com.viaversion", name = "viafabricplus-api", version.ref = "viafabricplus" }

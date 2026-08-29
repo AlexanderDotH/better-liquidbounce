@@ -120,6 +120,24 @@ class InteractableSessionTest {
     }
 
     @Test
+    fun `endpoint verification waits for correction-free ticks before starting the open timer`() {
+        val session = startedSession(
+            singleStepRoute(),
+            settings(endpointVerifyTicks = 2),
+        )
+        val packet = Any()
+
+        session.prepareMovement(packet)
+        val confirmation = session.confirmMovement(packet, InteractablePacketDisposition.DELIVERED, tick = 15)
+
+        assertTrue(confirmation.effects.isEmpty())
+        assertEquals(InteractableSessionState.Opening(attemptsSent = 0, attemptStartedTick = 15), session.state)
+        assertTrue(session.tick(tick = 16).isEmpty())
+        assertEquals(listOf(InteractableSessionEffect.OpenAttempt(1)), session.tick(tick = 17))
+        assertEquals(InteractableSessionState.Opening(attemptsSent = 1, attemptStartedTick = 17), session.state)
+    }
+
+    @Test
     fun `opening retries twice at the configured timeout then recovers exactly`() {
         val session = openedSession()
 
@@ -391,17 +409,33 @@ class InteractableSessionTest {
         val rejectedPacket = Any()
         session.prepareMovement(rejectedPacket)
 
-        val queued = session.confirmMovement(
+        val effects = session.rejectMovement(
             rejectedPacket,
             InteractablePacketDisposition.QUEUED,
+            InteractableSessionCause.ROUTE_BLOCKED,
             tick = 12,
         )
-        val effects = session.abort(InteractableSessionCause.ROUTE_BLOCKED, tick = 13)
 
-        assertFalse(queued.committed)
         assertEquals(Vec3.ZERO, session.confirmedPosition)
         assertEquals(
             listOf(InteractableSessionEffect.ReleaseMovementLease(InteractableSessionCause.ROUTE_BLOCKED)),
+            effects,
+        )
+        assertEquals(InteractableSessionState.Idle, session.state)
+    }
+
+    @Test
+    fun `stalled recovery resynchronizes locally and releases its movement lease`() {
+        val session = holdingSession()
+        session.abort(InteractableSessionCause.DISABLE, tick = 20)
+
+        val effects = session.tick(tick = 420)
+
+        assertEquals(
+            listOf(
+                InteractableSessionEffect.AcceptCorrectionLocally(Vec3(2.0, 0.0, 0.0)),
+                InteractableSessionEffect.ReleaseMovementLease(InteractableSessionCause.RESYNC_REQUIRED),
+            ),
             effects,
         )
         assertEquals(InteractableSessionState.Idle, session.state)
@@ -495,7 +529,14 @@ class InteractableSessionTest {
         openTimeoutTicks: Int = 20,
         routeTimeoutTicks: Int = 400,
         holdTimeoutTicks: Int = 0,
-    ) = InteractableSessionSettings(openRetries, openTimeoutTicks, routeTimeoutTicks, holdTimeoutTicks)
+        endpointVerifyTicks: Int = 0,
+    ) = InteractableSessionSettings(
+        openRetries,
+        openTimeoutTicks,
+        routeTimeoutTicks,
+        holdTimeoutTicks,
+        endpointVerifyTicks,
+    )
 
     private data class TestPayload(val name: String)
 }

@@ -143,7 +143,7 @@ class InteractableRoutePlannerTest {
     }
 
     @Test
-    fun `surface fallback composes cave surface and aligned vertical legs`() {
+    fun `fallback prefers a cave traversal and aligned vertical leg`() {
         val origin = Vec3(0.25, 10.0, 0.25)
         val target = stance(5, 5, 0)
         val cave = setOf(cell(0, 10, 0), cell(1, 10, 0), cell(2, 11, 0))
@@ -162,17 +162,11 @@ class InteractableRoutePlannerTest {
         } while (progress is InteractableRouteProgress.Running)
 
         val plan = (progress as InteractableRouteProgress.Ready).plan
-        assertEquals(InteractableRouteKind.SURFACE, plan.kind)
+        assertEquals(InteractableRouteKind.CAVE_CLIP, plan.kind)
         assertTrue(InteractableRoutePlanningPhase.DIRECT in phases)
-        assertTrue(InteractableRoutePlanningPhase.CAVE_EGRESS in phases)
-        assertTrue(InteractableRoutePlanningPhase.SURFACE_TRAVERSE in phases)
-        assertEquals(
-            listOf(
-                InteractableRoutePathKind.CAVE_EGRESS,
-                InteractableRoutePathKind.SURFACE_TRAVERSE,
-            ),
-            plan.outboundSegments.filterIsInstance<InteractableRouteSegment.Path>().map { it.kind },
-        )
+        assertTrue(InteractableRoutePlanningPhase.CAVE_CLIP in phases)
+        assertTrue(plan.outboundSegments.filterIsInstance<InteractableRouteSegment.Path>()
+            .all { it.kind == InteractableRoutePathKind.CAVE_TRAVERSE })
 
         val descent = plan.outboundSegments.last() as InteractableRouteSegment.VerticalClip
         assertEquals(target.position.x, descent.from.x)
@@ -182,8 +176,170 @@ class InteractableRoutePlannerTest {
         assertEquals(origin, plan.returnEndpoint)
 
         val render = plan.renderSnapshot
-        assertEquals(2, render.paths.size)
+        assertTrue(render.paths.isNotEmpty())
         assertEquals(listOf(descent), render.verticalClips)
+    }
+
+    @Test
+    fun `cave fallback chains only thirty block clips through supported cave anchors`() {
+        val origin = Vec3(0.2, 80.0, 0.2)
+        val target = stance(4, 10, 0)
+        val surface = corridor(0..2, y = 80)
+        val upperCave = corridor(2..3, y = 55)
+        val lowerCave = corridor(3..4, y = 30)
+        val world = TestRouteWorld(
+            passable = surface + upperCave + lowerCave + target.node,
+            surfaces = surface,
+        )
+        val phases = mutableSetOf<InteractableRoutePlanningPhase>()
+        val task = planner(world).begin(
+            request(
+                origin = origin,
+                goal = target,
+                surfaceFallback = true,
+                maxClipDistance = 30,
+            ),
+        )
+
+        var progress: InteractableRouteProgress
+        do {
+            progress = task.advance(1)
+            if (progress is InteractableRouteProgress.Running) phases += progress.snapshot.phase
+        } while (progress is InteractableRouteProgress.Running)
+
+        val plan = (progress as InteractableRouteProgress.Ready).plan
+        val clips = plan.outboundSegments.filterIsInstance<InteractableRouteSegment.VerticalClip>()
+
+        assertEquals(InteractableRouteKind.CAVE_CLIP, plan.kind)
+        assertTrue(InteractableRoutePlanningPhase.CAVE_CLIP in phases)
+        assertEquals(listOf(25.0, 25.0, 20.0), clips.map { kotlin.math.abs(it.to.y - it.from.y) })
+        assertTrue(clips.all { kotlin.math.abs(it.to.y - it.from.y) <= 30.0 })
+        assertEquals(clips.map(InteractableRouteSegment.VerticalClip::reversed).asReversed(),
+            plan.returnSegments.filterIsInstance<InteractableRouteSegment.VerticalClip>())
+        assertEquals(origin, plan.returnEndpoint)
+    }
+
+    @Test
+    fun `bounded direct probe leaves time to try a valid cave clip route`() {
+        val origin = Vec3(0.5, 60.0, 0.5)
+        val target = stance(2, 30, 0)
+        val surface = corridor(0..2, y = 60)
+        val world = TestRouteWorld(passable = surface + target.node, surfaces = surface)
+
+        val ready = finish(
+            planner(world).begin(
+                request(
+                    origin = origin,
+                    goal = target,
+                    surfaceFallback = true,
+                    directMaxIterations = 1,
+                ),
+            ),
+        ) as InteractableRouteProgress.Ready
+
+        assertEquals(InteractableRouteKind.CAVE_CLIP, ready.plan.kind)
+        assertEquals(30.0, kotlin.math.abs(
+            ready.plan.outboundSegments.filterIsInstance<InteractableRouteSegment.VerticalClip>().single().to.y -
+                ready.plan.outboundSegments.filterIsInstance<InteractableRouteSegment.VerticalClip>().single().from.y,
+        ))
+    }
+
+    @Test
+    fun `when no anchor exists over the target cave search uses a nearby thirty block chain`() {
+        val origin = Vec3(0.5, 80.0, 0.5)
+        val target = stance(10, 20, 0)
+        val surface = corridor(0..10, y = 80)
+        val upperCave = corridor(8..9, y = 55)
+        val lowerCave = corridor(9..10, y = 30)
+        val world = TestRouteWorld(
+            passable = surface + upperCave + lowerCave + target.node,
+            surfaces = surface,
+        )
+
+        val ready = finish(
+            planner(world).begin(
+                request(
+                    origin = origin,
+                    goal = target,
+                    surfaceFallback = true,
+                    directMaxIterations = 32,
+                ),
+            ),
+        ) as InteractableRouteProgress.Ready
+        val clips = ready.plan.outboundSegments.filterIsInstance<InteractableRouteSegment.VerticalClip>()
+
+        assertEquals(InteractableRouteKind.CAVE_CLIP, ready.plan.kind)
+        assertTrue(clips.size >= 2)
+        assertTrue(kotlin.math.abs(clips.first().from.x - target.position.x) <= 2.0)
+        assertTrue(clips.all { kotlin.math.abs(it.to.y - it.from.y) <= 30.0 })
+        assertEquals(origin, ready.plan.returnEndpoint)
+    }
+
+    @Test
+    fun `fallback refuses one long clip when no cave anchor exists within thirty blocks`() {
+        val origin = Vec3(0.5, 70.0, 0.5)
+        val target = stance(0, 0, 0)
+        val world = TestRouteWorld(
+            passable = setOf(cell(0, 70, 0), target.node),
+            surfaces = setOf(cell(0, 70, 0)),
+        )
+
+        val failed = finish(
+            planner(world).begin(
+                request(
+                    origin = origin,
+                    goal = target,
+                    surfaceFallback = true,
+                    maxClipDistance = 30,
+                ),
+            ),
+        ) as InteractableRouteProgress.Failed
+
+        assertEquals(InteractableRouteFailure.CLIP_DISTANCE_EXCEEDED, failed.reason)
+    }
+
+    @Test
+    fun `fallback never clips through an unloaded intermediate column`() {
+        val origin = Vec3(0.5, 30.0, 0.5)
+        val target = stance(0, 0, 0)
+        val world = TestRouteWorld(
+            passable = setOf(cell(0, 30, 0), target.node),
+            surfaces = setOf(cell(0, 30, 0)),
+            unloaded = setOf(cell(0, 15, 0)),
+        )
+
+        val failed = finish(
+            planner(world).begin(
+                request(
+                    origin = origin,
+                    goal = target,
+                    surfaceFallback = true,
+                    protectBedrock = false,
+                    maxClipDistance = 30,
+                ),
+            ),
+        ) as InteractableRouteProgress.Failed
+
+        assertEquals(InteractableRouteFailure.UNLOADED_WORLD, failed.reason)
+    }
+
+    @Test
+    fun `unloaded direct frontier still permits a loaded surface fallback`() {
+        val origin = Vec3(0.5, 10.0, 0.5)
+        val target = stance(5, 5, 0)
+        val surface = corridor(0..5, y = 10)
+        val world = TestRouteWorld(
+            passable = surface + target.node,
+            surfaces = surface,
+            unloaded = setOf(cell(0, 10, 1)),
+        )
+
+        val ready = finish(
+            planner(world).begin(request(origin, target, surfaceFallback = true)),
+        ) as InteractableRouteProgress.Ready
+
+        assertEquals(InteractableRouteKind.CAVE_CLIP, ready.plan.kind)
+        assertTrue(ready.plan.outboundSegments.last() is InteractableRouteSegment.VerticalClip)
     }
 
     @Test
@@ -352,6 +508,8 @@ class InteractableRoutePlannerTest {
         maxRise: Int = 128,
         maxCost: Double = 4096.0,
         maxIterations: Int = 20_000,
+        directMaxIterations: Int = maxIterations,
+        maxClipDistance: Int = 30,
     ) = InteractableRouteRequest(
         origin = origin,
         goalStances = listOf(goal),
@@ -360,11 +518,13 @@ class InteractableRoutePlannerTest {
             allowDiagonal = true,
             maxCost = maxCost,
             maxIterations = maxIterations,
+            directMaxIterations = directMaxIterations,
             lineOfSightShortcuts = true,
             surfaceFallback = surfaceFallback,
             maxRise = maxRise,
             horizontalSearch = horizontalSearch,
             protectBedrock = protectBedrock,
+            maxClipDistance = maxClipDistance,
         ),
     )
 

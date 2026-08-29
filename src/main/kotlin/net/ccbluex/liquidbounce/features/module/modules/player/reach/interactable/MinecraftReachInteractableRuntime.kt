@@ -26,6 +26,9 @@ import net.ccbluex.liquidbounce.features.module.modules.exploit.disabler.disable
 import net.ccbluex.liquidbounce.features.module.modules.player.reach.interactable.session.InteractableContainerCloseCause
 import net.ccbluex.liquidbounce.features.module.modules.player.reach.interactable.session.InteractableCorrectionDecision
 import net.ccbluex.liquidbounce.features.module.modules.player.reach.interactable.session.InteractableMovement
+import net.ccbluex.liquidbounce.features.module.modules.player.reach.interactable.session.InteractableMovementConfirmation
+import net.ccbluex.liquidbounce.features.module.modules.player.reach.interactable.session.InteractableOpenLifecycle
+import net.ccbluex.liquidbounce.features.module.modules.player.reach.interactable.session.InteractableOpenLifecycleAction
 import net.ccbluex.liquidbounce.features.module.modules.player.reach.interactable.session.InteractablePacketDisposition
 import net.ccbluex.liquidbounce.features.module.modules.player.reach.interactable.session.InteractableSession
 import net.ccbluex.liquidbounce.features.module.modules.player.reach.interactable.session.InteractableSessionCause
@@ -45,6 +48,7 @@ import net.ccbluex.liquidbounce.utils.entity.interactBlock
 import net.ccbluex.liquidbounce.utils.entity.interactEntity
 import net.ccbluex.liquidbounce.utils.input.InputTracker.wasPressedRecently
 import net.ccbluex.liquidbounce.utils.movement.remote.RemoteMovementOwnership
+import net.ccbluex.liquidbounce.utils.network.sendPacketSilently
 import net.ccbluex.liquidbounce.utils.raytracing.clip
 import net.minecraft.client.gui.screens.Screen
 import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen
@@ -101,8 +105,12 @@ internal class MinecraftReachInteractableRuntime {
     private var immediateDisposition: InteractablePacketDisposition? = null
     private var correctionContext: CorrectionContext? = null
     private val deferredOpenAttempts = ArrayDeque<InteractableSessionEffect.OpenAttempt>()
+    private val openLifecycle = InteractableOpenLifecycle(OPEN_SCREEN_CONFIRM_GRACE_TICKS)
+    private var lastTransportConfirmation: InteractableMovementConfirmation? = null
     private var interactionCaptureActive = false
     private val interactionDispositions = mutableListOf<InteractablePacketDisposition>()
+    @Volatile
+    private var acceptsContainerPackets = false
 
     var status: InteractableRuntimeStatus? = null
         private set
@@ -126,6 +134,7 @@ internal class MinecraftReachInteractableRuntime {
             tick = player.tickCount,
         )
         if (claimed) {
+            acceptsContainerPackets = true
             activeSettings = settings
             status = InteractableRuntimeStatus.State(session.state)
         } else {
@@ -144,14 +153,21 @@ internal class MinecraftReachInteractableRuntime {
             return
         }
         val tick = player.tickCount
-        controller.tick(tick)
+        evaluateOpenLifecycle(tick)
+        if (session.state !is InteractableSessionState.Opening || !openLifecycle.awaitingConfirmation) {
+            controller.tick(tick)
+        }
         controller.lastMessage?.let { status = InteractableRuntimeStatus.Failure(it.statusReason()) }
         if (!controller.active) {
             clearTransientState()
             return
         }
 
-        if (session.state.requiresTargetValidation() && !controller.validateTarget()) {
+        if (session.state.requiresTargetValidation() && !controller.validateTarget(
+                allowInteractionStateChange = session.state is InteractableSessionState.Holding ||
+                    session.state is InteractableSessionState.Opening && openLifecycle.awaitingConfirmation,
+            )
+        ) {
             status = InteractableRuntimeStatus.Failure("TARGET_CHANGED")
             controller.abort(InteractableSessionCause.TARGET_CHANGED, tick)
             controller.reconcileOwnership()
@@ -184,45 +200,42 @@ internal class MinecraftReachInteractableRuntime {
         }
     }
 
-    fun onContainerPacket(event: net.ccbluex.liquidbounce.event.events.PacketEvent) {
+    fun captureContainerPacket(event: net.ccbluex.liquidbounce.event.events.PacketEvent) {
+        if (!acceptsContainerPackets) return
         val origin = event.origin
         val packet = event.packet
-        when {
-            origin == TransferOrigin.INCOMING && packet is ClientboundOpenScreenPacket &&
-                session.state is InteractableSessionState.Opening -> {
-                val disposition = packet.finalDisposition(event.isCancelled, origin)
-                if (disposition == InteractablePacketDisposition.DELIVERED &&
-                    session.claimOpenedContainer(packet.containerId, currentTick())
-                ) {
-                    status = InteractableRuntimeStatus.State(session.state)
-                }
-            }
+        val fact = when {
+            origin == TransferOrigin.INCOMING && packet is ClientboundOpenScreenPacket -> ContainerPacketFact.Open(
+                packet.containerId,
+                packet.finalDisposition(event.isCancelled, origin),
+            )
             origin == TransferOrigin.INCOMING && packet is ClientboundContainerClosePacket -> {
-                packet.finalDisposition(event.isCancelled, origin)
-                executeEffects(session.containerClosed(
+                ContainerPacketFact.Close(
                     packet.containerId,
                     InteractableContainerCloseCause.SERVER,
-                    currentTick(),
-                ))
-                if (event.isCancelled) closeOwnedContainer(packet.containerId)
+                    packet.finalDisposition(event.isCancelled, origin),
+                )
             }
             origin == TransferOrigin.OUTGOING && packet is ServerboundContainerClosePacket -> {
-                packet.finalDisposition(event.isCancelled, origin)
-                executeEffects(session.containerClosed(
+                ContainerPacketFact.Close(
                     packet.containerId,
                     InteractableContainerCloseCause.USER,
-                    currentTick(),
-                ))
+                    packet.finalDisposition(event.isCancelled, origin),
+                )
             }
+            else -> null
         }
-        controller.reconcileOwnership()
+        fact ?: return
+        mc.execute { applyContainerFact(fact) }
     }
 
     fun onScreen(screen: Screen?) {
         val container = screen as? AbstractContainerScreen<*>
         val owned = session.ownedContainerId
         if (owned == null) {
-            if (container != null && session.movementLeaseRequired) {
+            if (container != null && session.movementLeaseRequired &&
+                session.state !is InteractableSessionState.Opening
+            ) {
                 controller.abort(InteractableSessionCause.CONFLICTING_SCREEN, currentTick())
                 controller.reconcileOwnership()
             }
@@ -233,6 +246,66 @@ internal class MinecraftReachInteractableRuntime {
             executeEffects(session.containerClosed(owned, InteractableContainerCloseCause.SERVER, currentTick()))
             controller.reconcileOwnership()
         }
+    }
+
+    private fun applyContainerFact(fact: ContainerPacketFact) {
+        when (fact) {
+            is ContainerPacketFact.Open -> applyOpenLifecycleAction(
+                openLifecycle.observe(
+                    fact.containerId,
+                    currentTick(),
+                    fact.disposition,
+                    opening = session.state is InteractableSessionState.Opening,
+                ),
+            )
+            is ContainerPacketFact.Close -> {
+                if (fact.cause == InteractableContainerCloseCause.USER &&
+                    fact.disposition != InteractablePacketDisposition.DELIVERED
+                ) {
+                    forceCloseServerContainer(fact.containerId)
+                }
+                executeEffects(session.containerClosed(fact.containerId, fact.cause, currentTick()))
+                if (fact.cause == InteractableContainerCloseCause.SERVER &&
+                    fact.disposition != InteractablePacketDisposition.DELIVERED
+                ) {
+                    closeOwnedContainer(fact.containerId)
+                }
+            }
+        }
+        controller.reconcileOwnership()
+    }
+
+    private fun evaluateOpenLifecycle(tick: Int) {
+        val screenContainerId = (mc.gui.screen() as? AbstractContainerScreen<*>)?.menu?.containerId
+        val playerMenuId = mc.player?.containerMenu?.containerId
+        applyOpenLifecycleAction(openLifecycle.evaluate(tick, screenContainerId, playerMenuId))
+    }
+
+    private fun applyOpenLifecycleAction(action: InteractableOpenLifecycleAction?) {
+        when (action) {
+            null -> Unit
+            is InteractableOpenLifecycleAction.Confirm -> if (
+                session.claimOpenedContainer(action.containerId, currentTick())
+            ) {
+                status = InteractableRuntimeStatus.State(session.state)
+            } else {
+                forceCloseServerContainer(action.containerId)
+            }
+            is InteractableOpenLifecycleAction.CloseUnexpected -> {
+                forceCloseServerContainer(action.containerId)
+                controller.abort(InteractableSessionCause.CONFLICTING_SCREEN, currentTick())
+            }
+            is InteractableOpenLifecycleAction.CloseAndAbort -> {
+                forceCloseServerContainer(action.containerId)
+                controller.abort(InteractableSessionCause.CONFLICTING_SCREEN, currentTick())
+            }
+        }
+        controller.reconcileOwnership()
+    }
+
+    private fun forceCloseServerContainer(containerId: Int) {
+        sendPacketSilently(ServerboundContainerClosePacket(containerId), bypassSilentPacketEvent = true)
+        closeOwnedContainer(containerId)
     }
 
     fun abort(cause: InteractableSessionCause) {
@@ -250,9 +323,11 @@ internal class MinecraftReachInteractableRuntime {
 
     fun beforeCorrection(packet: ClientboundPlayerPositionPacket, player: Player) {
         if (!session.movementLeaseRequired) return
-        val local = PositionMoveRotation(player.position(), player.deltaMovement, player.yRot, player.xRot)
+        val serverAnchor = session.serverAnchorPosition ?: player.position()
+        val local = PositionMoveRotation(serverAnchor, player.deltaMovement, player.yRot, player.xRot)
         val authoritative = PositionMoveRotation.calculateAbsolute(local, packet.change, packet.relatives).position
         correctionContext = CorrectionContext(packet, authoritative, session.origin, player.deltaMovement)
+        player.setPos(serverAnchor)
     }
 
     fun afterCorrection(packet: ClientboundPlayerPositionPacket, player: Player) {
@@ -273,14 +348,26 @@ internal class MinecraftReachInteractableRuntime {
     private fun dispatchNextMovement(tick: Int) {
         if (tick < nextMovementTick || pendingTransportPacket != null) return
         if (!session.state.acceptsMovement()) return
+        var activeBurstId: Int? = null
+        while (session.state.acceptsMovement()) {
+            val next = session.nextMovement() ?: return
+            val nextBurstId = next.payload.transportBurstId
+            if (activeBurstId != null && nextBurstId != activeBurstId) return
+            if (activeBurstId == null) activeBurstId = nextBurstId
+            if (!dispatchOneMovement(tick)) return
+            if (activeBurstId == null) return
+        }
+    }
+
+    private fun dispatchOneMovement(tick: Int): Boolean {
         val identity = Any()
-        val movement = session.prepareMovement(identity) ?: return
-        val confirmedOrigin = session.confirmedPosition ?: return
+        val movement = session.prepareMovement(identity) ?: return false
+        val confirmedOrigin = session.confirmedPosition ?: return false
         if (!movement.payload.isSafeToSend(confirmedOrigin, movement.confirmedPosition)) {
             status = InteractableRuntimeStatus.Failure("ROUTE_BLOCKED")
             session.confirmMovement(identity, InteractablePacketDisposition.DROPPED, tick)
             controller.abort(InteractableSessionCause.ROUTE_BLOCKED, tick)
-            return
+            return false
         }
 
         val packet = movement.payload.toPacket()
@@ -292,20 +379,41 @@ internal class MinecraftReachInteractableRuntime {
             clearPendingPacket()
             session.confirmMovement(identity, InteractablePacketDisposition.DROPPED, tick)
             hardReset(InteractableSessionCause.DISCONNECT)
-            return
+            return false
         }
+        lastTransportConfirmation = null
         connection.send(packet)
         if (pendingTransportPacket === packet) {
             clearPendingPacket()
-            session.confirmMovement(identity, InteractablePacketDisposition.DROPPED, tick)
+            val effects = session.rejectMovement(
+                identity,
+                InteractablePacketDisposition.DROPPED,
+                InteractableSessionCause.ROUTE_BLOCKED,
+                tick,
+            )
+            executeEffects(effects)
+            return false
         }
+        return lastTransportConfirmation?.committed == true
     }
 
     private fun confirmPendingTransport(packet: ServerboundMovePlayerPacket, cancelled: Boolean) {
         pendingInstruction?.applyTo(packet)
         val identity = pendingSessionIdentity ?: return
         val disposition = packet.finalDisposition(cancelled, TransferOrigin.OUTGOING)
-        val confirmation = session.confirmMovement(identity, disposition, currentTick())
+        val confirmation = if (disposition == InteractablePacketDisposition.DELIVERED) {
+            session.confirmMovement(identity, disposition, currentTick())
+        } else {
+            val effects = session.rejectMovement(
+                identity,
+                disposition,
+                InteractableSessionCause.ROUTE_BLOCKED,
+                currentTick(),
+            )
+            executeEffects(effects)
+            InteractableMovementConfirmation(matchedPacket = true, committed = false)
+        }
+        lastTransportConfirmation = confirmation
         clearPendingPacket()
         if (confirmation.committed) {
             nextMovementTick = currentTick() + (activeSettings?.routing?.stepDelayTicks ?: 0)
@@ -367,6 +475,10 @@ internal class MinecraftReachInteractableRuntime {
                 clearTransientState()
             }
             is InteractableSessionEffect.AcceptCorrectionLocally -> {
+                mc.player?.let { player ->
+                    player.setPos(effect.authoritativePosition)
+                    player.deltaMovement = Vec3.ZERO
+                }
                 status = InteractableRuntimeStatus.Resynchronized(effect.authoritativePosition)
                 clearTransientState()
             }
@@ -398,7 +510,7 @@ internal class MinecraftReachInteractableRuntime {
         return try {
             player.setPos(anchor)
             val handled = interactWithVanillaHandOrder { hand -> interaction.interact(hand) }
-            handled && interactionDispositions.lastOrNull() == InteractablePacketDisposition.DELIVERED
+            interactionDeliveryConfirmed(handled, interactionDispositions)
         } finally {
             interactionCaptureActive = false
             player.setPos(localPosition)
@@ -423,11 +535,14 @@ internal class MinecraftReachInteractableRuntime {
         val player = mc.player ?: return null
         val eyes = anchor.eyePosition()
         val interactionRange = activeSettings?.interactionRange ?: return null
-        val hit = sequenceOf(initialHit, Vec3.atCenterOf(position)).filter { point ->
-            eyes.distanceTo(point) <= interactionRange
-        }.map { point ->
-            level.clip(eyes, point, ClipContext.Block.OUTLINE, ClipContext.Fluid.NONE, player)
-        }.firstOrNull { it.type == HitResult.Type.BLOCK && it.blockPos == position } ?: return null
+        val hit = resolveInteractableBlockHit(
+            level,
+            player,
+            position,
+            initialHit,
+            eyes,
+            interactionRange,
+        ) ?: return null
         return ResolvedInteraction(hit.location) { hand ->
             interactBlock(hit, hand, SwingMode.DO_NOT_HIDE)
         }
@@ -435,19 +550,23 @@ internal class MinecraftReachInteractableRuntime {
 
     private fun resolveEntityInteraction(uuid: java.util.UUID, anchor: Vec3): ResolvedInteraction? {
         val level = mc.level ?: return null
+        val player = mc.player ?: return null
         val entity = level.getEntity(uuid) ?: return null
         val eyes = anchor.eyePosition()
         val point = entity.boundingBox.clip(eyes, entity.boundingBox.center).orElse(entity.boundingBox.center)
         if (eyes.distanceTo(point) > (activeSettings?.interactionRange ?: return null)) return null
-        val obstruction = level.clip(eyes, point, ClipContext.Block.COLLIDER, ClipContext.Fluid.NONE, mc.player!!)
+        val obstruction = level.clip(eyes, point, ClipContext.Block.COLLIDER, ClipContext.Fluid.NONE, player)
         if (obstruction.type != HitResult.Type.MISS &&
             obstruction.location.distanceToSqr(eyes) < point.distanceToSqr(eyes)
         ) {
             return null
         }
         val hit = EntityHitResult(entity, point)
+        val kind = (session.target?.lock as? InteractableTargetLock.ContainerVehicle)?.kind
         return ResolvedInteraction(point) { hand ->
-            interactEntity(entity, hit, hand, SwingMode.DO_NOT_HIDE)
+            withSecondaryUse(player, kind?.let(::requiresSecondaryUse) == true) {
+                interactEntity(entity, hit, hand, SwingMode.DO_NOT_HIDE)
+            }
         }
     }
 
@@ -534,12 +653,15 @@ internal class MinecraftReachInteractableRuntime {
     private fun clearTransientState() {
         if (controller.active) return
         activeSettings = null
+        acceptsContainerPackets = false
         nextMovementTick = 0
         clearPendingPacket()
         immediatePacket = null
         immediateDisposition = null
         correctionContext = null
         deferredOpenAttempts.clear()
+        openLifecycle.clear()
+        lastTransportConfirmation = null
         interactionCaptureActive = false
         interactionDispositions.clear()
     }
@@ -568,6 +690,29 @@ internal class MinecraftReachInteractableRuntime {
         val point: Vec3,
         val interact: (InteractionHand) -> InteractionResult?,
     )
+
+    private sealed interface ContainerPacketFact {
+        data class Open(
+            val containerId: Int,
+            val disposition: InteractablePacketDisposition,
+        ) : ContainerPacketFact
+
+        data class Close(
+            val containerId: Int,
+            val cause: InteractableContainerCloseCause,
+            val disposition: InteractablePacketDisposition,
+        ) : ContainerPacketFact
+    }
+}
+
+private inline fun <T> withSecondaryUse(player: Player, required: Boolean, action: () -> T): T {
+    if (!required || player.isShiftKeyDown) return action()
+    player.setShiftKeyDown(true)
+    return try {
+        action()
+    } finally {
+        player.setShiftKeyDown(false)
+    }
 }
 
 internal fun interactWithVanillaHandOrder(
@@ -581,6 +726,12 @@ internal fun interactWithVanillaHandOrder(
     }
     return false
 }
+
+internal fun interactionDeliveryConfirmed(
+    handled: Boolean,
+    dispositions: List<InteractablePacketDisposition>,
+): Boolean = handled && dispositions.isNotEmpty() &&
+    dispositions.all { it == InteractablePacketDisposition.DELIVERED }
 
 internal fun shouldRewriteInteractableAmbientMovement(
     movementLeaseRequired: Boolean,
@@ -734,14 +885,29 @@ private class CorrectionRouteWorld(
 ) {
     private val dimensions = player.getDimensions(Pose.STANDING)
 
-    fun isClear(from: Vec3, to: Vec3): Boolean = interpolatePositions(from, to, SWEEP_STEP).all(::isStandable)
+    fun isClear(from: Vec3, to: Vec3): Boolean {
+        val sweep = listOf(from) + interactableSweepWaypoints(from, to)
+        if (!sweep.zipWithNext().all { (start, end) ->
+                interpolatePositions(start, end, SWEEP_STEP).all(::isPassable)
+            }
+        ) {
+            return false
+        }
+        if (from.y != to.y) return isStandable(from) && isStandable(to)
+        return interpolatePositions(from, to, SWEEP_STEP).all(::isStandable)
+    }
 
     fun isStandable(position: Vec3): Boolean {
+        if (!isPassable(position)) return false
+        val box = dimensions.makeBoundingBox(position).deflate(1.0E-7)
+        return level.getBlockCollisions(player, box.move(0.0, -SUPPORT_DEPTH, 0.0)).any { !it.isEmpty }
+    }
+
+    private fun isPassable(position: Vec3): Boolean {
         val node = BlockPos.containing(position)
         if (!level.isLoaded(node) || level.isOutsideBuildHeight(node.y)) return false
         val box = dimensions.makeBoundingBox(position).deflate(1.0E-7)
-        if (!level.worldBorder.isWithinBounds(box) || !level.noCollision(player, box)) return false
-        return level.getBlockCollisions(player, box.move(0.0, -SUPPORT_DEPTH, 0.0)).any { !it.isEmpty }
+        return level.worldBorder.isWithinBounds(box) && level.noCollision(player, box)
     }
 
     private companion object {
@@ -751,6 +917,7 @@ private class CorrectionRouteWorld(
 }
 
 private const val FRESH_USE_WINDOW_MS = 150L
+private const val OPEN_SCREEN_CONFIRM_GRACE_TICKS = 2
 private const val POSITION_EPSILON = 1.0E-6
 private val SILENT_RELEASE_CAUSES = setOf(
     InteractableSessionCause.COMPLETED,

@@ -57,6 +57,7 @@ internal class InteractableRoutePhases(
                 start = startNode,
                 startPosition = request.origin,
                 goalPositions = goals.associate { it.node to it.position },
+                maxIterations = request.settings.directMaxIterations,
             ),
         )
     }
@@ -67,6 +68,28 @@ internal class InteractableRoutePhases(
     ): InteractableRoutePlan? = context.points(result)?.let { points ->
         val path = InteractableRouteSegment.Path(InteractableRoutePathKind.DIRECT, compact(points))
         InteractableRoutePlan(InteractableRouteKind.DIRECT, listOf(path))
+    }
+
+    fun caveClipSearch(): InteractableRouteSearchContext {
+        val diagnostics = InteractableRouteSearchDiagnostics()
+        return searchFactory.create(
+            start = startNode,
+            startPosition = request.origin,
+            goalPositions = request.goalStances.associate { it.node to it.position },
+            diagnostics = diagnostics,
+            candidateAllowed = searchFactory.caveCandidateAllowed(startNode, request.goalStances, request.settings),
+            verticalClipDistance = request.settings.maxClipDistance,
+        )
+    }
+
+    fun caveClipPlan(
+        context: InteractableRouteSearchContext,
+        result: IncrementalAStarResult.Ready,
+    ): InteractableRoutePlan? = context.caveSegments(
+        result = result,
+        compact = request.settings.lineOfSightShortcuts,
+    )?.let { segments ->
+        InteractableRoutePlan(InteractableRouteKind.CAVE_CLIP, segments)
     }
 
     fun caveEgressSearch(): InteractableRouteSearchContext {

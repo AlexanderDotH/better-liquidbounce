@@ -692,6 +692,22 @@ object ClientRenderPipelines {
     }
 
     @JvmField
+    val EspChamsComposite = newPipeline("esp/chams_composite") {
+        screenQuadSnippet()
+        withFragmentShader(ClientShaders.Fragment.EspChamsComposite)
+        withBindGroupLayout { withSampler("MaskSampler") }
+        withUniformBuffer(ClientUniformDefine.ESP_CHAMS)
+        withColorTargetState(
+            ColorTargetState(
+                optional(BlendFunction.TRANSLUCENT_PREMULTIPLIED_ALPHA),
+                GpuFormat.RGBA8_UNORM,
+                ColorTargetState.WRITE_COLOR,
+            )
+        )
+        withDepthStencilState(optional())
+    }
+
+    @JvmField
     val ChamsImage = newPipeline("chams/image_blit") {
         screenQuadSnippet()
         withFragmentShader(ClientShaders.Fragment.Chams)

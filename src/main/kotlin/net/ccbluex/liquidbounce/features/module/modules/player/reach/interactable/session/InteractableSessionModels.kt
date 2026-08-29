@@ -17,12 +17,14 @@ internal data class InteractableSessionSettings(
     val openTimeoutTicks: Int,
     val routeTimeoutTicks: Int,
     val holdTimeoutTicks: Int,
+    val endpointVerifyTicks: Int = 0,
 ) {
     init {
         require(openRetries >= 0) { "Open retries must not be negative" }
         require(openTimeoutTicks > 0) { "Open timeout must be positive" }
         require(routeTimeoutTicks > 0) { "Route timeout must be positive" }
         require(holdTimeoutTicks >= 0) { "Hold timeout must not be negative" }
+        require(endpointVerifyTicks >= 0) { "Endpoint verification must not be negative" }
     }
 }
 

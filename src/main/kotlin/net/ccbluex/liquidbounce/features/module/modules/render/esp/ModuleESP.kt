@@ -24,6 +24,7 @@ import net.ccbluex.liquidbounce.features.module.ClientModule
 import net.ccbluex.liquidbounce.features.module.ModuleCategories
 import net.ccbluex.liquidbounce.features.module.modules.render.esp.modes.Esp2DMode
 import net.ccbluex.liquidbounce.features.module.modules.render.esp.modes.EspBoxMode
+import net.ccbluex.liquidbounce.features.module.modules.render.esp.modes.EspChamsMode
 import net.ccbluex.liquidbounce.features.module.modules.render.esp.modes.EspGlowMode
 import net.ccbluex.liquidbounce.features.module.modules.render.esp.modes.EspLegacy2DMode
 import net.ccbluex.liquidbounce.features.module.modules.render.esp.modes.EspOutlineMode
@@ -53,7 +54,8 @@ object ModuleESP : ClientModule("ESP", ModuleCategories.RENDER) {
         Esp2DMode,
         EspLegacy2DMode,
         EspOutlineMode,
-        EspGlowMode
+        EspGlowMode,
+        EspChamsMode,
     ))
 
     private val colorModes = choices("ColorMode", 0) {

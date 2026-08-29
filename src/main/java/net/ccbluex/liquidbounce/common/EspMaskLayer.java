@@ -24,6 +24,8 @@ public enum EspMaskLayer {
     ITEM_GLOW,
     ORB_GLOW,
     STORAGE_GLOW,
+    ENTITY_CHAMS,
+    STORAGE_CHAMS,
     PLAYER_OUTLINE,
     STORAGE_OUTLINE
 }

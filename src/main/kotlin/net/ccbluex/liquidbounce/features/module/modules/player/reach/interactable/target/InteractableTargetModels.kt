@@ -76,6 +76,7 @@ internal sealed interface InteractableTargetLock {
     data class ContainerVehicle(
         val uuid: UUID,
         val kind: InteractableEntityKind,
+        val position: InteractableTargetPoint,
     ) : InteractableTargetLock {
         init {
             require(kind.isSupportedContainerVehicle) { "Unsupported entities cannot be locked" }
@@ -109,8 +110,9 @@ internal sealed interface InteractableTargetObservation {
         val removed: Boolean,
         val loaded: Boolean,
         val insideWorldBorder: Boolean,
+        val position: InteractableTargetPoint,
     ) : InteractableTargetObservation {
-        fun toLock() = InteractableTargetLock.ContainerVehicle(uuid, kind)
+        fun toLock() = InteractableTargetLock.ContainerVehicle(uuid, kind, position)
     }
 }
 

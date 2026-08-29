@@ -102,6 +102,7 @@ object ModuleMaceKill : ClientModule("MaceKill", ModuleCategories.COMBAT, disabl
     private var activeRouteOwner = MaceKillRouteOwner.NONE
     private var remoteStrikeEndpoint: Vec3? = null
     private var remoteStrikeTarget: LivingEntity? = null
+    private var remoteStrikeFallResetPlan: MacePostAttackFallResetPlan? = null
     private var remoteStrikeEarliestTick = 0
     private var fightBotMaceTarget: LivingEntity? = null
     private var fightBotMaceState = MaceKillFightBotState.Unavailable
@@ -556,6 +557,7 @@ object ModuleMaceKill : ClientModule("MaceKill", ModuleCategories.COMBAT, disabl
         if (remoteIntent && !isRemoteEndpointReady(localPlayer, target, endpoint)) {
             return MaceKillAttackResult.REJECTED
         }
+        if (remoteIntent && remoteStrikeFallResetPlan == null) return MaceKillAttackResult.REJECTED
 
         val result = MaceInstantStrikePlanner.plan(
             MaceInstantStrikeRequest(
@@ -569,9 +571,17 @@ object ModuleMaceKill : ClientModule("MaceKill", ModuleCategories.COMBAT, disabl
         val plan = (result as? MaceInstantStrikePlanResult.Ready)?.plan
             ?: return if (remoteIntent) MaceKillAttackResult.REJECTED else MaceKillAttackResult.NOT_APPLIED
 
+        applyMaceStrikePackets(localPlayer, plan.packets)
+        return MaceKillAttackResult.APPLIED
+    }
+
+    private fun applyMaceStrikePackets(
+        localPlayer: LocalPlayer,
+        packets: List<MaceInstantStrikePacket>,
+    ) {
         applyingStrikePackets = true
         try {
-            plan.packets.forEach { packet ->
+            packets.forEach { packet ->
                 when (packet) {
                     is MaceInstantStrikePacket.StatusOnly -> localPlayer.warp(null, packet.onGround)
                     is MaceInstantStrikePacket.Position -> localPlayer.warp(packet.position, packet.onGround)
@@ -580,7 +590,6 @@ object ModuleMaceKill : ClientModule("MaceKill", ModuleCategories.COMBAT, disabl
         } finally {
             applyingStrikePackets = false
         }
-        return MaceKillAttackResult.APPLIED
     }
 
     private fun routeOwnerFor(target: LivingEntity, manualLaunch: Boolean): MaceKillRouteOwner? = when {
@@ -1009,12 +1018,6 @@ object ModuleMaceKill : ClientModule("MaceKill", ModuleCategories.COMBAT, disabl
         originBoundingBox: AABB,
         motion: Boolean = false,
     ): MaceKillPlannedRoute? {
-        // Instant remains the explicit ClipReach mode while an ordinary collision route is available.
-        if (configuration.routingMode == MaceKillRoutingMode.INSTANT &&
-            buildCollisionAwareRoute(origin, endpoint, configuration, originBoundingBox) != null
-        ) {
-            return null
-        }
         for (movement in maceKillVanillaVClipCandidates(origin, endpoint)) {
             val originSegment = MaceKillVanillaVClipSegment(origin, origin.add(movement))
             buildMaceKillVanillaVClipRoute(
@@ -1340,13 +1343,26 @@ object ModuleMaceKill : ClientModule("MaceKill", ModuleCategories.COMBAT, disabl
         if (!target.isAlive || target.isRemoved || target.level() !== world || !hasServerHeldMace()) {
             return RemoteKillStrikeResult.Rejected("target-or-weapon-invalid")
         }
+        val endpointBoundingBox = player.boundingBox.move(endpoint.subtract(player.position()))
+        val fallResetResult = MacePostAttackFallResetPlanner.plan(
+            MacePostAttackFallResetRequest(endpoint, endpointBoundingBox),
+        ) { box -> world.getBlockCollisions(player, box).allEmpty() }
+        val fallResetPlan = (fallResetResult as? MacePostAttackFallResetPlanResult.Ready)?.plan
+            ?: return RemoteKillStrikeResult.Rejected("post-attack-fall-reset-unavailable")
         remoteStrikeTarget = target
         remoteStrikeEndpoint = endpoint
+        remoteStrikeFallResetPlan = fallResetPlan
         val result = try {
-            attackEntityWithResult(target, SwingMode.DO_NOT_HIDE, keepSprint = true)
+            attackEntityWithResult(target, SwingMode.DO_NOT_HIDE, keepSprint = true).also { attackResult ->
+                if (attackResult == MaceKillAttackResult.APPLIED) {
+                    applyMaceStrikePackets(player, fallResetPlan.packets)
+                    debugMaceKill("post-strike-fall-reset") { listOf("rise" to fallResetPlan.rise) }
+                }
+            }
         } finally {
             remoteStrikeTarget = null
             remoteStrikeEndpoint = null
+            remoteStrikeFallResetPlan = null
         }
         debugMaceKill("strike-result") {
             listOf("target" to target.id, "endpoint" to endpoint, "result" to result)
@@ -1526,6 +1542,7 @@ object ModuleMaceKill : ClientModule("MaceKill", ModuleCategories.COMBAT, disabl
         activeRouteOwner = MaceKillRouteOwner.NONE
         remoteStrikeEndpoint = null
         remoteStrikeTarget = null
+        remoteStrikeFallResetPlan = null
         remoteStrikeEarliestTick = 0
         routeOrigin = null
         routeOriginBoundingBox = null

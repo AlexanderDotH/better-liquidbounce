@@ -45,6 +45,7 @@ enum class ClientUniformDefine(val uboName: String, val size: Int) {
     UNIFIED_FOG_KERNEL("UnifiedFogKernelData", std140Size { repeat(6) { vec4 } }),
     ESP_BLUR("EspBlurData", std140Size { vec4 + vec4 + vec4 + vec4 + vec4 + vec4 + vec4 }),
     ESP_STYLE("EspStyleData", std140Size { vec4 + vec4 }),
+    ESP_CHAMS("EspChamsData", std140Size { vec4 }),
     BLEND("BlendData", std140Size { vec4 }),
     THEME_BACKGROUND("ThemeBackgroundData", std140Size { float + vec2 + vec2 }),
     ;

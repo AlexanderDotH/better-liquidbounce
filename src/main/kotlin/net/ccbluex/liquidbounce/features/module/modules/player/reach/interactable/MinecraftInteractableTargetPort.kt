@@ -59,6 +59,9 @@ internal class MinecraftInteractableTargetPort : ControllerTargetPort<Interactab
     override fun validate(target: InteractableResolvedTarget): Boolean =
         resolver.validate(target.lock) === InteractableTargetValidation.Valid
 
+    override fun validateWhileHolding(target: InteractableResolvedTarget): Boolean =
+        resolver.validate(target.lock, allowInteractionStateChange = true) === InteractableTargetValidation.Valid
+
     private fun rejected(reason: InteractableTargetRejection) = ControllerTargetResult.Rejected(reason.name)
 }
 
