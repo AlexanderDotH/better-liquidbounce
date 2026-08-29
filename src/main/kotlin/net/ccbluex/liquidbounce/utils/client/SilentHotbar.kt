@@ -30,23 +30,53 @@ import net.ccbluex.liquidbounce.utils.inventory.HotbarItemSlot
 import net.minecraft.world.entity.player.Inventory
 import org.jetbrains.annotations.Range
 
+enum class SilentHotbarSelectionPolicy(
+    val shouldKeepClientSlotVisible: Boolean,
+    val shouldSynchronizeCarriedItemImmediately: Boolean,
+) {
+    STANDARD(
+        shouldKeepClientSlotVisible = false,
+        shouldSynchronizeCarriedItemImmediately = false,
+    ),
+    SERVER_ONLY(
+        shouldKeepClientSlotVisible = true,
+        shouldSynchronizeCarriedItemImmediately = true,
+    ),
+}
+
 /**
  * Manages things like [ModuleScaffold]'s silent mode.
  * Not thread safe, please only use this on the main-thread of minecraft
  */
 object SilentHotbar : EventListener {
 
-    private var hotbarState: SilentHotbarState? = null
-    private var ticksSinceLastUpdate: Int = 0
+    private val state = SilentHotbarStateMachine {
+        mc.gameMode?.ensureHasSentCarriedItem()
+    }
+
+    private val realSelectedSlot: Int
+        get() = mc.player?.inventory?.realSelectedSlot ?: 0
 
     /**
      * Returns the slot that interactions would take place with
      */
     val serversideSlot: Int
-        get() = hotbarState?.enforcedHotbarSlot ?: mc.player?.inventory?.realSelectedSlot ?: 0
+        get() = state.serverSlot(realSelectedSlot)
 
     val clientsideSlot: Int
-        get() = hotbarState?.clientsideSlot ?: mc.player?.inventory?.realSelectedSlot ?: 0
+        get() = state.clientsideSlot(realSelectedSlot)
+
+    /**
+     * Whether local renderers should keep following the player's real selected slot.
+     */
+    val shouldKeepClientSlotVisible: Boolean
+        get() = state.shouldKeepClientSlotVisible
+
+    /**
+     * Slot local renderers should display. This follows manual scrolling while [SERVER_ONLY] is active.
+     */
+    val visualSlot: Int
+        get() = state.visualSlot(realSelectedSlot)
 
     /**
      * Silently selects a main-hand hotbar slot for duration of [ticksUntilReset].
@@ -54,16 +84,23 @@ object SilentHotbar : EventListener {
      *
      * @return `true` when the slot is selected or no selection is required, `false` when the request is cancelled
      */
-    fun selectSlotSilently(requester: Any?, slot: HotbarItemSlot, ticksUntilReset: Int): Boolean =
-        slot.hotbarIndex?.let { selectSlotSilently(requester, it, ticksUntilReset) } ?: true
+    @JvmOverloads
+    fun selectSlotSilently(
+        requester: Any?,
+        slot: HotbarItemSlot,
+        ticksUntilReset: Int,
+        policy: SilentHotbarSelectionPolicy = SilentHotbarSelectionPolicy.STANDARD,
+    ): Boolean = slot.hotbarIndex?.let { selectSlotSilently(requester, it, ticksUntilReset, policy) } ?: true
 
     /**
      * @see net.minecraft.world.entity.player.Inventory.isHotbarSlot
      */
+    @JvmOverloads
     fun selectSlotSilently(
         requester: Any?,
         slot: @Range(from = 0, to = Inventory.SELECTION_SIZE - 1L) Int,
         ticksUntilReset: Int,
+        policy: SilentHotbarSelectionPolicy = SilentHotbarSelectionPolicy.STANDARD,
     ): Boolean {
         require(Inventory.isHotbarSlot(slot)) { "Invalid hotbar slot: $slot" }
 
@@ -72,46 +109,109 @@ object SilentHotbar : EventListener {
             return false
         }
 
-        hotbarState = SilentHotbarState(slot, requester, ticksUntilReset, clientsideSlot)
-        ticksSinceLastUpdate = 0
+        state.select(slot, requester, ticksUntilReset, clientsideSlot, policy)
         return true
     }
 
     fun resetSlot(requester: Any?) {
-        if (hotbarState?.requester === requester) {
-            hotbarState = null
-        }
+        state.reset(requester)
     }
 
-    fun isSlotModified() = hotbarState != null
+    fun isSlotModified() = state.isModified
 
     /**
      * Returns if the slot is currently getting modified by a given requester
      */
-    fun isSlotModifiedBy(requester: Any?) = hotbarState?.requester === requester
+    fun isSlotModifiedBy(requester: Any?) = state.isModifiedBy(requester)
 
     @Suppress("unused")
     private val worldChangeHandler = handler<WorldChangeEvent> {
-        hotbarState = null
-        ticksSinceLastUpdate = 0
+        state.clearForWorldChange()
     }
 
     @Suppress("unused")
     private val tickHandler = handler<GameTickEvent>(priority = 1001) {
-        val hotbarState = hotbarState ?: return@handler
-
-        if (ticksSinceLastUpdate >= hotbarState.ticksUntilReset) {
-            this.hotbarState = null
-            return@handler
-        }
-
-        ticksSinceLastUpdate++
+        state.advanceTick()
     }
 }
 
-private class SilentHotbarState(
+internal class SilentHotbarStateMachine(
+    private val synchronizeCarriedItem: () -> Unit = {},
+) {
+
+    private var selection: SilentHotbarState? = null
+    private var ticksSinceLastUpdate = 0
+
+    val requester: Any?
+        get() = selection?.requester
+
+    val isModified: Boolean
+        get() = selection != null
+
+    val shouldKeepClientSlotVisible: Boolean
+        get() = selection?.policy?.shouldKeepClientSlotVisible == true
+
+    fun serverSlot(realSelectedSlot: Int): Int = selection?.enforcedHotbarSlot ?: realSelectedSlot
+
+    fun clientsideSlot(realSelectedSlot: Int): Int = selection?.clientsideSlot ?: realSelectedSlot
+
+    fun visualSlot(realSelectedSlot: Int): Int = if (shouldKeepClientSlotVisible) {
+        realSelectedSlot
+    } else {
+        clientsideSlot(realSelectedSlot)
+    }
+
+    fun select(
+        enforcedHotbarSlot: Int,
+        requester: Any?,
+        ticksUntilReset: Int,
+        clientsideSlot: Int,
+        policy: SilentHotbarSelectionPolicy = SilentHotbarSelectionPolicy.STANDARD,
+    ) {
+        selection = SilentHotbarState(enforcedHotbarSlot, requester, ticksUntilReset, clientsideSlot, policy)
+        ticksSinceLastUpdate = 0
+        synchronizeIfRequired(policy)
+    }
+
+    fun reset(requester: Any?) {
+        val activeSelection = selection ?: return
+        if (activeSelection.requester !== requester) return
+
+        selection = null
+        ticksSinceLastUpdate = 0
+        synchronizeIfRequired(activeSelection.policy)
+    }
+
+    fun isModifiedBy(requester: Any?): Boolean = selection?.requester === requester
+
+    fun advanceTick() {
+        val activeSelection = selection ?: return
+        if (ticksSinceLastUpdate < activeSelection.ticksUntilReset) {
+            ticksSinceLastUpdate++
+            return
+        }
+
+        selection = null
+        ticksSinceLastUpdate = 0
+        synchronizeIfRequired(activeSelection.policy)
+    }
+
+    fun clearForWorldChange() {
+        selection = null
+        ticksSinceLastUpdate = 0
+    }
+
+    private fun synchronizeIfRequired(policy: SilentHotbarSelectionPolicy) {
+        if (policy.shouldSynchronizeCarriedItemImmediately) {
+            synchronizeCarriedItem()
+        }
+    }
+}
+
+private data class SilentHotbarState(
     val enforcedHotbarSlot: Int,
     val requester: Any?,
     val ticksUntilReset: Int,
-    val clientsideSlot: Int
+    val clientsideSlot: Int,
+    val policy: SilentHotbarSelectionPolicy,
 )
