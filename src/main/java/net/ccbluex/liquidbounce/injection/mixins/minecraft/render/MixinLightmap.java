@@ -19,6 +19,7 @@
 package net.ccbluex.liquidbounce.injection.mixins.minecraft.render;
 
 import com.mojang.blaze3d.textures.GpuTexture;
+import net.ccbluex.liquidbounce.features.module.modules.render.ModuleFullBright;
 import net.ccbluex.liquidbounce.features.module.modules.render.customambience.ModuleCustomAmbience;
 import net.minecraft.client.renderer.Lightmap;
 import net.minecraft.client.renderer.state.LightmapRenderState;
@@ -53,19 +54,22 @@ public abstract class MixinLightmap {
     }
 
     /**
-     * <pre>
-     * this.dirty = false;
-     * </pre>
+     * Applies compatible lightmap overrides before Vanilla checks whether the texture needs an update.
      */
     @Inject(
         method = "render(Lnet/minecraft/client/renderer/state/LightmapRenderState;)V",
         at = @At(value = "FIELD", target = "Lnet/minecraft/client/renderer/state/LightmapRenderState;needsUpdate:Z", ordinal = 0, opcode = Opcodes.GETFIELD),
         cancellable = true
     )
-    private void injectCustomClearColor(LightmapRenderState renderState, CallbackInfo ci) {
+    private void injectLightmapOverrides(LightmapRenderState renderState, CallbackInfo ci) {
         ModuleCustomAmbience.CustomLightmap customLightmap = ModuleCustomAmbience.CustomLightmap.INSTANCE;
         if (customLightmap.getRunning() && customLightmap.getMode().getActiveMode().edit(this.texture, renderState)) {
             ci.cancel();
+            return;
+        }
+
+        if (ModuleFullBright.FullBrightComfort.INSTANCE.getRunning()) {
+            ModuleFullBright.FullBrightComfort.INSTANCE.applyTo(renderState);
         }
     }
 

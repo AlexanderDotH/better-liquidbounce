@@ -24,6 +24,8 @@ import net.ccbluex.liquidbounce.event.events.PlayerPostTickEvent
 import net.ccbluex.liquidbounce.event.handler
 import net.ccbluex.liquidbounce.features.module.ClientModule
 import net.ccbluex.liquidbounce.features.module.ModuleCategories
+import net.ccbluex.liquidbounce.features.module.modules.render.fullbright.ComfortableLightmap
+import net.minecraft.client.renderer.state.LightmapRenderState
 import net.minecraft.world.effect.MobEffectInstance
 import net.minecraft.world.effect.MobEffects
 
@@ -36,7 +38,7 @@ object ModuleFullBright : ClientModule("FullBright", ModuleCategories.RENDER) {
 
     private val modes = choices(
         "Mode", FullBrightGamma, arrayOf(
-            FullBrightGamma, FullBrightNightVision
+            FullBrightGamma, FullBrightComfort, FullBrightNightVision
         )
     )
 
@@ -58,6 +60,29 @@ object ModuleFullBright : ClientModule("FullBright", ModuleCategories.RENDER) {
             if (gamma < brightness) {
                 gamma = (gamma + 0.1F).coerceAtMost(brightness.toFloat())
             }
+        }
+
+    }
+
+    object FullBrightComfort : Mode("Comfort") {
+
+        override val parent: ModeValueGroup<Mode>
+            get() = modes
+
+        private val shadowBrightness by int("ShadowBrightness", 18, 5..35, "%")
+
+        fun applyTo(renderState: LightmapRenderState) {
+            val minimumBrightness = shadowBrightness / 100f
+            val lightMultiplier = ComfortableLightmap.lightContributionMultiplier(
+                renderState.ambientColor,
+                minimumBrightness,
+            )
+            renderState.ambientColor = ComfortableLightmap.liftAmbient(
+                renderState.ambientColor,
+                minimumBrightness,
+            )
+            renderState.skyFactor *= lightMultiplier
+            renderState.blockFactor *= lightMultiplier
         }
 
     }
