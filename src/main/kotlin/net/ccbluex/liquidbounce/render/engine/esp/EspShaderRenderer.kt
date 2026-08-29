@@ -75,6 +75,7 @@ object EspShaderRenderer : MinecraftShortcuts, EventListener {
         sourceExclusionMask,
         ::resources,
     )
+    private val chamsCapturer = EspPreparedChamsCapturer()
     private var hasOutline = false
     private var outlineStyle = EspOutlineStyle.DEFAULT
 
@@ -85,6 +86,7 @@ object EspShaderRenderer : MinecraftShortcuts, EventListener {
         protectedMaskRenderer.beginFrame()
         hasOutline = false
         outlineStyle = EspOutlineStyle.DEFAULT
+        chamsCapturer.beginFrame()
     }
 
     @JvmStatic
@@ -94,6 +96,7 @@ object EspShaderRenderer : MinecraftShortcuts, EventListener {
             val mainTarget = mc.gameRenderer.mainRenderTarget()
             preparedGlowCapturer.capture(bridge, mainTarget)
             protectedMaskRenderer.capture(bridge, mainTarget)
+            chamsCapturer.capture(bridge, mainTarget)
             captureOutline(bridge, mainTarget)
         }
     }
@@ -141,11 +144,18 @@ object EspShaderRenderer : MinecraftShortcuts, EventListener {
 
     @JvmStatic
     fun composite(target: RenderTarget) {
-        val plan = EspPostProcessPlan.create(glowFrameSources.hasAnyContribution, hasOutline)
+        val plan = EspPostProcessPlan.create(
+            glowFrameSources.hasAnyContribution,
+            hasOutline,
+            chamsCapturer.hasContribution,
+        )
         if (plan.isEmpty()) return
 
         IrisPipelineBypass.run {
             try {
+                if (EspPostProcessPass.CHAMS_COMPOSITE in plan) {
+                    chamsCapturer.composite(target)
+                }
                 val activeSources = glowFrameSources.activeSources
                 val maskSources = glowFrameSources.maskSources
                 activeSources.forEach { source ->
@@ -268,6 +278,7 @@ object EspShaderRenderer : MinecraftShortcuts, EventListener {
         blurPing.close()
         blurPong.close()
         outlineStyleData.buffer().close()
+        chamsCapturer.close()
     }
 }
 
@@ -493,4 +504,5 @@ private object EspCompositePassRenderer {
             pass.draw(3, 1, 0, 0)
         }
     }
+
 }

@@ -18,7 +18,10 @@ class EspPostProcessPlanTest {
 
     @Test
     fun `targetless frame schedules no post processing`() {
-        assertEquals(emptyList<EspPostProcessPass>(), EspPostProcessPlan.create(hasGlow = false, hasOutline = false))
+        assertEquals(
+            emptyList<EspPostProcessPass>(),
+            EspPostProcessPlan.create(hasGlow = false, hasOutline = false, hasChams = false),
+        )
     }
 
     @Test
@@ -30,7 +33,7 @@ class EspPostProcessPlanTest {
                 EspPostProcessPass.BLUR_VERTICAL,
                 EspPostProcessPass.GLOW_COMPOSITE,
             ),
-            EspPostProcessPlan.create(hasGlow = true, hasOutline = false),
+            EspPostProcessPlan.create(hasGlow = true, hasOutline = false, hasChams = false),
         )
     }
 
@@ -38,7 +41,7 @@ class EspPostProcessPlanTest {
     fun `outline schedules only its composite`() {
         assertEquals(
             listOf(EspPostProcessPass.OUTLINE_COMPOSITE),
-            EspPostProcessPlan.create(hasGlow = false, hasOutline = true),
+            EspPostProcessPlan.create(hasGlow = false, hasOutline = true, hasChams = false),
         )
     }
 

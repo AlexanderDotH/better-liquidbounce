@@ -18,6 +18,7 @@ import net.ccbluex.liquidbounce.features.module.modules.render.ModuleOrbESP;
 import net.ccbluex.liquidbounce.features.module.modules.render.ModuleStorageESP;
 import net.ccbluex.liquidbounce.features.module.modules.render.esp.ModuleESP;
 import net.ccbluex.liquidbounce.features.module.modules.render.esp.modes.EspGlowMode;
+import net.ccbluex.liquidbounce.features.module.modules.render.esp.modes.EspChamsMode;
 import net.ccbluex.liquidbounce.features.module.modules.render.esp.modes.EspOutlineMode;
 import net.ccbluex.liquidbounce.utils.combat.CombatExtensionsKt;
 import net.minecraft.world.entity.Entity;
@@ -56,7 +57,9 @@ public final class EspMaskTargetSelector {
 
         if (entity instanceof LivingEntity livingEntity && CombatExtensionsKt.shouldBeShown(livingEntity)) {
             int color = ModuleESP.INSTANCE.getColor(livingEntity).argb();
-            if (EspGlowMode.INSTANCE.getRunning() && EspGlowMode.INSTANCE.shouldRender(livingEntity)) {
+            if (EspChamsMode.INSTANCE.getRunning() && EspChamsMode.INSTANCE.shouldRender(livingEntity)) {
+                request = request.with(EspMaskLayer.ENTITY_CHAMS, color);
+            } else if (EspGlowMode.INSTANCE.getRunning() && EspGlowMode.INSTANCE.shouldRender(livingEntity)) {
                 request = request.with(EspMaskLayer.PLAYER_GLOW, color);
             } else if (EspOutlineMode.INSTANCE.getRunning() && EspOutlineMode.INSTANCE.shouldRender(livingEntity)) {
                 request = request.with(EspMaskLayer.PLAYER_OUTLINE, color);
@@ -84,7 +87,9 @@ public final class EspMaskTargetSelector {
 
         request = request.with(EspMaskLayer.PROTECTED_SURFACE, PROTECTED_SURFACE_COLOR);
 
-        if (ModuleStorageESP.GlowMode.INSTANCE.getRunning()) {
+        if (ModuleStorageESP.ChamsMode.INSTANCE.getRunning()) {
+            request = request.with(EspMaskLayer.STORAGE_CHAMS, category.getColor().argb());
+        } else if (ModuleStorageESP.GlowMode.INSTANCE.getRunning()) {
             request = request.with(EspMaskLayer.STORAGE_GLOW, category.getColor().argb());
         } else if (ModuleStorageESP.OutlineMode.INSTANCE.getRunning()) {
             request = request.with(EspMaskLayer.STORAGE_OUTLINE, category.getColor().argb());
@@ -107,6 +112,10 @@ public final class EspMaskTargetSelector {
         }
 
         request = request.with(EspMaskLayer.PROTECTED_SURFACE, PROTECTED_SURFACE_COLOR);
+
+        if (ModuleStorageESP.ChamsMode.INSTANCE.getRunning()) {
+            return request.with(EspMaskLayer.STORAGE_CHAMS, category.getColor().argb());
+        }
 
         if (ModuleStorageESP.GlowMode.INSTANCE.getRunning()) {
             return request.with(EspMaskLayer.STORAGE_GLOW, category.getColor().argb());

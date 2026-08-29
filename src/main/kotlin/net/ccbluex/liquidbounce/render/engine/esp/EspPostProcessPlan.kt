@@ -16,12 +16,18 @@ enum class EspPostProcessPass {
     BLUR_HORIZONTAL,
     BLUR_VERTICAL,
     GLOW_COMPOSITE,
+    CHAMS_COMPOSITE,
     OUTLINE_COMPOSITE,
 }
 
 object EspPostProcessPlan {
 
-    fun create(hasGlow: Boolean, hasOutline: Boolean): List<EspPostProcessPass> = buildList(5) {
+    fun create(
+        hasGlow: Boolean,
+        hasOutline: Boolean,
+        hasChams: Boolean,
+    ): List<EspPostProcessPass> = buildList(6) {
+        if (hasChams) add(EspPostProcessPass.CHAMS_COMPOSITE)
         if (hasGlow) {
             add(EspPostProcessPass.DOWNSAMPLE)
             add(EspPostProcessPass.BLUR_HORIZONTAL)

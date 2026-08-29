@@ -48,6 +48,16 @@ data class EspOutlineStyle(
     }
 }
 
+data class EspChamsStyle(val opacity: Float) {
+    init {
+        require(opacity in 0f..1f) { "Chams opacity must be between zero and one" }
+    }
+
+    companion object {
+        val DEFAULT = EspChamsStyle(opacity = 0.7f)
+    }
+}
+
 class EspGlowStyleConfig(owner: ValueGroup) {
     private val radius by owner.float("Radius", EspGlowStyle.DEFAULT.radius, 4f..24f, "px")
     private val softness by owner.float("Softness", EspGlowStyle.DEFAULT.softness, 0.5f..1.5f)
@@ -76,6 +86,13 @@ class EspOutlineStyleConfig(owner: ValueGroup) {
 
     val style: EspOutlineStyle
         get() = EspOutlineStyle(thickness, opacity / 100f)
+}
+
+class EspChamsStyleConfig(owner: ValueGroup) {
+    private val opacity by owner.int("Opacity", 70, 0..100, "%")
+
+    val style: EspChamsStyle
+        get() = EspChamsStyle(opacity / 100f)
 }
 
 /**
@@ -120,6 +137,11 @@ object EspShaderStyleResolver {
         }
         return resolved ?: EspOutlineStyle.DEFAULT
     }
+
+    fun resolveChams(vararg styles: EspChamsStyle?): EspChamsStyle = EspChamsStyle(
+        opacity = styles.filterNotNull().maxOfOrNull(EspChamsStyle::opacity)
+            ?: EspChamsStyle.DEFAULT.opacity,
+    )
 }
 
 /**
