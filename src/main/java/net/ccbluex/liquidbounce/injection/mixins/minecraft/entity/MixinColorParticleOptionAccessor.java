@@ -17,11 +17,16 @@
  * along with LiquidBounce. If not, see <https://www.gnu.org/licenses/>.
  */
 
-package net.ccbluex.liquidbounce.lang
+package net.ccbluex.liquidbounce.injection.mixins.minecraft.entity;
 
-import net.minecraft.network.chat.contents.TranslatableContents
+import net.minecraft.core.particles.ColorParticleOption;
+import org.spongepowered.asm.mixin.Mixin;
+import org.spongepowered.asm.mixin.gen.Accessor;
 
-// Here [args] is NullMarked but actually nullable, safe cast
-@Suppress("UNCHECKED_CAST")
-class LanguageText(key: String, args: Array<out Any?>) :
-    TranslatableContents(key, null, args as Array<out Any>)
+@Mixin(ColorParticleOption.class)
+public interface MixinColorParticleOptionAccessor {
+
+    @Accessor("color")
+    int getColor();
+
+}
