@@ -45,7 +45,6 @@ import net.ccbluex.liquidbounce.features.module.modules.combat.ModuleHitbox
 import net.ccbluex.liquidbounce.features.module.modules.combat.ModuleKeepSprint
 import net.ccbluex.liquidbounce.features.module.modules.combat.ModuleMaceKill
 import net.ccbluex.liquidbounce.features.module.modules.combat.ModuleNoMissCooldown
-import net.ccbluex.liquidbounce.features.module.modules.combat.ModuleSuperHit
 import net.ccbluex.liquidbounce.features.module.modules.combat.ModuleSpearKill
 import net.ccbluex.liquidbounce.features.module.modules.combat.ModuleSuperKnockback
 import net.ccbluex.liquidbounce.features.module.modules.combat.ModuleSwordBlock
@@ -114,6 +113,7 @@ import net.ccbluex.liquidbounce.features.module.modules.misc.ModuleMiddleClickAc
 import net.ccbluex.liquidbounce.features.module.modules.misc.ModuleNotifier
 import net.ccbluex.liquidbounce.features.module.modules.misc.ModulePacketLogger
 import net.ccbluex.liquidbounce.features.module.modules.misc.ModulePlayerPositionLogger
+import net.ccbluex.liquidbounce.features.module.modules.misc.ModuleSafeActions
 import net.ccbluex.liquidbounce.features.module.modules.misc.ModuleSpammer
 import net.ccbluex.liquidbounce.features.module.modules.misc.ModuleTargetLock
 import net.ccbluex.liquidbounce.features.module.modules.misc.ModuleTeams
@@ -267,6 +267,7 @@ import net.ccbluex.liquidbounce.features.module.modules.world.ModuleGroundSpoof
 import net.ccbluex.liquidbounce.features.module.modules.world.ModuleHoleFiller
 import net.ccbluex.liquidbounce.features.module.modules.world.ModuleLiquidFiller
 import net.ccbluex.liquidbounce.features.module.modules.world.ModuleLiquidPlace
+import net.ccbluex.liquidbounce.features.module.modules.world.ModuleLitematica
 import net.ccbluex.liquidbounce.features.module.modules.world.ModuleNoInterpolation
 import net.ccbluex.liquidbounce.features.module.modules.world.ModuleNoSlowBreak
 import net.ccbluex.liquidbounce.features.module.modules.world.ModuleProjectilePuncher
@@ -485,7 +486,6 @@ object ModuleManager : EventListener, Collection<ClientModule> by modules {
             ModuleFightBot,
             ModuleKillAura,
             ModuleTpAura,
-            ModuleSuperHit,
             ModuleSuperKnockback,
             ModuleTimerRange,
             ModuleTickBase,
@@ -566,6 +566,7 @@ object ModuleManager : EventListener, Collection<ClientModule> by modules {
             ModuleFlagCheck,
             ModulePacketLogger,
             ModulePlayerPositionLogger,
+            ModuleSafeActions,
             ModuleDebugRecorder,
             ModuleAntiCheatDetect,
             ModulePlayerCheatDetector,
@@ -721,6 +722,7 @@ object ModuleManager : EventListener, Collection<ClientModule> by modules {
             ModuleNoSlowBreak,
             ModuleLiquidFiller,
             ModuleLiquidPlace,
+            ModuleLitematica,
             ModuleProjectilePuncher,
             ModuleScaffold,
             ModuleTimer,
@@ -780,7 +782,14 @@ object ModuleManager : EventListener, Collection<ClientModule> by modules {
 
     @JvmName("getModuleByName")
     @ScriptApiRequired
-    fun getModuleByName(module: String) = find { it.name.equals(module, true) }
+    fun getModuleByName(module: String) = findModuleByNameOrAlias(module)
 
-    operator fun get(moduleName: String) = modules.find { it.name.equals(moduleName, true) }
+    operator fun get(moduleName: String) = findModuleByNameOrAlias(moduleName)
+
+    private fun findModuleByNameOrAlias(moduleName: String) = findByExactNameOrAlias(
+        values = modules,
+        requestedName = moduleName,
+        nameOf = ClientModule::name,
+        aliasesOf = ClientModule::aliases,
+    )
 }

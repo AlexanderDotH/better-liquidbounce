@@ -38,7 +38,9 @@
   },
   "suggests": {
     "fabric": ">=${fabric_version}",
-    "viafabricplus": ">=${viafabricplus_version}"
+    "viafabricplus": ">=${viafabricplus_version}",
+    "litematica": "=0.28.4",
+    "malilib": "=0.29.3"
   },
   "breaks": {
     "viafabricplus": "<${viafabricplus_version}"
