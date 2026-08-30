@@ -19,7 +19,6 @@
 
 package net.ccbluex.liquidbounce.injection.mixins.minecraft.render;
 
-import net.ccbluex.liquidbounce.features.module.modules.render.DoRender;
 import net.ccbluex.liquidbounce.features.module.modules.render.ModuleAntiBlind;
 import net.ccbluex.liquidbounce.features.module.modules.render.ModuleFullBright;
 import net.ccbluex.liquidbounce.features.module.modules.render.ModuleXRay;
@@ -60,7 +59,7 @@ public abstract class MixinLightmapRenderStateExtractor {
     // Turns off blinking when the darkness effect is active.
     @ModifyVariable(method = "extract", at = @At(value = "STORE"), name = "darknessEffectScaleOption")
     private float injectAntiDarkness(float darknessEffectScaleOption) {
-        return ModuleAntiBlind.canRender(DoRender.DARKNESS) ? darknessEffectScaleOption : 0f;
+        return ModuleAntiBlind.canRenderDarkness() ? darknessEffectScaleOption : 0f;
     }
 
 }

@@ -24,11 +24,15 @@ import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
 import com.llamalad7.mixinextras.sugar.Local;
 import com.mojang.blaze3d.vertex.PoseStack;
-import net.ccbluex.liquidbounce.features.module.modules.render.*;
+import net.ccbluex.liquidbounce.features.module.modules.render.ModuleAntiBlind;
+import net.ccbluex.liquidbounce.features.module.modules.render.ModuleCombineMobs;
+import net.ccbluex.liquidbounce.features.module.modules.render.ModuleItemESP;
+import net.ccbluex.liquidbounce.features.module.modules.render.ModuleMobOwners;
+import net.ccbluex.liquidbounce.features.module.modules.render.ModuleTNTTimer;
 import net.ccbluex.liquidbounce.features.module.modules.render.nametags.ModuleNametags;
 import net.ccbluex.liquidbounce.interfaces.EntityRenderStateAddition;
 import net.ccbluex.liquidbounce.render.engine.type.Color4b;
-import net.ccbluex.liquidbounce.utils.render.PlayerModelNametagHook;
+import net.ccbluex.liquidbounce.render.playermodel.PlayerModelNametagHook;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.renderer.SubmitNodeCollector;
@@ -68,7 +72,7 @@ public abstract class MixinEntityRenderer<T extends Entity, S extends EntityRend
             cir.setReturnValue(false);
         }
 
-        if (entity instanceof FallingBlockEntity && !ModuleAntiBlind.canRender(DoRender.FALLING_BLOCKS)) {
+        if (entity instanceof FallingBlockEntity && !ModuleAntiBlind.canRenderFallingBlocks()) {
             cir.setReturnValue(false);
         }
     }

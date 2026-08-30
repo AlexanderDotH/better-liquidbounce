@@ -1,0 +1,93 @@
+{
+  "schemaVersion": 1,
+  "includedExtensions": [
+    "cjs",
+    "java",
+    "js",
+    "kt",
+    "kts",
+    "mjs",
+    "py",
+    "sh",
+    "svelte",
+    "ts"
+  ],
+  "excludedDirectoryNames": [
+    ".git",
+    ".gradle",
+    ".idea",
+    ".kotlin",
+    ".svelte-kit",
+    "build",
+    "dist",
+    "generated",
+    "node_modules",
+    "out",
+    "third_party",
+    "vendor"
+  ],
+  "excludedPathPrefixes": [
+    "src/main/resources",
+    "src-theme/public"
+  ],
+  "testPathPrefixes": [
+    "buildSrc/src/test",
+    "scripts/tests",
+    "src-theme/test",
+    "src/test",
+    "tools/macekill-lab/observer-plugin/src/test"
+  ],
+  "uiPathPrefixes": [
+    "src-theme"
+  ],
+  "testFileNamePatterns": [
+    ".*(?:Test|Tests|Spec)\\.(?:java|kt)$",
+    ".*\\.(?:spec|test)\\.(?:cjs|js|mjs|ts)$"
+  ],
+  "limits": {
+    "production": 200,
+    "ui": 200,
+    "test": 300
+  },
+  "methods": {
+    "productionLines": 40,
+    "testLines": 60,
+    "complexity": 12,
+    "nesting": 3
+  },
+  "forbiddenSuppressions": [
+    "CognitiveComplexMethod",
+    "LargeClass",
+    "LongMethod",
+    "NestedBlockDepth",
+    "TooManyFunctions"
+  ],
+  "packageRoots": [
+    "buildSrc/src/main/kotlin",
+    "buildSrc/src/test/kotlin",
+    "src/main/java",
+    "src/main/kotlin",
+    "src/test/kotlin",
+    "tools/macekill-lab/observer-plugin/src/main/java",
+    "tools/macekill-lab/observer-plugin/src/test/java"
+  ],
+  "categoryRoots": [
+    "src/main/kotlin/net/ccbluex/liquidbounce/features/module/modules/combat",
+    "src/main/kotlin/net/ccbluex/liquidbounce/features/module/modules/exploit",
+    "src/main/kotlin/net/ccbluex/liquidbounce/features/module/modules/fun",
+    "src/main/kotlin/net/ccbluex/liquidbounce/features/module/modules/misc",
+    "src/main/kotlin/net/ccbluex/liquidbounce/features/module/modules/movement",
+    "src/main/kotlin/net/ccbluex/liquidbounce/features/module/modules/player",
+    "src/main/kotlin/net/ccbluex/liquidbounce/features/module/modules/render",
+    "src/main/kotlin/net/ccbluex/liquidbounce/features/module/modules/world"
+  ],
+  "strategyDirectories": [
+    "exploits",
+    "modes",
+    "triggers"
+  ],
+  "prefixCluster": {
+    "minimumFiles": 5,
+    "minimumTokens": 2
+  }
+}

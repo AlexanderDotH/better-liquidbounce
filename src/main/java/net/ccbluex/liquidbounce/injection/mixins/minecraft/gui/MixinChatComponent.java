@@ -20,17 +20,13 @@ package net.ccbluex.liquidbounce.injection.mixins.minecraft.gui;
 
 import com.llamalad7.mixinextras.injector.ModifyExpressionValue;
 import com.llamalad7.mixinextras.sugar.Local;
-import net.ccbluex.liquidbounce.features.module.modules.misc.betterchat.ChatNameHighlightPolicy;
 import net.ccbluex.liquidbounce.features.module.modules.misc.betterchat.ModuleBetterChat;
 import net.ccbluex.liquidbounce.interfaces.GuiMessageLineAddition;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.Font;
-import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.components.ChatComponent;
 import net.minecraft.client.multiplayer.chat.GuiMessage;
 import net.minecraft.util.ArrayListDeque;
 import net.minecraft.util.FormattedCharSequence;
-import net.minecraft.util.Mth;
 import org.spongepowered.asm.mixin.*;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
@@ -136,164 +132,6 @@ public abstract class MixinChatComponent {
         }
 
         ci.cancel();
-    }
-
-    @Inject(method = "extractRenderState(Lnet/minecraft/client/gui/GuiGraphicsExtractor;Lnet/minecraft/client/gui/Font;IIILnet/minecraft/client/gui/components/ChatComponent$DisplayMode;Z)V", at = @At("TAIL"))
-    private void hookRenderHighlights(
-        GuiGraphicsExtractor graphics,
-        Font font,
-        int tickCount,
-        int globalMouseX,
-        int globalMouseY,
-        ChatComponent.DisplayMode displayMode,
-        boolean changeCursorOnInsertions,
-        CallbackInfo ci
-    ) {
-        var betterChat = ModuleBetterChat.INSTANCE;
-        var player = minecraft.player;
-        boolean nameHighlightEnabled = betterChat.getRunning()
-            && ModuleBetterChat.NameHighlight.INSTANCE.getRunning()
-            && player != null;
-        boolean copyHighlightEnabled = displayMode.foreground
-            && betterChat.getRunning()
-            && ModuleBetterChat.Copy.INSTANCE.getRunning()
-            && ModuleBetterChat.Copy.INSTANCE.getHighlight();
-        if (!nameHighlightEnabled && !copyHighlightEnabled) {
-            return;
-        }
-
-        if (trimmedMessages.isEmpty()) {
-            return;
-        }
-
-        var accessor = (MixinChatComponentAccessor) this;
-        double chatScale = accessor.invokeGetScale();
-        if (chatScale <= 0.0) {
-            return;
-        }
-
-        int chatWidth = (int) Math.ceil(accessor.invokeGetWidth() / chatScale);
-        int lineHeight = accessor.invokeGetLineHeight();
-        if (lineHeight <= 0) {
-            return;
-        }
-
-        int guiHeight = minecraft.getWindow().getGuiScaledHeight();
-        int chatBottom = (int) Math.floor((guiHeight - 40) / chatScale);
-        int visibleLineCount = Math.min(accessor.invokeGetLinesPerPage(), trimmedMessages.size() - chatScrollbarPos);
-        if (visibleLineCount <= 0) {
-            return;
-        }
-
-        if (nameHighlightEnabled) {
-            //noinspection DataFlowIssue - guarded by nameHighlightEnabled
-            liquid_bounce$renderNameHighlights(
-                graphics,
-                tickCount,
-                displayMode.foreground,
-                player.getGameProfile().name(),
-                chatScale,
-                chatWidth,
-                lineHeight,
-                chatBottom,
-                visibleLineCount
-            );
-        }
-
-        if (!copyHighlightEnabled) {
-            return;
-        }
-
-        double localMouseX = globalMouseX / chatScale - 4.0;
-        if (localMouseX < 0.0 || localMouseX > chatWidth) {
-            return;
-        }
-
-        double localMouseY = chatBottom - globalMouseY / chatScale;
-        if (localMouseY < 0.0) {
-            return;
-        }
-
-        int lineIndex = (int) Math.floor(localMouseY / lineHeight);
-        if (lineIndex < 0 || lineIndex >= visibleLineCount) {
-            return;
-        }
-
-        int messageIndex = lineIndex + chatScrollbarPos;
-        if (messageIndex < 0 || messageIndex >= trimmedMessages.size()) {
-            return;
-        }
-
-        var messageBounds = ModuleBetterChat.resolveMessageBounds(trimmedMessages, messageIndex);
-        int visibleStart = chatScrollbarPos;
-        int visibleEnd = visibleStart + visibleLineCount - 1;
-        int highlightedStart = Math.max(messageBounds.getStart(), visibleStart);
-        int highlightedEnd = Math.min(messageBounds.getEndInclusive(), visibleEnd);
-        if (highlightedStart > highlightedEnd) {
-            return;
-        }
-
-        int startLineIndex = highlightedStart - visibleStart;
-        int endLineIndex = highlightedEnd - visibleStart;
-        int left = (int) Math.floor(4.0 * chatScale);
-        int right = (int) Math.ceil((chatWidth + 4.0) * chatScale);
-        int top = (int) Math.floor((chatBottom - (endLineIndex + 1) * lineHeight) * chatScale);
-        int bottom = (int) Math.ceil((chatBottom - startLineIndex * lineHeight) * chatScale);
-        graphics.fill(left, top, right, bottom, 0x4422AAFF);
-    }
-
-    @Unique
-    private void liquid_bounce$renderNameHighlights(
-        GuiGraphicsExtractor graphics,
-        int tickCount,
-        boolean foreground,
-        String playerName,
-        double chatScale,
-        int chatWidth,
-        int lineHeight,
-        int chatBottom,
-        int visibleLineCount
-    ) {
-        int left = 0;
-        int right = (int) Math.ceil((chatWidth + 12.0) * chatScale);
-        GuiMessage previousParent = null;
-        Integer highlightColor = null;
-
-        for (int lineIndex = 0; lineIndex < visibleLineCount; lineIndex++) {
-            var line = trimmedMessages.get(lineIndex + chatScrollbarPos);
-            var parent = line.parent();
-            if (parent != previousParent) {
-                float visibility = liquid_bounce$messageVisibility(tickCount, line, foreground);
-                highlightColor = visibility > 1.0E-5F
-                    ? ChatNameHighlightPolicy.colorFor(
-                        parent.content().getString(),
-                        playerName,
-                        ModuleBetterChat.NameHighlight.INSTANCE.getColor(),
-                        visibility
-                    )
-                    : null;
-                previousParent = parent;
-            }
-
-            if (highlightColor == null || highlightColor >>> 24 == 0) {
-                continue;
-            }
-
-            int top = (int) Math.floor((chatBottom - (lineIndex + 1) * lineHeight) * chatScale);
-            int bottom = (int) Math.ceil((chatBottom - lineIndex * lineHeight) * chatScale);
-            graphics.fill(left, top, right, bottom, highlightColor);
-        }
-    }
-
-    @Unique
-    private static float liquid_bounce$messageVisibility(int tickCount, GuiMessage.Line line, boolean foreground) {
-        if (foreground) {
-            return 1.0F;
-        }
-
-        double visibility = 1.0 - (tickCount - line.addedTime()) / 200.0;
-        visibility = Mth.clamp(visibility * 10.0, 0.0, 1.0);
-        return (float) (visibility * visibility);
     }
 
 }

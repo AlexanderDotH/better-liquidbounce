@@ -10,7 +10,7 @@
  */
 package net.ccbluex.liquidbounce.features.litematica.render
 
-import net.ccbluex.liquidbounce.event.events.WorldRenderEvent
+import net.ccbluex.liquidbounce.render.events.WorldRenderEvent
 import net.ccbluex.liquidbounce.render.FULL_BOX
 import net.ccbluex.liquidbounce.render.drawBox
 import net.ccbluex.liquidbounce.render.renderEnvironment

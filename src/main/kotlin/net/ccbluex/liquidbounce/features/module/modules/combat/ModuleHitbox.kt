@@ -22,7 +22,7 @@ import net.ccbluex.liquidbounce.event.events.EntityMarginEvent
 import net.ccbluex.liquidbounce.event.handler
 import net.ccbluex.liquidbounce.features.module.ClientModule
 import net.ccbluex.liquidbounce.features.module.ModuleCategories
-import net.ccbluex.liquidbounce.utils.combat.shouldBeAttacked
+import net.ccbluex.liquidbounce.features.combat.runtime.shouldBeAttacked
 
 /**
  * Hitbox module

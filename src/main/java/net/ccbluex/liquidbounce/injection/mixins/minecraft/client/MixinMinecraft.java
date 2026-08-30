@@ -25,36 +25,28 @@ import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
 import com.llamalad7.mixinextras.sugar.Local;
 import com.mojang.blaze3d.platform.Window;
-import net.ccbluex.liquidbounce.LiquidBounce;
 import net.ccbluex.liquidbounce.event.CoroutineTicker;
 import net.ccbluex.liquidbounce.event.EventManager;
 import net.ccbluex.liquidbounce.event.TickLoopTaskExecutor;
 import net.ccbluex.liquidbounce.event.events.*;
-import net.ccbluex.liquidbounce.features.misc.HideAppearance;
 import net.ccbluex.liquidbounce.features.module.modules.combat.ModuleAutoClicker;
 import net.ccbluex.liquidbounce.features.module.modules.combat.ModuleNoMissCooldown;
 import net.ccbluex.liquidbounce.features.module.modules.combat.ModuleSpearKill;
-import net.ccbluex.liquidbounce.features.module.modules.combat.killaura.features.KillAuraAutoBlock;
 import net.ccbluex.liquidbounce.features.module.modules.exploit.ModuleMultiActions;
 import net.ccbluex.liquidbounce.features.module.modules.misc.ModuleMiddleClickAction;
 import net.ccbluex.liquidbounce.features.module.modules.movement.autododge.ModuleAutoDodge;
 import net.ccbluex.liquidbounce.features.module.modules.player.ModuleAutoBreak;
 import net.ccbluex.liquidbounce.features.module.modules.player.ModuleNoBlockInteract;
 import net.ccbluex.liquidbounce.features.module.modules.player.ModuleReach;
-import net.ccbluex.liquidbounce.features.module.modules.player.reach.interactable.ReachInteractableFeature;
 import net.ccbluex.liquidbounce.features.module.modules.render.ModuleFreeCam;
-import net.ccbluex.liquidbounce.features.module.modules.render.playermodel.ServerPlayerModelStateTracker;
+import net.ccbluex.liquidbounce.injection.hooks.MinecraftTitleHook;
 import net.ccbluex.liquidbounce.injection.mixins.minecraft.entity.MixinEntityAccessor;
-import net.ccbluex.liquidbounce.integration.backend.BrowserBackendManager;
-import net.ccbluex.liquidbounce.integration.backend.browser.GlobalBrowserSettings;
+import net.ccbluex.liquidbounce.interfaces.MinecraftClientFeatureBridge;
 import net.ccbluex.liquidbounce.integration.screen.ScreenManager;
 import net.ccbluex.liquidbounce.render.ClientTesselator;
 import net.ccbluex.liquidbounce.render.buffers.StaticGpuBufferPool;
 import net.ccbluex.liquidbounce.render.mesh.MeshDraw;
 import net.ccbluex.liquidbounce.render.utils.RenderingDebug;
-import net.ccbluex.liquidbounce.utils.client.vfp.VfpCompatibility;
-import net.ccbluex.liquidbounce.utils.combat.CombatManager;
-import net.minecraft.SharedConstants;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.Options;
 import net.minecraft.client.User;
@@ -64,7 +56,6 @@ import net.minecraft.client.multiplayer.ClientPacketListener;
 import net.minecraft.client.multiplayer.MultiPlayerGameMode;
 import net.minecraft.client.multiplayer.ServerData;
 import net.minecraft.client.player.LocalPlayer;
-import net.minecraft.client.resources.language.I18n;
 import net.minecraft.client.server.IntegratedServer;
 import net.minecraft.util.profiling.ProfilerFiller;
 import net.minecraft.world.entity.Entity;
@@ -84,8 +75,6 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 import org.spongepowered.asm.mixin.injection.callback.LocalCapture;
-
-import static net.ccbluex.liquidbounce.utils.client.ProtocolUtilKt.getUsesViaFabricPlus;
 
 @Mixin(Minecraft.class)
 public abstract class MixinMinecraft {
@@ -173,68 +162,15 @@ public abstract class MixinMinecraft {
             ordinal = 1),
             cancellable = true)
     private void getClientTitle(CallbackInfoReturnable<String> callback) {
-        if (HideAppearance.INSTANCE.isHidingNow()) {
-            return;
+        String title = MinecraftTitleHook.buildTitle(
+            this::getConnection,
+            this::getCurrentServer,
+            () -> this.singleplayerServer,
+            () -> this.level == null && this.player == null
+        );
+        if (title != null) {
+            callback.setReturnValue(title);
         }
-
-        LiquidBounce.INSTANCE.getLogger().debug("Modifying window title");
-
-        StringBuilder titleBuilder = new StringBuilder(LiquidBounce.CLIENT_NAME);
-        titleBuilder.append(" v");
-        titleBuilder.append(LiquidBounce.INSTANCE.getClientVersion());
-        titleBuilder.append(" ");
-
-        if (LiquidBounce.IN_DEVELOPMENT) {
-            titleBuilder.append("(dev) ");
-        }
-
-        titleBuilder.append(LiquidBounce.INSTANCE.getClientCommit());
-
-        titleBuilder.append(" | ");
-
-        // ViaFabricPlus compatibility
-        if (getUsesViaFabricPlus()) {
-            var protocolVersion = VfpCompatibility.INSTANCE.unsafeGetProtocolVersion();
-
-            if (protocolVersion != null) {
-                titleBuilder.append(protocolVersion.name());
-            } else {
-                titleBuilder.append(SharedConstants.getCurrentVersion().name());
-            }
-        } else {
-            titleBuilder.append(SharedConstants.getCurrentVersion().name());
-        }
-
-        // For debugging purposes, will be removed until we have a stable release
-        var backend = BrowserBackendManager.INSTANCE.getBackend();
-        if (backend != null && backend.isInitialized() && backend.getAccelerationFlags().isSupported()) {
-            var accelerated = GlobalBrowserSettings.INSTANCE.getAccelerated();
-
-            if (accelerated != null && accelerated.get()) {
-                titleBuilder.append(" | Accelerated Paint is ON");
-                // Hotkey only works when not in-game
-                if (this.level == null && this.player == null) {
-                    titleBuilder.append(" [Hotkey: F12]");
-                }
-            }
-        }
-
-        ClientPacketListener clientPlayNetworkHandler = this.getConnection();
-        if (clientPlayNetworkHandler != null && clientPlayNetworkHandler.getConnection().isConnected()) {
-            titleBuilder.append(" - ");
-            ServerData serverInfo = this.getCurrentServer();
-            if (this.singleplayerServer != null && !this.singleplayerServer.isPublished()) {
-                titleBuilder.append(I18n.get("title.singleplayer"));
-            } else if (serverInfo != null && serverInfo.isRealm()) {
-                titleBuilder.append(I18n.get("title.multiplayer.realms"));
-            } else if (this.singleplayerServer == null && (serverInfo == null || !serverInfo.isLan())) {
-                titleBuilder.append(I18n.get("title.multiplayer.other"));
-            } else {
-                titleBuilder.append(I18n.get("title.multiplayer.lan"));
-            }
-        }
-
-        callback.setReturnValue(titleBuilder.toString());
     }
 
     /**
@@ -245,7 +181,7 @@ public abstract class MixinMinecraft {
         CoroutineTicker.INSTANCE.beginMinecraftTick();
         TickLoopTaskExecutor.INSTANCE.onTickLoopStart();
         CoroutineTicker.INSTANCE.tick();
-        ServerPlayerModelStateTracker.onGameTick();
+        MinecraftClientFeatureBridge.onGameTick();
         EventManager.INSTANCE.callEvent(GameTickEvent.INSTANCE);
     }
 
@@ -304,7 +240,7 @@ public abstract class MixinMinecraft {
         EventManager.INSTANCE.callEvent(useCooldownEvent);
         rightClickDelay = useCooldownEvent.getCooldown();
 
-        if (ReachInteractableFeature.claimUse()) {
+        if (MinecraftClientFeatureBridge.claimReachUse()) {
             callbackInfo.cancel();
         }
     }
@@ -364,7 +300,7 @@ public abstract class MixinMinecraft {
             return;
         }
 
-        if (CombatManager.INSTANCE.getShouldPauseCombat()) {
+        if (MinecraftClientFeatureBridge.shouldPauseCombat()) {
             cir.setReturnValue(false);
         }
     }
@@ -414,8 +350,7 @@ public abstract class MixinMinecraft {
     private boolean injectMultiActionsAttackingWhileUsingAndEnforcedBlockingState(boolean isUsingItem) {
         if (isUsingItem) {
             if (!this.options.keyUse.isDown()
-                && !(KillAuraAutoBlock.INSTANCE.getRunning()
-                && KillAuraAutoBlock.INSTANCE.getEnforcedBlockingHand() != null)
+                && !MinecraftClientFeatureBridge.hasEnforcedBlockingHand()
                 && !ModuleSpearKill.ownsKillAuraSpearUse()
                 && !ModuleAutoDodge.ownsSpearShieldUse()) {
                 this.gameMode.releaseUsingItem(this.player);
@@ -441,7 +376,7 @@ public abstract class MixinMinecraft {
 
     @Inject(method = "clearDownloadedResourcePacks", at = @At("HEAD"))
     private void handleDisconnection(CallbackInfo ci) {
-        ServerPlayerModelStateTracker.reset();
+        MinecraftClientFeatureBridge.resetPlayerModelState();
         EventManager.INSTANCE.callEvent(DisconnectEvent.INSTANCE);
     }
 

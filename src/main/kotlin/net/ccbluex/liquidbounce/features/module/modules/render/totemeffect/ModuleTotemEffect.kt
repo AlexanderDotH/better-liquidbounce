@@ -23,26 +23,25 @@ import net.ccbluex.liquidbounce.event.events.PacketEvent
 import net.ccbluex.liquidbounce.event.handler
 import net.ccbluex.liquidbounce.features.module.ClientModule
 import net.ccbluex.liquidbounce.features.module.ModuleCategories
-import net.ccbluex.liquidbounce.utils.collection.ExpiringList.Companion.ExpiringList
-import net.minecraft.network.protocol.game.ClientboundEntityEventPacket
 import net.ccbluex.liquidbounce.features.module.modules.render.totemeffect.modes.TotemEffectShockwave
 import net.ccbluex.liquidbounce.features.module.modules.render.totemeffect.modes.TotemEffectSoul
+import net.ccbluex.liquidbounce.features.module.modules.render.totemeffect.model.TotemPopSnapshot
+import net.ccbluex.liquidbounce.features.module.modules.render.totemeffect.runtime.TotemEffectRuntime
 import net.ccbluex.liquidbounce.utils.network.isDeathProtection
-import net.minecraft.world.entity.Entity
-import net.minecraft.world.phys.Vec3
+import net.minecraft.network.protocol.game.ClientboundEntityEventPacket
 
 object ModuleTotemEffect : ClientModule("TotemEffect", ModuleCategories.RENDER) {
 
-    val entities = ExpiringList<TotemPopSnapshot>()
+    private val runtime = TotemEffectRuntime(this)
 
-    val modes = choices("Mode", 0) {
+    val modes = choices("Mode", 0) { parent ->
         arrayOf(
-            TotemEffectShockwave,
-            TotemEffectSoul
+            TotemEffectShockwave(parent, runtime),
+            TotemEffectSoul(parent, runtime),
         )
-    }.apply { tagBy(this); onChanged { entities.clear() } }
+    }.apply { tagBy(this); onChanged { runtime.entities.clear() } }
 
-    override fun onDisabled() { entities.clear() }
+    override fun onDisabled() { runtime.entities.clear() }
 
     @Suppress("unused")
     private val totemHandler = handler<PacketEvent> { event ->
@@ -53,22 +52,8 @@ object ModuleTotemEffect : ClientModule("TotemEffect", ModuleCategories.RENDER) 
             val entity = event.packet.getEntity(world) ?: return@execute
 
             val lifetime = modes.activeMode.lifetime
-            entities.add(TotemPopSnapshot(entity), lifetime)
+            runtime.entities.add(TotemPopSnapshot(entity), lifetime)
         }
-    }
-
-    data class TotemPopSnapshot(
-        val pos: Vec3,
-        val xRot: Float,
-        val yRot: Float,
-        val bbHeight: Float,
-    ) {
-        constructor(entity: Entity) : this(
-            pos = entity.position(),
-            xRot = entity.xRot,
-            yRot = entity.yRot,
-            bbHeight = entity.bbHeight
-        )
     }
 
 }

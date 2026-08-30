@@ -12,14 +12,10 @@ package net.ccbluex.liquidbounce.features.module.modules.movement.vclip
 
 import com.google.gson.JsonObject
 import net.ccbluex.liquidbounce.config.types.group.Mode
-import net.ccbluex.liquidbounce.config.types.group.ModeValueGroup
 import net.ccbluex.liquidbounce.config.types.group.ToggleableValueGroup
-import net.ccbluex.liquidbounce.features.module.modules.movement.ModuleVClip
 import net.minecraft.world.entity.Entity
 
 internal abstract class VClipTargetMode(name: String) : Mode(name) {
-    final override val parent: ModeValueGroup<*>
-        get() = ModuleVClip.targets
 
     abstract fun resolve(
         entity: Entity,

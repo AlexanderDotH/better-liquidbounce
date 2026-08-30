@@ -19,33 +19,36 @@
 package net.ccbluex.liquidbounce.features.module.modules.`fun`.notebot.stages
 
 import net.ccbluex.fastutil.enumMapOf
-import net.ccbluex.liquidbounce.features.module.modules.`fun`.notebot.ModuleNotebot
-import net.ccbluex.liquidbounce.features.module.modules.`fun`.notebot.NoteBlockTracker
-import net.ccbluex.liquidbounce.features.module.modules.`fun`.notebot.NotebotEngine
+import net.ccbluex.liquidbounce.features.module.modules.`fun`.notebot.contract.NotebotRuntimeBridge
+import net.ccbluex.liquidbounce.features.module.modules.`fun`.notebot.contract.NotebotStage
 import net.ccbluex.liquidbounce.features.module.modules.`fun`.notebot.nbs.InstrumentNote
-import net.ccbluex.liquidbounce.utils.client.chat
+import net.ccbluex.liquidbounce.features.module.modules.`fun`.notebot.runtime.NoteBlockTracker
+import net.ccbluex.liquidbounce.features.module.modules.`fun`.notebot.runtime.NotebotEngine
+import net.ccbluex.liquidbounce.features.module.modules.`fun`.notebot.runtime.NotebotStageHandler
 import net.minecraft.ChatFormatting
 
-class NotebotTuneStageHandler(engine: NotebotEngine) : ModuleNotebot.NotebotStageHandler {
+internal class NotebotTuneStageHandler(engine: NotebotEngine) : NotebotStageHandler {
 
-    private val progressName = ModuleNotebot.message("progressTune")
+    private val progressName = NotebotRuntimeBridge.message("progressTune")
     private val assignments: Map<InstrumentNote, List<NoteBlockTracker>> = this.assignBlocks(engine)
     private val blocks: List<Pair<NoteBlockTracker, InstrumentNote>> = assignments.flatMap { note ->
         note.value.map { block -> block to note.key }
     }
 
-    override val handledStage: ModuleNotebot.NotebotStage
-        get() = ModuleNotebot.NotebotStage.TUNE
+    override val handledStage: NotebotStage
+        get() = NotebotStage.TUNE
 
     init {
-        ModuleNotebot.setRenderedBlocks(blocks.map { it.first })
+        NotebotRuntimeBridge.setRenderedBlocks(blocks.map { it.first.pos })
     }
 
     override fun onTick(engine: NotebotEngine) {
         val untunedBlocks = blocks.filter { (block, note) -> block.currentNote != note.noteValue }
 
         if (untunedBlocks.isEmpty()) {
-            chat(ModuleNotebot.message("startPlaying").withStyle(ChatFormatting.GREEN), ModuleNotebot)
+            NotebotRuntimeBridge.chat(
+                NotebotRuntimeBridge.message("startPlaying").withStyle(ChatFormatting.GREEN)
+            )
             engine.changeStage(NotebotPlayStageHandler(this.assignments))
 
             return
@@ -55,7 +58,7 @@ class NotebotTuneStageHandler(engine: NotebotEngine) : ModuleNotebot.NotebotStag
 
         blockToTune?.first?.tuneOnce()
 
-        ModuleNotebot.sendNewProgressMessage(progressName, this.blocks.size - untunedBlocks.size, this.blocks.size)
+        NotebotRuntimeBridge.sendProgress(progressName, blocks.size - untunedBlocks.size, blocks.size)
     }
 
     private fun assignBlocks(engine: NotebotEngine): Map<InstrumentNote, List<NoteBlockTracker>> {

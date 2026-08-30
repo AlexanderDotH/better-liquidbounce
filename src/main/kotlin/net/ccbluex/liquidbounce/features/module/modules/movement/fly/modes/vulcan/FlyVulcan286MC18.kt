@@ -25,9 +25,8 @@ import net.ccbluex.liquidbounce.event.events.BlockShapeEvent
 import net.ccbluex.liquidbounce.event.events.PacketEvent
 import net.ccbluex.liquidbounce.event.events.PlayerTickEvent
 import net.ccbluex.liquidbounce.event.handler
-import net.ccbluex.liquidbounce.features.module.modules.movement.fly.ModuleFly
-import net.ccbluex.liquidbounce.features.module.modules.movement.fly.ModuleFly.message
-import net.ccbluex.liquidbounce.features.module.modules.movement.fly.ModuleFly.modes
+import net.ccbluex.liquidbounce.features.module.modules.movement.fly.runtime.FlyModuleControl
+import net.ccbluex.liquidbounce.features.module.modules.movement.fly.runtime.FlyModuleControl.message
 import net.ccbluex.liquidbounce.features.module.modules.movement.fly.automation.FlyAutomationCapabilities
 import net.ccbluex.liquidbounce.features.module.modules.movement.fly.automation.FlyAutomationEnd
 import net.ccbluex.liquidbounce.features.module.modules.movement.fly.automation.FlyAutomationKind
@@ -36,8 +35,8 @@ import net.ccbluex.liquidbounce.features.module.modules.movement.fly.automation.
 import net.ccbluex.liquidbounce.features.module.modules.movement.fly.modes.FlyAutomaticEndSignal
 import net.ccbluex.liquidbounce.features.module.modules.movement.fly.modes.flyAutomationSneak
 import net.ccbluex.liquidbounce.utils.client.Timer
-import net.ccbluex.liquidbounce.utils.client.chat
-import net.ccbluex.liquidbounce.utils.client.regular
+import net.ccbluex.liquidbounce.features.chat.chat
+import net.ccbluex.liquidbounce.utils.text.regular
 import net.ccbluex.liquidbounce.utils.kotlin.Priority
 import net.minecraft.network.protocol.game.ClientboundPlayerPositionPacket
 import net.minecraft.world.phys.Vec3
@@ -56,9 +55,6 @@ internal object FlyVulcan286MC18 : Mode("Vulcan286-18"), FlyAutomationProfile {
     // 2.5 is the maximum timer tested.
     private val timer by float("Timer", 2.5f, 1f..2.5f)
     private val autoDisable by boolean("AutoDisable", false)
-
-    override val parent: ModeValueGroup<*>
-        get() = modes
 
     var flags = 0
     private var flagPos: Vec3? = null
@@ -90,7 +86,7 @@ internal object FlyVulcan286MC18 : Mode("Vulcan286-18"), FlyAutomationProfile {
     val tickHandler = handler<PlayerTickEvent> {
         if (flags > 1) {
             // 1.8 vulcan allows timer while desynced, 1.9 doesn't.
-            Timer.requestTimerSpeed(timer, Priority.NORMAL, ModuleFly, 1)
+            Timer.requestTimerSpeed(timer, Priority.NORMAL, FlyModuleControl.module, 1)
         }
     }
 
@@ -125,7 +121,7 @@ internal object FlyVulcan286MC18 : Mode("Vulcan286-18"), FlyAutomationProfile {
                     flagPos = pos
                 } else if (flags > 2 && flagPos != pos) {
                     automaticEnd.mark("Vulcan desync position changed")
-                    ModuleFly.enabled = false
+                    FlyModuleControl.disable()
                     // Return here so we accept this packet
                     return@handler
                 }

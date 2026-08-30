@@ -26,13 +26,14 @@ import net.ccbluex.liquidbounce.event.events.EntityHealthUpdateEvent;
 import net.ccbluex.liquidbounce.event.events.PlayerAfterJumpEvent;
 import net.ccbluex.liquidbounce.event.events.PlayerJumpEvent;
 import net.ccbluex.liquidbounce.features.module.modules.combat.elytratarget.ModuleElytraTarget;
-import net.ccbluex.liquidbounce.features.module.modules.movement.*;
-import net.ccbluex.liquidbounce.features.module.modules.render.DoRender;
+import net.ccbluex.liquidbounce.features.module.modules.movement.ModuleAirJump;
+import net.ccbluex.liquidbounce.features.module.modules.movement.ModuleAntiLevitation;
+import net.ccbluex.liquidbounce.features.module.modules.movement.ModuleElytraRecast;
+import net.ccbluex.liquidbounce.features.module.modules.movement.ModuleNoJumpDelay;
 import net.ccbluex.liquidbounce.features.module.modules.render.animations.ModuleAnimations;
 import net.ccbluex.liquidbounce.features.module.modules.render.ModuleAntiBlind;
 import net.ccbluex.liquidbounce.features.module.modules.render.hitfx.ModuleHitFX;
 import net.ccbluex.liquidbounce.features.module.modules.world.scaffold.ModuleScaffold;
-import net.ccbluex.liquidbounce.features.module.modules.world.scaffold.tower.ScaffoldTowerNone;
 import net.ccbluex.liquidbounce.interfaces.LivingEntityAddition;
 import net.ccbluex.liquidbounce.utils.aiming.RotationManager;
 import net.ccbluex.liquidbounce.utils.aiming.features.MovementCorrection;
@@ -250,9 +251,7 @@ public abstract class MixinLivingEntity extends MixinEntity implements LivingEnt
         var noJumpDelay = ModuleNoJumpDelay.INSTANCE.getRunning() && !ModuleAirJump.INSTANCE.getAllowJump();
 
         // The jumping cooldown would lead to very slow tower building
-        var towerActive = ModuleScaffold.INSTANCE.getRunning() &&
-                ModuleScaffold.INSTANCE.getTowerMode().getActiveMode() != ScaffoldTowerNone.INSTANCE &&
-                ModuleScaffold.INSTANCE.getTowerMode().getActiveMode().getRunning();
+        var towerActive = ModuleScaffold.isTowerModeActive();
 
         if (noJumpDelay || towerActive) {
             this.noJumpDelay = 0;
@@ -308,7 +307,7 @@ public abstract class MixinLivingEntity extends MixinEntity implements LivingEnt
 
     @Inject(method = "spawnItemParticles", at = @At("HEAD"), cancellable = true)
     private void hookEatParticles(ItemStack itemStack, int count, CallbackInfo ci) {
-        if (itemStack.getComponents().has(DataComponents.FOOD) && !ModuleAntiBlind.canRender(DoRender.EAT_PARTICLES)) {
+        if (itemStack.getComponents().has(DataComponents.FOOD) && !ModuleAntiBlind.canRenderEatParticles()) {
             ci.cancel();
         }
     }

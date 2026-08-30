@@ -22,7 +22,6 @@ package net.ccbluex.liquidbounce.features.module.modules.movement.fly.modes.vulc
 import net.ccbluex.liquidbounce.config.types.group.Mode
 import net.ccbluex.liquidbounce.config.types.group.ModeValueGroup
 import net.ccbluex.liquidbounce.event.tickHandler
-import net.ccbluex.liquidbounce.features.module.modules.movement.fly.ModuleFly.modes
 import net.ccbluex.liquidbounce.features.module.modules.movement.fly.automation.FlyAutomationCapabilities
 import net.ccbluex.liquidbounce.features.module.modules.movement.fly.automation.FlyAutomationKind
 import net.ccbluex.liquidbounce.features.module.modules.movement.fly.automation.FlyAutomationProfile
@@ -35,9 +34,6 @@ import net.ccbluex.liquidbounce.features.module.modules.movement.fly.automation.
  * @note NA
  */
 internal object FlyVulcan277 : Mode("Vulcan277"), FlyAutomationProfile {
-
-    override val parent: ModeValueGroup<*>
-        get() = modes
 
     override val automationCapabilities = FlyAutomationCapabilities(
         horizontal = true,

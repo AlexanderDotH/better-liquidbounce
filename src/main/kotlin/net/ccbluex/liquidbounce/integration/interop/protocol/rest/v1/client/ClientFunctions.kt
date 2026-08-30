@@ -27,8 +27,9 @@ import io.ktor.server.routing.post
 import io.ktor.server.routing.put
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import net.ccbluex.liquidbounce.LiquidBounce
 import net.ccbluex.liquidbounce.api.services.client.ClientUpdate.update
+import net.ccbluex.liquidbounce.common.ClientBuildMetadata
+import net.ccbluex.liquidbounce.common.clientResource
 import net.ccbluex.liquidbounce.config.ConfigSystem
 import net.ccbluex.liquidbounce.config.types.FileDialogMode
 import net.ccbluex.liquidbounce.features.module.modules.render.ModuleHud
@@ -49,9 +50,9 @@ private fun Route.getClientInfo() = get("/info") {
     call.respond(JsonObject().apply {
         addProperty("os", Util.getPlatform().telemetryName())
         addProperty("gameVersion", mc.launchedVersion)
-        addProperty("clientVersion", LiquidBounce.clientVersion)
-        addProperty("clientName", LiquidBounce.CLIENT_NAME)
-        addProperty("development", LiquidBounce.IN_DEVELOPMENT)
+        addProperty("clientVersion", ClientBuildMetadata.version)
+        addProperty("clientName", ClientBuildMetadata.NAME)
+        addProperty("development", ClientBuildMetadata.IN_DEVELOPMENT)
         addProperty("fps", mc.fps)
         addProperty("gameDir", mc.gameDirectory.path)
         addProperty("clientDir", ConfigSystem.rootFolder.path)
@@ -65,8 +66,8 @@ private fun Route.getClientInfo() = get("/info") {
 @Suppress("ReturnCount")
 private fun Route.getUpdateInfo() = get("/update") {
     call.respond(JsonObject().apply {
-        addProperty("development", LiquidBounce.IN_DEVELOPMENT)
-        addProperty("commit", LiquidBounce.clientCommit)
+        addProperty("development", ClientBuildMetadata.IN_DEVELOPMENT)
+        addProperty("commit", ClientBuildMetadata.commit)
 
         val updateInfo = update.await() ?: return@apply
         add("update", JsonObject().apply {
@@ -169,7 +170,7 @@ private fun Route.postFileDialog() = post("/fileDialog") {
 private val POSSIBLE_URL_TARGETS: Map<String, URI> = buildMap {
     val properties = Properties()
 
-    properties.load(LiquidBounce::class.java.getResourceAsStream("/resources/liquidbounce/client_urls.properties"))
+    properties.load(clientResource("client_urls.properties"))
 
     properties.forEach { (k, v) ->
         this[k as String] = URI(v as String)

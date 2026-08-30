@@ -35,7 +35,7 @@ import io.ktor.server.routing.route
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import net.ccbluex.liquidbounce.config.ConfigSystem
-import net.ccbluex.liquidbounce.config.autoconfig.AutoConfig
+import net.ccbluex.liquidbounce.features.autoconfig.AutoConfig
 import net.ccbluex.liquidbounce.config.gson.interopGson
 import net.ccbluex.liquidbounce.features.module.ClientModule
 import net.ccbluex.liquidbounce.features.module.ModuleCategories

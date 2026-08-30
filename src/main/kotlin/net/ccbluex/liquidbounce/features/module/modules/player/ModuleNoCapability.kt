@@ -23,6 +23,8 @@ import net.ccbluex.liquidbounce.event.events.WorldChangeEvent
 import net.ccbluex.liquidbounce.event.handler
 import net.ccbluex.liquidbounce.features.module.ClientModule
 import net.ccbluex.liquidbounce.features.module.ModuleCategories
+import net.ccbluex.liquidbounce.features.module.modules.player.nocapability.FlightCapabilityState
+import net.ccbluex.liquidbounce.features.module.modules.player.nocapability.NoCapabilityFlightController
 import net.minecraft.network.protocol.game.ClientboundPlayerAbilitiesPacket
 import net.minecraft.world.entity.player.Abilities
 

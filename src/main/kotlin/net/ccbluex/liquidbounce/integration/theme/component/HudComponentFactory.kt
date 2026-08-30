@@ -22,7 +22,7 @@ package net.ccbluex.liquidbounce.integration.theme.component
 import com.google.gson.JsonObject
 import net.ccbluex.liquidbounce.config.gson.accessibleInteropGson
 import net.ccbluex.liquidbounce.integration.theme.component.components.WebHudComponent
-import net.ccbluex.liquidbounce.utils.render.Alignment
+import net.ccbluex.liquidbounce.config.types.group.Alignment
 
 abstract class HudComponentFactory {
 

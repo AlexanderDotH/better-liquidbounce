@@ -23,10 +23,10 @@ import com.google.gson.JsonObject
 import net.ccbluex.liquidbounce.event.events.MouseButtonEvent
 import net.ccbluex.liquidbounce.event.events.PacketEvent
 import net.ccbluex.liquidbounce.event.handler
-import net.ccbluex.liquidbounce.features.module.modules.misc.debugrecorder.ModuleDebugRecorder
+import net.ccbluex.liquidbounce.features.module.modules.misc.debugrecorder.runtime.DebugRecorderMode
 import net.minecraft.network.protocol.game.ServerboundSwingPacket
 
-object DebugCPSRecorder : ModuleDebugRecorder.DebugRecorderMode<JsonObject>("CPS") {
+object DebugCPSRecorder : DebugRecorderMode<JsonObject>("CPS") {
 
     val packetHandler = handler<PacketEvent> { event ->
         if (event.packet !is ServerboundSwingPacket) {

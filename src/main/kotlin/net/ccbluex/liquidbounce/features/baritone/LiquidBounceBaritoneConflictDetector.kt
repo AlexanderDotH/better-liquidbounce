@@ -16,13 +16,13 @@ import net.ccbluex.liquidbounce.features.baritone.core.BaritonePauseReason
 import net.ccbluex.liquidbounce.features.baritone.flight.runtime.BaritoneFlightLeaseRegistry
 import net.ccbluex.liquidbounce.features.blink.BlinkManager
 import net.ccbluex.liquidbounce.features.module.ModuleManager
-import net.ccbluex.liquidbounce.features.module.modules.combat.RemoteKillMovementOwnership
+import net.ccbluex.liquidbounce.utils.movement.remote.RemoteMovementOwnership
 import net.ccbluex.liquidbounce.features.module.modules.player.ModuleBaritone
 import net.ccbluex.liquidbounce.utils.aiming.RotationManager
 import net.ccbluex.liquidbounce.utils.client.SilentHotbar
 import net.ccbluex.liquidbounce.utils.client.mc
-import net.ccbluex.liquidbounce.utils.input.InputTracker.isPressedOnAny
-import net.ccbluex.liquidbounce.utils.inventory.InventoryManager
+import net.ccbluex.liquidbounce.features.input.InputTracker.isPressedOnAny
+import net.ccbluex.liquidbounce.features.inventory.InventoryManager
 
 internal object LiquidBounceBaritoneConflictDetector : BaritoneConflictDetector {
 
@@ -32,7 +32,7 @@ internal object LiquidBounceBaritoneConflictDetector : BaritoneConflictDetector 
         hotbarOwned = SilentHotbar.isSlotModified(),
         inventoryOwned = InventoryManager.isInventoryOpen,
         blinkActive = BlinkManager.isLagging,
-        remoteMovementOwned = RemoteKillMovementOwnership.active,
+        remoteMovementOwned = RemoteMovementOwnership.active,
         movementOwners = ModuleBaritone.conflictModuleNames.filter { ModuleManager[it]?.running == true },
         exemptLeasedFly = BaritoneFlightLeaseRegistry.exemptsFlyConflict(),
     )

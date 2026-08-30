@@ -18,6 +18,13 @@
  */
 package net.ccbluex.liquidbounce.features.module.modules.movement.autododge
 
+import net.ccbluex.liquidbounce.features.module.modules.movement.autododge.spearteleport.SpearTeleportPlan
+import net.ccbluex.liquidbounce.features.module.modules.movement.autododge.spearteleport.CombatTeleportThreat
+import net.ccbluex.liquidbounce.features.module.modules.movement.autododge.spearteleport.SpearTeleportRuntime
+import net.ccbluex.liquidbounce.features.module.modules.movement.autododge.spearteleport.SpearTeleportSettings
+import net.ccbluex.liquidbounce.features.module.modules.movement.autododge.spearteleport.SpearTeleportState
+import net.ccbluex.liquidbounce.features.module.modules.movement.autododge.spearteleport.isSafeSpearTeleportCandidate
+
 import net.ccbluex.liquidbounce.features.module.modules.misc.antibot.ModuleAntiBot
 import net.minecraft.client.multiplayer.ClientLevel
 import net.minecraft.client.player.LocalPlayer
@@ -67,7 +74,9 @@ internal class MaceMovementController(
             projectilePlanActive = projectilePlanActive,
             tick = player.tickCount.toLong(),
             playerPosition = player.position(),
-            threat = threat,
+            threat = threat?.let {
+                CombatTeleportThreat(it.candidate.position, it.candidate.lookDirection, trustsAttackerLook = false)
+            },
             settings = settings.teleport,
             isSafe = { candidate -> isSafeSpearTeleportCandidate(world, player, settings.teleport, candidate) },
         )

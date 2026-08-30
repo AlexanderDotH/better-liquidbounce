@@ -20,7 +20,7 @@ package net.ccbluex.liquidbounce.injection.mixins.authlib;
 
 import com.llamalad7.mixinextras.injector.ModifyExpressionValue;
 import com.mojang.authlib.minecraft.client.MinecraftClient;
-import net.ccbluex.liquidbounce.features.misc.proxy.ProxyManager;
+import net.ccbluex.liquidbounce.features.misc.proxy.ProxyRuntimeHook;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.screens.ConnectScreen;
 import org.objectweb.asm.Opcodes;
@@ -46,7 +46,7 @@ public abstract class MixinMinecraftClient {
             return Proxy.NO_PROXY;
         }
 
-        var currentProxy = ProxyManager.INSTANCE.getCurrentProxy();
+        var currentProxy = ProxyRuntimeHook.currentProxy();
         if (currentProxy != null && currentProxy.getForwardAuthentication()) {
             var credentials = currentProxy.getCredentials();
 

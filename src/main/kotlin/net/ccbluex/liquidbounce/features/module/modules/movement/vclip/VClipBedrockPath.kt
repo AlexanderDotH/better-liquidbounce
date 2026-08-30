@@ -37,16 +37,19 @@ internal object VClipBedrockPath {
 
         for (blockX in minBlockX..maxBlockX) {
             for (blockY in minBlockY..maxBlockY) {
-                for (blockZ in minBlockZ..maxBlockZ) {
-                    if (isBedrockAt(BlockPos(blockX, blockY, blockZ))) {
-                        return true
-                    }
-                }
+                if (hasBedrockAtY(blockX, blockY, minBlockZ..maxBlockZ, isBedrockAt)) return true
             }
         }
 
         return false
     }
+
+    private fun hasBedrockAtY(
+        blockX: Int,
+        blockY: Int,
+        blockZRange: IntRange,
+        isBedrockAt: (BlockPos) -> Boolean,
+    ): Boolean = blockZRange.any { blockZ -> isBedrockAt(BlockPos(blockX, blockY, blockZ)) }
 
     private const val BOUNDING_BOX_EPSILON = 1.0E-7
 }

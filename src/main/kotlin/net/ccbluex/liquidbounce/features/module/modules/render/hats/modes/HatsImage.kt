@@ -20,7 +20,8 @@
 package net.ccbluex.liquidbounce.features.module.modules.render.hats.modes
 
 import net.ccbluex.liquidbounce.config.types.toTextureProperty
-import net.ccbluex.liquidbounce.features.module.modules.render.hats.HatsMode
+import net.ccbluex.liquidbounce.config.types.group.ModeValueGroup
+import net.ccbluex.liquidbounce.features.module.modules.render.hats.runtime.HatsMode
 import net.ccbluex.liquidbounce.render.WorldRenderEnvironment
 import net.ccbluex.liquidbounce.render.drawTexQuad
 import net.ccbluex.liquidbounce.render.engine.type.Color4b
@@ -30,7 +31,7 @@ import net.minecraft.util.Mth
 import org.joml.Quaternionf
 import org.joml.Vector2f
 
-internal object HatsImage : HatsMode("Image") {
+internal class HatsImage(parent: ModeValueGroup<*>) : HatsMode("Image", parent) {
 
     private val image by file("Image", supportedExtensions = PNG_AND_JPG)
         .toTextureProperty(this, printErrorToChat = true)
@@ -38,14 +39,14 @@ internal object HatsImage : HatsMode("Image") {
     private val scale by vec2f("Scale", Vector2f(1f, 1f))
     private val spinSpeed by float("SpinSpeed", 1f, -10f..10f)
 
-    private val ROTATION = Quaternionf()
+    private val rotation = Quaternionf()
 
     override fun WorldRenderEnvironment.drawHat(isHurt: Boolean) {
         val texture = image ?: return
 
         poseStack.withPush {
             mulPose(
-                ROTATION.scaling(1f)
+                rotation.scaling(1f)
                     .rotateX(Mth.HALF_PI)
                     .rotateZ(getRotationAngle(spinSpeed))
             )

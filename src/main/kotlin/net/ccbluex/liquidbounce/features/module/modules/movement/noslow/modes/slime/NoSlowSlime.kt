@@ -22,10 +22,9 @@ import net.ccbluex.liquidbounce.config.types.group.ToggleableValueGroup
 import net.ccbluex.liquidbounce.event.events.BlockSlipperinessMultiplierEvent
 import net.ccbluex.liquidbounce.event.events.BlockVelocityMultiplierEvent
 import net.ccbluex.liquidbounce.event.handler
-import net.ccbluex.liquidbounce.features.module.modules.movement.noslow.ModuleNoSlow
 import net.minecraft.world.level.block.SlimeBlock
 
-internal object NoSlowSlime : ToggleableValueGroup(ModuleNoSlow, "SlimeBlock", true) {
+internal object NoSlowSlime : ToggleableValueGroup(name = "SlimeBlock", enabled = true) {
 
     private val multiplier by float("Multiplier", 1f, 0.4f..2f)
 

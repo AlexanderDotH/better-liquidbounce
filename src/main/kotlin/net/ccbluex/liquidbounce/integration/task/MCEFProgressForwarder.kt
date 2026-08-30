@@ -19,7 +19,7 @@
 
 package net.ccbluex.liquidbounce.integration.task
 
-import net.ccbluex.liquidbounce.integration.task.type.Task
+import net.ccbluex.liquidbounce.common.task.Task
 import net.ccbluex.liquidbounce.mcef.listeners.MCEFProgressListener
 
 class MCEFProgressForwarder(val task: Task) : MCEFProgressListener {

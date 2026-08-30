@@ -23,12 +23,11 @@ import io.ktor.server.response.respond
 import io.ktor.server.routing.Route
 import io.ktor.server.routing.get
 import io.ktor.server.routing.route
-import net.ccbluex.fastutil.mapToArray
+import net.ccbluex.liquidbounce.common.interop.PlayerDataPayload
+import net.ccbluex.liquidbounce.common.interop.PlayerInventoryDataPayload
 import net.ccbluex.liquidbounce.features.module.modules.combat.ModuleSwordBlock.hideShieldSlot
 import net.ccbluex.liquidbounce.features.module.modules.combat.ModuleSwordBlock.shouldHideOffhand
 import net.ccbluex.liquidbounce.features.module.modules.misc.nameprotect.ModuleNameProtect
-import net.ccbluex.liquidbounce.features.module.modules.misc.nameprotect.sanitizeForeignInput
-import net.ccbluex.liquidbounce.injection.mixins.minecraft.gui.MixinHudAccessor
 import net.ccbluex.liquidbounce.integration.theme.component.ModernContextualBar
 import net.ccbluex.liquidbounce.utils.client.mc
 import net.ccbluex.liquidbounce.utils.entity.armorItems
@@ -36,21 +35,14 @@ import net.ccbluex.liquidbounce.utils.entity.getActualHealth
 import net.ccbluex.liquidbounce.utils.entity.hasHealthScoreboard
 import net.ccbluex.liquidbounce.utils.entity.netherPosition
 import net.ccbluex.liquidbounce.utils.entity.ping
-import net.ccbluex.liquidbounce.utils.inventory.EnderChestInventoryTracker
+import net.ccbluex.liquidbounce.integration.inventory.EnderChestInventoryTracker
 import net.minecraft.core.BlockPos
-import net.minecraft.network.chat.Component
-import net.minecraft.network.chat.numbers.NumberFormat
-import net.minecraft.network.chat.numbers.StyledFormat
 import net.minecraft.resources.Identifier
 import net.minecraft.world.effect.MobEffectInstance
 import net.minecraft.world.entity.player.Player
 import net.minecraft.world.item.ItemStack
 import net.minecraft.world.level.GameType
 import net.minecraft.world.phys.Vec3
-import net.minecraft.world.scores.DisplaySlot
-import net.minecraft.world.scores.PlayerScoreEntry
-import net.minecraft.world.scores.PlayerTeam
-import net.minecraft.world.scores.Scoreboard
 import kotlin.math.min
 
 // GET /api/v1/client/player
@@ -117,7 +109,7 @@ data class PlayerData(
     val offHandStack: ItemStack,
     val armorItems: List<ItemStack> = emptyList(),
     val scoreboard: ScoreboardData? = null,
-) {
+) : PlayerDataPayload {
 
     companion object {
 
@@ -163,7 +155,7 @@ data class PlayerInventoryData(
     val main: List<ItemStack>,
     val crafting: List<ItemStack>,
     val enderChest: List<ItemStack>,
-) {
+) : PlayerInventoryDataPayload {
 
     companion object {
         @JvmStatic
@@ -174,56 +166,6 @@ data class PlayerInventoryData(
             /** player.enderChestInventory.getHeldStacks().map(ItemStack::copy) */
             enderChest = EnderChestInventoryTracker.stacks,
         )
-    }
-
-}
-
-@JvmRecord
-data class ScoreboardData(val header: Component, val entries: List<SidebarEntry?>) {
-
-    @JvmRecord
-    data class SidebarEntry(val name: Component, val score: Component)
-
-    companion object {
-
-        /**
-         * Creates a [ScoreboardData] from the players's scoreboard
-         *
-         * Taken from the Minecraft source code
-         *
-         * @see net.minecraft.client.gui.Hud.extractScoreboardSidebar
-         * @see net.minecraft.client.gui.Hud.displayScoreboardSidebar
-         */
-        @JvmStatic
-        fun fromScoreboard(scoreboard: Scoreboard?): ScoreboardData? {
-            scoreboard ?: return null
-
-            val team = mc.player?.let { player ->
-                scoreboard.getPlayersTeam(player.scoreboardName)
-            }
-
-            val objective = team?.color?.orElse(null)?.displaySlot()?.let(scoreboard::getDisplayObjective)
-                ?: scoreboard.getDisplayObjective(DisplaySlot.SIDEBAR)
-                ?: return null
-
-            val objectiveScoreboard: Scoreboard = objective.scoreboard
-            val numberFormat: NumberFormat = objective.numberFormatOrDefault(StyledFormat.SIDEBAR_DEFAULT)
-
-            val sidebarEntries = objectiveScoreboard.listPlayerScores(objective)
-                .filter { score: PlayerScoreEntry -> !score.isHidden }
-                .sortedWith(MixinHudAccessor.getScoreboardEntryComparator())
-                .take(15)
-                .mapToArray { scoreboardEntry: PlayerScoreEntry ->
-                    val team = objectiveScoreboard.getPlayersTeam(scoreboardEntry.owner())
-                    val entryName = scoreboardEntry.ownerName()
-                    val entryWithDecoration: Component = PlayerTeam.formatNameForTeam(team, entryName)
-                    val entryValue: Component = scoreboardEntry.formatValue(numberFormat)
-
-                    SidebarEntry(entryWithDecoration.sanitizeForeignInput(), entryValue.sanitizeForeignInput())
-                }.asList()
-
-            return ScoreboardData(objective.displayName.sanitizeForeignInput(), sidebarEntries)
-        }
     }
 
 }

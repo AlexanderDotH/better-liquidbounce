@@ -26,9 +26,8 @@ import net.ccbluex.liquidbounce.event.events.PacketEvent
 import net.ccbluex.liquidbounce.event.events.PlayerMoveEvent
 import net.ccbluex.liquidbounce.event.events.PlayerTickEvent
 import net.ccbluex.liquidbounce.event.handler
-import net.ccbluex.liquidbounce.features.module.modules.movement.fly.ModuleFly
-import net.ccbluex.liquidbounce.features.module.modules.movement.fly.ModuleFly.message
-import net.ccbluex.liquidbounce.features.module.modules.movement.fly.ModuleFly.modes
+import net.ccbluex.liquidbounce.features.module.modules.movement.fly.runtime.FlyModuleControl
+import net.ccbluex.liquidbounce.features.module.modules.movement.fly.runtime.FlyModuleControl.message
 import net.ccbluex.liquidbounce.features.module.modules.movement.fly.automation.FlyAutomationCapabilities
 import net.ccbluex.liquidbounce.features.module.modules.movement.fly.automation.FlyAutomationEnd
 import net.ccbluex.liquidbounce.features.module.modules.movement.fly.automation.FlyAutomationKind
@@ -36,9 +35,9 @@ import net.ccbluex.liquidbounce.features.module.modules.movement.fly.automation.
 import net.ccbluex.liquidbounce.features.module.modules.movement.fly.automation.FlyAutomationReadiness
 import net.ccbluex.liquidbounce.features.module.modules.movement.fly.modes.FlyAutomaticEndSignal
 import net.ccbluex.liquidbounce.features.module.modules.movement.fly.modes.flyAutomationSneak
-import net.ccbluex.liquidbounce.utils.client.chat
+import net.ccbluex.liquidbounce.features.chat.chat
 import net.ccbluex.liquidbounce.utils.network.handlePacket
-import net.ccbluex.liquidbounce.utils.client.regular
+import net.ccbluex.liquidbounce.utils.text.regular
 import net.ccbluex.liquidbounce.utils.math.copy
 import net.minecraft.network.protocol.game.ClientboundPlayerPositionPacket
 import net.minecraft.network.protocol.game.ServerboundMovePlayerPacket
@@ -51,9 +50,6 @@ import net.minecraft.world.phys.shapes.Shapes
  * @note ONLY WORKS ON 1.13+ SERVERS
  */
 internal object FlyVulcan286 : Mode("Vulcan286-113"), FlyAutomationProfile {
-
-    override val parent: ModeValueGroup<*>
-        get() = modes
 
     var packet: ClientboundPlayerPositionPacket? = null
     var flags = 0
@@ -122,7 +118,7 @@ internal object FlyVulcan286 : Mode("Vulcan286-113"), FlyAutomationProfile {
                 event.cancelEvent()
             } else {
                 automaticEnd.mark("Vulcan sent a second setback")
-                ModuleFly.enabled = false
+                FlyModuleControl.disable()
             }
         }
     }

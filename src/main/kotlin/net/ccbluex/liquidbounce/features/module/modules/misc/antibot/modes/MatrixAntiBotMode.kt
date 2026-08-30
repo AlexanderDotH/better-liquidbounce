@@ -23,8 +23,7 @@ import net.ccbluex.liquidbounce.event.events.PacketEvent
 import net.ccbluex.liquidbounce.event.handler
 import net.ccbluex.liquidbounce.event.tickHandler
 import net.ccbluex.liquidbounce.event.waitTicks
-import net.ccbluex.liquidbounce.features.module.modules.misc.antibot.ModuleAntiBot.isADuplicate
-import net.ccbluex.liquidbounce.features.module.modules.misc.antibot.ModuleAntiBot.isGameProfileUnique
+import net.ccbluex.liquidbounce.features.module.modules.misc.antibot.contract.AntiBotProfileBridge
 import net.ccbluex.liquidbounce.utils.entity.armorItems
 import net.ccbluex.liquidbounce.utils.item.isPlayerArmor
 import net.minecraft.network.protocol.game.ClientboundPlayerInfoRemovePacket
@@ -44,11 +43,13 @@ object MatrixAntiBotMode : AntiBotMode("Matrix") {
                 for (entry in packet.newEntries()) {
                     val profile = entry.profile ?: continue
 
-                    if (entry.latency < 2 || profile.properties?.isEmpty == false || isGameProfileUnique(profile)) {
+                    if (entry.latency < 2 || profile.properties?.isEmpty == false ||
+                        AntiBotProfileBridge.isUnique(profile)
+                    ) {
                         continue
                     }
 
-                    if (isADuplicate(profile)) {
+                    if (AntiBotProfileBridge.isDuplicate(profile)) {
                         botList.add(entry.profileId)
                         continue
                     }

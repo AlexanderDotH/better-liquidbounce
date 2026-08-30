@@ -22,7 +22,6 @@ import com.google.gson.JsonObject
 import net.ccbluex.liquidbounce.config.types.group.Mode
 import net.ccbluex.liquidbounce.config.types.group.ModeValueGroup
 import net.ccbluex.liquidbounce.config.types.group.ToggleableValueGroup
-import net.ccbluex.liquidbounce.config.types.list.Tagged
 import net.ccbluex.liquidbounce.event.events.GameTickEvent
 import net.ccbluex.liquidbounce.event.events.MovementInputEvent
 import net.ccbluex.liquidbounce.event.handler
@@ -31,10 +30,18 @@ import net.ccbluex.liquidbounce.event.waitTicks
 import net.ccbluex.liquidbounce.features.module.ClientModule
 import net.ccbluex.liquidbounce.features.module.ModuleCategories
 import net.ccbluex.liquidbounce.features.module.modules.combat.ModuleSpearKill
+import net.ccbluex.liquidbounce.features.module.modules.player.fastuse.adjustedSpearAnimationTicks
+import net.ccbluex.liquidbounce.features.module.modules.player.fastuse.FastUseCondition
+import net.ccbluex.liquidbounce.features.module.modules.player.fastuse.FastUseCrossbow
+import net.ccbluex.liquidbounce.features.module.modules.player.fastuse.isFastUseSpear
+import net.ccbluex.liquidbounce.features.module.modules.player.fastuse.migrateLegacyFastUseConfig
+import net.ccbluex.liquidbounce.features.module.modules.player.fastuse.shouldAccelerateFastUseFood
+import net.ccbluex.liquidbounce.features.module.modules.player.fastuse.shouldRefreshFastUseSpear
+import net.ccbluex.liquidbounce.features.module.modules.player.fastuse.shouldReleaseFastUseSpear
+import net.ccbluex.liquidbounce.features.module.modules.player.fastuse.shouldRenderFastUseSpear
+import net.ccbluex.liquidbounce.features.module.modules.player.fastuse.shouldStopFastUseFoodInput
 import net.ccbluex.liquidbounce.utils.network.MovePacketType
 import net.ccbluex.liquidbounce.utils.client.Timer
-import net.ccbluex.liquidbounce.utils.entity.moving
-import net.ccbluex.liquidbounce.utils.entity.opposite
 import net.ccbluex.liquidbounce.utils.item.isConsumable
 import net.ccbluex.liquidbounce.utils.kotlin.EventPriorityConvention.CRITICAL_MODIFICATION
 import net.ccbluex.liquidbounce.utils.kotlin.Priority
@@ -43,10 +50,6 @@ import net.minecraft.core.component.DataComponents
 import net.minecraft.network.protocol.game.ServerboundMovePlayerPacket
 import net.minecraft.world.InteractionHand
 import net.minecraft.world.entity.LivingEntity
-import net.minecraft.world.effect.MobEffects
-import net.minecraft.world.entity.player.Inventory
-import net.minecraft.world.inventory.ContainerInput
-import net.minecraft.world.item.Items
 
 /**
  * FastUse module
@@ -60,7 +63,7 @@ object ModuleFastUse : ClientModule("FastUse", ModuleCategories.PLAYER, aliases 
 
         val modes = choices("Mode", Immediate, arrayOf(Immediate, ItemUseTime))
 
-        private val conditions by multiEnumChoice("Conditions", UseConditions.NOT_IN_THE_AIR)
+        private val conditions by multiEnumChoice("Conditions", FastUseCondition.NOT_IN_THE_AIR)
         private val stopInput by boolean("StopInput", false)
 
         /**
@@ -88,7 +91,7 @@ object ModuleFastUse : ClientModule("FastUse", ModuleCategories.PLAYER, aliases 
 
                 return shouldAccelerateFastUseFood(
                     foodRunning = true,
-                    hasBlockingCondition = conditions.any { it.meetsConditions() },
+                    hasBlockingCondition = conditions.any { it.meets(player) },
                     isUsingItem = player.isUsingItem,
                     isConsumable = player.useItem.isConsumable,
                 )
@@ -155,43 +158,11 @@ object ModuleFastUse : ClientModule("FastUse", ModuleCategories.PLAYER, aliases 
 
     private object Spear : ToggleableValueGroup(this, "Spear", true)
 
-    private object Crossbow : ToggleableValueGroup(this, "Crossbow", false) {
-
-        private val tickCooldown by int("TickCooldown", 1, 1..20)
-
-        @Suppress("unused")
-        val tickHandler = handler<GameTickEvent> {
-            if (player.isUsingItem && player.activeItem.`is`(Items.CROSSBOW) && player.tickCount % tickCooldown == 0) {
-                val hand = player.usedItemHand
-                val containerId = player.inventoryMenu.containerId
-                val slot = player.inventory.selectedSlot + Inventory.INVENTORY_SIZE
-
-                interaction.handleContainerInput(
-                    containerId,
-                    slot,
-                    Inventory.SLOT_OFFHAND,
-                    ContainerInput.SWAP,
-                    player
-                )
-
-                interaction.useItem(player, hand.opposite)
-
-                interaction.handleContainerInput(
-                    containerId,
-                    slot,
-                    Inventory.SLOT_OFFHAND,
-                    ContainerInput.SWAP,
-                    player
-                )
-
-                interaction.useItem(player, hand)
-            }
-        }
-    }
+    private val crossbow = FastUseCrossbow(this)
 
     init {
         tagBy(Food.modes)
-        treeAll(Food, Spear, Crossbow)
+        treeAll(Food, Spear, crossbow)
     }
 
     val accelerateNow: Boolean
@@ -278,19 +249,4 @@ object ModuleFastUse : ClientModule("FastUse", ModuleCategories.PLAYER, aliases 
         migrateLegacyFastUseConfig(jsonObject)
     }
 
-    @Suppress("unused")
-    private enum class UseConditions(
-        override val tag: String,
-        val meetsConditions: () -> Boolean
-    ) : Tagged {
-        NOT_IN_THE_AIR("NotInTheAir", {
-            !player.onGround()
-        }),
-        NOT_DURING_MOVE("NotDuringMove", {
-            player.moving
-        }),
-        NOT_DURING_REGENERATION("NotDuringRegeneration", {
-            player.hasEffect(MobEffects.REGENERATION)
-        })
-    }
 }

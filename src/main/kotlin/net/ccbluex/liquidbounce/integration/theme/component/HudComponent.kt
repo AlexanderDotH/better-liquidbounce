@@ -19,11 +19,12 @@
 
 package net.ccbluex.liquidbounce.integration.theme.component
 
+import net.ccbluex.liquidbounce.common.interop.HudComponentPayload
 import net.ccbluex.liquidbounce.config.types.group.ModeValueGroup
 import net.ccbluex.liquidbounce.config.types.group.ToggleableValueGroup
 import net.ccbluex.liquidbounce.config.types.group.ValueGroup
 import net.ccbluex.liquidbounce.features.module.modules.render.ModuleHud
-import net.ccbluex.liquidbounce.utils.render.Alignment
+import net.ccbluex.liquidbounce.config.types.group.Alignment
 import java.util.UUID
 
 /**
@@ -35,7 +36,7 @@ abstract class HudComponent(
     alignment: Alignment = Alignment.center(),
     val tweaks: Array<HudComponentTweak> = emptyArray(),
     val componentDescription: String = "",
-) : ToggleableValueGroup(parent = ModuleHud, name = name, enabled = enabled) {
+) : ToggleableValueGroup(parent = ModuleHud, name = name, enabled = enabled), HudComponentPayload {
 
     val id: UUID = UUID.randomUUID()
     private val defaultAlignment = Alignment(

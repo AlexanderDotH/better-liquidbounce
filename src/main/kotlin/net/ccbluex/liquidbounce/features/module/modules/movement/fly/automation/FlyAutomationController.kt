@@ -10,39 +10,7 @@
  */
 package net.ccbluex.liquidbounce.features.module.modules.movement.fly.automation
 
-internal enum class FlyAutomationOwnership {
-    BARITONE,
-    USER,
-}
-
-internal data class FlyAutomationLease internal constructor(
-    val generation: Long,
-    val modeName: String,
-    val ownership: FlyAutomationOwnership,
-)
-
-internal sealed interface FlyAutomationAcquireResult {
-    data class Acquired(val lease: FlyAutomationLease) : FlyAutomationAcquireResult
-    data class Rejected(val reason: String) : FlyAutomationAcquireResult
-}
-
-internal sealed interface FlyAutomationLeaseValidation {
-    data object Valid : FlyAutomationLeaseValidation
-    data class Invalid(val reason: String) : FlyAutomationLeaseValidation
-}
-
-internal interface FlyAutomationRuntime {
-    val enabled: Boolean
-    val selectedModeName: String
-    val selectedProfile: FlyAutomationProfile?
-
-    fun setModuleEnabled(enabled: Boolean)
-    fun enableSelectedMode()
-    fun disableSelectedMode()
-}
-
 /** Owns one generation-tagged steering lease and all reversible Fly lifecycle transitions. */
-@Suppress("TooManyFunctions", "ReturnCount")
 internal class FlyAutomationController(
     private val runtime: FlyAutomationRuntime,
 ) {
@@ -92,16 +60,16 @@ internal class FlyAutomationController(
 
     fun validate(lease: FlyAutomationLease): FlyAutomationLeaseValidation {
         val current = session ?: return invalid("Fly automation lease is no longer active")
-        if (current.lease.generation != lease.generation) return invalid("Fly automation lease is stale")
-        current.externalStateChange?.let { return invalid(it) }
-        if (runtime.selectedModeName != lease.modeName) {
-            return invalid("Fly mode changed to ${runtime.selectedModeName}")
-        }
-        if (runtime.selectedProfile == null) return invalid("${runtime.selectedModeName} has no Fly automation profile")
-
         val expectedEnabled = current.phase != Phase.MODULE_DISABLED
-        if (runtime.enabled != expectedEnabled) return invalid("Fly enabled state changed outside the automation lease")
-        return FlyAutomationLeaseValidation.Valid
+        val externalStateChange = current.externalStateChange
+        return when {
+            current.lease.generation != lease.generation -> invalid("Fly automation lease is stale")
+            externalStateChange != null -> invalid(externalStateChange)
+            runtime.selectedModeName != lease.modeName -> invalid("Fly mode changed to ${runtime.selectedModeName}")
+            runtime.selectedProfile == null -> invalid("${runtime.selectedModeName} has no Fly automation profile")
+            runtime.enabled != expectedEnabled -> invalid("Fly enabled state changed outside the automation lease")
+            else -> FlyAutomationLeaseValidation.Valid
+        }
     }
 
     fun temporarilySuspend(lease: FlyAutomationLease): Boolean {

@@ -25,11 +25,11 @@ import net.ccbluex.liquidbounce.features.command.preset.pagedQuery
 import net.ccbluex.liquidbounce.lang.translation
 import net.ccbluex.liquidbounce.utils.text.asPlainText
 import net.ccbluex.liquidbounce.utils.text.asText
-import net.ccbluex.liquidbounce.utils.client.bold
-import net.ccbluex.liquidbounce.utils.client.onClick
-import net.ccbluex.liquidbounce.utils.client.onHover
-import net.ccbluex.liquidbounce.utils.client.regular
-import net.ccbluex.liquidbounce.utils.client.withColor
+import net.ccbluex.liquidbounce.utils.text.bold
+import net.ccbluex.liquidbounce.utils.text.onClick
+import net.ccbluex.liquidbounce.utils.text.onHover
+import net.ccbluex.liquidbounce.utils.text.regular
+import net.ccbluex.liquidbounce.utils.text.withColor
 import net.ccbluex.liquidbounce.utils.text.buildText
 import net.minecraft.ChatFormatting
 import net.minecraft.network.chat.ClickEvent

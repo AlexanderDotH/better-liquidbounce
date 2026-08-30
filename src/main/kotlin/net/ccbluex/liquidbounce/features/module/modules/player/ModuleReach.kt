@@ -18,11 +18,20 @@
  */
 package net.ccbluex.liquidbounce.features.module.modules.player
 
+import net.ccbluex.liquidbounce.config.ConfigMigrationOrder
+import net.ccbluex.liquidbounce.config.ConfigMigrationRegistry
+import net.ccbluex.liquidbounce.features.combat.runtime.attackEntity
+import net.ccbluex.liquidbounce.features.combat.runtime.shouldBeAttacked
 import net.ccbluex.liquidbounce.features.module.ClientModule
 import net.ccbluex.liquidbounce.features.module.ModuleCategories
+import net.ccbluex.liquidbounce.features.module.modules.player.reach.contract.ReachHitCombatBridge
+import net.ccbluex.liquidbounce.features.module.modules.player.reach.contract.ReachHitCombatPort
+import net.ccbluex.liquidbounce.features.module.modules.player.reach.migrateLegacyReachConfig
 import net.ccbluex.liquidbounce.features.module.modules.player.reach.hit.ReachHit
 import net.ccbluex.liquidbounce.features.module.modules.player.reach.interactable.ReachInteractableFeature
-import net.ccbluex.liquidbounce.utils.range.RangeValueGroup
+import net.ccbluex.liquidbounce.features.range.RangeValueGroup
+import net.ccbluex.liquidbounce.utils.block.SwingMode
+import net.minecraft.world.entity.LivingEntity
 
 /**
  * Reach module
@@ -33,8 +42,22 @@ import net.ccbluex.liquidbounce.utils.range.RangeValueGroup
  * @see net.ccbluex.liquidbounce.injection.mixins.minecraft.item.MixinAttackRange
  */
 object ModuleReach : ClientModule("Reach", ModuleCategories.PLAYER, aliases = listOf("SuperHit")) {
+
+    init {
+        ReachHitCombatBridge.install(MinecraftReachHitCombatPort)
+        ConfigMigrationRegistry.register("reach", ConfigMigrationOrder.REACH, ::migrateLegacyReachConfig)
+    }
+
     val entity = tree(RangeValueGroup("Entity", 1f, 0f))
     val blockRangeIncrease by float("BlockRangeIncrease", 0.5f, 0f..64f)
     internal val hit = tree(ReachHit(this))
     internal val interactable = tree(ReachInteractableFeature(this))
+}
+
+private object MinecraftReachHitCombatPort : ReachHitCombatPort {
+    override fun shouldAttack(entity: LivingEntity) = entity.shouldBeAttacked()
+
+    override fun attack(entity: LivingEntity, swingMode: SwingMode, keepSprint: Boolean) {
+        attackEntity(entity, swingMode, keepSprint)
+    }
 }

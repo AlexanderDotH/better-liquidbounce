@@ -113,7 +113,7 @@ class FogBlurShaderContractTest {
         const val COMPOSITE_SHADER =
             "src/main/resources/resources/liquidbounce/shaders/fog/fog_blur_composite.frag"
         const val SHADERS = "src/main/kotlin/net/ccbluex/liquidbounce/render/ClientShaders.kt"
-        const val PIPELINES = "src/main/kotlin/net/ccbluex/liquidbounce/render/ClientRenderPipelines.kt"
+        const val PIPELINES = "src/main/kotlin/net/ccbluex/liquidbounce/render/FogPipelineDefinitions.kt"
         const val UNIFORMS = "src/main/kotlin/net/ccbluex/liquidbounce/render/ClientUniformDefine.kt"
     }
 }

@@ -21,11 +21,19 @@ package net.ccbluex.liquidbounce.utils.aiming
 import net.ccbluex.liquidbounce.utils.aiming.data.Rotation
 import net.ccbluex.liquidbounce.utils.aiming.features.MovementCorrection
 import net.ccbluex.liquidbounce.utils.aiming.features.processors.RotationProcessor
-import net.ccbluex.liquidbounce.utils.aiming.features.processors.ShortStopRotationProcessor
 import net.ccbluex.liquidbounce.utils.client.RestrictedSingleUseAction
 import net.ccbluex.liquidbounce.utils.client.player
 import net.ccbluex.liquidbounce.utils.entity.rotation
 import net.minecraft.world.entity.Entity
+
+interface RotationTargetFactory {
+    fun toRotationTarget(
+        rotation: Rotation,
+        entity: Entity? = null,
+        considerInventory: Boolean = false,
+        whenReached: RestrictedSingleUseAction? = null,
+    ): RotationTarget
+}
 
 /**
  * An aim plan is a plan to aim at a certain rotation.
@@ -40,8 +48,7 @@ class RotationTarget(
     var entity: Entity? = null,
     /**
      * The rotation processors which are being used to calculate the next rotation.
-     * This list should start with [net.ccbluex.liquidbounce.utils.aiming.features.processors.anglesmooth.AngleSmooth]
-     * and then continue with other processors like [ShortStopRotationProcessor] and [FailFocus].
+     * This list starts with an angle smoother and then continues with optional stop or failure processors.
      */
     val processors: List<RotationProcessor> = emptyList(),
     /**

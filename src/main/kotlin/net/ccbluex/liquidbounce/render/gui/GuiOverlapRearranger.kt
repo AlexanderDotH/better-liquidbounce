@@ -28,54 +28,55 @@ class GuiOverlapRearranger(
         require(maxIter > 0) { "maxIter must be greater than zero." }
     }
 
-    @Suppress("NestedBlockDepth", "CognitiveComplexMethod")
     fun rearrange(elements: Collection<GuiRearrangeable>) {
-        if (elements.size <= 1) {
-            return
-        }
+        if (elements.size <= 1) return
 
-        val sorted = elements.toTypedArray()
-        sorted.sortWith { a, b ->
-            val ay = a.bounds.yCenter
-            val by = b.bounds.yCenter
-            when {
-                ay != by -> ay.compareTo(by)
-                else -> a.bounds.xCenter.compareTo(b.bounds.xCenter)
-            }
-        }
+        val sorted = sortedElements(elements)
 
         var iter = 0
         while (iter++ < maxIter) {
-            var moved = false
+            if (!resolvePass(sorted)) break
+        }
+    }
 
-            for (i in 0 until sorted.size) {
-                for (j in i + 1 until sorted.size) {
-                    val a = sorted[i]
-                    val b = sorted[j]
-                    val aBounds = a.bounds
-                    val bBounds = b.bounds
-
-                    val ax = aBounds.xCenter
-                    val ay = aBounds.yCenter
-                    val bx = bBounds.xCenter
-                    val by = bBounds.yCenter
-                    val dx = (aBounds.width + bBounds.width) * 0.5f - abs(ax - bx)
-                    val dy = (aBounds.height + bBounds.height) * 0.5f - abs(ay - by)
-
-                    if (dx > 0f && dy > 0f) {
-                        b.bounds = if (dx < dy) {
-                            bBounds.offset(if (ax < bx) dx else -dx, 0f)
-                        } else {
-                            bBounds.offset(0f, if (ay < by) dy else -dy)
-                        }
-                        moved = true
-                    }
-                }
-            }
-
-            if (!moved) {
-                break
+    private fun sortedElements(elements: Collection<GuiRearrangeable>) = elements.toTypedArray().apply {
+        sortWith { first, second ->
+            val firstY = first.bounds.yCenter
+            val secondY = second.bounds.yCenter
+            if (firstY != secondY) {
+                firstY.compareTo(secondY)
+            } else {
+                first.bounds.xCenter.compareTo(second.bounds.xCenter)
             }
         }
+    }
+
+    private fun resolvePass(elements: Array<GuiRearrangeable>): Boolean {
+        var moved = false
+        for (firstIndex in elements.indices) {
+            for (secondIndex in firstIndex + 1 until elements.size) {
+                if (resolveOverlap(elements[firstIndex], elements[secondIndex])) moved = true
+            }
+        }
+        return moved
+    }
+
+    private fun resolveOverlap(first: GuiRearrangeable, second: GuiRearrangeable): Boolean {
+        val firstBounds = first.bounds
+        val secondBounds = second.bounds
+        val horizontalOverlap = (firstBounds.width + secondBounds.width) * 0.5f -
+            abs(firstBounds.xCenter - secondBounds.xCenter)
+        val verticalOverlap = (firstBounds.height + secondBounds.height) * 0.5f -
+            abs(firstBounds.yCenter - secondBounds.yCenter)
+        if (horizontalOverlap <= 0f || verticalOverlap <= 0f) return false
+
+        second.bounds = if (horizontalOverlap < verticalOverlap) {
+            val offset = if (firstBounds.xCenter < secondBounds.xCenter) horizontalOverlap else -horizontalOverlap
+            secondBounds.offset(offset, 0f)
+        } else {
+            val offset = if (firstBounds.yCenter < secondBounds.yCenter) verticalOverlap else -verticalOverlap
+            secondBounds.offset(0f, offset)
+        }
+        return true
     }
 }

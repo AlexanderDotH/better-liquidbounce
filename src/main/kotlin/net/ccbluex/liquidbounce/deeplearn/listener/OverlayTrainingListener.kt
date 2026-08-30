@@ -22,11 +22,11 @@ import ai.djl.training.Trainer
 import ai.djl.training.listener.TrainingListener
 import ai.djl.training.listener.TrainingListenerAdapter
 import net.ccbluex.liquidbounce.utils.text.asPlainText
-import net.ccbluex.liquidbounce.utils.client.mc
-import net.ccbluex.liquidbounce.utils.client.regular
+import net.ccbluex.liquidbounce.utils.text.regular
 import net.ccbluex.liquidbounce.utils.text.textOf
-import net.ccbluex.liquidbounce.utils.client.variable
+import net.ccbluex.liquidbounce.utils.text.variable
 import net.minecraft.ChatFormatting
+import net.minecraft.client.Minecraft
 
 /**
  * Displays training overlay in Minecraft
@@ -74,8 +74,9 @@ class OverlayTrainingListener(
             "]".asPlainText(ChatFormatting.GRAY),
         )
 
-        mc.execute {
-            mc.gui.hud.setOverlayMessage(progressBar, false)
+        val minecraft = Minecraft.getInstance()
+        minecraft.execute {
+            minecraft.gui.hud.setOverlayMessage(progressBar, false)
         }
     }
 

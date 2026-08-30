@@ -19,9 +19,7 @@
 package net.ccbluex.liquidbounce.injection.mixins.minecraft.item;
 
 import com.llamalad7.mixinextras.injector.ModifyExpressionValue;
-import net.ccbluex.liquidbounce.features.module.modules.exploit.phase.modes.PhaseIntaveBlock;
-import net.ccbluex.liquidbounce.features.module.modules.movement.fly.modes.intave.FlyIntave;
-import net.ccbluex.liquidbounce.features.module.modules.movement.speed.modes.intave.SpeedIntaveInBlock;
+import net.ccbluex.liquidbounce.features.module.modules.exploit.phase.IntaveBlockPlacementHook;
 import net.minecraft.world.item.BlockItem;
 import net.minecraft.world.item.context.BlockPlaceContext;
 import net.minecraft.world.level.block.state.BlockState;
@@ -39,9 +37,7 @@ public abstract class MixinBlockItem {
             BlockState state
     ) {
         return original
-                || PhaseIntaveBlock.canPlaceThroughPlayer(context, state)
-                || FlyIntave.canPlaceThroughPlayer(context, state)
-                || SpeedIntaveInBlock.canPlaceThroughPlayer(context, state);
+                || IntaveBlockPlacementHook.canPlaceThroughPlayer(context, state);
     }
 
 }

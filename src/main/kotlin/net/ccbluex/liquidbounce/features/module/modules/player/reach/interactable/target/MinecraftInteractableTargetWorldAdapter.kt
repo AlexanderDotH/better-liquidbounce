@@ -25,8 +25,6 @@ import net.ccbluex.liquidbounce.utils.entity.rotation
 import net.ccbluex.liquidbounce.utils.raytracing.clip
 import net.minecraft.client.multiplayer.ClientLevel
 import net.minecraft.core.BlockPos
-import net.minecraft.core.Direction
-import net.minecraft.core.registries.BuiltInRegistries
 import net.minecraft.world.entity.Entity
 import net.minecraft.world.entity.EntitySelector
 import net.minecraft.world.entity.EntityTypes
@@ -35,7 +33,6 @@ import net.minecraft.world.entity.vehicle.boat.ChestBoat
 import net.minecraft.world.entity.vehicle.boat.ChestRaft
 import net.minecraft.world.entity.vehicle.minecart.AbstractMinecartContainer
 import net.minecraft.world.level.ClipContext
-import net.minecraft.world.level.BlockGetter
 import net.minecraft.world.level.block.Block
 import net.minecraft.world.level.block.ChestBlock
 import net.minecraft.world.level.block.EnderChestBlock
@@ -213,52 +210,3 @@ internal object MinecraftInteractableTargetWorldAdapter : InteractableTargetWorl
 
     private const val ENTITY_SEARCH_MARGIN = 1.0
 }
-
-private fun occludedMenuBlockHit(
-    level: ClientLevel,
-    player: Entity,
-    start: Vec3,
-    end: Vec3,
-): BlockHitResult? {
-    val context = ClipContext(start, end, ClipContext.Block.OUTLINE, ClipContext.Fluid.NONE, player)
-    val hit = BlockGetter.traverseBlocks(start, end, context, { rayContext, position ->
-        if (!level.isLoaded(position)) return@traverseBlocks null
-        val state = level.getBlockState(position)
-        if (!isPotentialOccludedMenuTarget(
-                hasMenuProvider = state.getMenuProvider(level, position) != null,
-                opensMenuWithoutProvider = state.block is EnderChestBlock,
-                isChest = state.block is ChestBlock,
-            )
-        ) {
-            return@traverseBlocks null
-        }
-        level.clipWithInteractionOverride(
-            rayContext.from,
-            rayContext.to,
-            position,
-            rayContext.getBlockShape(state, level, position),
-            state,
-        )
-    }, { rayContext ->
-        BlockHitResult.miss(
-            rayContext.to,
-            Direction.getApproximateNearest(rayContext.from.subtract(rayContext.to)),
-            BlockPos.containing(rayContext.to),
-        )
-    })
-    return hit.takeIf { it.type == HitResult.Type.BLOCK }
-}
-
-internal fun isPotentialOccludedMenuTarget(
-    hasMenuProvider: Boolean,
-    opensMenuWithoutProvider: Boolean,
-    isChest: Boolean,
-): Boolean = hasMenuProvider || opensMenuWithoutProvider || isChest
-
-internal fun InteractableBlockPosition.toBlockPos() = BlockPos(x, y, z)
-
-internal fun BlockPos.toTargetPosition() = InteractableBlockPosition(x, y, z)
-
-internal fun Vec3.toTargetPoint() = InteractableTargetPoint(x, y, z)
-
-internal fun Block.toTargetBlockKey() = InteractableBlockKey(BuiltInRegistries.BLOCK.getKey(this).toString())

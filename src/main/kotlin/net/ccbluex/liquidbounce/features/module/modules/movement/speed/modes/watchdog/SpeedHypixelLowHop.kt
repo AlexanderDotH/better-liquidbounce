@@ -23,6 +23,7 @@ import net.ccbluex.liquidbounce.event.events.PlayerJumpEvent
 import net.ccbluex.liquidbounce.event.handler
 import net.ccbluex.liquidbounce.event.tickHandler
 import net.ccbluex.liquidbounce.features.module.modules.movement.speed.modes.SpeedBHopBase
+import net.ccbluex.liquidbounce.features.module.modules.movement.targetstrafe.contract.TargetStrafeEnvironment
 import net.ccbluex.liquidbounce.utils.entity.airTicks
 import net.ccbluex.liquidbounce.utils.entity.horizontalSpeed
 import net.ccbluex.liquidbounce.utils.entity.withStrafe
@@ -38,6 +39,10 @@ class SpeedHypixelLowHop(parent: ModeValueGroup<*>) : SpeedBHopBase("HypixelLowH
 
     companion object {
         var shouldStrafe = false
+
+        init {
+            TargetStrafeEnvironment.bindLowHopShouldStrafe { shouldStrafe }
+        }
     }
 
     private var glide by boolean("Glide", false)

@@ -20,7 +20,6 @@ package net.ccbluex.liquidbounce.features.module.modules.`fun`.notebot
 
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import net.ccbluex.fastutil.enumSetOf
 import net.ccbluex.liquidbounce.config.types.group.ValueGroup
 import net.ccbluex.liquidbounce.event.events.PacketEvent
 import net.ccbluex.liquidbounce.event.handler
@@ -31,21 +30,29 @@ import net.ccbluex.liquidbounce.features.module.modules.`fun`.notebot.nbs.Instru
 import net.ccbluex.liquidbounce.features.module.modules.`fun`.notebot.nbs.NbsLoader
 import net.ccbluex.liquidbounce.features.module.modules.`fun`.notebot.nbs.NbsNoteBlock
 import net.ccbluex.liquidbounce.features.module.modules.`fun`.notebot.nbs.SongData
+import net.ccbluex.liquidbounce.features.module.modules.`fun`.notebot.nbs.resolveInstrumentNote
+import net.ccbluex.liquidbounce.features.module.modules.`fun`.notebot.nbs.resolveRequiredInstruments
+import net.ccbluex.liquidbounce.features.module.modules.`fun`.notebot.contract.NotebotRuntimeBridge
+import net.ccbluex.liquidbounce.features.module.modules.`fun`.notebot.contract.NotebotRuntimeHook
+import net.ccbluex.liquidbounce.features.module.modules.`fun`.notebot.contract.NotebotStage
+import net.ccbluex.liquidbounce.features.module.modules.`fun`.notebot.runtime.NoteBlockTracker
+import net.ccbluex.liquidbounce.features.module.modules.`fun`.notebot.runtime.NotebotEngine
+import net.ccbluex.liquidbounce.features.module.modules.`fun`.notebot.stages.NotebotTestStageHandler
 import net.ccbluex.liquidbounce.features.module.modules.world.packetmine.ModulePacketMine
-import net.ccbluex.liquidbounce.render.engine.type.Color4b
-import net.ccbluex.liquidbounce.utils.aiming.RotationsValueGroup
-import net.ccbluex.liquidbounce.utils.client.MessageMetadata
-import net.ccbluex.liquidbounce.utils.client.chat
+import net.ccbluex.liquidbounce.features.rotation.RotationsValueGroup
+import net.ccbluex.liquidbounce.features.chat.MessageMetadata
+import net.ccbluex.liquidbounce.features.chat.chat
 import net.ccbluex.liquidbounce.utils.client.inGame
-import net.ccbluex.liquidbounce.utils.client.markAsError
-import net.ccbluex.liquidbounce.utils.client.regular
+import net.ccbluex.liquidbounce.utils.text.markAsError
+import net.ccbluex.liquidbounce.utils.text.regular
 import net.ccbluex.liquidbounce.utils.client.removeMessage
 import net.ccbluex.liquidbounce.utils.text.textLoadingBar
-import net.ccbluex.liquidbounce.utils.client.variable
+import net.ccbluex.liquidbounce.utils.text.variable
 import net.minecraft.ChatFormatting
 import net.minecraft.network.chat.MutableComponent
 import net.minecraft.network.protocol.game.ClientboundSoundPacket
-import net.minecraft.util.Mth
+import net.minecraft.core.BlockPos
+import net.minecraft.network.chat.Component
 import net.minecraft.world.level.block.state.properties.NoteBlockInstrument
 
 /**
@@ -75,6 +82,31 @@ object ModuleNotebot : ClientModule("Notebot", ModuleCategories.FUN, disableOnQu
     }
 
     val renderer = tree(NotebotRenderer)
+
+    init {
+        NotebotRuntimeBridge.install(object : NotebotRuntimeHook {
+            override fun range() = this@ModuleNotebot.range.toDouble()
+            override fun reuseBlocks() = this@ModuleNotebot.reuseBlocks
+            override fun pianoOnly() = this@ModuleNotebot.pianoOnly
+            override fun stageDelay(stage: NotebotStage) = when (stage) {
+                NotebotStage.TEST -> StartDelay.test
+                NotebotStage.TUNE -> StartDelay.tune
+                NotebotStage.PLAY -> StartDelay.play
+            }
+            override fun onStageChanged(stage: NotebotStage) = renderer.onStateChange(stage)
+            override fun message(key: String) = this@ModuleNotebot.message(key)
+            override fun chat(component: Component) = chat(component, this@ModuleNotebot)
+            override fun reportLoadError(key: String, vararg args: Any) {
+                chat(markAsError(this@ModuleNotebot.message(key, *args)), this@ModuleNotebot)
+            }
+            override fun sendProgress(name: Component, progress: Int, total: Int) =
+                sendNewProgressMessage(name.copy(), progress, total)
+            override fun setRenderedBlocks(blocks: List<BlockPos>) = setRenderedBlockPositions(blocks)
+            override fun disable() {
+                enabled = false
+            }
+        })
+    }
 
     var engine: NotebotEngine? = null
         private set
@@ -115,19 +147,19 @@ object ModuleNotebot : ClientModule("Notebot", ModuleCategories.FUN, disableOnQu
             return
         }
 
-        this.setRenderedBlocks(blocksAndRequirements.availableBlocks.flatMap { it.value })
+        setRenderedBlockPositions(blocksAndRequirements.availableBlocks.flatMap { it.value }.map(NoteBlockTracker::pos))
 
         showSongInfo(songData, messageMetadata)
 
-        this.engine = NotebotEngine(songData, blocksAndRequirements)
+        this.engine = NotebotEngine(songData, blocksAndRequirements, ::NotebotTestStageHandler)
         chat(message("startTesting").withStyle(ChatFormatting.GREEN), this)
     }
 
-    fun setRenderedBlocks(blocks: List<NoteBlockTracker>) {
+    private fun setRenderedBlockPositions(blocks: List<BlockPos>) {
         renderer.clearSilently()
 
         blocks.forEach {
-            renderer.addBlock(it.pos, false)
+            renderer.addBlock(it, false)
         }
 
         renderer.updateAll()
@@ -213,41 +245,9 @@ object ModuleNotebot : ClientModule("Notebot", ModuleCategories.FUN, disableOnQu
         )
     }
 
-    fun getPlayedNote(note: NbsNoteBlock): InstrumentNote {
-        val noteValue = Mth.clamp(note.key - 33, 0, 24)
-        val instrument = if (!this.pianoOnly) {
-            note.instrument.toInt()
-        } else {
-            0
-        }
+    fun getPlayedNote(note: NbsNoteBlock): InstrumentNote = resolveInstrumentNote(note, pianoOnly)
 
-        return InstrumentNote(instrument, noteValue)
-    }
+    fun getRequiredInstruments(songData: SongData): Set<NoteBlockInstrument> =
+        resolveRequiredInstruments(songData, pianoOnly)
 
-    fun getRequiredInstruments(songData: SongData): Set<NoteBlockInstrument> {
-        if (pianoOnly) {
-            return setOf(NoteBlockInstrument.HARP)
-        }
-
-        return songData.nbs.noteBlocks
-            .mapTo(enumSetOf()) {
-                InstrumentNote.getInstrumentEnumFromId(it.instrument.toInt())
-            }
-    }
-
-    enum class NotebotStage(
-        val stageStartDelay: () -> Int,
-        val blockColor: () -> Color4b,
-        val blockOutlineColor: () -> Color4b
-    ) {
-        TEST(StartDelay::test, NotebotRenderer::testColor, NotebotRenderer::outlineTestColor),
-        TUNE(StartDelay::tune, NotebotRenderer::tuneColor, NotebotRenderer::outlineTuneColor),
-        PLAY(StartDelay::play, NotebotRenderer::colorSetting, NotebotRenderer::outlineColorSetting)
-    }
-
-    interface NotebotStageHandler {
-        val handledStage: NotebotStage
-
-        fun onTick(engine: NotebotEngine)
-    }
 }

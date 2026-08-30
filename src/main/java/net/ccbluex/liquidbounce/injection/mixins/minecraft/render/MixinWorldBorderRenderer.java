@@ -19,7 +19,6 @@
 
 package net.ccbluex.liquidbounce.injection.mixins.minecraft.render;
 
-import net.ccbluex.liquidbounce.features.module.modules.render.DoRender;
 import net.ccbluex.liquidbounce.features.module.modules.render.ModuleAntiBlind;
 import net.minecraft.client.renderer.WorldBorderRenderer;
 import net.minecraft.client.renderer.state.level.WorldBorderRenderState;
@@ -34,7 +33,7 @@ public abstract class MixinWorldBorderRenderer {
 
     @Inject(method = "render", at = @At("HEAD"), cancellable = true)
     private void render(WorldBorderRenderState state, Vec3 cameraPos, double viewDistanceBlocks, double farPlaneDistance, CallbackInfo ci) {
-        if (!ModuleAntiBlind.canRender(DoRender.WORLD_BORDER)) {
+        if (!ModuleAntiBlind.canRenderWorldBorder()) {
             ci.cancel();
         }
     }

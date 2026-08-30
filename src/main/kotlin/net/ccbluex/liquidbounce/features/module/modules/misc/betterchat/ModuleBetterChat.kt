@@ -20,7 +20,7 @@ package net.ccbluex.liquidbounce.features.module.modules.misc.betterchat
 
 import com.mojang.blaze3d.platform.InputConstants
 import net.ccbluex.liquidbounce.config.types.group.ToggleableValueGroup
-import net.ccbluex.liquidbounce.config.types.list.Tagged
+import net.ccbluex.liquidbounce.common.Tagged
 import net.ccbluex.liquidbounce.event.events.ChatReceiveEvent
 import net.ccbluex.liquidbounce.event.events.KeyboardKeyEvent
 import net.ccbluex.liquidbounce.event.events.NotificationEvent
@@ -30,12 +30,11 @@ import net.ccbluex.liquidbounce.features.command.CommandManager
 import net.ccbluex.liquidbounce.features.global.GlobalSettingsAutoTranslate
 import net.ccbluex.liquidbounce.features.module.ClientModule
 import net.ccbluex.liquidbounce.features.module.ModuleCategories
-import net.ccbluex.liquidbounce.interfaces.GuiMessageLineAddition
 import net.ccbluex.liquidbounce.render.engine.type.Color4b
-import net.ccbluex.liquidbounce.utils.client.MessageMetadata
-import net.ccbluex.liquidbounce.utils.client.chat
-import net.ccbluex.liquidbounce.utils.client.notification
-import net.ccbluex.liquidbounce.utils.client.openChat
+import net.ccbluex.liquidbounce.features.chat.MessageMetadata
+import net.ccbluex.liquidbounce.features.chat.chat
+import net.ccbluex.liquidbounce.features.chat.notification
+import net.ccbluex.liquidbounce.features.chat.openChat
 import net.ccbluex.liquidbounce.utils.text.stripMinecraftColorCodes
 import net.ccbluex.liquidbounce.utils.collection.Pools
 import net.minecraft.client.gui.screens.DeathScreen
@@ -219,45 +218,7 @@ object ModuleBetterChat : ClientModule("BetterChat", ModuleCategories.RENDER, al
     /**
      * Resolves the contiguous wrapped-line range for the message at [index].
      */
-    @Suppress("CAST_NEVER_SUCCEEDS")
     @JvmStatic
-    fun resolveMessageBounds(visibleMessages: List<GuiMessage.Line>, index: Int): IntRange {
-        val id = (visibleMessages[index] as GuiMessageLineAddition).`liquid_bounce$getId`()
-
-        if (id != null) {
-            var start = index
-            while (start > 0) {
-                val previousId = (visibleMessages[start - 1] as GuiMessageLineAddition).`liquid_bounce$getId`()
-                if (id != previousId) {
-                    break
-                }
-                start--
-            }
-
-            var end = index
-            val lastIndex = visibleMessages.size - 1
-            while (end < lastIndex) {
-                val nextId = (visibleMessages[end + 1] as GuiMessageLineAddition).`liquid_bounce$getId`()
-                if (id != nextId) {
-                    break
-                }
-                end++
-            }
-
-            return start..end
-        }
-
-        var start = index
-        while (start > 0 && !visibleMessages[start].endOfEntry()) {
-            start--
-        }
-
-        var end = index
-        val lastIndex = visibleMessages.size - 1
-        while (end < lastIndex && !visibleMessages[end + 1].endOfEntry()) {
-            end++
-        }
-
-        return start..end
-    }
+    fun resolveMessageBounds(visibleMessages: List<GuiMessage.Line>, index: Int): IntRange =
+        resolveChatMessageBounds(visibleMessages, index)
 }

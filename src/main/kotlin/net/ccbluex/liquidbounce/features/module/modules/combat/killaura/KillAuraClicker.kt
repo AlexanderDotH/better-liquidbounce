@@ -31,18 +31,18 @@ import net.ccbluex.liquidbounce.render.engine.type.Color4b
 import net.ccbluex.liquidbounce.utils.aiming.data.Rotation
 import net.ccbluex.liquidbounce.utils.aiming.utils.canSeeBox
 import net.ccbluex.liquidbounce.utils.aiming.utils.withFixedYaw
-import net.ccbluex.liquidbounce.utils.clicking.Clicker
-import net.ccbluex.liquidbounce.utils.clicking.ItemCooldown
+import net.ccbluex.liquidbounce.features.clicking.Clicker
+import net.ccbluex.liquidbounce.features.clicking.ItemCooldown
 import net.ccbluex.liquidbounce.utils.client.mc
 import net.ccbluex.liquidbounce.utils.client.network
 import net.ccbluex.liquidbounce.utils.client.player
-import net.ccbluex.liquidbounce.utils.network.send1_11_1OpenInventory
+import net.ccbluex.liquidbounce.utils.network.sendLegacyOpenInventory
 import net.ccbluex.liquidbounce.utils.network.sendCloseInventory
 import net.ccbluex.liquidbounce.utils.entity.PositionExtrapolation
 import net.ccbluex.liquidbounce.utils.entity.getBoundingBoxAt
 import net.ccbluex.liquidbounce.utils.entity.isBlockingServerside
 import net.ccbluex.liquidbounce.utils.entity.wouldBlockHit
-import net.ccbluex.liquidbounce.utils.inventory.InventoryManager
+import net.ccbluex.liquidbounce.features.inventory.InventoryManager
 import net.minecraft.network.protocol.game.ServerboundMovePlayerPacket.PosRot
 import kotlin.math.round
 
@@ -115,82 +115,78 @@ object KillAuraClicker : Clicker<ModuleKillAura>(
      * - Closing the inventory if we are simulating inventory closing
      * - Unblocking if we are blocking and the tick on is 0
      */
-    @Suppress("CognitiveComplexMethod")
     suspend fun prepareForAttack(rotation: Rotation? = null, attack: suspend () -> Boolean) {
-        if (!canExecuteClickNow()) {
+        if (!canExecuteClickNow() || !prepareBlockingState()) {
             // If we are not going to click, we don't need to prepare the environment
-            return
-        }
-
-        // 1. Stop blocking
-        if (player.isBlockingServerside || KillAuraAutoBlock.enforcedBlockingHand != null) {
-            if (!KillAuraAutoBlock.enabled && !ModuleMultiActions.mayAttackWhileUsing()) {
-                return
-            }
-
-            if (KillAuraAutoBlock.enabled && KillAuraAutoBlock.shouldUnblockToHit) {
-                if (KillAuraAutoBlock.stopBlocking(pauses = true) && KillAuraAutoBlock.pauseOnUnblockTicks > 0) {
-                    ModuleKillAura.waitTicks = KillAuraAutoBlock.pauseOnUnblockTicks
-                    return
-                }
-            }
-        } else if (player.isUsingItem && !ModuleMultiActions.mayAttackWhileUsing()) {
-            // Since we are not allowed to attack while the player is using another item,
-            // we will return here.
             return
         }
 
         val wasSimulatedInventoryClose = simulateInventoryClosing && InventoryManager.isInventoryOpen
 
-        // 2. Close Inventory
         if (wasSimulatedInventoryClose) {
             network.sendCloseInventory()
         }
 
-        // 3. Rotate to target (if we have on-tick enabled)
-        if (rotationTiming == KillAuraRotationsValueGroup.KillAuraRotationTiming.ON_TICK && rotation != null) {
-            network.send(
-                PosRot(
-                    player.x,
-                    player.y,
-                    player.z,
-                    rotation.yaw,
-                    rotation.pitch,
-                    player.onGround(),
-                    player.horizontalCollision
-                )
-            )
-        }
+        sendAttackRotation(rotation)
 
         try {
-            // Run the attack
             clickSuspending(attack)
         } finally {
-            // 1. Rotate back
-            if (rotationTiming == KillAuraRotationsValueGroup.KillAuraRotationTiming.ON_TICK && rotation != null) {
-                network.send(
-                    PosRot(
-                        player.x,
-                        player.y,
-                        player.z,
-                        player.withFixedYaw(rotation),
-                        player.xRot,
-                        player.onGround(),
-                        player.horizontalCollision
-                    )
-                )
-            }
+            restoreRotation(rotation)
 
-            // 2. Start blocking again
             if (KillAuraAutoBlock.blockImmediate) {
                 KillAuraAutoBlock.startBlocking()
             }
 
-            // 3. Open inventory again
             if (wasSimulatedInventoryClose) {
-                network.send1_11_1OpenInventory()
+                network.sendLegacyOpenInventory()
             }
         }
+    }
+
+    private fun prepareBlockingState(): Boolean {
+        val blocking = player.isBlockingServerside || KillAuraAutoBlock.enforcedBlockingHand != null
+        if (!blocking) {
+            return !player.isUsingItem || ModuleMultiActions.mayAttackWhileUsing()
+        }
+        if (!KillAuraAutoBlock.enabled && !ModuleMultiActions.mayAttackWhileUsing()) {
+            return false
+        }
+        if (!KillAuraAutoBlock.enabled || !KillAuraAutoBlock.shouldUnblockToHit) {
+            return true
+        }
+        if (!KillAuraAutoBlock.stopBlocking(pauses = true) || KillAuraAutoBlock.pauseOnUnblockTicks <= 0) {
+            return true
+        }
+
+        ModuleKillAura.waitTicks = KillAuraAutoBlock.pauseOnUnblockTicks
+        return false
+    }
+
+    private fun sendAttackRotation(rotation: Rotation?) {
+        if (rotationTiming != KillAuraRotationsValueGroup.KillAuraRotationTiming.ON_TICK || rotation == null) return
+        network.send(PosRot(
+            player.x,
+            player.y,
+            player.z,
+            rotation.yaw,
+            rotation.pitch,
+            player.onGround(),
+            player.horizontalCollision,
+        ))
+    }
+
+    private fun restoreRotation(rotation: Rotation?) {
+        if (rotationTiming != KillAuraRotationsValueGroup.KillAuraRotationTiming.ON_TICK || rotation == null) return
+        network.send(PosRot(
+            player.x,
+            player.y,
+            player.z,
+            player.withFixedYaw(rotation),
+            player.xRot,
+            player.onGround(),
+            player.horizontalCollision,
+        ))
     }
 
 }

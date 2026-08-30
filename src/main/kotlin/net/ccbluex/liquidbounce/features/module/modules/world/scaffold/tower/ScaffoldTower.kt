@@ -20,17 +20,15 @@ package net.ccbluex.liquidbounce.features.module.modules.world.scaffold.tower
 
 import net.ccbluex.liquidbounce.config.types.group.Mode
 import net.ccbluex.liquidbounce.config.types.group.ModeValueGroup
-import net.ccbluex.liquidbounce.features.module.modules.world.scaffold.ModuleScaffold
-import net.ccbluex.liquidbounce.features.module.modules.world.scaffold.ModuleScaffold.towerMode
 import net.minecraft.core.BlockPos
 
 sealed class ScaffoldTower(name: String) : Mode(name) {
 
     final override val parent: ModeValueGroup<*>
-        get() = towerMode
+        get() = ScaffoldTowerRuntimeBridge.requireRuntime().towerMode
 
     /**
-     * Overwrites the [ModuleScaffold.getTargetedPosition] with a tower-specific one.
+     * Overwrites the scaffold target position with a tower-specific one.
      */
     open fun getTargetedPosition(blockPos: BlockPos): BlockPos {
         return blockPos.below()

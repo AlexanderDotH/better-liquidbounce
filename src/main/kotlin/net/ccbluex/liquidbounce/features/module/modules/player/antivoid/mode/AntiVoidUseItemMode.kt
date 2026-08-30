@@ -22,7 +22,7 @@ import net.ccbluex.liquidbounce.config.types.group.ModeValueGroup
 import net.ccbluex.liquidbounce.features.module.modules.player.antivoid.ModuleAntiVoid
 import net.ccbluex.liquidbounce.features.module.modules.render.ModuleDebug.debugParameter
 import net.ccbluex.liquidbounce.utils.collection.itemSortedSetOf
-import net.ccbluex.liquidbounce.utils.entity.PlayerSimulationCache
+import net.ccbluex.liquidbounce.features.simulation.PlayerSimulationCache
 import net.ccbluex.liquidbounce.utils.inventory.Slots
 import net.ccbluex.liquidbounce.utils.inventory.findClosestSlot
 import net.ccbluex.liquidbounce.utils.inventory.useHotbarSlotOrOffhand

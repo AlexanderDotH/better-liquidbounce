@@ -25,9 +25,10 @@ import net.ccbluex.liquidbounce.event.handler
 import net.ccbluex.liquidbounce.features.module.ClientModule
 import net.ccbluex.liquidbounce.features.module.ModuleCategories
 import net.ccbluex.liquidbounce.features.module.modules.world.seedcracker.SeedCrackerPresentation
+import net.ccbluex.liquidbounce.features.module.modules.world.seedcracker.SeedCrackerCommandOperations
 import net.ccbluex.liquidbounce.features.module.modules.world.seedcracker.SeedCrackerRuntime
-import net.ccbluex.liquidbounce.utils.client.chat
-import net.ccbluex.liquidbounce.utils.client.notification
+import net.ccbluex.liquidbounce.features.chat.chat
+import net.ccbluex.liquidbounce.features.chat.notification
 
 /**
  * Collects client-visible seed evidence and delegates cracking to [SeedCrackerRuntime].
@@ -35,8 +36,7 @@ import net.ccbluex.liquidbounce.utils.client.notification
  * This module intentionally owns presentation and settings only. Observation, persistence and
  * background solving stay behind the runtime boundary so no Minecraft objects escape to solvers.
  */
-@Suppress("TooManyFunctions")
-object ModuleSeedCracker : ClientModule("SeedCracker", ModuleCategories.WORLD) {
+object ModuleSeedCracker : ClientModule("SeedCracker", ModuleCategories.WORLD), SeedCrackerCommandOperations {
 
     internal val structures by boolean("Structures", true).onChanged {
         updateRuntimeSettings()
@@ -91,30 +91,6 @@ object ModuleSeedCracker : ClientModule("SeedCracker", ModuleCategories.WORLD) {
         SeedCrackerRuntime.onTick()
         publishPendingPresentation()
     }
-
-    internal fun status() = SeedCrackerRuntime.status()
-
-    internal fun pendingEvidenceIds() = SeedCrackerRuntime.pendingEvidenceIds()
-
-    internal fun evidenceIds() = SeedCrackerRuntime.evidenceIds()
-
-    internal fun confirm(id: String) = SeedCrackerRuntime.confirm(id)
-
-    internal fun confirmGuided() = SeedCrackerRuntime.confirmGuided()
-
-    internal fun reject(id: String) = SeedCrackerRuntime.reject(id)
-
-    internal fun rejectGuided() = SeedCrackerRuntime.rejectGuided()
-
-    internal fun undo(id: String) = SeedCrackerRuntime.undo(id)
-
-    internal fun pause() = SeedCrackerRuntime.pause()
-
-    internal fun resume() = SeedCrackerRuntime.resume()
-
-    internal fun resetCurrent() = SeedCrackerRuntime.resetCurrent()
-
-    internal fun resetAll() = SeedCrackerRuntime.resetAll()
 
     private fun updateRuntimeSettings() {
         if (!running) return

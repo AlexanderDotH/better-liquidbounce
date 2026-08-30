@@ -25,7 +25,6 @@ import com.mojang.blaze3d.systems.RenderPass
 import com.mojang.blaze3d.systems.RenderSystem
 import com.mojang.blaze3d.textures.FilterMode
 import com.mojang.blaze3d.textures.GpuSampler
-import net.ccbluex.liquidbounce.features.module.MinecraftShortcuts
 import net.ccbluex.liquidbounce.render.createRenderPass
 
 /**
@@ -36,7 +35,7 @@ abstract class OverlayShaderRenderer(
     private val blitPipeline: RenderPipeline,
     private val useDepth: Boolean = false,
     private val needDefaultUniforms: Boolean = false,
-) : MinecraftShortcuts {
+) {
 
     private val renderTargetHolder = LazyRenderTargetHolder("Custom shader FBO $name", useDepth)
     private val sampler: GpuSampler = RenderSystem.getSamplerCache().getClampToEdge(FilterMode.NEAREST)

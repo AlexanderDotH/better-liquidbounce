@@ -19,8 +19,8 @@
 package net.ccbluex.liquidbounce.features.module.modules.movement.elytrafly.modes
 
 import net.ccbluex.liquidbounce.event.events.NotificationEvent
-import net.ccbluex.liquidbounce.features.module.modules.movement.elytrafly.ModuleElytraFly
-import net.ccbluex.liquidbounce.utils.client.notification
+import net.ccbluex.liquidbounce.features.module.modules.movement.elytrafly.runtime.ElytraFlyRuntime
+import net.ccbluex.liquidbounce.features.chat.notification
 
 internal object ElytraFlyModePitch40Infinite : ElytraFlyMode("Pitch40Infinite") {
 
@@ -44,7 +44,7 @@ internal object ElytraFlyModePitch40Infinite : ElytraFlyMode("Pitch40Infinite") 
         if (player.y < maxHeight) {
             notification(
                 "ElytraFly",
-                ModuleElytraFly.message("altitudeTooLow", maxHeight),
+                ElytraFlyRuntime.message("altitudeTooLow", maxHeight),
                 NotificationEvent.Severity.INFO
             )
         }

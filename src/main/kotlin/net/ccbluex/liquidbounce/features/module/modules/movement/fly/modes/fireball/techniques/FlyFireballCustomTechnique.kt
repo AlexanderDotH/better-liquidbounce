@@ -20,7 +20,6 @@
 package net.ccbluex.liquidbounce.features.module.modules.movement.fly.modes.fireball.techniques
 
 import net.ccbluex.liquidbounce.config.types.group.Mode
-import net.ccbluex.liquidbounce.config.types.group.ModeValueGroup
 import net.ccbluex.liquidbounce.config.types.group.ToggleableValueGroup
 import net.ccbluex.liquidbounce.event.events.MovementInputEvent
 import net.ccbluex.liquidbounce.event.events.PlayerMoveEvent
@@ -28,20 +27,17 @@ import net.ccbluex.liquidbounce.event.events.RotationUpdateEvent
 import net.ccbluex.liquidbounce.event.handler
 import net.ccbluex.liquidbounce.event.sequenceHandler
 import net.ccbluex.liquidbounce.event.waitTicks
-import net.ccbluex.liquidbounce.features.module.modules.movement.fly.ModuleFly
-import net.ccbluex.liquidbounce.features.module.modules.movement.fly.modes.fireball.FlyFireball
+import net.ccbluex.liquidbounce.features.module.modules.movement.fly.runtime.FlyModuleControl
+import net.ccbluex.liquidbounce.features.module.modules.movement.fly.modes.fireball.runtime.FlyFireballRuntime
 import net.ccbluex.liquidbounce.features.module.modules.movement.fly.modes.flyAutomationYaw
 import net.ccbluex.liquidbounce.utils.aiming.RotationManager
-import net.ccbluex.liquidbounce.utils.aiming.RotationsValueGroup
+import net.ccbluex.liquidbounce.features.rotation.RotationsValueGroup
 import net.ccbluex.liquidbounce.utils.aiming.data.Rotation
 import net.ccbluex.liquidbounce.utils.kotlin.Priority
 import net.ccbluex.liquidbounce.utils.movement.DirectionalInput
 import net.minecraft.world.entity.MoverType
 
 object FlyFireballCustomTechnique : Mode("Custom") {
-
-    override val parent: ModeValueGroup<Mode>
-        get() = FlyFireball.technique
 
     private val disableDelay by int("DisableDelay", 10, 0..20)
     private val throwDelay by int("ThrowDelay", 2, 0..20)
@@ -77,7 +73,7 @@ object FlyFireballCustomTechnique : Mode("Custom") {
             Rotation(flyAutomationYaw(player.yRot), Rotations.pitch),
             valueGroup = Rotations,
             priority = Priority.IMPORTANT_FOR_PLAYER_LIFE,
-            provider = ModuleFly
+            provider = FlyModuleControl.module
         )
     }
 
@@ -100,7 +96,7 @@ object FlyFireballCustomTechnique : Mode("Custom") {
 
             waitTicks(throwDelay)
 
-            FlyFireball.throwFireball()
+            FlyFireballRuntime.throwFireball()
 
             if (sprint) {
                 player.isSprinting = true
@@ -114,10 +110,10 @@ object FlyFireballCustomTechnique : Mode("Custom") {
 
         waitTicks(disableDelay)
 
-        FlyFireball.markAutomaticEnd()
-        ModuleFly.enabled = false // Disable after the fireball was thrown
+        FlyFireballRuntime.markAutomaticEnd()
+        FlyModuleControl.disable() // Disable after the fireball was thrown
         canMove = true
-        FlyFireball.wasTriggered = false
+        FlyFireballRuntime.wasTriggered = false
     }
 
 }

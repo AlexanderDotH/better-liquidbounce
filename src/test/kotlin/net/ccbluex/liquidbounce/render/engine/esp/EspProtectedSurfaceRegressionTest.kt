@@ -21,11 +21,12 @@ class EspProtectedSurfaceRegressionTest {
     @Test
     fun `local player surface is captured before combat target filtering`() {
         val source = readSource(
-            "src/main/java/net/ccbluex/liquidbounce/render/engine/esp/EspMaskTargetSelector.java"
+            "src/main/kotlin/net/ccbluex/liquidbounce/features/module/modules/render/esp/integration/" +
+                "EspMaskFeatureAdapter.kt"
         )
 
-        val surfaceCapture = source.indexOf("request.with(EspMaskLayer.PROTECTED_SURFACE")
-        val combatFilter = source.indexOf("CombatExtensionsKt.shouldBeShown")
+        val surfaceCapture = source.indexOf("var request = protectPlayerSurface(entity)")
+        val combatFilter = source.indexOf("request = appendLivingEntityMask(request, entity)")
 
         assertTrue(surfaceCapture >= 0)
         assertTrue(combatFilter > surfaceCapture)
@@ -34,7 +35,7 @@ class EspProtectedSurfaceRegressionTest {
     @Test
     fun `protected model layer is rendered into the composite exclusion mask`() {
         val source = readSource(
-            "src/main/kotlin/net/ccbluex/liquidbounce/render/engine/esp/EspShaderRenderer.kt"
+            "src/main/kotlin/net/ccbluex/liquidbounce/render/engine/esp/EspMaskCapture.kt"
         )
 
         assertTrue(source.contains("executeEspMask`(EspMaskLayer.PROTECTED_SURFACE)"))
@@ -43,7 +44,7 @@ class EspProtectedSurfaceRegressionTest {
     @Test
     fun `deferred tracer glow cannot skip player surface capture`() {
         val source = readSource(
-            "src/main/kotlin/net/ccbluex/liquidbounce/render/engine/esp/EspShaderRenderer.kt"
+            "src/main/kotlin/net/ccbluex/liquidbounce/render/engine/esp/EspMaskCapture.kt"
         )
         val capture = source
             .substringAfter("private class EspProtectedMaskRenderer")
@@ -67,7 +68,7 @@ class EspProtectedSurfaceRegressionTest {
     @Test
     fun `protected mask union preserves alpha for nested ESP owners`() {
         val pipelines = readSource(
-            "src/main/kotlin/net/ccbluex/liquidbounce/render/ClientRenderPipelines.kt"
+            "src/main/kotlin/net/ccbluex/liquidbounce/render/CompositePipelineDefinitions.kt"
         )
         val unionPipeline = pipelines
             .substringAfter("val EspMaskUnion")
@@ -81,12 +82,16 @@ class EspProtectedSurfaceRegressionTest {
         val module = readSource(
             "src/main/kotlin/net/ccbluex/liquidbounce/features/module/modules/render/ModuleBlockESP.kt"
         )
-        val renderer = readSource(
-            "src/main/kotlin/net/ccbluex/liquidbounce/render/engine/esp/EspShaderRenderer.kt"
+        val capture = readSource(
+            "src/main/kotlin/net/ccbluex/liquidbounce/render/engine/esp/EspMaskCapture.kt"
         )
 
         assertFalse(module.contains("DrawOutlinesEvent"))
-        assertTrue(renderer.contains("ModuleBlockESP.activeShaderMode"))
+        assertTrue(module.contains("source = EspGlowSource.BLOCK_ESP"))
+        assertTrue(module.contains("style = { activeShaderMode?.style }"))
+        assertTrue(module.contains("activeShaderMode?.drawMask(target) == true"))
+        assertTrue(capture.contains("EspFeatureRendererRegistry.glow(source)"))
+        assertTrue(capture.contains("provider.drawMask(target)"))
     }
 
     @Test
@@ -115,6 +120,9 @@ class EspProtectedSurfaceRegressionTest {
             "src/main/java/net/ccbluex/liquidbounce/injection/mixins/minecraft/render/entity/" +
                 "MixinLivingEntityRenderer.java"
         )
+        val antiBlind = readSource(
+            "src/main/kotlin/net/ccbluex/liquidbounce/features/module/modules/render/ModuleAntiBlind.kt"
+        )
 
         val beginFrame = gameRenderer.indexOf("EspShaderRenderer.beginFrame()")
         val gameRenderEvent = gameRenderer.indexOf("EventManager.INSTANCE.callEvent(GameRenderEvent.INSTANCE)")
@@ -123,7 +131,12 @@ class EspProtectedSurfaceRegressionTest {
         assertTrue(levelRenderer.contains("EspShaderRenderer.capture(preparedFrame)"))
         assertTrue(levelRenderer.contains("method = \"addAlwaysOnTopPass\""))
         assertTrue(livingRenderer.contains("PlayerModelDelayHook.applyDelayedTransform"))
-        assertTrue(livingRenderer.contains("ModuleAntiBlind.canRender(DoRender.INVISIBLE_ENTITIES)"))
+        assertTrue(livingRenderer.contains("ModuleAntiBlind.canRenderInvisibleEntities()"))
+        assertTrue(
+            Regex(
+                """fun canRenderInvisibleEntities\(\)\s*=\s*canRender\(DoRender\.INVISIBLE_ENTITIES\)"""
+            ).containsMatchIn(antiBlind)
+        )
     }
 
     private fun readSource(path: String): String = Files.readString(Path.of(path))

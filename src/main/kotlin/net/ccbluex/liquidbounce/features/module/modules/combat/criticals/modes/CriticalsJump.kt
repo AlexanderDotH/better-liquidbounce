@@ -18,7 +18,6 @@
  */
 package net.ccbluex.liquidbounce.features.module.modules.combat.criticals.modes
 
-import com.google.gson.JsonObject
 import net.ccbluex.fastutil.component1
 import net.ccbluex.fastutil.component2
 import net.ccbluex.liquidbounce.config.types.group.Mode
@@ -30,16 +29,9 @@ import net.ccbluex.liquidbounce.features.module.modules.combat.ModuleAutoClicker
 import net.ccbluex.liquidbounce.features.module.modules.combat.criticals.ModuleCriticals
 import net.ccbluex.liquidbounce.features.module.modules.combat.criticals.ModuleCriticals.allowsCriticalHit
 import net.ccbluex.liquidbounce.features.module.modules.combat.killaura.ModuleKillAura
-import net.ccbluex.liquidbounce.features.module.modules.misc.debugrecorder.modes.GenericDebugRecorder
-import net.ccbluex.liquidbounce.features.module.modules.render.ModuleDebug
-import net.ccbluex.liquidbounce.utils.aiming.data.Rotation
-import net.ccbluex.liquidbounce.utils.combat.findEnemies
+import net.ccbluex.liquidbounce.features.combat.runtime.findEnemies
 import net.ccbluex.liquidbounce.utils.entity.FallingPlayer
-import net.ccbluex.liquidbounce.utils.entity.SimulatedPlayer
-import net.ccbluex.liquidbounce.utils.movement.DirectionalInput
 import net.minecraft.world.entity.Entity
-import net.minecraft.world.entity.player.Player
-import net.minecraft.world.phys.Vec3
 
 object CriticalsJump : Mode("Jump") {
 
@@ -112,7 +104,6 @@ object CriticalsJump : Mode("Jump") {
      * will try to attack the enemy anyway. To maximise damage, this function is used to determine
      * whether it is worth to wait for the fall.
      */
-    @Suppress("CognitiveComplexMethod", "LongMethod")
     fun shouldWaitForCrit(target: Entity, ignoreState: Boolean = false): Boolean {
         if (!isActive() && !ignoreState) {
             return false
@@ -126,113 +117,14 @@ object CriticalsJump : Mode("Jump") {
         if (!allowsCriticalHit(ignoreOnGround = true)) {
             return false
         }
-
-        val onGround = player.onGround()
-        val isJumping = player.input.keyPresses.jump || adjustNextJump
-
-        // If player is on ground and not trying to jump, no need to wait for a crit.
-        if (onGround && !isJumping) {
-            return false
-        }
-
-        val nextPossibleCrit = calculateTicksUntilNextCrit()
-
-        // If player is already falling in the air
-        if (!onGround && player.deltaMovement.y <= 0.0) {
-            // If already capable of landing a critical hit right now, don't wait!
-            if (player.fallDistance > 0.0 && player.getAttackStrengthScale(0.5f) > 0.9f) {
-                return false
-            }
-
-            // If cooldown is not ready yet during fall, check if cooldown will recover before landing
-            val collision = FallingPlayer.fromPlayer(player).findCollision((nextPossibleCrit + 1.0f).toInt())
-            return collision == null || collision.tick >= nextPossibleCrit.toInt()
-        }
-
-        // If player is rising (in jump) or starting a jump on ground
-        val initialMotionY = if (onGround) height.toDouble() else player.deltaMovement.y
-        val gravity = 0.08
-        val ticksTillFall = (initialMotionY / gravity).toFloat()
-        val ticksTillCrit = nextPossibleCrit.coerceAtLeast(ticksTillFall)
-
-        val (simulatedPlayerPos, simulatedTargetPos) = if (target is Player) {
-            predictPlayerPos(target, ticksTillCrit.toInt())
-        } else {
-            player.position() to target.position()
-        }
-
-        ModuleDebug.debugParameter(ModuleCriticals, "timeToCrit", ticksTillCrit)
-
-        GenericDebugRecorder.recordDebugInfo(ModuleCriticals, "critEstimation", JsonObject().apply {
-            addProperty("ticksTillCrit", ticksTillCrit)
-            add("player", GenericDebugRecorder.debugObject(player))
-            add("target", GenericDebugRecorder.debugObject(target))
-            addProperty("simulatedPlayerPos", simulatedPlayerPos.toString())
-            addProperty("simulatedTargetPos", simulatedTargetPos.toString())
-        })
-
-        GenericDebugRecorder.debugEntityIn(target, ticksTillCrit.toInt())
-
-        // Check whether player will hit the ground before reaching falling critical state
-        val simulatedFallingPlayer = if (onGround) {
-            FallingPlayer(
-                player,
-                player.x,
-                player.y,
-                player.z,
-                player.deltaMovement.x,
-                player.deltaMovement.y + initialMotionY,
-                player.deltaMovement.z,
-                player.yRot
-            )
-        } else {
-            FallingPlayer.fromPlayer(player)
-        }
-
-        val collision = simulatedFallingPlayer.findCollision((ticksTillCrit + 5.0f).toInt())
-        // If player lands before reaching the apex/crit tick, cannot land a crit by waiting
-        if (collision != null && collision.tick < ticksTillFall.toInt()) {
-            return false
-        }
-
-        return true
+        return evaluateCriticalWait(target)
     }
 
-    private fun calculateTicksUntilNextCrit(): Float {
-        val durationToWait = player.currentItemAttackStrengthDelay * 0.9F - 0.5F
-        val waitedDuration = player.attackStrengthTicker.toFloat()
+    internal val configuredHeight: Float
+        get() = height
 
-        return (durationToWait - waitedDuration).coerceAtLeast(0.0f)
-    }
-
-    /**
-     * This function simulates a chase between the player and the target. The target continues its motion, the player
-     * too but changes their rotation to the target after some reaction time.
-     */
-    private fun predictPlayerPos(target: Player, ticks: Int): Pair<Vec3, Vec3> {
-        // Ticks until the player
-        val reactionTime = 10
-
-        val simulatedPlayer = SimulatedPlayer.fromClientPlayer(
-            SimulatedPlayer.SimulatedPlayerInput.fromClientPlayer(DirectionalInput(player.input))
-        )
-        val simulatedTarget = SimulatedPlayer.fromOtherPlayer(
-            target,
-            SimulatedPlayer.SimulatedPlayerInput.guessInput(target)
-        )
-
-        for (i in 0 until ticks) {
-            // Rotate to the target after some time
-            if (i == reactionTime) {
-                simulatedPlayer.yRot = Rotation.lookingAt(point = target.position(), from = simulatedPlayer.pos).yRot
-            }
-
-            simulatedPlayer.tick()
-            simulatedTarget.tick()
-        }
-
-        return simulatedPlayer.pos to simulatedTarget.pos
-    }
+    internal val automaticJumpPending: Boolean
+        get() = adjustNextJump
 
     fun shouldWaitForJump(initialMotion: Float = 0.42f): Boolean {
         if (!allowsCriticalHit(true) || !running) {
@@ -240,7 +132,7 @@ object CriticalsJump : Mode("Jump") {
         }
 
         val ticksTillFall = initialMotion / 0.08f
-        val nextPossibleCrit = calculateTicksUntilNextCrit()
+        val nextPossibleCrit = calculateCriticalsJumpTicksUntilNextCrit()
 
         var ticksTillNextOnGround = FallingPlayer(
             player,
@@ -279,5 +171,3 @@ object CriticalsJump : Mode("Jump") {
     }
 
 }
-
-

@@ -18,7 +18,7 @@
  */
 package net.ccbluex.liquidbounce.features.module.modules.movement.fly.modes.revive
 
-import net.ccbluex.liquidbounce.features.module.modules.movement.fly.ModuleFly
+import net.ccbluex.liquidbounce.features.module.modules.movement.fly.runtime.FlyModuleControl
 import net.ccbluex.liquidbounce.features.module.modules.movement.fly.modes.withFlyAutomationStrafe
 import net.ccbluex.liquidbounce.utils.client.Timer
 import net.ccbluex.liquidbounce.utils.kotlin.Priority
@@ -34,5 +34,5 @@ internal fun LocalPlayer.stopReviveFlySpeed() {
 }
 
 internal fun requestReviveFlyTimer(timerSpeed: Float) {
-    Timer.requestTimerSpeed(timerSpeed, Priority.IMPORTANT_FOR_USAGE_1, ModuleFly)
+    Timer.requestTimerSpeed(timerSpeed, Priority.IMPORTANT_FOR_USAGE_1, FlyModuleControl.module)
 }

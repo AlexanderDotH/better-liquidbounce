@@ -26,11 +26,13 @@ import com.mojang.blaze3d.framegraph.FrameGraphBuilder;
 import com.mojang.blaze3d.framegraph.FramePass;
 import com.mojang.blaze3d.pipeline.RenderTarget;
 import com.mojang.blaze3d.vertex.PoseStack;
-import net.ccbluex.liquidbounce.LiquidBounce;
+import net.ccbluex.liquidbounce.common.ClientBuildMetadata;
 import net.ccbluex.liquidbounce.event.EventManager;
 import net.ccbluex.liquidbounce.event.events.DrawOutlinesEvent;
 import net.ccbluex.liquidbounce.event.events.WorldFeatureSubmitEvent;
-import net.ccbluex.liquidbounce.features.module.modules.render.*;
+import net.ccbluex.liquidbounce.features.module.modules.render.ModuleAntiBlind;
+import net.ccbluex.liquidbounce.features.module.modules.render.ModuleBlockOutline;
+import net.ccbluex.liquidbounce.features.module.modules.render.ModuleChams;
 import net.ccbluex.liquidbounce.features.module.modules.render.customambience.ModuleCustomAmbience;
 import net.ccbluex.liquidbounce.render.engine.esp.EspShaderRenderer;
 import net.ccbluex.liquidbounce.utils.collection.Pools;
@@ -166,7 +168,7 @@ public abstract class MixinLevelRenderer {
         GpuBufferSlice fog,
         CallbackInfo ci
     ) {
-        FramePass pass = frame.addPass((LiquidBounce.CLIENT_NAME + ' ' + ModuleChams.INSTANCE.getName()).toLowerCase(Locale.ROOT));
+        FramePass pass = frame.addPass((ClientBuildMetadata.NAME + ' ' + ModuleChams.INSTANCE.getName()).toLowerCase(Locale.ROOT));
         pass.disableCulling();
         pass.executes(() -> ModuleChams.INSTANCE.compositeIfNeeded(Minecraft.getInstance().gameRenderer.mainRenderTarget()));
     }
@@ -196,7 +198,7 @@ public abstract class MixinLevelRenderer {
 
     @WrapWithCondition(method = "submitBlockDestroyAnimation", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/renderer/SubmitNodeCollector;submitBreakingBlockModel(Lcom/mojang/blaze3d/vertex/PoseStack;Ljava/util/List;I)V"))
     private boolean cancelRenderBreakingTexture(SubmitNodeCollector instance, PoseStack poseStack, List<?> list, int i) {
-        return ModuleAntiBlind.canRender(DoRender.BLOCK_BREAK_OVERLAY);
+        return ModuleAntiBlind.canRenderBlockBreakOverlay();
     }
 
 }

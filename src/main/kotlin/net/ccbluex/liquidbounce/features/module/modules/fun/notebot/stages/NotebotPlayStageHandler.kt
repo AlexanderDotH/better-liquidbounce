@@ -18,24 +18,26 @@
  */
 package net.ccbluex.liquidbounce.features.module.modules.`fun`.notebot.stages
 
-import net.ccbluex.liquidbounce.features.module.modules.`fun`.notebot.ModuleNotebot
-import net.ccbluex.liquidbounce.features.module.modules.`fun`.notebot.NoteBlockTracker
-import net.ccbluex.liquidbounce.features.module.modules.`fun`.notebot.NotebotEngine
+import net.ccbluex.liquidbounce.features.module.modules.`fun`.notebot.contract.NotebotRuntimeBridge
+import net.ccbluex.liquidbounce.features.module.modules.`fun`.notebot.contract.NotebotStage
 import net.ccbluex.liquidbounce.features.module.modules.`fun`.notebot.nbs.InstrumentNote
 import net.ccbluex.liquidbounce.features.module.modules.`fun`.notebot.nbs.SongData
-import net.ccbluex.liquidbounce.utils.client.chat
+import net.ccbluex.liquidbounce.features.module.modules.`fun`.notebot.nbs.resolveInstrumentNote
+import net.ccbluex.liquidbounce.features.module.modules.`fun`.notebot.runtime.NoteBlockTracker
+import net.ccbluex.liquidbounce.features.module.modules.`fun`.notebot.runtime.NotebotEngine
+import net.ccbluex.liquidbounce.features.module.modules.`fun`.notebot.runtime.NotebotStageHandler
 import net.minecraft.ChatFormatting
 
-class NotebotPlayStageHandler(
+internal class NotebotPlayStageHandler(
     private val availableBlocksForNote: Map<InstrumentNote, List<NoteBlockTracker>>
-) : ModuleNotebot.NotebotStageHandler {
+) : NotebotStageHandler {
 
-    private val progressName = ModuleNotebot.message("progressPlay")
+    private val progressName = NotebotRuntimeBridge.message("progressPlay")
     private var songTickAccumulator = 0f
     private var currentSongTick = 0
 
-    override val handledStage: ModuleNotebot.NotebotStage
-        get() = ModuleNotebot.NotebotStage.PLAY
+    override val handledStage: NotebotStage
+        get() = NotebotStage.PLAY
 
     override fun onTick(engine: NotebotEngine) {
         val songData = engine.songData
@@ -46,11 +48,13 @@ class NotebotPlayStageHandler(
             songTickAccumulator -= 1f
             currentSongTick++
 
-            ModuleNotebot.sendNewProgressMessage(progressName, currentSongTick, songData.songTickLength)
+            NotebotRuntimeBridge.sendProgress(progressName, currentSongTick, songData.songTickLength)
 
             if (currentSongTick > songData.songTickLength) {
-                chat(ModuleNotebot.message("finished").withStyle(ChatFormatting.GREEN), ModuleNotebot)
-                ModuleNotebot.enabled = false
+                NotebotRuntimeBridge.chat(
+                    NotebotRuntimeBridge.message("finished").withStyle(ChatFormatting.GREEN)
+                )
+                NotebotRuntimeBridge.disable()
                 return
             }
 
@@ -63,14 +67,14 @@ class NotebotPlayStageHandler(
         val usedBlocks = hashSetOf<NoteBlockTracker>()
 
         notes.forEach { note ->
-            val instrumentNote = ModuleNotebot.getPlayedNote(note)
+            val instrumentNote = resolveInstrumentNote(note, NotebotRuntimeBridge.pianoOnly())
 
             val blockToPlayWith = this.availableBlocksForNote[instrumentNote]!!.firstOrNull { it !in usedBlocks }
 
             if (blockToPlayWith != null) {
                 blockToPlayWith.click()
 
-                if (!ModuleNotebot.reuseBlocks) {
+                if (!NotebotRuntimeBridge.reuseBlocks()) {
                     usedBlocks.add(blockToPlayWith)
                 }
             }

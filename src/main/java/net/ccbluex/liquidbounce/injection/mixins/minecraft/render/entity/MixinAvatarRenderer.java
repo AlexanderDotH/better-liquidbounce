@@ -19,10 +19,10 @@
 package net.ccbluex.liquidbounce.injection.mixins.minecraft.render.entity;
 
 import net.ccbluex.liquidbounce.features.module.modules.combat.ModuleSwordBlock;
-import net.ccbluex.liquidbounce.features.module.modules.render.playermodel.PlayerModelRenderStateApplier;
-import net.ccbluex.liquidbounce.utils.render.PlayerModelActionHook;
-import net.ccbluex.liquidbounce.utils.render.PlayerModelAppearanceHook;
-import net.ccbluex.liquidbounce.utils.render.PlayerModelDelayHook;
+import net.ccbluex.liquidbounce.features.module.modules.render.playermodel.PlayerModelRenderStateHook;
+import net.ccbluex.liquidbounce.render.playermodel.PlayerModelActionHook;
+import net.ccbluex.liquidbounce.render.playermodel.PlayerModelAppearanceHook;
+import net.ccbluex.liquidbounce.render.playermodel.PlayerModelDelayHook;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.model.HumanoidModel;
 import net.minecraft.client.player.LocalPlayer;
@@ -75,7 +75,7 @@ public abstract class MixinAvatarRenderer {
             PlayerModelActionHook.applyAmnesiaActions(livingEntity, state);
             PlayerModelAppearanceHook.applyAppearance(livingEntity, state);
             if (livingEntity instanceof LocalPlayer localPlayer) {
-                PlayerModelRenderStateApplier.applyReplacement(localPlayer, state, tickDelta);
+                PlayerModelRenderStateHook.applyReplacement(localPlayer, state, tickDelta);
             }
         }
     }

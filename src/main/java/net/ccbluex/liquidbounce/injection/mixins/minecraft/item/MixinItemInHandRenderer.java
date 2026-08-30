@@ -23,14 +23,13 @@ import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
 import com.llamalad7.mixinextras.sugar.Local;
 import com.mojang.blaze3d.vertex.PoseStack;
-import com.mojang.math.Axis;
 import net.ccbluex.liquidbounce.features.module.modules.combat.ModuleSpearKill;
 import net.ccbluex.liquidbounce.features.module.modules.combat.ModuleSwordBlock;
 import net.ccbluex.liquidbounce.features.module.modules.player.ModuleFastUse;
 import net.ccbluex.liquidbounce.features.module.modules.render.animations.ModuleAnimations;
-import net.ccbluex.liquidbounce.features.module.modules.render.animations.ModuleAnimationsKt;
+import net.ccbluex.liquidbounce.features.module.modules.render.animations.AnimationRenderHook;
 import net.ccbluex.liquidbounce.features.module.modules.render.ModuleSilentHotbar;
-import net.ccbluex.liquidbounce.features.module.modules.render.animations.SwingAnimations;
+import net.ccbluex.liquidbounce.injection.hooks.FirstPersonItemTransformHook;
 import net.ccbluex.liquidbounce.utils.client.SilentHotbar;
 import net.ccbluex.liquidbounce.utils.item.ItemCategorizationsKt;
 import net.ccbluex.liquidbounce.utils.render.FirstPersonShieldTint;
@@ -39,7 +38,6 @@ import net.minecraft.client.player.AbstractClientPlayer;
 import net.minecraft.client.renderer.ItemInHandRenderer;
 import net.minecraft.client.renderer.SubmitNodeCollector;
 import net.minecraft.client.renderer.item.ItemStackRenderState;
-import net.minecraft.core.component.DataComponents;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.entity.HumanoidArm;
 import net.minecraft.world.entity.LivingEntity;
@@ -50,7 +48,6 @@ import net.minecraft.world.item.ShieldItem;
 import org.spongepowered.asm.mixin.Final;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
-import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.*;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
@@ -98,13 +95,12 @@ public abstract class MixinItemInHandRenderer {
     ) {
         AbstractClientPlayer player = Minecraft.getInstance().player;
 
-        if (player == null || !ModuleAnimations.INSTANCE.getRunning() || !SwingAnimations.INSTANCE.getEnabled() || arm != player.getMainArm() || ModuleSwordBlock.shouldAnimateSwordBlock(player)) {
+        if (player == null || !AnimationRenderHook.isSwingAnimationEnabled() || arm != player.getMainArm() || ModuleSwordBlock.shouldAnimateSwordBlock(player)) {
             return;
         }
 
-        SwingAnimations.INSTANCE.onRenderItem(
+        AnimationRenderHook.renderMainHandSwing(
             player,
-            InteractionHand.MAIN_HAND,
             attack,
             poseStack
         );
@@ -115,35 +111,7 @@ public abstract class MixinItemInHandRenderer {
     @Inject(method = "submitArmWithItem", at = @At(value = "INVOKE", target = "Lcom/mojang/blaze3d/vertex/PoseStack;pushPose()V", shift = At.Shift.AFTER))
     private void hookRenderFirstPersonItem(
         AbstractClientPlayer player, float frameInterp, float xRot, InteractionHand hand, float attack, ItemStack itemStack, float inverseArmHeight, PoseStack poseStack, SubmitNodeCollector submitNodeCollector, int lightCoords, CallbackInfo ci) {
-        if (ModuleAnimations.INSTANCE.getRunning()) {
-            var isInBothHands = InteractionHand.MAIN_HAND == hand && itemStack.has(DataComponents.MAP_ID) && offHandItem.isEmpty();
-            ModuleAnimations.MainHand mainHand = ModuleAnimations.MainHand.INSTANCE;
-            ModuleAnimations.OffHand offHand = ModuleAnimations.OffHand.INSTANCE;
-            if (isInBothHands && mainHand.getRunning() && offHand.getRunning()) {
-                liquid_bounce$applyTransformations(poseStack,
-                        (mainHand.getMainHandX() + offHand.getOffHandX()) / 2f,
-                        (mainHand.getMainHandY() + offHand.getOffHandY()) / 2f,
-                        (mainHand.getMainHandItemScale() + offHand.getOffHandItemScale()) / 2f,
-                        (mainHand.getMainHandPositiveX() + offHand.getOffHandPositiveX()) / 2f,
-                        (mainHand.getMainHandPositiveY() + offHand.getOffHandPositiveY()) / 2f,
-                        (mainHand.getMainHandPositiveZ() + offHand.getOffHandPositiveZ()) / 2f
-                );
-            } else if (isInBothHands && mainHand.getRunning()) {
-                poseStack.translate(0f, 0f, mainHand.getMainHandItemScale());
-            } else if (InteractionHand.MAIN_HAND == hand && mainHand.getRunning()) {
-                liquid_bounce$applyTransformations(poseStack, mainHand.getMainHandX(), mainHand.getMainHandY(), mainHand.getMainHandItemScale(), mainHand.getMainHandPositiveX(), mainHand.getMainHandPositiveY(), mainHand.getMainHandPositiveZ());
-            } else if (ModuleAnimationsKt.shouldApplyOffHandTransform(hand, isInBothHands, offHand.getRunning())) {
-                liquid_bounce$applyTransformations(poseStack, offHand.getOffHandX(), offHand.getOffHandY(), offHand.getOffHandItemScale(), offHand.getOffHandPositiveX(), offHand.getOffHandPositiveY(), offHand.getOffHandPositiveZ());
-            }
-        }
-    }
-
-    @Unique
-    private static void liquid_bounce$applyTransformations(PoseStack matrices, float translateX, float translateY, float translateZ, float rotateX, float rotateY, float rotateZ) {
-        matrices.translate(translateX, translateY, translateZ);
-        matrices.mulPose(Axis.XP.rotationDegrees(rotateX));
-        matrices.mulPose(Axis.YP.rotationDegrees(rotateY));
-        matrices.mulPose(Axis.ZP.rotationDegrees(rotateZ));
+        FirstPersonItemTransformHook.apply(hand, itemStack, offHandItem, poseStack);
     }
 
     @Inject(method = "submitArmWithItem",

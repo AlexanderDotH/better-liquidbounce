@@ -22,18 +22,18 @@ import net.ccbluex.liquidbounce.features.command.Command
 import net.ccbluex.liquidbounce.features.command.builder.CommandBuilder
 import net.ccbluex.liquidbounce.features.command.builder.ParameterBuilder
 import net.ccbluex.liquidbounce.features.command.builder.enumChoice
-import net.ccbluex.liquidbounce.script.DebugProtocol
-import net.ccbluex.liquidbounce.script.ScriptDebugOptions
-import net.ccbluex.liquidbounce.script.ScriptManager
-import net.ccbluex.liquidbounce.utils.client.chat
-import net.ccbluex.liquidbounce.utils.client.clickablePath
-import net.ccbluex.liquidbounce.utils.client.regular
-import net.ccbluex.liquidbounce.utils.client.variable
+import net.ccbluex.liquidbounce.features.command.commands.client.script.ScriptCommandBridge
+import net.ccbluex.liquidbounce.features.command.commands.client.script.ScriptCommandDebugOptions
+import net.ccbluex.liquidbounce.features.command.commands.client.script.ScriptCommandDebugProtocol
+import net.ccbluex.liquidbounce.features.chat.chat
+import net.ccbluex.liquidbounce.utils.text.clickablePath
+import net.ccbluex.liquidbounce.utils.text.regular
+import net.ccbluex.liquidbounce.utils.text.variable
 import net.minecraft.util.Util
 import java.io.File
 
 private fun ParameterBuilder<*>.autocompletedFromScriptNames() =
-    autocompletedFrom { ScriptManager.root.listFiles()?.map { it.name } }
+    autocompletedFrom { ScriptCommandBridge.root().listFiles()?.map { it.name } }
 
 object CommandScript : Command.Factory {
 
@@ -58,7 +58,7 @@ object CommandScript : Command.Factory {
             .build()
     ).handler {
         val name = args[0] as String
-        val scriptFile = ScriptManager.root.resolve(name)
+        val scriptFile = ScriptCommandBridge.root().resolve(name)
 
         if (!scriptFile.exists()) {
             chat(regular(command.result("notFound", variable(name))))
@@ -70,13 +70,13 @@ object CommandScript : Command.Factory {
     }.build()
 
     private fun browseSubcommand() = CommandBuilder.begin("browse").handler {
-        Util.getPlatform().openFile(ScriptManager.root)
-        chat(regular(command.result("browse", clickablePath(ScriptManager.root))))
+        Util.getPlatform().openFile(ScriptCommandBridge.root())
+        chat(regular(command.result("browse", clickablePath(ScriptCommandBridge.root()))))
     }.build()
 
     private fun listSubcommand() = CommandBuilder.begin("list").handler {
-        val scripts = ScriptManager.scripts
-        val scriptNames = scripts.map { script -> "${script.scriptName} (${script.language})" }
+        val scripts = ScriptCommandBridge.scripts()
+        val scriptNames = scripts.map { script -> "${script.name} (${script.language})" }
 
         if (scriptNames.isEmpty()) {
             chat(regular(command.result("noScripts")))
@@ -95,7 +95,7 @@ object CommandScript : Command.Factory {
                 .build()
         )
         .parameter(
-            ParameterBuilder.enumChoice<DebugProtocol>("protocol")
+            ParameterBuilder.enumChoice<ScriptCommandDebugProtocol>("protocol")
                 .optional()
                 .build()
         )
@@ -119,7 +119,7 @@ object CommandScript : Command.Factory {
         )
         .handler {
             val name = args[0] as String
-            val scriptFile = ScriptManager.root.resolve(name)
+            val scriptFile = ScriptCommandBridge.root().resolve(name)
 
             if (!scriptFile.exists()) {
                 chat(regular(command.result("notFound", variable(name))))
@@ -137,20 +137,18 @@ object CommandScript : Command.Factory {
         command: Command,
         name: String
     ) {
-        val protocol = args.getOrNull(1) as DebugProtocol? ?: DebugProtocol.INSPECT
+        val protocol = args.getOrNull(1) as ScriptCommandDebugProtocol? ?: ScriptCommandDebugProtocol.INSPECT
 
-        runCatching {
-            ScriptManager.loadScript(
-                scriptFile, debugOptions = ScriptDebugOptions(
-                    enabled = true,
-                    protocol = protocol,
-                    suspendOnStart = args.getOrNull(2) as Boolean? == true,
-                    inspectInternals = args.getOrNull(3) as Boolean? == true,
-                    port = args.getOrNull(4) as Int?
-                        ?: if (protocol == DebugProtocol.INSPECT) 4242 else 4711,
-                )
-            ).enable()
-        }.onSuccess {
+        ScriptCommandBridge.load(
+            scriptFile,
+            ScriptCommandDebugOptions(
+                protocol = protocol,
+                suspendOnStart = args.getOrNull(2) as Boolean? == true,
+                inspectInternals = args.getOrNull(3) as Boolean? == true,
+                port = args.getOrNull(4) as Int?
+                    ?: if (protocol == ScriptCommandDebugProtocol.INSPECT) 4242 else 4711,
+            )
+        ).onSuccess {
             chat(regular(command.result("loaded", variable(name))))
         }.onFailure {
             chat(regular(command.result("failedToLoad", variable(it.message ?: "unknown"))))
@@ -162,12 +160,10 @@ object CommandScript : Command.Factory {
         command: Command,
         name: String
     ) {
-        ScriptManager.scripts.find { it.file == scriptFile }?.also { script ->
+        ScriptCommandBridge.scripts().find { it.file == scriptFile }?.also {
             chat(regular(command.result("alreadyLoaded", variable(name))))
 
-            runCatching {
-                ScriptManager.unloadScript(script)
-            }.onSuccess {
+            ScriptCommandBridge.unload(scriptFile).onSuccess {
                 chat(regular(command.result("unloaded", variable(name))))
             }.onFailure {
                 chat(regular(command.result("failedToUnload", variable(it.message ?: "unknown"))))
@@ -178,22 +174,20 @@ object CommandScript : Command.Factory {
     private fun unloadSubcommand() = CommandBuilder.begin("unload").parameter(
         ParameterBuilder.begin<String>("name").verifiedBy(ParameterBuilder.STRING_VALIDATOR).required()
             .autocompletedFrom {
-                ScriptManager.scripts.map { it.scriptName }
+                ScriptCommandBridge.scripts().map { it.name }
             }
             .build()
     ).handler {
         val name = args[0] as String
 
-        val script = ScriptManager.scripts.find { it.scriptName.equals(name, true) }
+        val script = ScriptCommandBridge.scripts().find { it.name.equals(name, true) }
 
         if (script == null) {
             chat(regular(command.result("notFound", variable(name))))
             return@handler
         }
 
-        runCatching {
-            ScriptManager.unloadScript(script)
-        }.onSuccess {
+        ScriptCommandBridge.unload(script.file).onSuccess {
             chat(regular(command.result("unloaded", variable(name))))
         }.onFailure {
             chat(regular(command.result("failedToUnload", variable(it.message ?: "unknown"))))
@@ -208,7 +202,7 @@ object CommandScript : Command.Factory {
             .build()
     ).handler {
         val name = args[0] as String
-        val scriptFile = ScriptManager.root.resolve(name)
+        val scriptFile = ScriptCommandBridge.root().resolve(name)
 
         if (!scriptFile.exists()) {
             chat(regular(command.result("notFound", variable(name))))
@@ -216,14 +210,12 @@ object CommandScript : Command.Factory {
         }
 
         // Check if script is already loaded
-        if (ScriptManager.scripts.any { it.file == scriptFile }) {
+        if (ScriptCommandBridge.scripts().any { it.file == scriptFile }) {
             chat(regular(command.result("alreadyLoaded", variable(name))))
             return@handler
         }
 
-        runCatching {
-            ScriptManager.loadScript(scriptFile).enable()
-        }.onSuccess {
+        ScriptCommandBridge.load(scriptFile).onSuccess {
             chat(regular(command.result("loaded", variable(name))))
         }.onFailure {
             chat(regular(command.result("failedToLoad", variable(it.message ?: "unknown"))))
@@ -232,9 +224,7 @@ object CommandScript : Command.Factory {
     }.build()
 
     private fun reloadSubcommand() = CommandBuilder.begin("reload").handler {
-        runCatching {
-            ScriptManager.reload()
-        }.onSuccess {
+        ScriptCommandBridge.reload().onSuccess {
             chat(regular(command.result("reloaded")))
         }.onFailure {
             chat(regular(command.result("reloadFailed", variable(it.message ?: "unknown"))))

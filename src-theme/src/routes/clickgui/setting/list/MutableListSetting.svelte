@@ -4,7 +4,7 @@
     import {createEventDispatcher} from "svelte";
     import SettingButton from "../common/SettingButton.svelte";
     import RemovableItem from "../common/RemovableItem.svelte";
-    import {cefTextInput} from "../common/cefTextInput";
+    import {cefTextInput} from "../../../../integration/input/cefTextInput";
 
     export let setting: ModuleSetting;
 

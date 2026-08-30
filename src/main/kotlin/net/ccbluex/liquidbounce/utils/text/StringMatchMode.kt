@@ -19,7 +19,7 @@
 
 package net.ccbluex.liquidbounce.utils.text
 
-import net.ccbluex.liquidbounce.config.types.list.Tagged
+import net.ccbluex.liquidbounce.common.Tagged
 import java.util.function.BiPredicate
 
 /**

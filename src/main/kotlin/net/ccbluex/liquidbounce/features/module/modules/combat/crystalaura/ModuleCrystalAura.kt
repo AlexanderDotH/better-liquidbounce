@@ -28,13 +28,13 @@ import net.ccbluex.liquidbounce.features.module.modules.combat.crystalaura.place
 import net.ccbluex.liquidbounce.features.module.modules.combat.crystalaura.post.CrystalPostAttackTracker
 import net.ccbluex.liquidbounce.features.module.modules.combat.crystalaura.post.SubmoduleSetDead
 import net.ccbluex.liquidbounce.features.module.modules.combat.crystalaura.trigger.CrystalAuraTriggerer
-import net.ccbluex.liquidbounce.utils.aiming.NoRotationMode
-import net.ccbluex.liquidbounce.utils.aiming.NormalRotationMode
-import net.ccbluex.liquidbounce.utils.client.FloatValueProvider
-import net.ccbluex.liquidbounce.utils.combat.CombatManager
-import net.ccbluex.liquidbounce.utils.combat.TargetTracker
+import net.ccbluex.liquidbounce.features.rotation.NoRotationMode
+import net.ccbluex.liquidbounce.features.rotation.NormalRotationMode
+import net.ccbluex.liquidbounce.config.types.FloatValueProvider
+import net.ccbluex.liquidbounce.features.combat.runtime.CombatManager
+import net.ccbluex.liquidbounce.features.combat.runtime.TargetTracker
 import net.ccbluex.liquidbounce.utils.kotlin.Priority
-import net.ccbluex.liquidbounce.utils.render.TargetRenderer
+import net.ccbluex.liquidbounce.render.target.TargetRenderer
 
 /**
  * Module CrystalAura
@@ -74,7 +74,7 @@ object ModuleCrystalAura : ClientModule(
     }
 
     init {
-        tree(TargetRenderer(this, targetTracker))
+        tree(TargetRenderer(this, targetTracker::target))
     }
 
     val rotationMode = modes(this, "RotationMode") {

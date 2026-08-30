@@ -19,9 +19,9 @@
 package net.ccbluex.liquidbounce.features.module.modules.render.esp.modes
 
 import net.ccbluex.fastutil.mapToArray
-import net.ccbluex.liquidbounce.event.events.WorldRenderEvent
+import net.ccbluex.liquidbounce.render.events.WorldRenderEvent
 import net.ccbluex.liquidbounce.event.handler
-import net.ccbluex.liquidbounce.features.module.modules.render.esp.ModuleESP.getColor
+import net.ccbluex.liquidbounce.features.module.modules.render.esp.runtime.EspModeRuntime
 import net.ccbluex.liquidbounce.render.WorldRenderEnvironment
 import net.ccbluex.liquidbounce.render.drawBox
 import net.ccbluex.liquidbounce.render.engine.type.Color4b
@@ -45,7 +45,7 @@ object EspBoxMode : EspMode.BoxBased("Box") {
             if (!mergeIntersecting) {
                 for ((entity, localBox, position) in preparedBoxes) {
                     withPositionRelativeToCamera(position) {
-                        drawColoredBox(localBox, getColor(entity))
+                        drawColoredBox(localBox, EspModeRuntime.color(entity))
                     }
                 }
                 return@renderEnvironment
@@ -53,7 +53,7 @@ object EspBoxMode : EspMode.BoxBased("Box") {
 
             val mergedBoxes = mergeIntersectingAabbsSweep(
                 preparedBoxes.mapToArray { (entity, _, _, worldBox) ->
-                    KeyedAabb(worldBox, getColor(entity))
+                    KeyedAabb(worldBox, EspModeRuntime.color(entity))
                 }.asList()
             )
 

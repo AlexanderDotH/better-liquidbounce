@@ -18,12 +18,14 @@
  */
 package net.ccbluex.liquidbounce.features.module.modules.`fun`
 
+import net.ccbluex.liquidbounce.features.module.modules.`fun`.spinbot.SpinBotRotation
+
 import net.ccbluex.liquidbounce.event.events.RotationUpdateEvent
 import net.ccbluex.liquidbounce.event.handler
 import net.ccbluex.liquidbounce.features.module.ClientModule
 import net.ccbluex.liquidbounce.features.module.ModuleCategories
 import net.ccbluex.liquidbounce.utils.aiming.RotationManager
-import net.ccbluex.liquidbounce.utils.aiming.RotationsValueGroup
+import net.ccbluex.liquidbounce.features.rotation.RotationsValueGroup
 import net.ccbluex.liquidbounce.utils.aiming.data.Rotation
 import net.ccbluex.liquidbounce.utils.kotlin.Priority
 

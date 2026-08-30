@@ -21,7 +21,6 @@ package net.ccbluex.liquidbounce.injection.mixins.minecraft.render;
 
 import com.llamalad7.mixinextras.injector.ModifyExpressionValue;
 import com.mojang.blaze3d.vertex.PoseStack;
-import net.ccbluex.liquidbounce.features.module.modules.render.DoRender;
 import net.ccbluex.liquidbounce.features.module.modules.render.ModuleAntiBlind;
 import net.minecraft.client.renderer.MapRenderer;
 import net.minecraft.client.renderer.SubmitNodeCollector;
@@ -41,12 +40,12 @@ public abstract class MixinMapRenderer {
             method = "render",
             at = @At(value = "FIELD", target = "Lnet/minecraft/client/renderer/state/MapRenderState;decorations:Ljava/util/List;", opcode = Opcodes.GETFIELD)
     ) private List<MapDecoration> hookMapMarkers(List<MapDecoration> original) {
-        return ModuleAntiBlind.canRender(DoRender.MAP_MARKERS) ? original : List.of();
+        return ModuleAntiBlind.canRenderMapMarkers() ? original : List.of();
     }
 
     @Inject(method = "render", at = @At("HEAD"), cancellable = true)
     private void hookMapContents(MapRenderState state, PoseStack matrices, SubmitNodeCollector queue, boolean bl, int light, CallbackInfo ci) {
-        if (!ModuleAntiBlind.canRender(DoRender.MAP_CONTENTS)) {
+        if (!ModuleAntiBlind.canRenderMapContents()) {
             ci.cancel();
         }
     }

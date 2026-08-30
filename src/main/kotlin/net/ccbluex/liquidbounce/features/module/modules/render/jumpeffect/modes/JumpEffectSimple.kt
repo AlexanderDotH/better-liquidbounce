@@ -19,12 +19,15 @@
 
 package net.ccbluex.liquidbounce.features.module.modules.render.jumpeffect.modes
 
-import net.ccbluex.liquidbounce.features.module.modules.render.jumpeffect.JumpEffectColorSettings
-import net.ccbluex.liquidbounce.features.module.modules.render.jumpeffect.JumpEffectMode
+import net.ccbluex.liquidbounce.config.types.group.ModeValueGroup
+import net.ccbluex.liquidbounce.features.module.modules.render.jumpeffect.config.JumpEffectColorSettings
+import net.ccbluex.liquidbounce.features.module.modules.render.jumpeffect.runtime.JumpEffectMode
+import net.ccbluex.liquidbounce.features.module.modules.render.jumpeffect.runtime.JumpEffectRuntime
 import net.ccbluex.liquidbounce.render.WorldRenderEnvironment
 import net.ccbluex.liquidbounce.render.drawGradientCircle
 
-internal object JumpEffectSimple : JumpEffectMode("Simple") {
+internal class JumpEffectSimple(parent: ModeValueGroup<*>, runtime: JumpEffectRuntime) :
+    JumpEffectMode("Simple", parent, runtime) {
 
     private val colors = JumpEffectColorSettings()
 

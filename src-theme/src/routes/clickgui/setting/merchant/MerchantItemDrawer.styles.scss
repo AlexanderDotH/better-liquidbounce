@@ -1,0 +1,160 @@
+    .item-drawer {
+        min-width: 0;
+        margin-top: var(--clickgui-setting-control-gap, 5px);
+        padding: var(--clickgui-setting-group-padding, 7px);
+        background: color-mix(in srgb, var(--clickgui-input-background-color) 78%, transparent);
+        border-left: solid var(--clickgui-setting-group-border-width, 2px) var(--clickgui-setting-group-border-color);
+        border-radius: var(--clickgui-merchant-drawer-radius, 8px);
+    }
+
+    .drawer-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        min-width: 0;
+        margin-bottom: var(--clickgui-setting-label-gap, 5px);
+        color: var(--clickgui-text-color);
+        font-size: var(--clickgui-control-font-size, 12px);
+    }
+
+    .close-button {
+        display: grid;
+        width: 22px;
+        height: 22px;
+        padding: 0;
+        place-items: center;
+        color: var(--clickgui-text-dimmed-color);
+        background: transparent;
+        border: none;
+        border-radius: var(--clickgui-merchant-action-radius, 5px);
+        cursor: pointer;
+        font: inherit;
+
+        &:hover,
+        &:focus-visible {
+            color: var(--clickgui-text-color);
+            background: var(--clickgui-selection-chip-background-color);
+            outline: none;
+        }
+    }
+
+    .selected-chips {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 4px;
+        max-height: 78px;
+        margin-bottom: var(--clickgui-setting-label-gap, 5px);
+        overflow-y: auto;
+    }
+
+    .selected-chip {
+        display: inline-grid;
+        grid-template-columns: auto minmax(0, 1fr) auto;
+        align-items: center;
+        max-width: 100%;
+        gap: 4px;
+        padding: var(--clickgui-chip-padding, 3px 6px);
+        color: var(--clickgui-selection-chip-selected-color);
+        background: var(--clickgui-selection-chip-selected-background-color);
+        border: none;
+        border-radius: var(--clickgui-chip-radius, 3px);
+        cursor: pointer;
+        font-family: "Inter", sans-serif;
+        font-size: 9px;
+
+        span:nth-child(2) {
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+    }
+
+    .chip-remove {
+        color: var(--clickgui-selection-chip-remove-color);
+        font-size: 13px;
+        line-height: 1;
+    }
+
+    .search-input {
+        box-sizing: border-box;
+        width: 100%;
+        margin-bottom: var(--clickgui-setting-label-gap, 5px);
+        padding: var(--clickgui-input-padding, 5px);
+        color: var(--clickgui-text-color);
+        background: var(--clickgui-input-background-color);
+        border: none;
+        border-bottom: solid var(--clickgui-control-border-width, 2px) var(--clickgui-input-border-color);
+        border-radius: var(--clickgui-merchant-input-radius, 6px);
+        font-family: "Inter", sans-serif;
+        font-size: var(--clickgui-control-font-size, 12px);
+        outline: none;
+    }
+
+    .result-list {
+        min-width: 0;
+        overflow: hidden;
+    }
+
+    .result-item {
+        box-sizing: border-box;
+        display: grid;
+        grid-template-columns: auto minmax(0, 1fr) 14px;
+        align-items: center;
+        width: 100%;
+        height: 38px;
+        gap: var(--clickgui-setting-control-gap, 5px);
+        padding: 3px 5px;
+        color: var(--clickgui-text-color);
+        background: transparent;
+        border: none;
+        border-radius: var(--clickgui-merchant-result-radius, 6px);
+        cursor: pointer;
+        text-align: left;
+
+        &:hover,
+        &:focus-visible,
+        &.selected {
+            background: var(--clickgui-selection-chip-selected-background-color);
+            outline: none;
+        }
+    }
+
+    .item-text {
+        display: grid;
+        min-width: 0;
+    }
+
+    .item-name,
+    .item-identifier {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .item-name {
+        font-size: var(--clickgui-control-font-size, 12px);
+    }
+
+    .item-identifier {
+        color: var(--clickgui-text-dimmed-color);
+        font-size: 8px;
+    }
+
+    .checkmark {
+        color: var(--accent-color);
+        font-size: 12px;
+        font-weight: 700;
+        text-align: center;
+    }
+
+    .empty-state {
+        min-height: 54px;
+        padding: 16px 4px;
+        color: var(--clickgui-text-dimmed-color);
+        font-size: var(--clickgui-control-font-size, 12px);
+        text-align: center;
+
+        &.error {
+            color: var(--error-color);
+        }
+    }

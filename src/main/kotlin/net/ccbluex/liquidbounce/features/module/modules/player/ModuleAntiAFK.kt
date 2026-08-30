@@ -21,7 +21,7 @@ package net.ccbluex.liquidbounce.features.module.modules.player
 import net.ccbluex.liquidbounce.config.types.group.Mode
 import net.ccbluex.liquidbounce.config.types.group.ModeValueGroup
 import net.ccbluex.liquidbounce.config.types.group.ToggleableValueGroup
-import net.ccbluex.liquidbounce.config.types.list.Tagged
+import net.ccbluex.liquidbounce.common.Tagged
 import net.ccbluex.liquidbounce.event.events.MovementInputEvent
 import net.ccbluex.liquidbounce.event.handler
 import net.ccbluex.liquidbounce.event.once
@@ -33,7 +33,7 @@ import net.ccbluex.liquidbounce.features.module.modules.player.ModuleAntiAFK.Cus
 import net.ccbluex.liquidbounce.features.module.modules.player.ModuleAntiAFK.CustomMode.Rotate.ignoreOpenInventory
 import net.ccbluex.liquidbounce.features.module.modules.player.ModuleAntiAFK.CustomMode.Rotate.rotations
 import net.ccbluex.liquidbounce.utils.aiming.RotationManager
-import net.ccbluex.liquidbounce.utils.aiming.RotationsValueGroup
+import net.ccbluex.liquidbounce.features.rotation.RotationsValueGroup
 import net.ccbluex.liquidbounce.utils.aiming.data.Rotation
 import net.ccbluex.liquidbounce.utils.kotlin.Priority
 import net.ccbluex.liquidbounce.utils.kotlin.random

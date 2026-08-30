@@ -22,7 +22,6 @@ package net.ccbluex.liquidbounce.features.module.modules.combat.aimbot.autobow
 import net.ccbluex.liquidbounce.config.types.group.ToggleableValueGroup
 import net.ccbluex.liquidbounce.event.events.GameTickEvent
 import net.ccbluex.liquidbounce.event.handler
-import net.ccbluex.liquidbounce.features.module.modules.combat.aimbot.ModuleAutoBow
 import net.ccbluex.liquidbounce.utils.network.MovePacketType
 import net.ccbluex.liquidbounce.utils.entity.moving
 import net.ccbluex.liquidbounce.utils.entity.usingItemOrNull
@@ -35,7 +34,7 @@ import net.minecraft.world.item.BowItem
  *
  * TODO: Add version specific options
  */
-object AutoBowFastChargeFeature : ToggleableValueGroup(ModuleAutoBow, "FastCharge", false) {
+class AutoBowFastChargeFeature(owner: AutoBowFeatureOwner) : ToggleableValueGroup(owner, "FastCharge", false) {
 
     private val speed by int("Speed", 20, 3..20)
 

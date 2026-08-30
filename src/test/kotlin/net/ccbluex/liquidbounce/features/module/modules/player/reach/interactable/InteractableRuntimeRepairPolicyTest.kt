@@ -10,6 +10,8 @@
  */
 package net.ccbluex.liquidbounce.features.module.modules.player.reach.interactable
 
+import net.ccbluex.liquidbounce.features.module.modules.player.reach.contract.interactableSweepWaypoints
+import net.ccbluex.liquidbounce.features.module.modules.player.reach.contract.interactionDeliveryConfirmed
 import net.ccbluex.liquidbounce.features.module.modules.player.reach.interactable.session.InteractablePacketDisposition
 import net.ccbluex.liquidbounce.features.module.modules.player.reach.interactable.target.InteractableEntityKind
 import net.minecraft.core.BlockPos

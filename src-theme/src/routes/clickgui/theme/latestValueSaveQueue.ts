@@ -19,142 +19,150 @@ export interface LatestValueSaveQueue<T> {
     whenIdle(): Promise<void>;
 }
 
+interface SaveAttempt<T> {
+    failed: boolean;
+    attempted: boolean;
+    latestValue: T | undefined;
+}
+
 export function createLatestValueSaveQueue<T>(
     dependencies: LatestValueSaveQueueDependencies<T>,
 ): LatestValueSaveQueue<T> {
-    let pendingValue: T | undefined;
-    let pending = false;
-    let saving = false;
-    let error: Error | null = null;
-    let idleWaiters: Array<() => void> = [];
-
-    function enqueue(value: T): void {
-        pendingValue = value;
-        pending = true;
-        error = null;
-
-        if (!saving) {
-            void flush();
-        }
-    }
-
-    function retry(): void {
-        if (!saving && pending) {
-            error = null;
-            void flush();
-        }
-    }
-
-    async function flush(): Promise<void> {
-        if (saving || !pending) {
-            return;
-        }
-
-        saving = true;
-        publishState();
-        let failed = false;
-        let latestAttemptedValue: T | undefined;
-        let attemptedValue = false;
-
-        try {
-            while (true) {
-                const latestSaved = await savePendingValues();
-                if (latestSaved.attempted) {
-                    latestAttemptedValue = latestSaved.value;
-                    attemptedValue = true;
-                }
-                const confirmed = await dependencies.reload();
-
-                if (pending) {
-                    continue;
-                }
-
-                dependencies.onConfirmed(confirmed);
-                break;
-            }
-        } catch (cause) {
-            failed = true;
-            if (!pending && attemptedValue) {
-                pendingValue = latestAttemptedValue as T;
-                pending = true;
-            }
-            error = toError(cause);
-        } finally {
-            saving = false;
-            publishState();
-            resolveIdleWaiters();
-
-            if (pending && !failed) {
-                void flush();
-            }
-        }
-    }
-
-    async function savePendingValues(): Promise<{
-        attempted: boolean;
-        value: T | undefined;
-    }> {
-        let latestValue: T | undefined;
-        let attempted = false;
-
-        while (pending) {
-            const value = pendingValue as T;
-            pending = false;
-            latestValue = value;
-            attempted = true;
-
-            try {
-                await dependencies.save(value);
-            } catch (cause) {
-                if (!pending) {
-                    pendingValue = value;
-                    pending = true;
-                }
-
-                throw cause;
-            }
-        }
-
-        return {attempted, value: latestValue};
-    }
-
-    function publishState(): void {
-        dependencies.onStateChange?.({
-            saving,
-            error,
-            hasPending: pending,
-        });
-    }
-
-    function whenIdle(): Promise<void> {
-        if (!saving) {
-            return Promise.resolve();
-        }
-
-        return new Promise(resolve => {
-            idleWaiters.push(resolve);
-        });
-    }
-
-    function resolveIdleWaiters(): void {
-        const waiters = idleWaiters;
-        idleWaiters = [];
-        waiters.forEach(resolve => resolve());
-    }
-
+    const controller = new LatestValueSaveQueueController(dependencies);
     return {
-        enqueue,
-        retry,
-        isSaving: () => saving,
-        hasPending: () => pending,
-        whenIdle,
+        enqueue: value => controller.enqueue(value),
+        retry: () => controller.retry(),
+        isSaving: () => controller.isSaving(),
+        hasPending: () => controller.hasPending(),
+        whenIdle: () => controller.whenIdle(),
     };
 }
 
-function toError(cause: unknown): Error {
-    if (cause instanceof Error) {
-        return cause;
+class LatestValueSaveQueueController<T> {
+    private readonly dependencies: LatestValueSaveQueueDependencies<T>;
+    private pendingValue: T | undefined;
+    private pending = false;
+    private saving = false;
+    private error: Error | null = null;
+    private idleWaiters: Array<() => void> = [];
+
+    constructor(dependencies: LatestValueSaveQueueDependencies<T>) {
+        this.dependencies = dependencies;
     }
 
-    return new Error("The settings update failed.");
+    enqueue(value: T): void {
+        this.pendingValue = value;
+        this.pending = true;
+        this.error = null;
+        if (!this.saving) void this.flush();
+    }
+
+    retry(): void {
+        if (this.saving || !this.pending) return;
+        this.error = null;
+        void this.flush();
+    }
+
+    isSaving(): boolean {
+        return this.saving;
+    }
+
+    hasPending(): boolean {
+        return this.pending;
+    }
+
+    whenIdle(): Promise<void> {
+        if (!this.saving) return Promise.resolve();
+        return new Promise(resolve => this.idleWaiters.push(resolve));
+    }
+
+    private async flush(): Promise<void> {
+        if (this.saving || !this.pending) return;
+        this.saving = true;
+        this.publishState();
+        const attempt: SaveAttempt<T> = {failed: false, attempted: false, latestValue: undefined};
+        try {
+            await this.saveUntilConfirmed(attempt);
+        } catch (cause) {
+            attempt.failed = true;
+            this.restoreFailedAttempt(attempt);
+            this.error = toError(cause);
+        } finally {
+            this.finishFlush(attempt.failed);
+        }
+    }
+
+    private async saveUntilConfirmed(attempt: SaveAttempt<T>): Promise<void> {
+        while (true) {
+            const latest = await this.savePendingValues();
+            if (latest.attempted) {
+                attempt.latestValue = latest.value;
+                attempt.attempted = true;
+            }
+            const confirmed = await this.dependencies.reload();
+            if (this.pending) continue;
+            this.dependencies.onConfirmed(confirmed);
+            return;
+        }
+    }
+
+    private async savePendingValues(): Promise<{attempted: boolean; value: T | undefined}> {
+        let latestValue: T | undefined;
+        let attempted = false;
+        while (this.pending) {
+            const value = this.takePendingValue();
+            latestValue = value;
+            attempted = true;
+            try {
+                await this.dependencies.save(value);
+            } catch (cause) {
+                this.restoreUnsupersededValue(value);
+                throw cause;
+            }
+        }
+        return {attempted, value: latestValue};
+    }
+
+    private takePendingValue(): T {
+        const value = this.pendingValue as T;
+        this.pending = false;
+        return value;
+    }
+
+    private restoreUnsupersededValue(value: T): void {
+        if (this.pending) return;
+        this.pendingValue = value;
+        this.pending = true;
+    }
+
+    private restoreFailedAttempt(attempt: SaveAttempt<T>): void {
+        if (this.pending || !attempt.attempted) return;
+        this.pendingValue = attempt.latestValue as T;
+        this.pending = true;
+    }
+
+    private finishFlush(failed: boolean): void {
+        this.saving = false;
+        this.publishState();
+        this.resolveIdleWaiters();
+        if (this.pending && !failed) void this.flush();
+    }
+
+    private publishState(): void {
+        this.dependencies.onStateChange?.({
+            saving: this.saving,
+            error: this.error,
+            hasPending: this.pending,
+        });
+    }
+
+    private resolveIdleWaiters(): void {
+        const waiters = this.idleWaiters;
+        this.idleWaiters = [];
+        waiters.forEach(resolve => resolve());
+    }
+}
+
+function toError(cause: unknown): Error {
+    return cause instanceof Error ? cause : new Error("The settings update failed.");
 }

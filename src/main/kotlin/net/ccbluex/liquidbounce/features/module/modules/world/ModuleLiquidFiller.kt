@@ -19,15 +19,16 @@
 package net.ccbluex.liquidbounce.features.module.modules.world
 
 import net.ccbluex.fastutil.enumSetAllOf
-import net.ccbluex.liquidbounce.config.types.list.Tagged
+import net.ccbluex.liquidbounce.common.Tagged
 import net.ccbluex.liquidbounce.event.events.RotationUpdateEvent
 import net.ccbluex.liquidbounce.event.handler
+import net.ccbluex.liquidbounce.features.block.placer.BlockPlacer
 import net.ccbluex.liquidbounce.features.module.ClientModule
 import net.ccbluex.liquidbounce.features.module.ModuleCategories
+import net.ccbluex.liquidbounce.features.module.modules.world.liquidfiller.SpongeWaterReachability
 import net.ccbluex.liquidbounce.utils.block.hasAnySolidPlacementNeighbor
 import net.ccbluex.liquidbounce.utils.block.isBlockedByEntities
 import net.ccbluex.liquidbounce.utils.block.searchBlocksInCuboid
-import net.ccbluex.liquidbounce.utils.block.placer.BlockPlacer
 import net.ccbluex.liquidbounce.utils.block.state
 import net.ccbluex.liquidbounce.utils.collection.Filter
 import net.ccbluex.liquidbounce.utils.collection.getSlot
@@ -39,10 +40,8 @@ import net.ccbluex.liquidbounce.utils.kotlin.Priority
 import net.ccbluex.liquidbounce.utils.math.center
 import net.ccbluex.liquidbounce.utils.math.sq
 import net.minecraft.core.BlockPos
-import net.minecraft.core.Direction
 import net.minecraft.tags.FluidTags
 import net.minecraft.world.level.block.Blocks
-import net.minecraft.world.level.block.BucketPickup
 import net.minecraft.world.level.block.state.BlockState
 import net.minecraft.world.item.Items
 import net.minecraft.world.level.block.SpongeBlock
@@ -81,6 +80,7 @@ object ModuleLiquidFiller : ClientModule("LiquidFiller", ModuleCategories.WORLD)
         ::findSlotForTarget,
         allowSupportPlacements = false
     ))
+    private val spongeWaterReachability = SpongeWaterReachability { pos -> pos.state }
 
     override fun onDisabled() {
         placer.disable()
@@ -160,63 +160,8 @@ object ModuleLiquidFiller : ClientModule("LiquidFiller", ModuleCategories.WORLD)
                 state.canBeReplaced() &&
                 pos.hasAnySolidPlacementNeighbor() &&
                 !pos.isBlockedByEntities() &&
-                canAbsorbWaterFrom(pos, waterPos)
+                spongeWaterReachability.canAbsorbFrom(pos, waterPos)
         }.minByOrNull { (pos, _) -> pos.distToCenterSqr(player.eyePosition) }?.first
-    }
-
-    /**
-     * @see SpongeBlock.removeWaterBreadthFirstSearch
-     */
-    @Suppress("CognitiveComplexMethod")
-    private fun canAbsorbWaterFrom(spongePos: BlockPos, waterPos: BlockPos): Boolean {
-        if (spongePos == waterPos) {
-            return true
-        }
-
-        var reachedTarget = false
-        BlockPos.breadthFirstTraversal(
-            spongePos,
-            SpongeBlock.MAX_DEPTH,
-            SpongeBlock.MAX_COUNT + 1,
-            { pos, consumer ->
-                for (direction in Direction.entries) {
-                    consumer.accept(pos.relative(direction))
-                }
-            },
-            { pos ->
-                if (pos == spongePos) {
-                    return@breadthFirstTraversal BlockPos.TraversalNodeStatus.ACCEPT
-                }
-
-                val state = pos.state ?: return@breadthFirstTraversal BlockPos.TraversalNodeStatus.SKIP
-                val fluidState = state.fluidState
-                if (!fluidState.`is`(FluidTags.WATER)) {
-                    return@breadthFirstTraversal BlockPos.TraversalNodeStatus.SKIP
-                }
-
-                if (pos == waterPos) {
-                    reachedTarget = true
-                    return@breadthFirstTraversal BlockPos.TraversalNodeStatus.STOP
-                }
-
-                when (val block = state.block) {
-                    is BucketPickup -> BlockPos.TraversalNodeStatus.ACCEPT
-
-                    else -> if (
-                        block === Blocks.KELP ||
-                        block === Blocks.KELP_PLANT ||
-                        block === Blocks.SEAGRASS ||
-                        block === Blocks.TALL_SEAGRASS
-                    ) {
-                        BlockPos.TraversalNodeStatus.ACCEPT
-                    } else {
-                        BlockPos.TraversalNodeStatus.SKIP
-                    }
-                }
-            }
-        )
-
-        return reachedTarget
     }
 
     private fun spongeSlot() = if (useSponge) {

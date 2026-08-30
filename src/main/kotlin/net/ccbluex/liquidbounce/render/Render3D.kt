@@ -17,7 +17,7 @@
  * along with LiquidBounce. If not, see <https://www.gnu.org/licenses/>.
  */
 
-@file:Suppress("detekt:TooManyFunctions", "NOTHING_TO_INLINE")
+@file:Suppress("NOTHING_TO_INLINE")
 
 package net.ccbluex.liquidbounce.render
 
@@ -38,6 +38,7 @@ import net.minecraft.core.BlockPos
 import net.minecraft.core.Vec3i
 import net.minecraft.util.FormattedCharSequence
 import org.joml.Matrix4f
+import org.joml.Matrix4fc
 
 inline fun <T> usePoseStack(block: PoseStack.() -> T): T {
     val matrices = Pools.MatStack.borrow()
@@ -86,6 +87,11 @@ class WorldRenderEnvironment internal constructor(
     val camera: Camera,
     private val batchCollector: BatchCollector,
 ) {
+    companion object {
+        internal fun create(renderTarget: RenderTarget, poseStack: PoseStack, camera: Camera) =
+            WorldRenderEnvironment(renderTarget, poseStack, camera, BatchCollector())
+    }
+
     /**
      * Low-level draw entrypoint.
      *
@@ -104,6 +110,10 @@ class WorldRenderEnvironment internal constructor(
             uniforms,
         )
         return batchCollector.start(key)
+    }
+
+    internal fun flush(modelViewMatrix: Matrix4fc) {
+        batchCollector.flush(renderTarget, getDynamicTransformsUniform(Matrix4f(modelViewMatrix)))
     }
 }
 

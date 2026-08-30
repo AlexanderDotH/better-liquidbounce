@@ -1,8 +1,8 @@
 import assert from "node:assert/strict";
-import {readFileSync} from "node:fs";
 import test from "node:test";
+import {readComponentSourceWithStyles} from "./themeSource.mjs";
 
-const panelSource = readFileSync(
+const panelSource = readComponentSourceWithStyles(
     new URL(
         "../src/routes/clickgui/themes/modern/ModernPanel.svelte",
         import.meta.url,
@@ -43,8 +43,9 @@ test("temporary viewport clamping keeps the persisted panel arrangement restorab
         panelSource,
         /let visiblePanelPosition = \$state<ModernPanelPosition>/,
     );
-    assert.match(panelSource, /style:left="\{visiblePanelPosition\.left\}px"/);
-    assert.match(panelSource, /style:top="\{visiblePanelPosition\.top\}px"/);
+    assert.match(panelSource, /visiblePosition=\{visiblePanelPosition\}/);
+    assert.match(panelSource, /style:left="\{visiblePosition\.left\}px"/);
+    assert.match(panelSource, /style:top="\{visiblePosition\.top\}px"/);
 
     assert.match(resizeBody, /syncVisiblePanelPosition\(\)/);
     assert.doesNotMatch(resizeBody, /savePanelState\(\)/);

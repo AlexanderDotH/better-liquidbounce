@@ -24,7 +24,7 @@ import net.ccbluex.liquidbounce.event.EventListener
 import net.ccbluex.liquidbounce.event.events.PlayerJumpEvent
 import net.ccbluex.liquidbounce.event.handler
 import net.ccbluex.liquidbounce.event.tickHandler
-import net.ccbluex.liquidbounce.features.module.modules.movement.speed.ModuleSpeed
+import net.ccbluex.liquidbounce.features.module.modules.movement.speed.runtime.SpeedModuleControl
 import net.ccbluex.liquidbounce.features.module.modules.movement.speed.modes.SpeedBHopBase
 import net.ccbluex.liquidbounce.utils.client.Timer
 import net.ccbluex.liquidbounce.utils.entity.horizontalSpeed
@@ -124,7 +124,7 @@ class SpeedNCP(parent: ModeValueGroup<*>) : SpeedBHopBase("NCP", parent) {
         }
 
         if (timerBoost) {
-            Timer.requestTimerSpeed(1.08f, priority = Priority.IMPORTANT_FOR_USAGE_1, provider = ModuleSpeed)
+            Timer.requestTimerSpeed(1.08f, priority = Priority.IMPORTANT_FOR_USAGE_1, provider = SpeedModuleControl.module)
         }
 
         if (player.hurtTime >= 1 && damageBoost) {

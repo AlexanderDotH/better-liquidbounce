@@ -19,10 +19,11 @@
 
 package net.ccbluex.liquidbounce.features.module.modules.render
 
-import net.ccbluex.liquidbounce.config.types.list.Tagged
+import net.ccbluex.liquidbounce.common.Tagged
 import net.ccbluex.liquidbounce.event.events.MouseRotationEvent
 import net.ccbluex.liquidbounce.event.events.PerspectiveEvent
 import net.ccbluex.liquidbounce.event.handler
+import net.ccbluex.liquidbounce.features.combat.contract.CombatRuntimeEnvironment
 import net.ccbluex.liquidbounce.features.module.ClientModule
 import net.ccbluex.liquidbounce.features.module.ModuleCategories
 import net.ccbluex.liquidbounce.utils.aiming.utils.RotationUtil
@@ -41,6 +42,10 @@ object ModuleFreeLook : ClientModule(
 
     var cameraYaw = 0f
     var cameraPitch = 0f
+
+    init {
+        CombatRuntimeEnvironment.bindFreeLook { enabled }
+    }
 
     @get:JvmName("isInvertedView")
     val invertedView get() = perspective.perspective == THIRD_PERSON_FRONT

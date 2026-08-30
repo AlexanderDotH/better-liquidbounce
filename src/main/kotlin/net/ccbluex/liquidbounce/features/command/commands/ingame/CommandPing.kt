@@ -20,10 +20,10 @@ package net.ccbluex.liquidbounce.features.command.commands.ingame
 
 import net.ccbluex.liquidbounce.features.command.Command
 import net.ccbluex.liquidbounce.features.command.builder.CommandBuilder
-import net.ccbluex.liquidbounce.utils.client.chat
+import net.ccbluex.liquidbounce.features.chat.chat
 import net.ccbluex.liquidbounce.utils.client.player
-import net.ccbluex.liquidbounce.utils.client.regular
-import net.ccbluex.liquidbounce.utils.client.variable
+import net.ccbluex.liquidbounce.utils.text.regular
+import net.ccbluex.liquidbounce.utils.text.variable
 
 /**
  * Ping Command

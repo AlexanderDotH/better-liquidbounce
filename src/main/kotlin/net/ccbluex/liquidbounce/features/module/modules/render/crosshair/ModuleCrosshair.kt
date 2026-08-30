@@ -26,10 +26,10 @@ import net.ccbluex.liquidbounce.features.module.modules.render.crosshair.modes.C
 
 object ModuleCrosshair : ClientModule("Crosshair", ModuleCategories.RENDER) {
     val modes =
-        choices("Mode", 0) {
+        choices("Mode", 0) { parent ->
             arrayOf(
-                CrosshairCircle,
-                CrosshairCS2,
+                CrosshairCircle(parent),
+                CrosshairCS2(parent),
             )
         }.apply { tagBy(this) }
 }

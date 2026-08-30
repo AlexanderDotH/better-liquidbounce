@@ -2,12 +2,18 @@ name: Build
 
 on:
   push:
-    branches: [ nextgen ]
+    branches: [nextgen]
   pull_request:
-    branches: [ nextgen ]
+    branches: [nextgen]
+
+permissions:
+  actions: read
+  contents: read
+  security-events: write
 
 jobs:
   extract-versions:
+    name: extract-versions
     runs-on: ubuntu-latest
     outputs:
       lb_version: ${{ steps.versions.outputs.lb_version }}
@@ -19,135 +25,278 @@ jobs:
       fabric_kotlin_version: ${{ steps.versions.outputs.fabric_kotlin_version }}
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
       - name: Extract versions
         id: versions
+        shell: bash
         run: |
           set -euo pipefail
-          
-          function gradleprop {
-            local key="$1"
-            local value=$(grep "^${key}=" gradle.properties | head -n1 | cut -d'=' -f2- | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
-            if [ -z "$value" ]; then
-              echo "[ERROR] gradleprop: '${key}' not found or blank in gradle.properties" >&2
-              exit 1
-            fi
-            echo "$value"
-          }
-          
-          function tomlprop {
-            local key="$1"
-            local value=$(grep "^${key}[[:space:]]*=" gradle/libs.versions.toml | head -n1 | sed -n 's/^[^=]*=[[:space:]]*"\([^"]*\)".*/\1/p')
-            if [ -z "$value" ]; then
-              echo "[ERROR] tomlprop: '${key}' not found or blank in gradle/libs.versions.toml" >&2
-              exit 1
-            fi
-            echo "$value"
-          }
-          
-          LB_VERSION=$(gradleprop 'mod_version')
-          JDK_VERSION=$(tomlprop 'jdk')
-          MINECRAFT_VERSION=$(tomlprop 'minecraft')
-          LOADER_VERSION=$(tomlprop 'fabric-loader')
-          FABRICAPI_VERSION=$(tomlprop 'fabric-api')
-          KOTLIN_VERSION=$(tomlprop 'kotlin')
-          FABRIC_KOTLIN_VERSION=$(tomlprop 'fabric-kotlin')
-          
-          echo "lb_version=$LB_VERSION" >> "$GITHUB_OUTPUT"
-          echo "jdk_version=$JDK_VERSION" >> "$GITHUB_OUTPUT"
-          echo "minecraft_version=$MINECRAFT_VERSION" >> "$GITHUB_OUTPUT"
-          echo "loader_version=$LOADER_VERSION" >> "$GITHUB_OUTPUT"
-          echo "fabricapi_version=$FABRICAPI_VERSION" >> "$GITHUB_OUTPUT"
-          echo "kotlin_version=$KOTLIN_VERSION" >> "$GITHUB_OUTPUT"
-          echo "fabric_kotlin_version=$FABRIC_KOTLIN_VERSION" >> "$GITHUB_OUTPUT"
-          
-          echo "LiquidBounce: $LB_VERSION"
-          echo "JDK: $JDK_VERSION"
-          echo "Minecraft: $MINECRAFT_VERSION"
-          echo "Fabric Loader: $LOADER_VERSION"
-          echo "Fabric API: $FABRICAPI_VERSION"
-          echo "Kotlin: $KOTLIN_VERSION"
-          echo "Fabric Kotlin: $FABRIC_KOTLIN_VERSION"
 
-  build:
+          gradleprop() {
+            local key="$1"
+            local value
+            value=$(sed -n "s/^${key}=//p" gradle.properties | head -n 1)
+            if [[ -z "$value" ]]; then
+              printf "[ERROR] Missing Gradle property: %s\n" "$key" >&2
+              exit 1
+            fi
+            printf "%s\n" "$value"
+          }
+
+          tomlprop() {
+            local key="$1"
+            local value
+            value=$(sed -n "s/^${key}[[:space:]]*=[[:space:]]*\"\([^\"]*\)\".*/\1/p" \
+              gradle/libs.versions.toml | head -n 1)
+            if [[ -z "$value" ]]; then
+              printf "[ERROR] Missing version-catalog entry: %s\n" "$key" >&2
+              exit 1
+            fi
+            printf "%s\n" "$value"
+          }
+
+          declare -A versions
+          versions[lb_version]=$(gradleprop mod_version)
+          versions[jdk_version]=$(tomlprop jdk)
+          versions[minecraft_version]=$(tomlprop minecraft)
+          versions[loader_version]=$(tomlprop fabric-loader)
+          versions[fabricapi_version]=$(tomlprop fabric-api)
+          versions[kotlin_version]=$(tomlprop kotlin)
+          versions[fabric_kotlin_version]=$(tomlprop fabric-kotlin)
+          for key in "${!versions[@]}"; do
+            printf "%s=%s\n" "$key" "${versions[$key]}" >> "$GITHUB_OUTPUT"
+          done
+
+          node_version=$(tr -d '[:space:]' < .node-version)
+          npm_version=$(tr -d '[:space:]' < .npm-version)
+          if [[ -z "$node_version" ]]; then
+            printf "[ERROR] Missing Node version in .node-version\n" >&2
+            exit 1
+          fi
+          if [[ -z "$npm_version" ]]; then
+            printf "[ERROR] Missing npm version in .npm-version\n" >&2
+            exit 1
+          fi
+          printf "LiquidBounce: %s\n" "${versions[lb_version]}"
+          printf "JDK: %s\n" "${versions[jdk_version]}"
+          printf "Node: %s\n" "$node_version"
+          printf "npm: %s\n" "$npm_version"
+          printf "Minecraft: %s\n" "${versions[minecraft_version]}"
+          printf "Fabric Loader: %s\n" "${versions[loader_version]}"
+          printf "Fabric API: %s\n" "${versions[fabricapi_version]}"
+          printf "Kotlin: %s\n" "${versions[kotlin_version]}"
+          printf "Fabric Kotlin: %s\n" "${versions[fabric_kotlin_version]}"
+
+          {
+            printf "## Build versions\n\n"
+            printf "| Component | Version |\n| --- | --- |\n"
+            printf "| LiquidBounce | %s |\n" "${versions[lb_version]}"
+            printf "| JDK | %s |\n" "${versions[jdk_version]}"
+            printf "| Node | %s |\n" "$node_version"
+            printf "| npm | %s |\n" "$npm_version"
+            printf "| Minecraft | %s |\n" "${versions[minecraft_version]}"
+            printf "| Fabric Loader | %s |\n" "${versions[loader_version]}"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  quality-gate:
+    name: quality-gate
     runs-on: ubuntu-latest
     needs: extract-versions
-    if: github.ref == 'refs/heads/nextgen'
     steps:
       - name: Checkout repository and submodules
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           submodules: recursive
-      - name: Cache npm dependencies
-        uses: actions/cache@v5
+      - name: Set up JDK
+        uses: actions/setup-java@v6
         with:
-          path: ~/.npm
-          key: npm-${{ runner.os }}-${{ hashFiles('src-theme/package-lock.json') }}
-          restore-keys: npm-${{ runner.os }}-
-      - name: Setting up JDK
-        uses: actions/setup-java@v5
-        with:
-          distribution: 'temurin'
+          distribution: temurin
           java-version: ${{ needs.extract-versions.outputs.jdk_version }}
-      - name: Grant permissions to src-theme
-        run: sudo chmod -R 777 src-theme
-      - name: Setup Gradle
+      - name: Set up pinned Node
+        uses: actions/setup-node@v7
+        with:
+          node-version-file: .node-version
+          cache: npm
+          cache-dependency-path: src-theme/package-lock.json
+      - name: Set up pinned npm
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm_version=$(tr -d '[:space:]' < .npm-version)
+          npm install --global "npm@$npm_version"
+          test "$(npm --version)" = "$npm_version"
+      - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v6
         with:
-          cache-read-only: ${{ github.ref != 'refs/heads/nextgen' }}
+          cache-read-only: ${{ github.event_name == 'pull_request' }}
       - name: Verify pinned Baritone vendor bundle
         run: scripts/verify-baritone-vendor.sh
-      - name: Build
+      - name: Run repository quality gate
         env:
           CI: true
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: ./gradlew build -x test -x detekt
-      - name: Verify nested Baritone release artifact
+        run: ./gradlew --no-daemon qualityGate
+      - name: Verify required quality reports
+        if: ${{ always() }}
+        shell: bash
         run: |
           set -euo pipefail
-          JAR=$(find build/libs -maxdepth 1 -type f -name 'liquidbounce-[0-9.]*.jar' \
-            ! -name '*-sources.jar' -print -quit)
-          test -n "$JAR"
-          scripts/verify-baritone-vendor.sh "$JAR"
-      - name: Enforce Baritone third-party release license gate
-        if: github.repository == 'CCBlueX/LiquidBounce'
+          required_reports=(
+            build/reports/source-hygiene/source-quality.md
+            build/reports/source-hygiene/source-quality.json
+            build/reports/source-hygiene/source-quality.sarif
+            build/reports/detekt/detekt.sarif
+          )
+          missing=0
+          for report in "${required_reports[@]}"; do
+            if [[ ! -f "$report" ]]; then
+              printf '[ERROR] Required quality report is missing: %s\n' "$report" >&2
+              missing=1
+            fi
+          done
+          exit "$missing"
+      - name: Publish source-quality summary
+        if: ${{ always() }}
+        shell: bash
+        run: |
+          report=build/reports/source-hygiene/source-quality.md
+          if [[ -f "$report" ]]; then
+            cat "$report" >> "$GITHUB_STEP_SUMMARY"
+          else
+            printf "## Source quality\n\nNo source-quality report was produced. Inspect the quality-gate log.\n" \
+              >> "$GITHUB_STEP_SUMMARY"
+          fi
+      - name: Upload source-quality reports
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: source-quality-reports
+          if-no-files-found: error
+          path: |
+            build/reports/source-hygiene/source-quality.md
+            build/reports/source-hygiene/source-quality.json
+            build/reports/source-hygiene/source-quality.sarif
+            build/reports/detekt/detekt.sarif
+      - name: Upload source-quality SARIF
+        if: ${{ always() && github.actor != 'dependabot[bot]' && (github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository) }}
+        uses: github/codeql-action/upload-sarif@v4
+        with:
+          category: source-quality
+          sarif_file: build/reports/source-hygiene/source-quality.sarif
+      - name: Upload Detekt SARIF
+        if: ${{ always() && github.actor != 'dependabot[bot]' && (github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository) }}
+        uses: github/codeql-action/upload-sarif@v4
+        with:
+          category: detekt
+          sarif_file: build/reports/detekt/detekt.sarif
+
+  release-build:
+    name: release-build
+    runs-on: ubuntu-latest
+    needs: extract-versions
+    steps:
+      - name: Checkout repository and submodules
+        uses: actions/checkout@v7
+        with:
+          submodules: recursive
+      - name: Set up JDK
+        uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: ${{ needs.extract-versions.outputs.jdk_version }}
+      - name: Set up pinned Node
+        uses: actions/setup-node@v7
+        with:
+          node-version-file: .node-version
+          cache: npm
+          cache-dependency-path: src-theme/package-lock.json
+      - name: Set up pinned npm
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm_version=$(tr -d '[:space:]' < .npm-version)
+          npm install --global "npm@$npm_version"
+          test "$(npm --version)" = "$npm_version"
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v6
+        with:
+          cache-read-only: ${{ github.event_name == 'pull_request' }}
+      - name: Verify pinned Baritone vendor bundle
+        run: scripts/verify-baritone-vendor.sh
+      - name: Build release artifact
         env:
-          BARITONE_ENFORCE_LICENSE: 1
+          CI: true
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: ./gradlew --no-daemon build verifyReleaseArtifact
+      - name: Verify release archive and nested Baritone artifact
+        shell: bash
         run: |
           set -euo pipefail
-          JAR=$(find build/libs -maxdepth 1 -type f -name 'liquidbounce-[0-9.]*.jar' \
-            ! -name '*-sources.jar' -print -quit)
-          test -n "$JAR"
-          scripts/verify-baritone-vendor.sh "$JAR"
-      - name: Upload artifact
-        if: github.repository == 'CCBlueX/LiquidBounce'
-        env:
-          COMMIT_MESSAGE: ${{ github.event.head_commit.message }}
-          JDK_VERSION: ${{ needs.extract-versions.outputs.jdk_version }}
-          LB_VERSION: ${{ needs.extract-versions.outputs.lb_version }}
-          MINECRAFT_VERSION: ${{ needs.extract-versions.outputs.minecraft_version }}
-          LOADER_VERSION: ${{ needs.extract-versions.outputs.loader_version }}
-          FABRICAPI_VERSION: ${{ needs.extract-versions.outputs.fabricapi_version }}
-          KOTLIN_VERSION: ${{ needs.extract-versions.outputs.kotlin_version }}
-          FABRIC_KOTLIN_VERSION: ${{ needs.extract-versions.outputs.fabric_kotlin_version }}
-        run: |
-          set -euo pipefail
-          
-          cd build/libs
-          JAR=$(find . -regex '.*liquidbounce-[0-9.]*\.jar')
-          if [ -z "$JAR" ]; then
-            echo "[ERROR] built jar not found in build/libs" >&2
+          jar=$(find build/libs -maxdepth 1 -type f -name 'liquidbounce-[0-9.]*.jar' \
+            ! -name '*-sources.jar' ! -name '*-dev.jar' -print -quit)
+          if [[ -z "$jar" ]]; then
+            printf "[ERROR] Release JAR not found in build/libs\n" >&2
             exit 1
           fi
-          
-          cp $JAR zip/liquidbounce.jar
-          cd zip
-          zip -r liquidbounce.zip *
-          md5sum liquidbounce.zip
-          
-          curl --connect-timeout 30 -m 300 -X POST -F "artifact=@liquidbounce.zip" \
-            -H "Authorization: ${{ secrets.NIGHTLY_PASS }}" \
+          zip -T "$jar"
+          scripts/verify-baritone-vendor.sh "$jar"
+      - name: Enforce Baritone public-release license gate
+        if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/nextgen' && github.repository == 'CCBlueX/LiquidBounce' }}
+        env:
+          BARITONE_ENFORCE_LICENSE: 1
+        shell: bash
+        run: |
+          set -euo pipefail
+          jar=$(find build/libs -maxdepth 1 -type f -name 'liquidbounce-[0-9.]*.jar' \
+            ! -name '*-sources.jar' ! -name '*-dev.jar' -print -quit)
+          test -n "$jar"
+          scripts/verify-baritone-vendor.sh "$jar"
+      - name: Upload release bundle
+        uses: actions/upload-artifact@v7
+        with:
+          name: liquidbounce-release
+          if-no-files-found: error
+          path: |
+            build/libs/
+            !build/libs/*-sources.jar
+            !build/libs/*-dev.jar
+
+  publish-nightly:
+    name: publish-nightly
+    runs-on: ubuntu-latest
+    needs: [extract-versions, quality-gate, release-build]
+    if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/nextgen' && github.repository == 'CCBlueX/LiquidBounce' }}
+    steps:
+      - name: Download verified release JAR
+        uses: actions/download-artifact@v8
+        with:
+          name: liquidbounce-release
+          path: build/libs
+      - name: Package and upload nightly
+        env:
+          COMMIT_MESSAGE: ${{ github.event.head_commit.message }}
+          FABRICAPI_VERSION: ${{ needs.extract-versions.outputs.fabricapi_version }}
+          FABRIC_KOTLIN_VERSION: ${{ needs.extract-versions.outputs.fabric_kotlin_version }}
+          JDK_VERSION: ${{ needs.extract-versions.outputs.jdk_version }}
+          KOTLIN_VERSION: ${{ needs.extract-versions.outputs.kotlin_version }}
+          LB_VERSION: ${{ needs.extract-versions.outputs.lb_version }}
+          LOADER_VERSION: ${{ needs.extract-versions.outputs.loader_version }}
+          MINECRAFT_VERSION: ${{ needs.extract-versions.outputs.minecraft_version }}
+          NIGHTLY_PASS: ${{ secrets.NIGHTLY_PASS }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          jar=$(find build/libs -maxdepth 1 -type f -name 'liquidbounce-[0-9.]*.jar' \
+            ! -name '*-sources.jar' ! -name '*-dev.jar' -print -quit)
+          test -n "$jar"
+          test -d build/libs/zip
+          cp "$jar" build/libs/zip/liquidbounce.jar
+          (cd build/libs/zip && zip -r liquidbounce.zip ./*)
+          md5sum build/libs/zip/liquidbounce.zip
+          curl --fail-with-body --connect-timeout 30 --max-time 300 \
+            -H "Authorization: $NIGHTLY_PASS" \
+            -F "artifact=@build/libs/zip/liquidbounce.zip" \
             -F "gh_id=${{ github.event.head_commit.id }}" \
             -F "gh_ref=${{ github.ref }}" \
             -F "gh_message=${COMMIT_MESSAGE}" \
@@ -161,48 +310,3 @@ jobs:
             -F "kotlin_version=$KOTLIN_VERSION" \
             -F "fabric_kotlin_version=$FABRIC_KOTLIN_VERSION" \
             https://api.liquidbounce.net/api/v1/version/new
-
-  verify-pr:
-    runs-on: ubuntu-latest
-    needs: extract-versions
-    if: github.ref != 'refs/heads/nextgen'
-    steps:
-      - name: Checkout repository and submodules
-        uses: actions/checkout@v6
-        with:
-          submodules: recursive
-      - name: Cache npm dependencies
-        uses: actions/cache@v5
-        with:
-          path: ~/.npm
-          key: npm-${{ runner.os }}-${{ hashFiles('src-theme/package-lock.json') }}
-          restore-keys: npm-${{ runner.os }}-
-      - name: Setting up JDK
-        uses: actions/setup-java@v5
-        with:
-          distribution: 'temurin'
-          java-version: ${{ needs.extract-versions.outputs.jdk_version }}
-      - name: Grant permissions to src-theme
-        run: sudo chmod -R 777 src-theme
-      - name: Setup Gradle
-        uses: gradle/actions/setup-gradle@v6
-        with:
-          cache-read-only: ${{ github.ref != 'refs/heads/nextgen' }}
-      - name: Verify pinned Baritone vendor bundle
-        run: scripts/verify-baritone-vendor.sh
-      - name: Build
-        env:
-          CI: true
-        run: ./gradlew build
-      - name: Verify nested Baritone release artifact
-        run: |
-          set -euo pipefail
-          JAR=$(find build/libs -maxdepth 1 -type f -name 'liquidbounce-[0-9.]*.jar' \
-            ! -name '*-sources.jar' -print -quit)
-          test -n "$JAR"
-          scripts/verify-baritone-vendor.sh "$JAR"
-      - name: Upload SARIF to GitHub using the upload-sarif action
-        uses: github/codeql-action/upload-sarif@v4
-        if: success() || failure()
-        with:
-          sarif_file: build/reports/detekt/detekt.sarif

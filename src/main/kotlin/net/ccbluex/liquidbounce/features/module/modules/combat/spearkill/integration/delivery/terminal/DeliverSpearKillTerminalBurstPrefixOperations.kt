@@ -1,0 +1,136 @@
+/*
+ * This file is part of LiquidBounce (https://github.com/CCBlueX/LiquidBounce)
+ *
+ * Copyright (c) 2015 - 2026 CCBlueX
+ *
+ * LiquidBounce is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ */
+package net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.integration.delivery.terminal
+
+import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.integration.*
+import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.integration.event.*
+import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.integration.tick.*
+import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.integration.planning.*
+import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.integration.delivery.packet.*
+import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.integration.delivery.terminal.*
+import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.integration.startup.*
+import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.integration.recovery.*
+import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.integration.research.*
+import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.integration.facade.*
+import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.*
+import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.contract.*
+import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.planner.collision.*
+import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.damage.*
+import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.planner.direct.*
+import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.planner.instant.*
+import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.planner.profiled.*
+import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.planner.schedule.*
+import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.session.attempt.*
+import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.session.movement.*
+import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.session.packet.*
+import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.session.safety.*
+import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.config.*
+import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.debug.*
+import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.target.*
+import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.preview.*
+import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.contract.SPEAR_KILL_RECOVERY_POSITION_EPSILON_SQUARED
+import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.session.safety.SpearKillFallSafetyPendingStepAction
+import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.session.safety.SpearKillFallSafetyPendingStepGate
+import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.SpearKillModuleState
+import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.debug.debugSpearKill
+import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.session.safety.resolveSpearKillFallSafetyPendingStepAction
+import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.session.movement.shouldProtectFallDamage
+import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.debug.spearKillDebugSessionFields
+import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.debug.spearKillDebugTargetFields
+import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.debug.spearKillDebugVector
+import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.runtime.delivery.packetPositionOrigin
+import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.runtime.delivery.sendFallbackMovementPacket
+import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.runtime.delivery.sendSpearKillFallStabilizationPacket
+import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.session.recovery.applyConfirmedPhysicalReturnPosition
+import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.session.recovery.beginSafeExactReturn
+import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.session.packet.pendingLogicalOutboundCompletion
+import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.session.packet.pendingTerminalBurstMovement
+import net.ccbluex.liquidbounce.utils.client.player
+import net.minecraft.world.phys.Vec3
+
+/** Sends every non-final terminal segment now; the normal movement event carries the final one. */
+internal fun SpearKillModuleState.deliverSpearKillTerminalBurstPrefix(): Boolean {
+    while (packetBootSession.pendingTerminalBurstMovement != null &&
+        !packetBootSession.pendingLogicalOutboundCompletion
+    ) {
+        val movement = packetBootSession.pendingMovement ?: return false
+        if (!preparePendingSpearKillFallSafety(movement)) return false
+
+        val expectedOffset = packetBootSession.virtualOffset
+        awaitingVanillaMovementPacket = true
+        sendFallbackMovementPacket()
+        if (packetBootSession.committedOffset.distanceToSqr(expectedOffset) >
+            SPEAR_KILL_RECOVERY_POSITION_EPSILON_SQUARED
+        ) {
+            return false
+        }
+        if (packetBootSession.prepareNextStep() == null) return false
+    }
+    return true
+}
+
+internal fun SpearKillModuleState.preparePendingSpearKillFallSafety(movement: Vec3): Boolean {
+    val physicallyNearGround = isSpearKillPositionNearGround(
+        packetPositionOrigin().add(packetBootSession.virtualOffset),
+    )
+    val gate = fallSafetyLifecycle.gatePendingMovement(
+        movement,
+        physicallyNearGround = physicallyNearGround,
+    )
+    val stabilizationRequired = gate == SpearKillFallSafetyPendingStepGate.CLEAR &&
+        fallSafetyLifecycle.shouldStabilizePendingMovement(movement, shouldProtectFallDamage)
+
+    return when (resolveSpearKillFallSafetyPendingStepAction(gate, stabilizationRequired)) {
+        SpearKillFallSafetyPendingStepAction.DELIVER -> true
+        SpearKillFallSafetyPendingStepAction.STABILIZE -> {
+            val delivery = sendSpearKillFallStabilizationPacket()
+            if (!delivery.delivered) {
+                confirmRemoteSpearKillPacketStep(delivered = false)
+                awaitingVanillaMovementPacket = false
+            }
+            false
+        }
+        SpearKillFallSafetyPendingStepAction.BLOCKED -> {
+            rejectPendingSpearKillFallSafety(movement)
+            false
+        }
+    }
+}
+
+internal fun SpearKillModuleState.gatePendingSpearKillFallSafety(movement: Vec3): Boolean = when (
+    fallSafetyLifecycle.gatePendingMovement(
+        movement,
+        physicallyNearGround = isSpearKillPositionNearGround(
+            packetPositionOrigin().add(packetBootSession.virtualOffset),
+        ),
+    )
+) {
+    SpearKillFallSafetyPendingStepGate.CLEAR -> true
+    SpearKillFallSafetyPendingStepGate.BLOCKED -> {
+        rejectPendingSpearKillFallSafety(movement)
+        false
+    }
+}
+
+internal fun SpearKillModuleState.rejectPendingSpearKillFallSafety(movement: Vec3) {
+    debugSpearKill("FALL_SAFETY_BLOCK") {
+        listOf(
+            "tick" to player.tickCount,
+            "movement" to spearKillDebugVector(movement),
+            "movement_length" to movement.length(),
+            "confirmed_fall_distance" to fallSafetyLifecycle.confirmedFallDistance,
+        ) + spearKillDebugTargetFields(lockedAStarTarget) + spearKillDebugSessionFields()
+    }
+    confirmRemoteSpearKillPacketStep(delivered = false)
+    awaitingVanillaMovementPacket = false
+    beginSafeExactReturn()
+    applyConfirmedPhysicalReturnPosition()
+}

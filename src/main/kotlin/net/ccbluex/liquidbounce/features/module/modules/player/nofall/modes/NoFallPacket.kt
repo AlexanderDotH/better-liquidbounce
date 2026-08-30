@@ -25,9 +25,9 @@ import net.ccbluex.liquidbounce.event.events.WorldChangeEvent
 import net.ccbluex.liquidbounce.event.handler
 import net.ccbluex.liquidbounce.event.tickHandler
 import net.ccbluex.liquidbounce.features.module.modules.combat.ModuleMaceKill
-import net.ccbluex.liquidbounce.features.module.modules.combat.RemoteKillMovementOwnership
 import net.ccbluex.liquidbounce.utils.kotlin.EventPriorityConvention.READ_FINAL_STATE
 import net.ccbluex.liquidbounce.utils.kotlin.EventPriorityConvention.SAFETY_FEATURE
+import net.ccbluex.liquidbounce.utils.movement.remote.RemoteMovementOwnership
 import net.ccbluex.liquidbounce.utils.network.MovePacketType
 
 internal object NoFallPacket : NoFallMode("Packet") {
@@ -46,8 +46,8 @@ internal object NoFallPacket : NoFallMode("Packet") {
     }
 
     val repeatable = tickHandler {
-        val remoteMovementOwned = RemoteKillMovementOwnership.active
-        val exclusiveRoutePacketsActive = when (RemoteKillMovementOwnership.currentOwner) {
+        val remoteMovementOwned = RemoteMovementOwnership.active
+        val exclusiveRoutePacketsActive = when (RemoteMovementOwnership.currentOwner) {
             "MaceKill" -> ModuleMaceKill.suppressesNoFallPackets
             else -> remoteMovementOwned
         }

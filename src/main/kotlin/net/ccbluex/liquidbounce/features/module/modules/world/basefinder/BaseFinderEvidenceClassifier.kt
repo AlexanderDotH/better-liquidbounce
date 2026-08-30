@@ -18,6 +18,7 @@
  */
 package net.ccbluex.liquidbounce.features.module.modules.world.basefinder
 
+import net.ccbluex.liquidbounce.features.module.modules.world.basefinder.model.BaseFinderBlockPathClassifier
 import net.minecraft.core.registries.BuiltInRegistries
 import net.minecraft.world.entity.Entity
 import net.minecraft.world.entity.EntityType
@@ -36,27 +37,26 @@ import net.minecraft.world.level.block.state.BlockState
  * This intentionally does not depend on StorageESP settings or colors. Detection remains active and deterministic
  * regardless of the state of unrelated render modules.
  */
-@Suppress("TooManyFunctions")
 internal object BaseFinderEvidenceClassifier {
 
     fun classifyBlock(state: BlockState): BaseFinderBlockClassification {
         val path = state.registryPath()
         return BaseFinderBlockClassification(
             path = path,
-            storageWeight = storageWeight(path),
-            utilityCategory = utilityCategory(path),
-            automationCategory = automationCategory(path),
-            structuralCategory = structuralCategory(path),
+            storageWeight = BaseFinderBlockPathClassifier.storageWeight(path),
+            utilityCategory = BaseFinderBlockPathClassifier.utilityCategory(path),
+            automationCategory = BaseFinderBlockPathClassifier.automationCategory(path),
+            structuralCategory = BaseFinderBlockPathClassifier.structuralCategory(path),
         )
     }
 
-    fun storageWeight(state: BlockState): Int = storageWeight(state.registryPath())
+    fun storageWeight(state: BlockState): Int = BaseFinderBlockPathClassifier.storageWeight(state.registryPath())
 
-    fun isStoragePath(path: String): Boolean = storageWeight(path) > 0
+    fun isStoragePath(path: String): Boolean = BaseFinderBlockPathClassifier.storageWeight(path) > 0
 
-    fun isUtilityPath(path: String): Boolean = utilityCategory(path) != null
+    fun isUtilityPath(path: String): Boolean = BaseFinderBlockPathClassifier.utilityCategory(path) != null
 
-    fun isAutomationPath(path: String): Boolean = automationCategory(path) != null
+    fun isAutomationPath(path: String): Boolean = BaseFinderBlockPathClassifier.automationCategory(path) != null
 
     /**
      * Natural blocks whose occupancy changes as vegetation grows or world features settle.
@@ -64,85 +64,24 @@ internal object BaseFinderEvidenceClassifier {
      * This deliberately excludes processed products such as planks, stripped stems, bamboo blocks, and
      * dried-kelp blocks. Those are stable player-placeable materials and remain useful BaseFinder evidence.
      */
-    internal fun isNaturalGrowthPath(path: String): Boolean {
-        if (path.startsWith("potted_")) return false
-        return path in NATURAL_GROWTH_PATHS ||
-            path.endsWith("_leaves") ||
-            path.endsWith("_sapling") ||
-            path.endsWith("_flower") ||
-            path.endsWith("flower") ||
-            path.endsWith("_tulip") ||
-            path.endsWith("_orchid") ||
-            path.endsWith("_daisy") ||
-            path.endsWith("_blossom") ||
-            path.endsWith("eyeblossom") ||
-            path.endsWith("_bush") ||
-            path.endsWith("_roots") ||
-            path.endsWith("_fungus") ||
-            path.endsWith("_vines") ||
-            path.endsWith("_vines_plant") ||
-            path.contains("seagrass") ||
-            path.contains("coral")
-    }
+    internal fun isNaturalGrowthPath(path: String): Boolean = BaseFinderBlockPathClassifier.isNaturalGrowthPath(path)
 
     fun isPhysicalPlayerStorageAnchor(anchor: EvidenceAnchor): Boolean {
         val key = anchor.key
-        if (!key.startsWith(STORAGE_ANCHOR_PREFIX)) return false
-
-        return isPhysicalPlayerStoragePath(key.removePrefix(STORAGE_ANCHOR_PREFIX))
+        if (!key.startsWith(BaseFinderBlockPathClassifier.STORAGE_ANCHOR_PREFIX)) return false
+        return BaseFinderBlockPathClassifier.isPhysicalPlayerStoragePath(
+            key.removePrefix(BaseFinderBlockPathClassifier.STORAGE_ANCHOR_PREFIX),
+        )
     }
 
-    private fun storageWeight(path: String): Int = when (path) {
-        "ender_chest", "shulker_box", "dyed_shulker_box" -> 4
-        "chest", "trapped_chest", "barrel", "hopper", "copper_chest" -> 3
-        "furnace", "blast_furnace", "smoker", "brewing_stand", "crafter", "dispenser", "dropper" -> 1
-        else -> if (path.endsWith("_shulker_box")) 4 else 0
-    }
+    fun utilityCategory(state: BlockState): String? =
+        BaseFinderBlockPathClassifier.utilityCategory(state.registryPath())
 
-    private fun isPhysicalPlayerStoragePath(path: String): Boolean =
-        path in PHYSICAL_PLAYER_STORAGE_PATHS || path == "shulker_box" || path.endsWith("_shulker_box")
+    fun automationCategory(state: BlockState): String? =
+        BaseFinderBlockPathClassifier.automationCategory(state.registryPath())
 
-    fun utilityCategory(state: BlockState): String? = utilityCategory(state.registryPath())
-
-    private fun utilityCategory(path: String): String? = when {
-            path == "crafting_table" -> "crafting"
-            path == "enchanting_table" -> "enchanting"
-            path.endsWith("anvil") -> "anvil"
-            path == "beacon" -> "beacon"
-            path == "lodestone" -> "lodestone"
-            path == "ender_chest" -> "ender_chest"
-            path == "brewing_stand" -> "brewing"
-            path == "furnace" || path == "blast_furnace" || path == "smoker" -> "smelting"
-            path == "respawn_anchor" -> "respawn_anchor"
-            path.endsWith("_bed") -> "bed"
-            path == "note_block" || path == "jukebox" -> "music"
-            isSign(path) -> "sign"
-            else -> null
-    }
-
-    fun automationCategory(state: BlockState): String? = automationCategory(state.registryPath())
-
-    private fun automationCategory(path: String): String? = when {
-            path == "redstone_wire" || path == "redstone_block" -> "redstone"
-            path == "repeater" || path == "comparator" || path == "redstone_torch" -> "logic"
-            path == "piston" || path == "sticky_piston" || path == "moving_piston" -> "piston"
-            path == "observer" -> "observer"
-            path == "hopper" -> "hopper"
-            path == "dispenser" || path == "dropper" || path == "crafter" -> "machine"
-            path.endsWith("rail") -> "rail"
-            path == "farmland" -> "crop"
-            else -> null
-    }
-
-    fun structuralCategory(state: BlockState): String? = structuralCategory(state.registryPath())
-
-    private fun structuralCategory(path: String): String? = when {
-            path == "nether_portal" || path == "end_portal" -> "portal"
-            path.endsWith("_bed") -> "bed"
-            path == "beacon" || path == "lodestone" || path == "respawn_anchor" -> "infrastructure"
-            isSign(path) || path == "decorated_pot" -> "decoration"
-            else -> null
-    }
+    fun structuralCategory(state: BlockState): String? =
+        BaseFinderBlockPathClassifier.structuralCategory(state.registryPath())
 
     fun activityCategory(soundPath: String): String? {
         val normalized = soundPath.lowercase()
@@ -176,92 +115,6 @@ internal object BaseFinderEvidenceClassifier {
     }
 
     private fun BlockState.registryPath(): String = BuiltInRegistries.BLOCK.getKey(block).path
-
-    private fun isSign(path: String): Boolean = path.endsWith("_sign") || path.endsWith("_hanging_sign")
-
-    private const val STORAGE_ANCHOR_PREFIX = "storage."
-
-    private val PHYSICAL_PLAYER_STORAGE_PATHS = setOf(
-        "chest",
-        "trapped_chest",
-        "barrel",
-        "copper_chest",
-        "ender_chest",
-    )
-
-    private val NATURAL_GROWTH_PATHS = setOf(
-        "short_grass",
-        "tall_grass",
-        "short_dry_grass",
-        "tall_dry_grass",
-        "fern",
-        "large_fern",
-        "dead_bush",
-        "bush",
-        "firefly_bush",
-        "wheat",
-        "carrots",
-        "potatoes",
-        "beetroots",
-        "torchflower_crop",
-        "pitcher_crop",
-        "nether_wart",
-        "sugar_cane",
-        "cactus",
-        "cactus_flower",
-        "pumpkin",
-        "melon",
-        "pumpkin_stem",
-        "melon_stem",
-        "attached_pumpkin_stem",
-        "attached_melon_stem",
-        "cocoa",
-        "bamboo",
-        "bamboo_sapling",
-        "kelp",
-        "kelp_plant",
-        "seagrass",
-        "tall_seagrass",
-        "sweet_berry_bush",
-        "vine",
-        "glow_lichen",
-        "lily_pad",
-        "sea_pickle",
-        "mangrove_propagule",
-        "azalea",
-        "flowering_azalea",
-        "moss_block",
-        "moss_carpet",
-        "pale_moss_block",
-        "pale_moss_carpet",
-        "pale_hanging_moss",
-        "big_dripleaf",
-        "big_dripleaf_stem",
-        "small_dripleaf",
-        "hanging_roots",
-        "spore_blossom",
-        "pink_petals",
-        "wildflowers",
-        "leaf_litter",
-        "brown_mushroom",
-        "red_mushroom",
-        "brown_mushroom_block",
-        "red_mushroom_block",
-        "crimson_fungus",
-        "warped_fungus",
-        "crimson_roots",
-        "warped_roots",
-        "nether_sprouts",
-        "weeping_vines",
-        "weeping_vines_plant",
-        "twisting_vines",
-        "twisting_vines_plant",
-        "nether_wart_block",
-        "warped_wart_block",
-        "shroomlight",
-        "chorus_plant",
-        "chorus_flower",
-    )
 }
 
 internal data class BaseFinderBlockClassification(

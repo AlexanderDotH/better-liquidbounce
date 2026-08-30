@@ -20,14 +20,14 @@ package net.ccbluex.liquidbounce.features.module.modules.movement.liquidwalk
 
 import net.ccbluex.liquidbounce.features.module.ClientModule
 import net.ccbluex.liquidbounce.features.module.ModuleCategories
+import net.ccbluex.liquidbounce.features.module.modules.movement.liquidwalk.contract.LiquidWalkModulePort
 import net.ccbluex.liquidbounce.features.module.modules.movement.liquidwalk.modes.LiquidWalkNoCheatPlus
 import net.ccbluex.liquidbounce.features.module.modules.movement.liquidwalk.modes.LiquidWalkVanilla
 import net.ccbluex.liquidbounce.features.module.modules.movement.liquidwalk.modes.LiquidWalkVerusB3901
 import net.ccbluex.liquidbounce.features.module.modules.movement.liquidwalk.modes.LiquidWalkVulcan291
-import net.ccbluex.liquidbounce.utils.block.collideBlockIntersects
-import net.ccbluex.liquidbounce.utils.block.isBlockAtPosition
-import net.ccbluex.liquidbounce.utils.entity.box
-import net.minecraft.world.level.block.LiquidBlock
+import net.ccbluex.liquidbounce.features.module.modules.movement.liquidwalk.modes.collidesWithAnythingElse
+import net.ccbluex.liquidbounce.features.module.modules.movement.liquidwalk.modes.standingOnWater
+import net.ccbluex.liquidbounce.features.module.modules.movement.liquidwalk.runtime.LiquidWalkModuleProvider
 
 /**
  * LiquidWalk module
@@ -40,6 +40,14 @@ object ModuleLiquidWalk : ClientModule(
     aliases = listOf("Jesus", "WaterWalk")
 ) {
 
+    init {
+        LiquidWalkModuleProvider.bind(ModuleLiquidWalkPort)
+    }
+
+    private object ModuleLiquidWalkPort : LiquidWalkModulePort {
+        override fun timerOwner(): Any = ModuleLiquidWalk
+    }
+
     internal val modes = choices("Mode", LiquidWalkVanilla, arrayOf(
         LiquidWalkVanilla,
         LiquidWalkNoCheatPlus,
@@ -50,18 +58,8 @@ object ModuleLiquidWalk : ClientModule(
     /**
      * Check if player is standing on water
      */
-    fun standingOnWater(): Boolean {
-        val boundingBox = player.box
-        val detectionBox = boundingBox.setMinY(boundingBox.minY - 0.01)
+    fun standingOnWater(): Boolean = standingOnWater(player)
 
-        return detectionBox.isBlockAtPosition { it is LiquidBlock }
-    }
-
-    fun collidesWithAnythingElse(): Boolean {
-        val boundingBox = player.box
-        val detectionBox = boundingBox.setMinY(boundingBox.minY - 0.5)
-
-        return detectionBox.collideBlockIntersects { it !is LiquidBlock }
-    }
+    fun collidesWithAnythingElse(): Boolean = collidesWithAnythingElse(player)
 
 }

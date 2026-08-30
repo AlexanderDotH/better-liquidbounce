@@ -38,25 +38,20 @@ import net.ccbluex.liquidbounce.event.suspendHandler
 import net.ccbluex.liquidbounce.event.tickHandler
 import net.ccbluex.liquidbounce.features.chat.AxochatClient
 import net.ccbluex.liquidbounce.features.chat.LiquidChatUsers
-import net.ccbluex.liquidbounce.features.chat.packet.C2SRequestJWTPacket
-import net.ccbluex.liquidbounce.features.command.CommandExecutor.suspendHandler
+import net.ccbluex.liquidbounce.features.chat.packet.AxoUser
 import net.ccbluex.liquidbounce.features.command.CommandManager
-import net.ccbluex.liquidbounce.features.command.builder.CommandBuilder
-import net.ccbluex.liquidbounce.features.command.builder.ParameterBuilder
 import net.ccbluex.liquidbounce.features.misc.HideAppearance.isDestructed
 import net.ccbluex.liquidbounce.lang.translation
-import net.ccbluex.liquidbounce.utils.client.MessageMetadata
+import net.ccbluex.liquidbounce.features.chat.MessageMetadata
 import net.ccbluex.liquidbounce.utils.text.asPlainText
-import net.ccbluex.liquidbounce.utils.text.asText
-import net.ccbluex.liquidbounce.utils.client.chat
-import net.ccbluex.liquidbounce.utils.client.copyable
+import net.ccbluex.liquidbounce.features.chat.chat
+import net.ccbluex.liquidbounce.utils.text.copyable
 import net.ccbluex.liquidbounce.utils.client.inGame
 import net.ccbluex.liquidbounce.utils.client.logger
-import net.ccbluex.liquidbounce.utils.client.notification
+import net.ccbluex.liquidbounce.features.chat.notification
 import net.ccbluex.liquidbounce.utils.text.plus
-import net.ccbluex.liquidbounce.utils.client.regular
+import net.ccbluex.liquidbounce.utils.text.regular
 import net.ccbluex.liquidbounce.utils.text.textOf
-import net.ccbluex.liquidbounce.utils.client.withColor
 import net.ccbluex.liquidbounce.utils.kotlin.optional
 import net.ccbluex.liquidbounce.utils.text.PlainText
 import net.minecraft.ChatFormatting
@@ -81,67 +76,13 @@ object GlobalSettingsClientChat : ToggleableValueGroup(
     private val autoTranslate by multiEnumChoice<ClientChatMessageEvent.ChatGroup>("AutoTranslate")
 
     private val chatClient = AxochatClient()
-    private val prefix: Component = "".asText()
-        .withStyle(ChatFormatting.RESET).withStyle(ChatFormatting.GRAY)
-        .append(this.name.asPlainText(ChatFormatting.BLUE))
-        .withStyle(ChatFormatting.BOLD)
-        .append(" ▸ ".asText().withStyle(ChatFormatting.RESET).withColor(ChatFormatting.DARK_GRAY))
+    private val prefix = createLiquidChatPrefix(name)
     private val exceptionData = MessageMetadata(prefix = false, id = "LiquidChat#exception")
     private val messageData = MessageMetadata(prefix = false)
 
-    private fun createChatWriteCommand() = CommandBuilder
-        .begin("chat")
-        .parameter(
-            ParameterBuilder
-                .begin<String>("message")
-                .verifiedBy(ParameterBuilder.STRING_VALIDATOR)
-                .required()
-                .vararg()
-                .build()
-        )
-        .suspendHandler {
-            if (!chatClient.isConnected) {
-                chat(
-                    prefix, translation("liquidbounce.liquidchat.notConnected").withStyle(ChatFormatting.GRAY),
-                    metadata = exceptionData
-                )
-                return@suspendHandler
-            }
-
-            if (!chatClient.isLoggedIn) {
-                chat(
-                    prefix, translation("liquidbounce.liquidchat.notLoggedIn").withStyle(ChatFormatting.GRAY),
-                    metadata = exceptionData
-                )
-                return@suspendHandler
-            }
-
-            chatClient.sendMessage((args[0] as Array<*>).joinToString(" ") { it as String })
-        }
-        .build()
-
-    private fun createChatJwtCommand() = CommandBuilder
-        .begin("chatjwt")
-        .suspendHandler {
-            if (!chatClient.isConnected) {
-                chat(
-                    prefix, translation("liquidbounce.liquidchat.notConnected").withStyle(ChatFormatting.GRAY),
-                    metadata = exceptionData
-                )
-                return@suspendHandler
-            }
-
-            chatClient.sendPacket(C2SRequestJWTPacket())
-            chat(
-                prefix, translation("liquidbounce.liquidchat.jwtTokenRequested").withStyle(ChatFormatting.GRAY),
-                metadata = exceptionData
-            )
-        }
-        .build()
-
     init {
-        CommandManager.addCommand(createChatWriteCommand())
-        CommandManager.addCommand(createChatJwtCommand())
+        CommandManager.addCommand(createChatWriteCommand(chatClient, prefix, exceptionData))
+        CommandManager.addCommand(createChatJwtCommand(chatClient, prefix, exceptionData))
     }
 
     override fun onEnabled() {
@@ -178,7 +119,7 @@ object GlobalSettingsClientChat : ToggleableValueGroup(
 
     @Suppress("unused")
     private val handleChatMessage = suspendHandler<ClientChatMessageEvent> { event ->
-        LiquidChatUsers.remember(event.user)
+        LiquidChatUsers.remember(event.user as AxoUser)
 
         val resolvableProfile = ResolvableProfile.createUnresolved(event.user.uuid)
         withTimeoutOrNull(5.seconds) {

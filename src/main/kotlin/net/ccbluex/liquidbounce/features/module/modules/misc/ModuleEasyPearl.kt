@@ -22,41 +22,29 @@ import net.ccbluex.liquidbounce.event.events.GameTickEvent
 import net.ccbluex.liquidbounce.event.events.OverlayRenderEvent
 import net.ccbluex.liquidbounce.event.events.PlayerInteractItemEvent
 import net.ccbluex.liquidbounce.event.events.RotationUpdateEvent
-import net.ccbluex.liquidbounce.event.events.WorldRenderEvent
+import net.ccbluex.liquidbounce.render.events.WorldRenderEvent
 import net.ccbluex.liquidbounce.event.handler
 import net.ccbluex.liquidbounce.features.module.ClientModule
 import net.ccbluex.liquidbounce.features.module.ModuleCategories
-import net.ccbluex.liquidbounce.render.FontManager
-import net.ccbluex.liquidbounce.render.FULL_BOX
-import net.ccbluex.liquidbounce.render.drawBox
-import net.ccbluex.liquidbounce.render.drawBoxSide
-import net.ccbluex.liquidbounce.render.drawGradientSides
-import net.ccbluex.liquidbounce.render.engine.font.HorizontalAnchor
-import net.ccbluex.liquidbounce.render.engine.font.VerticalAnchor
+import net.ccbluex.liquidbounce.features.module.modules.misc.easypearl.renderEasyPearlDistance
+import net.ccbluex.liquidbounce.features.module.modules.misc.easypearl.renderEasyPearlTarget
 import net.ccbluex.liquidbounce.render.engine.type.Color4b
-import net.ccbluex.liquidbounce.render.renderEnvironment
-import net.ccbluex.liquidbounce.render.withPositionRelativeToCamera
 import net.ccbluex.liquidbounce.utils.aiming.RotationManager
-import net.ccbluex.liquidbounce.utils.aiming.RotationsValueGroup
+import net.ccbluex.liquidbounce.features.rotation.RotationsValueGroup
 import net.ccbluex.liquidbounce.utils.aiming.data.Rotation
 import net.ccbluex.liquidbounce.utils.aiming.projectiles.SituationalProjectileAngleCalculator
 import net.ccbluex.liquidbounce.utils.block.state
-import net.ccbluex.liquidbounce.utils.client.chat
-import net.ccbluex.liquidbounce.utils.client.markAsError
+import net.ccbluex.liquidbounce.features.chat.chat
+import net.ccbluex.liquidbounce.utils.text.markAsError
 import net.ccbluex.liquidbounce.utils.entity.PositionExtrapolation
 import net.ccbluex.liquidbounce.utils.inventory.HotbarItemSlot
 import net.ccbluex.liquidbounce.utils.inventory.Slots
 import net.ccbluex.liquidbounce.utils.inventory.useHotbarSlotOrOffhand
 import net.ccbluex.liquidbounce.utils.kotlin.Priority
-import net.ccbluex.liquidbounce.utils.math.toFixed
 import net.ccbluex.liquidbounce.utils.math.toBlockPos
-import net.ccbluex.liquidbounce.utils.render.WorldToScreen
-import net.ccbluex.liquidbounce.utils.text.asPlainText
 import net.ccbluex.liquidbounce.utils.render.trajectory.TrajectoryInfo
-import net.minecraft.core.Direction
 import net.minecraft.world.entity.EntityDimensions
 import net.minecraft.world.item.Items
-import net.minecraft.world.level.block.RenderShape
 import net.minecraft.world.phys.HitResult
 import net.minecraft.world.phys.Vec3
 
@@ -74,8 +62,6 @@ object ModuleEasyPearl :
     private val showDistance by boolean("ShowDistance", true)
 
     private var targetPosition: Vec3? = null
-
-    private val fontRenderer get() = FontManager.FONT_RENDERER
 
     var currentTargetRotation : Rotation? = null
         private set
@@ -163,31 +149,7 @@ object ModuleEasyPearl :
         val blockPos = pos.toBlockPos()
         val state = blockPos.state ?: return@handler
 
-        event.renderEnvironment {
-            val color = targetColor(pos)
-
-            val baseColor = color.with(a = 50)
-            val transparentColor = baseColor.with(a = 0)
-            val outlineColor = color.with(a = 200)
-
-            withPositionRelativeToCamera(blockPos) {
-                if (state.renderShape != RenderShape.MODEL && state.isAir) {
-                    drawBoxSide(
-                        FULL_BOX,
-                        Direction.DOWN,
-                        baseColor,
-                        outlineColor,
-                    )
-                    drawGradientSides(0.7, baseColor, transparentColor, FULL_BOX)
-                } else {
-                    drawBox(
-                        FULL_BOX,
-                        baseColor,
-                        outlineColor,
-                    )
-                }
-            }
-        }
+        renderEasyPearlTarget(event, blockPos, state, targetColor(pos))
     }
 
     @Suppress("unused")
@@ -199,25 +161,7 @@ object ModuleEasyPearl :
         val pos = getPositionPlayerLookAt(event.tickDelta)?.location ?: return@handler
         pos.toBlockPos().state ?: return@handler
 
-        val screenPos = WorldToScreen.calculateScreenPos(
-            pos.add(0.0, player.eyeHeight.toDouble(), 0.0)
-        ) ?: return@handler
-        val distanceText = "${player.position().distanceTo(pos).toFixed(1)}m".asPlainText()
-        val fontRenderer = fontRenderer
-
-        with(event.context) {
-            pose().pushMatrix()
-            pose().translate(screenPos.x, screenPos.y)
-            pose().scale(fontRenderer.scaleToVanillaFont)
-
-            fontRenderer.draw(fontRenderer.process(distanceText, targetColor(pos))) {
-                horizontalAnchor = HorizontalAnchor.CENTER
-                verticalAnchor = VerticalAnchor.MIDDLE
-                shadow = true
-            }
-
-            pose().popMatrix()
-        }
+        renderEasyPearlDistance(event, pos, player.position(), player.eyeHeight, targetColor(pos))
     }
 
     private fun isHoldingPearl() =

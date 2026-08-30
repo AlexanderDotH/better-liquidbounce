@@ -20,7 +20,7 @@ import net.ccbluex.liquidbounce.config.types.group.Mode
 import net.ccbluex.liquidbounce.config.types.group.ModeValueGroup
 import net.ccbluex.liquidbounce.config.types.group.ValueGroup
 import net.ccbluex.liquidbounce.event.EventListener
-import net.ccbluex.liquidbounce.lang.LanguageManager
+import net.ccbluex.liquidbounce.features.language.LanguageManager
 import net.ccbluex.liquidbounce.test.MinecraftBootstrap
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse

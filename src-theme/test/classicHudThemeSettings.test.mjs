@@ -10,7 +10,7 @@ const classicSettings = readFileSync(
 test("Classic settings mounts the compact HUD appearance selector below ClickGUI appearance", () => {
     assert.match(
         classicSettings,
-        /import HudThemeSelector from "\.\.\/\.\.\/hud\/theme\/HudThemeSelector\.svelte";/,
+        /import HudThemeSelector from "\.\.\/\.\.\/\.\.\/shared\/hud-theme\/HudThemeSelector\.svelte";/,
     );
     assert.match(classicSettings, /<HudThemeSelector variant="compact"\s*\/>/);
 

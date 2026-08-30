@@ -21,8 +21,6 @@ package net.ccbluex.liquidbounce.features.module.modules.world.scaffold.tower
 import net.ccbluex.liquidbounce.event.events.PacketEvent
 import net.ccbluex.liquidbounce.event.handler
 import net.ccbluex.liquidbounce.event.tickHandler
-import net.ccbluex.liquidbounce.features.module.modules.world.scaffold.ModuleScaffold
-import net.ccbluex.liquidbounce.features.module.modules.world.scaffold.ModuleScaffold.isBlockBelow
 import net.ccbluex.liquidbounce.utils.entity.moving
 import net.minecraft.network.protocol.game.ServerboundMovePlayerPacket
 import net.minecraft.stats.Stats
@@ -31,7 +29,8 @@ object ScaffoldTowerVulcan : ScaffoldTower("Vulcan") {
 
     @Suppress("unused")
     private val tickHandler = tickHandler {
-        if (!mc.options.keyJump.isDown || ModuleScaffold.blockCount <= 0 || !isBlockBelow) {
+        val runtime = ScaffoldTowerRuntimeBridge.requireRuntime()
+        if (!mc.options.keyJump.isDown || runtime.blockCount <= 0 || !runtime.isBlockBelow) {
             return@tickHandler
         }
 

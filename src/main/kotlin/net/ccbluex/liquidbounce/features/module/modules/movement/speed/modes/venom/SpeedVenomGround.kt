@@ -21,7 +21,7 @@ package net.ccbluex.liquidbounce.features.module.modules.movement.speed.modes.ve
 import net.ccbluex.liquidbounce.config.types.group.Mode
 import net.ccbluex.liquidbounce.config.types.group.ModeValueGroup
 import net.ccbluex.liquidbounce.event.tickHandler
-import net.ccbluex.liquidbounce.features.module.modules.movement.speed.ModuleSpeed
+import net.ccbluex.liquidbounce.features.module.modules.movement.speed.runtime.SpeedModuleControl
 import net.ccbluex.liquidbounce.utils.client.Timer
 import net.ccbluex.liquidbounce.utils.entity.moving
 import net.ccbluex.liquidbounce.utils.kotlin.Priority
@@ -33,7 +33,7 @@ class SpeedVenomGround(override val parent: ModeValueGroup<*>) : Mode("VenomGrou
     @Suppress("unused")
     private val tickHandler = tickHandler {
         if (player.moving) {
-            Timer.requestTimerSpeed(timer, Priority.IMPORTANT_FOR_USAGE_1, ModuleSpeed)
+            Timer.requestTimerSpeed(timer, Priority.IMPORTANT_FOR_USAGE_1, SpeedModuleControl.module)
         }
     }
 

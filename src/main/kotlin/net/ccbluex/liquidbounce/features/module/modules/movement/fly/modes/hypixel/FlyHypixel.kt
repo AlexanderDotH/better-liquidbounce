@@ -20,14 +20,13 @@
 package net.ccbluex.liquidbounce.features.module.modules.movement.fly.modes.hypixel
 
 import net.ccbluex.liquidbounce.config.types.group.Mode
-import net.ccbluex.liquidbounce.config.types.group.ModeValueGroup
 import net.ccbluex.liquidbounce.event.events.PacketEvent
 import net.ccbluex.liquidbounce.event.events.PlayerMoveEvent
 import net.ccbluex.liquidbounce.event.handler
 import net.ccbluex.liquidbounce.event.tickHandler
 import net.ccbluex.liquidbounce.event.tickUntil
 import net.ccbluex.liquidbounce.event.waitTicks
-import net.ccbluex.liquidbounce.features.module.modules.movement.fly.ModuleFly
+import net.ccbluex.liquidbounce.features.module.modules.movement.fly.runtime.FlyModuleControl
 import net.ccbluex.liquidbounce.features.module.modules.movement.fly.automation.FlyAutomationCapabilities
 import net.ccbluex.liquidbounce.features.module.modules.movement.fly.automation.FlyAutomationEnd
 import net.ccbluex.liquidbounce.features.module.modules.movement.fly.automation.FlyAutomationKind
@@ -47,8 +46,6 @@ import net.minecraft.network.protocol.game.ClientboundExplodePacket
  */
 internal object FlyHypixel : Mode("Hypixel"), FlyAutomationProfile {
 
-    override val parent: ModeValueGroup<*>
-        get() = ModuleFly.modes
 
     private val timer by float("Timer", 1.0f, 0.1f..1.0f)
 
@@ -101,12 +98,12 @@ internal object FlyHypixel : Mode("Hypixel"), FlyAutomationProfile {
 
         tickUntil { player.onGround() }
         automaticEnd.mark("Hypixel boost landed")
-        ModuleFly.enabled = false
+        FlyModuleControl.disable()
     }
 
     @Suppress("unused")
     private val timerHandler = tickHandler {
-        Timer.requestTimerSpeed(timer, Priority.IMPORTANT_FOR_USAGE_1, ModuleFly)
+        Timer.requestTimerSpeed(timer, Priority.IMPORTANT_FOR_USAGE_1, FlyModuleControl.module)
     }
 
     @Suppress("unused")

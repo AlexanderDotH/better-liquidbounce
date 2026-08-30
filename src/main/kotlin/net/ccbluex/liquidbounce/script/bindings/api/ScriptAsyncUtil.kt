@@ -24,7 +24,7 @@ import net.ccbluex.liquidbounce.api.core.HttpClient.sendAsync
 import net.ccbluex.liquidbounce.event.EventListener
 import net.ccbluex.liquidbounce.event.events.GameTickEvent
 import net.ccbluex.liquidbounce.event.handler
-import net.ccbluex.liquidbounce.script.ScriptApiRequired
+import net.ccbluex.liquidbounce.annotations.ScriptApiRequired
 import net.ccbluex.liquidbounce.utils.client.mc
 import net.ccbluex.liquidbounce.utils.kotlin.EventPriorityConvention.FIRST_PRIORITY
 import net.minecraft.util.Util

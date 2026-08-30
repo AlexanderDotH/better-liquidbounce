@@ -21,7 +21,6 @@ package net.ccbluex.liquidbounce.features.cosmetic
 import com.mojang.authlib.GameProfile
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
-import net.ccbluex.liquidbounce.LiquidBounce
 import net.ccbluex.liquidbounce.api.core.ioScope
 import net.ccbluex.liquidbounce.api.models.cosmetics.Cosmetic
 import net.ccbluex.liquidbounce.api.models.cosmetics.CosmeticCategory
@@ -30,6 +29,7 @@ import net.ccbluex.liquidbounce.event.EventListener
 import net.ccbluex.liquidbounce.event.events.DisconnectEvent
 import net.ccbluex.liquidbounce.event.handler
 import net.ccbluex.liquidbounce.utils.client.clientLogger
+import net.ccbluex.liquidbounce.utils.client.clientIdentifier
 import net.ccbluex.liquidbounce.utils.client.mc
 import net.ccbluex.liquidbounce.utils.render.registerTexture
 import net.minecraft.resources.Identifier
@@ -83,7 +83,7 @@ object CapeCosmeticsManager : EventListener {
 
                 logger.info("Successfully loaded cape for ${player.name}")
 
-                val id = LiquidBounce.identifier("cape-$name")
+                val id = clientIdentifier("cape-$name")
 
                 mc.execute {
                     // Register cape texture

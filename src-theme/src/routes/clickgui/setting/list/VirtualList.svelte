@@ -53,48 +53,65 @@
     async function handle_scroll() {
         const { scrollTop } = viewport;
         const old_start = start;
+        measureVisibleRows();
+        const visibleStart = findVisibleStart(scrollTop);
+        start = visibleStart.startIndex;
+        top = visibleStart.topHeight;
+        const visibleEnd = findVisibleEnd(visibleStart, scrollTop);
+        end = visibleEnd.index;
+        const remaining = items.length - end;
+        average_height = visibleEnd.height / end;
+        fillUnknownHeights(visibleEnd.index);
+        bottom = remaining * average_height;
+        if (start < old_start) await compensateScrollUp(old_start, scrollTop);
+        // TODO if we overestimated the space these rows would occupy we may need to add some more.
+    }
+    function measureVisibleRows() {
         for (let v = 0; v < rows.length; v += 1) {
             height_map[start + v] = itemHeight || rows[v].offsetHeight;
         }
+    }
+    function findVisibleStart(scrollTop: number) {
         let i = 0;
         let y = 0;
+        let startIndex = start;
+        let topHeight = top;
         while (i < items.length) {
             const row_height = height_map[i] || average_height;
             if (y + row_height > scrollTop) {
-                start = i;
-                top = y;
+                startIndex = i;
+                topHeight = y;
                 break;
             }
             y += row_height;
             i += 1;
         }
+        return {startIndex, topHeight, cursor: i, height: y};
+    }
+    function findVisibleEnd(visibleStart: {cursor: number, height: number}, scrollTop: number) {
+        let i = visibleStart.cursor;
+        let y = visibleStart.height;
         while (i < items.length) {
             y += height_map[i] || average_height;
             i += 1;
             if (y > scrollTop + viewport_height) break;
         }
-        end = i;
-        const remaining = items.length - end;
-        average_height = y / end;
-        while (i < items.length) height_map[i++] = average_height;
-        bottom = remaining * average_height;
-        // prevent jumping if we scrolled up into unknown territory
-        if (start < old_start) {
-            await tick();
-            let expected_height = 0;
-            let actual_height = 0;
-            for (let i = start; i < old_start; i +=1) {
-                if (rows[i - start]) {
-                    expected_height += height_map[i];
-                    actual_height += itemHeight || rows[i - start].offsetHeight;
-                }
+        return {index: i, height: y};
+    }
+    function fillUnknownHeights(index: number) {
+        while (index < items.length) height_map[index++] = average_height;
+    }
+    async function compensateScrollUp(oldStart: number, scrollTop: number) {
+        await tick();
+        let expected_height = 0;
+        let actual_height = 0;
+        for (let i = start; i < oldStart; i +=1) {
+            if (rows[i - start]) {
+                expected_height += height_map[i];
+                actual_height += itemHeight || rows[i - start].offsetHeight;
             }
-            const d = actual_height - expected_height;
-            viewport.scrollTo(0, scrollTop + d);
         }
-        // TODO if we overestimated the space these
-        // rows would occupy we may need to add some
-        // more. maybe we can just call handle_scroll again?
+        viewport.scrollTo(0, scrollTop + actual_height - expected_height);
     }
     // trigger initial refresh
     onMount(() => {

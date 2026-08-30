@@ -28,11 +28,11 @@ import net.ccbluex.liquidbounce.utils.client.mc
 import net.ccbluex.liquidbounce.utils.client.player
 import net.ccbluex.liquidbounce.utils.math.toDegrees
 import net.ccbluex.liquidbounce.utils.entity.box
-import net.ccbluex.liquidbounce.utils.input.InputTracker.isPressedOnAny
+import net.ccbluex.liquidbounce.features.input.InputTracker.isPressedOnAny
 import net.ccbluex.liquidbounce.utils.math.geometry.NormalizedPlane
 import net.ccbluex.liquidbounce.utils.math.plus
 import net.ccbluex.liquidbounce.utils.math.withLength
-import net.ccbluex.liquidbounce.utils.render.WorldToScreen
+import net.ccbluex.liquidbounce.render.WorldToScreen
 import net.minecraft.client.gui.GuiGraphicsExtractor
 import net.minecraft.client.gui.screens.Screen
 import net.minecraft.client.input.KeyEvent
@@ -53,7 +53,6 @@ private const val DRAG_BUTTON = InputConstants.MOUSE_BUTTON_LEFT
  */
 private const val ZOOM_STEP_BASE = 1.25
 
-@Suppress("detekt.TooManyFunctions")
 class DroneControlScreen : Screen("BowAimbot Control Panel".asPlainText()) {
 
     var cameraPos = player.eyePosition.add(0.0, 10.0, 0.0)
@@ -66,9 +65,8 @@ class DroneControlScreen : Screen("BowAimbot Control Panel".asPlainText()) {
 
     private var zoomSteps = 0.0
 
-    fun getZoomFactor(): Float {
-        return ZOOM_STEP_BASE.pow(zoomSteps).toFloat()
-    }
+    val zoomFactor: Float
+        get() = ZOOM_STEP_BASE.pow(zoomSteps).toFloat()
 
     override fun mouseDragged(click: MouseButtonEvent, offsetX: Double, offsetY: Double): Boolean {
         val mX = click.x
@@ -108,10 +106,6 @@ class DroneControlScreen : Screen("BowAimbot Control Panel".asPlainText()) {
         }
 
         return super.keyPressed(input)
-    }
-
-    override fun keyReleased(input: KeyEvent): Boolean {
-        return super.keyReleased(input)
     }
 
     override fun mouseClicked(click: MouseButtonEvent, doubled: Boolean): Boolean {

@@ -23,14 +23,14 @@ import com.mojang.blaze3d.vertex.PoseStack
 import net.ccbluex.liquidbounce.config.types.group.Mode
 import net.ccbluex.liquidbounce.config.types.group.ModeValueGroup
 import net.ccbluex.liquidbounce.event.events.GameRenderEvent
-import net.ccbluex.liquidbounce.event.events.WorldRenderEvent
+import net.ccbluex.liquidbounce.render.events.WorldRenderEvent
 import net.ccbluex.liquidbounce.event.handler
 import net.ccbluex.liquidbounce.render.drawBox
 import net.ccbluex.liquidbounce.render.engine.type.Color4b
 import net.ccbluex.liquidbounce.render.renderEnvironment
 import net.ccbluex.liquidbounce.render.withPositionRelativeToCamera
 import net.ccbluex.liquidbounce.utils.aiming.data.Rotation
-import net.ccbluex.liquidbounce.utils.render.WireframePlayer
+import net.ccbluex.liquidbounce.render.wireframe.WireframePlayer
 import net.ccbluex.liquidbounce.utils.render.isCustom
 import net.ccbluex.liquidbounce.utils.render.scaleLightCoords
 import net.ccbluex.liquidbounce.utils.render.setPosition

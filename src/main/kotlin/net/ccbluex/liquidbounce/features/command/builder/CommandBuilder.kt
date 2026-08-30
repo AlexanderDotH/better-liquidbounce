@@ -22,13 +22,16 @@ package net.ccbluex.liquidbounce.features.command.builder
 import it.unimi.dsi.fastutil.objects.ObjectArrayList
 import net.ccbluex.fastutil.unmodifiable
 import net.ccbluex.liquidbounce.features.command.Command
+import net.ccbluex.liquidbounce.features.command.CommandHandlerBuilder
 import net.ccbluex.liquidbounce.features.command.Parameter
 import net.ccbluex.liquidbounce.features.command.dsl.CommandBuilderDsl
 import net.ccbluex.liquidbounce.features.module.MinecraftShortcuts
 import net.ccbluex.liquidbounce.utils.kotlin.unmodifiable
 
 @CommandBuilderDsl
-class CommandBuilder private constructor(val name: String) : MinecraftShortcuts {
+class CommandBuilder private constructor(val name: String) :
+    MinecraftShortcuts,
+    CommandHandlerBuilder<CommandBuilder> {
 
     private var aliases: Array<out String>? = null
     private var parameters: MutableList<Parameter<*>> = ObjectArrayList()
@@ -56,7 +59,7 @@ class CommandBuilder private constructor(val name: String) : MinecraftShortcuts 
 
     fun subcommand(subcommandFactory: Command.Factory) = subcommand(subcommandFactory.createCommand())
 
-    fun handler(handler: Command.Handler) = apply {
+    override fun handler(handler: Command.Handler) = apply {
         this.handler = handler
     }
 

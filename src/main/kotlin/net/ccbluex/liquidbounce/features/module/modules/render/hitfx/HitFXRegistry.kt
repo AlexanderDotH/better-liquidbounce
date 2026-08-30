@@ -20,7 +20,7 @@
 package net.ccbluex.liquidbounce.features.module.modules.render.hitfx
 
 import net.ccbluex.fastutil.mapToArray
-import net.ccbluex.liquidbounce.config.types.list.Tagged
+import net.ccbluex.liquidbounce.common.Tagged
 import net.ccbluex.liquidbounce.utils.client.clientIdentifier
 import net.ccbluex.liquidbounce.utils.client.logger
 import net.minecraft.core.Registry

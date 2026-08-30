@@ -19,6 +19,7 @@
 package net.ccbluex.liquidbounce.features.module.modules.render.esp
 
 import net.ccbluex.liquidbounce.config.ConfigSystem
+import net.ccbluex.liquidbounce.common.EspMaskLayer
 import net.ccbluex.liquidbounce.features.misc.FriendManager
 import net.ccbluex.liquidbounce.features.module.ClientModule
 import net.ccbluex.liquidbounce.features.module.ModuleCategories
@@ -28,14 +29,15 @@ import net.ccbluex.liquidbounce.features.module.modules.render.esp.modes.EspCham
 import net.ccbluex.liquidbounce.features.module.modules.render.esp.modes.EspGlowMode
 import net.ccbluex.liquidbounce.features.module.modules.render.esp.modes.EspLegacy2DMode
 import net.ccbluex.liquidbounce.features.module.modules.render.esp.modes.EspOutlineMode
+import net.ccbluex.liquidbounce.features.module.modules.render.esp.runtime.EspModeRuntime
 import net.ccbluex.liquidbounce.render.GenericDistanceHSBColorMode
 import net.ccbluex.liquidbounce.render.GenericEntityHealthColorMode
 import net.ccbluex.liquidbounce.render.GenericRainbowColorMode
 import net.ccbluex.liquidbounce.render.GenericStaticColorMode
+import net.ccbluex.liquidbounce.render.engine.esp.EspFeatureRendererRegistry
+import net.ccbluex.liquidbounce.render.engine.esp.EspGlowSource
 import net.ccbluex.liquidbounce.render.engine.type.Color4b
-import net.ccbluex.liquidbounce.utils.combat.EntityTaggingManager
-import net.ccbluex.liquidbounce.utils.combat.shouldBeShown
-import net.ccbluex.liquidbounce.utils.entity.RenderedEntities
+import net.ccbluex.liquidbounce.features.render.RenderedEntities
 import net.minecraft.world.entity.LivingEntity
 import net.minecraft.world.entity.player.Player
 
@@ -71,6 +73,29 @@ object ModuleESP : ClientModule("ESP", ModuleCategories.RENDER) {
 
     internal val maximumDistance by float("MaximumDistance", 128F, 1F..512F)
 
+    init {
+        EspModeRuntime.install(
+            maximumDistance = { maximumDistance },
+            color = ::getColor,
+            renderedEntities = { RenderedEntities },
+        )
+        EspFeatureRendererRegistry.registerGlow(
+            id = "module:esp",
+            source = EspGlowSource.PLAYER_ESP,
+            style = { EspGlowMode.style.takeIf { EspGlowMode.running } },
+        )
+        EspFeatureRendererRegistry.registerOutline(
+            id = "module:esp",
+            layer = EspMaskLayer.PLAYER_OUTLINE,
+            style = { EspOutlineMode.style.takeIf { EspOutlineMode.running } },
+        )
+        EspFeatureRendererRegistry.registerChams(
+            id = "module:esp",
+            layer = EspMaskLayer.ENTITY_CHAMS,
+            style = { EspChamsMode.style.takeIf { EspChamsMode.running } },
+        )
+    }
+
     override fun onEnabled() {
         RenderedEntities.subscribe(this)
     }
@@ -93,7 +118,7 @@ object ModuleESP : ClientModule("ESP", ModuleCategories.RENDER) {
                 return friendColor
             }
 
-            EntityTaggingManager.getTag(entity).color?.let { return it }
+            EspModeRuntime.taggedColor(entity)?.let { return it }
         }
 
         return colorModes.activeMode.getColor(entity)
@@ -103,6 +128,6 @@ object ModuleESP : ClientModule("ESP", ModuleCategories.RENDER) {
      * Check if the entity requires true sight to be shown with the current ESP mode
      */
     fun requiresTrueSight(entity: LivingEntity) =
-        modes.activeMode.requiresTrueSight && entity.shouldBeShown()
+        modes.activeMode.requiresTrueSight && EspModeRuntime.shouldBeShown(entity)
 
 }

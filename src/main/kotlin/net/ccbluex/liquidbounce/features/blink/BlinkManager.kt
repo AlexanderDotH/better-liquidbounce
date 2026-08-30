@@ -25,49 +25,34 @@ import net.ccbluex.liquidbounce.config.types.group.ValueGroup
 import net.ccbluex.liquidbounce.event.EventListener
 import net.ccbluex.liquidbounce.event.EventManager
 import net.ccbluex.liquidbounce.event.events.BlinkPacketEvent
+import net.ccbluex.liquidbounce.event.events.BlinkPacketAction
 import net.ccbluex.liquidbounce.event.events.GameRenderTaskQueueEvent
 import net.ccbluex.liquidbounce.event.events.PacketEvent
 import net.ccbluex.liquidbounce.event.events.PerspectiveEvent
 import net.ccbluex.liquidbounce.event.events.TickPacketProcessEvent
 import net.ccbluex.liquidbounce.event.events.TransferOrigin
 import net.ccbluex.liquidbounce.event.events.WorldChangeEvent
-import net.ccbluex.liquidbounce.event.events.WorldRenderEvent
+import net.ccbluex.liquidbounce.render.events.WorldRenderEvent
 import net.ccbluex.liquidbounce.event.handler
 import net.ccbluex.liquidbounce.features.blink.esp.BlinkEspBox
 import net.ccbluex.liquidbounce.features.blink.esp.BlinkEspData
 import net.ccbluex.liquidbounce.features.blink.esp.BlinkEspModel
 import net.ccbluex.liquidbounce.features.blink.esp.BlinkEspNone
 import net.ccbluex.liquidbounce.features.blink.esp.BlinkEspWireframe
+import net.ccbluex.liquidbounce.features.rotation.contract.RotationLagState
 import net.ccbluex.liquidbounce.render.drawLineStrip
 import net.ccbluex.liquidbounce.render.engine.type.Color4b
 import net.ccbluex.liquidbounce.render.renderEnvironment
 import net.ccbluex.liquidbounce.render.utils.MutableVertexList
 import net.ccbluex.liquidbounce.utils.aiming.RotationManager
-import net.ccbluex.liquidbounce.utils.network.handlePacket
 import net.ccbluex.liquidbounce.utils.client.mc
 import net.ccbluex.liquidbounce.utils.client.player
-import net.ccbluex.liquidbounce.utils.network.sendPacketSilently
 import net.ccbluex.liquidbounce.utils.kotlin.EventPriorityConvention.FINAL_DECISION
 import net.ccbluex.liquidbounce.utils.network.position
 import net.minecraft.client.CameraType
 import net.minecraft.network.protocol.Packet
-import net.minecraft.network.protocol.common.ClientboundDisconnectPacket
-import net.minecraft.network.protocol.game.ClientboundDisguisedChatPacket
-import net.minecraft.network.protocol.game.ClientboundLoginPacket
-import net.minecraft.network.protocol.game.ClientboundPlayerPositionPacket
-import net.minecraft.network.protocol.game.ClientboundRespawnPacket
-import net.minecraft.network.protocol.game.ClientboundSetHealthPacket
-import net.minecraft.network.protocol.game.ClientboundSoundPacket
-import net.minecraft.network.protocol.game.ClientboundSystemChatPacket
-import net.minecraft.network.protocol.game.ServerboundChatCommandPacket
-import net.minecraft.network.protocol.game.ServerboundChatPacket
 import net.minecraft.network.protocol.game.ServerboundMovePlayerPacket
-import net.minecraft.network.protocol.handshake.ClientIntentionPacket
-import net.minecraft.network.protocol.ping.ServerboundPingRequestPacket
-import net.minecraft.network.protocol.status.ServerboundStatusRequestPacket
-import net.minecraft.sounds.SoundEvents
 import java.util.concurrent.ConcurrentLinkedQueue
-import java.util.Queue
 
 /**
  * Allows queueing packets and flush them later on demand.
@@ -100,6 +85,10 @@ object BlinkManager : EventListener, ValueGroup("BlinkManager") {
 
     private val lineColor by color("Line", Color4b.LIQUID_BOUNCE)
 
+    init {
+        RotationLagState.bindBlinkLag { isLagging }
+    }
+
     @Suppress("unused")
     private val flushHandler = handler<GameRenderTaskQueueEvent> {
         if (mc.connection?.connection?.isConnected != true) {
@@ -107,7 +96,7 @@ object BlinkManager : EventListener, ValueGroup("BlinkManager") {
             return@handler
         }
 
-        if (fireEvent(null, TransferOrigin.OUTGOING) == Action.FLUSH) {
+        if (fireEvent(null, TransferOrigin.OUTGOING) == BlinkPacketAction.FLUSH) {
             flush(TransferOrigin.OUTGOING)
         }
     }
@@ -119,7 +108,7 @@ object BlinkManager : EventListener, ValueGroup("BlinkManager") {
             return@handler
         }
 
-        if (fireEvent(null, TransferOrigin.INCOMING) == Action.FLUSH) {
+        if (fireEvent(null, TransferOrigin.INCOMING) == BlinkPacketAction.FLUSH) {
             flush(TransferOrigin.INCOMING)
         }
     }
@@ -136,49 +125,22 @@ object BlinkManager : EventListener, ValueGroup("BlinkManager") {
 
         // If we shouldn't lag, don't do anything
         val lagResult = fireEvent(packet, origin)
-        if (lagResult == Action.FLUSH) {
+        if (lagResult == BlinkPacketAction.FLUSH) {
             flush(origin)
             return@handler
         }
 
-        if (lagResult == Action.PASS) {
+        if (lagResult == BlinkPacketAction.PASS) {
             return@handler
         }
 
-        when (packet) {
-
-            is ClientIntentionPacket, is ServerboundStatusRequestPacket, is ServerboundPingRequestPacket -> {
-                return@handler
-            }
-
-            // Ignore message-related packets
-            is ServerboundChatPacket,
-            is ClientboundSystemChatPacket,
-            is ClientboundDisguisedChatPacket,
-            is ServerboundChatCommandPacket -> {
-                return@handler
-            }
-
-            // Flush on teleport, reconnect, or disconnect
-            is ClientboundPlayerPositionPacket,
-            is ClientboundDisconnectPacket,
-            is ClientboundRespawnPacket,
-            is ClientboundLoginPacket -> {
+        when (blinkPacketDecision(packet)) {
+            BlinkPacketDecision.PASS -> return@handler
+            BlinkPacketDecision.FLUSH -> {
                 flush(origin)
                 return@handler
             }
-
-            // Ignore own hurt sounds
-            is ClientboundSoundPacket if packet.sound.value() == SoundEvents.PLAYER_HURT -> {
-                return@handler
-            }
-
-            // Flush on own death
-            is ClientboundSetHealthPacket if packet.health <= 0 -> {
-                flush(origin)
-                return@handler
-            }
-
+            BlinkPacketDecision.QUEUE -> Unit
         }
 
         event.cancelEvent()
@@ -217,14 +179,7 @@ object BlinkManager : EventListener, ValueGroup("BlinkManager") {
     }
 
     fun flush(flushWhen: (PacketSnapshot) -> Boolean) {
-        packetQueue.removeIf { snapshot ->
-            if (flushWhen(snapshot)) {
-                flushSnapshot(snapshot)
-                true
-            } else {
-                false
-            }
-        }
+        flushBlinkPackets(packetQueue, flushWhen)
     }
 
     fun flush(origin: TransferOrigin) {
@@ -232,40 +187,11 @@ object BlinkManager : EventListener, ValueGroup("BlinkManager") {
     }
 
     fun flush(count: Int) {
-        // Take all packets until the counter of move packets reaches count and send them
-        var counter = 0
-
-        with(packetQueue.iterator()) {
-            while (hasNext()) {
-                val snapshot = next()
-                val packet = snapshot.packet
-
-                if (packet is ServerboundMovePlayerPacket && packet.hasPos) {
-                    counter += 1
-                }
-
-                flushSnapshot(snapshot)
-                remove()
-
-                if (counter >= count) {
-                    break
-                }
-            }
-        }
+        flushBlinkPacketCount(packetQueue, count)
     }
 
     fun cancel() {
-        positions.firstOrNull()?.let { pos ->
-            player.setPos(pos)
-        }
-
-        for (snapshot in packetQueue) {
-            when (snapshot.packet) {
-                is ServerboundMovePlayerPacket -> continue
-                else -> flushSnapshot(snapshot)
-            }
-        }
-        packetQueue.clear()
+        cancelBlinkPackets(packetQueue, positions.firstOrNull())
     }
 
     /** Removes one exact queued packet without flushing it, allowing its owner to retry safely. */
@@ -281,38 +207,7 @@ object BlinkManager : EventListener, ValueGroup("BlinkManager") {
         packetQueue.forEachIsInstance<T>(action)
     }
 
-    private fun flushSnapshot(snapshot: PacketSnapshot) {
-        when (snapshot.origin) {
-            TransferOrigin.OUTGOING -> sendPacketSilently(snapshot.packet)
-            TransferOrigin.INCOMING -> handlePacket(snapshot.packet)
-        }
-    }
-
     private fun fireEvent(packet: Packet<*>?, origin: TransferOrigin) =
         EventManager.callEvent(BlinkPacketEvent(packet, origin)).action
 
-    enum class Action(val priority: Int) {
-        FLUSH(0),
-        PASS(1),
-        QUEUE(2),
-    }
-
 }
-
-internal fun Queue<PacketSnapshot>.takeQueuedPacket(packet: Packet<*>, origin: TransferOrigin): Boolean {
-    val iterator = iterator()
-    while (iterator.hasNext()) {
-        val snapshot = iterator.next()
-        if (snapshot.packet !== packet || snapshot.origin != origin) continue
-        iterator.remove()
-        return true
-    }
-    return false
-}
-
-@JvmRecord
-data class PacketSnapshot(
-    val packet: Packet<*>,
-    val origin: TransferOrigin,
-    val timestamp: Long
-)

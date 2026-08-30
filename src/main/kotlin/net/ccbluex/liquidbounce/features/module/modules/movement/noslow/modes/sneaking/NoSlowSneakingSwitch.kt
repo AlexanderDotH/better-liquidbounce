@@ -21,15 +21,15 @@ package net.ccbluex.liquidbounce.features.module.modules.movement.noslow.modes.s
 
 import net.ccbluex.liquidbounce.config.types.group.Mode
 import net.ccbluex.liquidbounce.config.types.group.ModeValueGroup
-import net.ccbluex.liquidbounce.config.types.list.Tagged
+import net.ccbluex.liquidbounce.common.Tagged
 import net.ccbluex.liquidbounce.event.EventState
 import net.ccbluex.liquidbounce.event.events.NotificationEvent
 import net.ccbluex.liquidbounce.event.events.PlayerNetworkMovementTickEvent
 import net.ccbluex.liquidbounce.event.handler
 import net.ccbluex.liquidbounce.utils.client.isNewerThanOrEquals1_21_6
-import net.ccbluex.liquidbounce.utils.client.notification
-import net.ccbluex.liquidbounce.utils.network.send1_21_5StartSneaking
-import net.ccbluex.liquidbounce.utils.network.send1_21_5StopSneaking
+import net.ccbluex.liquidbounce.features.chat.notification
+import net.ccbluex.liquidbounce.utils.network.sendLegacyStartSneaking
+import net.ccbluex.liquidbounce.utils.network.sendLegacyStopSneaking
 import net.ccbluex.liquidbounce.utils.client.usesViaFabricPlus
 
 internal class NoSlowSneakingSwitch(override val parent: ModeValueGroup<*>) : Mode("Switch") {
@@ -50,16 +50,16 @@ internal class NoSlowSneakingSwitch(override val parent: ModeValueGroup<*>) : Mo
     private val networkTickHandler = handler<PlayerNetworkMovementTickEvent> { event ->
         when (timingMode) {
             TimingMode.PRE_POST -> when (event.state) {
-                EventState.PRE -> network.send1_21_5StartSneaking()
-                EventState.POST -> network.send1_21_5StopSneaking()
+                EventState.PRE -> network.sendLegacyStartSneaking()
+                EventState.POST -> network.sendLegacyStopSneaking()
             }
             TimingMode.PRE_TICK -> if (event.state == EventState.PRE) {
-                network.send1_21_5StartSneaking()
-                network.send1_21_5StopSneaking()
+                network.sendLegacyStartSneaking()
+                network.sendLegacyStopSneaking()
             }
             TimingMode.POST_TICK -> if (event.state == EventState.POST) {
-                network.send1_21_5StartSneaking()
-                network.send1_21_5StopSneaking()
+                network.sendLegacyStartSneaking()
+                network.sendLegacyStopSneaking()
             }
         }
     }

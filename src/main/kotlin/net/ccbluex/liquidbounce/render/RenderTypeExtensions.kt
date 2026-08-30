@@ -18,24 +18,8 @@
  */
 package net.ccbluex.liquidbounce.render
 
-import net.ccbluex.liquidbounce.injection.mixins.minecraft.render.MixinRenderSetupAccessor
 import net.minecraft.client.renderer.rendertype.OutputTarget
 import net.minecraft.client.renderer.rendertype.RenderSetup
 
-fun RenderSetup.withOutputTarget(outputTarget: OutputTarget): RenderSetup {
-    @Suppress("CAST_NEVER_SUCCEEDS")
-    this as MixinRenderSetupAccessor
-
-    return MixinRenderSetupAccessor.`liquid_bounce$invokeInit`(
-        this.getPipeline(),
-        this.getTextures(),
-        this.getUseLightmap(),
-        this.getUseOverlay(),
-        this.getLayeringTransform(),
-        outputTarget,
-        this.getTextureTransform(),
-        this.getOutlineProperty(),
-        this.getAffectsCrumbling(),
-        this.getSortOnUpload()
-    )
-}
+fun RenderSetup.withOutputTarget(outputTarget: OutputTarget): RenderSetup =
+    RenderInjectionAccess.copyWithOutputTarget(this, outputTarget)

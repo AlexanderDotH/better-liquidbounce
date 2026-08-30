@@ -23,11 +23,11 @@ import net.ccbluex.liquidbounce.config.gson.stategies.Exclude
 import net.ccbluex.liquidbounce.config.gson.stategies.ProtocolExclude
 import net.ccbluex.liquidbounce.config.types.Value
 import net.ccbluex.liquidbounce.config.types.ValueType
+import net.ccbluex.liquidbounce.annotations.ScriptApiRequired
+import net.ccbluex.liquidbounce.common.Toggleable
 import net.ccbluex.liquidbounce.event.EventListener
 import net.ccbluex.liquidbounce.event.removeEventListenerScope
-import net.ccbluex.liquidbounce.features.misc.Toggleable
-import net.ccbluex.liquidbounce.features.module.MinecraftShortcuts
-import net.ccbluex.liquidbounce.script.ScriptApiRequired
+import net.ccbluex.liquidbounce.utils.client.MinecraftShortcuts
 import net.ccbluex.liquidbounce.utils.client.inGame
 import net.ccbluex.liquidbounce.utils.client.logger
 
@@ -37,12 +37,19 @@ import net.ccbluex.liquidbounce.utils.client.logger
  * it also features [onEnabled] and [onDisabled] which are called when the state is toggled.
  */
 abstract class ToggleableValueGroup(
-    @Exclude @ProtocolExclude val parent: EventListener? = null,
+    parent: EventListener? = null,
     name: String,
     enabled: Boolean,
     aliases: List<String> = emptyList(),
 ) : ValueGroup(name, valueType = ValueType.TOGGLEABLE, aliases = aliases), EventListener, Toggleable,
     MinecraftShortcuts {
+
+    @Exclude
+    @ProtocolExclude
+    private val configuredParent = parent
+
+    val parent: EventListener?
+        get() = configuredParent ?: base as? EventListener
 
     @ScriptApiRequired
     @get:JvmName("getEnabledValue")
@@ -68,7 +75,8 @@ abstract class ToggleableValueGroup(
     fun onToggled(state: Boolean, isParentUpdate: Boolean): Boolean {
         // We cannot use [parent.running] because we are interested in the state of the parent,
         // not if it is running. We do not care if we are the root.
-        if (!isParentUpdate && parent is Toggleable && !parent.enabled) {
+        val eventParent = parent
+        if (!isParentUpdate && eventParent is Toggleable && !eventParent.enabled) {
             return state
         }
 
@@ -113,20 +121,22 @@ abstract class ToggleableValueGroup(
  * should call this function in [Toggleable.onToggled].
  */
 private fun ValueGroup.updateChildState(state: Boolean) {
-    for (value in inner) {
-        when (value) {
-            is ToggleableValueGroup -> if (state && value.enabled) {
-                value.onToggled(state = true, isParentUpdate = true)
-            } else if (!state && value.enabled) {
-                value.onToggled(state = false, isParentUpdate = true)
-            }
-            is ModeValueGroup<*> -> value.updateChildState(state)
-            is ValueGroup -> value.updateChildState(state)
-            is Toggleable -> if (state && value.enabled) {
-                value.onToggled(true)
-            } else if (!state && value.enabled) {
-                value.onToggled(false)
-            }
-        }
+    inner.forEach { value -> value.updateFromParent(state) }
+}
+
+private fun Value<*>.updateFromParent(state: Boolean) {
+    when (this) {
+        is ToggleableValueGroup -> updateToggleableGroupFromParent(state)
+        is ModeValueGroup<*> -> updateChildState(state)
+        is ValueGroup -> updateChildState(state)
+        is Toggleable -> updateToggleableFromParent(state)
     }
+}
+
+private fun ToggleableValueGroup.updateToggleableGroupFromParent(state: Boolean) {
+    if (enabled) onToggled(state = state, isParentUpdate = true)
+}
+
+private fun Toggleable.updateToggleableFromParent(state: Boolean) {
+    if (enabled) onToggled(state)
 }

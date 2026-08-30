@@ -19,9 +19,11 @@
 
 package net.ccbluex.liquidbounce.features.module.modules.world.autofarm
 
+import net.ccbluex.fastutil.enumSetOf
 import net.ccbluex.liquidbounce.utils.block.getBlock
 import net.ccbluex.liquidbounce.utils.client.world
 import net.minecraft.core.BlockPos
+import net.minecraft.core.Direction
 import net.minecraft.tags.BlockTags
 import net.minecraft.world.level.block.BambooStalkBlock
 import net.minecraft.world.level.block.Block
@@ -100,3 +102,8 @@ inline val BlockState.supportsCrops: Boolean get() = `is`(BlockTags.SUPPORTS_CRO
 inline val BlockState.supportsCocoa: Boolean get() = `is`(BlockTags.SUPPORTS_COCOA)
 
 inline val BlockState.supportsNetherWart: Boolean get() = `is`(BlockTags.SUPPORTS_NETHER_WART)
+
+internal fun Iterable<AutoFarmTrackedState.Plantable>.findPlantableSides(
+    pos: BlockPos,
+    state: BlockState,
+): MutableSet<Direction> = flatMapTo(enumSetOf()) { it.findPlantableSides(pos, state) }

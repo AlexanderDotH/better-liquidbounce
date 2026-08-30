@@ -24,10 +24,11 @@ import net.ccbluex.liquidbounce.features.module.modules.world.nuker.area.FloorNu
 import net.ccbluex.liquidbounce.features.module.modules.world.nuker.area.SphereNukerArea
 import net.ccbluex.liquidbounce.features.module.modules.world.nuker.mode.InstantNukerMode
 import net.ccbluex.liquidbounce.features.module.modules.world.nuker.mode.LegitNukerMode
+import net.ccbluex.liquidbounce.render.engine.CustomFogInteractionBridge
 import net.ccbluex.liquidbounce.utils.block.SwingMode
-import net.ccbluex.liquidbounce.utils.render.BreakingProgress
-import net.ccbluex.liquidbounce.utils.render.BreakingProgressRenderer
-import net.ccbluex.liquidbounce.utils.render.placement.PlacementRenderer
+import net.ccbluex.liquidbounce.render.progress.BreakingProgress
+import net.ccbluex.liquidbounce.render.progress.BreakingProgressRenderer
+import net.ccbluex.liquidbounce.render.placement.PlacementRenderer
 import net.minecraft.core.BlockPos
 import net.minecraft.world.level.block.Block
 import net.minecraft.world.level.block.state.BlockState
@@ -38,6 +39,10 @@ import net.minecraft.world.level.block.state.BlockState
  * Destroys blocks around you.
  */
 object ModuleNuker : ClientModule("Nuker", ModuleCategories.WORLD, disableOnQuit = true), BreakingProgress.Provider {
+
+    init {
+        CustomFogInteractionBridge.install { running }
+    }
 
     val mode =
         choices("Mode", LegitNukerMode, arrayOf(LegitNukerMode, InstantNukerMode))

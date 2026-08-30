@@ -1,0 +1,85 @@
+  .modern-clickgui {
+    position: absolute;
+    inset: 0;
+    overflow: hidden;
+    color: var(--modern-text-primary, #f3f5f7);
+  }
+
+  .modern-clickgui:focus-visible {
+    outline: none;
+  }
+
+  .status {
+    position: absolute;
+    top: 112px;
+    left: 50%;
+    width: min(360px, calc(100% - 40px));
+    min-width: 0;
+    display: grid;
+    justify-items: center;
+    gap: 8px;
+    padding: 18px 22px;
+    transform: translateX(-50%);
+    color: var(--modern-text-secondary, #aeb5bf);
+    background: var(--modern-surface-panel, rgba(18, 21, 27, 0.97));
+    border: 1px solid var(--modern-border, rgba(255, 255, 255, 0.1));
+    border-radius: 12px;
+    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.24);
+    text-align: center;
+  }
+
+  .status strong {
+    color: var(--modern-text-primary, #f3f5f7);
+    font-size: 13px;
+  }
+
+  .status span {
+    max-width: 360px;
+    font-size: 12px;
+    line-height: 1.45;
+  }
+
+  .status-indicator {
+    width: 18px;
+    height: 18px;
+    border: 2px solid rgba(255, 255, 255, 0.12);
+    border-top-color: color-mix(in srgb, var(--accent-color) 75%, white);
+    border-radius: 50%;
+    animation: modern-panel-loading 700ms linear infinite;
+  }
+
+  .status button {
+    min-height: 30px;
+    margin-top: 4px;
+    padding: 0 12px;
+    color: var(--modern-text-primary, #f3f5f7);
+    background: rgba(255, 255, 255, 0.055);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 7px;
+    cursor: pointer;
+    font: inherit;
+    font-size: 12px;
+    font-weight: 600;
+  }
+
+  .status button:hover {
+    background: rgba(255, 255, 255, 0.09);
+  }
+
+  .status button:focus-visible {
+    outline: 2px solid var(--modern-focus-ring, color-mix(in srgb, var(--accent-color) 80%, white));
+    outline-offset: 2px;
+  }
+
+  @keyframes modern-panel-loading {
+    to {
+      transform: rotate(360deg);
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .status-indicator {
+      animation: none;
+      border-color: color-mix(in srgb, var(--accent-color) 65%, white);
+    }
+  }

@@ -23,9 +23,9 @@ import net.ccbluex.liquidbounce.config.ConfigSystem
 import net.ccbluex.liquidbounce.features.command.builder.CommandBuilder
 import net.ccbluex.liquidbounce.features.command.builder.ParameterBuilder
 import net.ccbluex.liquidbounce.features.global.GlobalManager
-import net.ccbluex.liquidbounce.lang.LanguageManager
-import net.ccbluex.liquidbounce.utils.client.chat
-import net.ccbluex.liquidbounce.utils.client.regular
+import net.ccbluex.liquidbounce.features.language.LanguageManager
+import net.ccbluex.liquidbounce.features.chat.chat
+import net.ccbluex.liquidbounce.utils.text.regular
 
 object CommandClientLanguageSubcommand {
     fun languageCommand() = CommandBuilder.begin("language")

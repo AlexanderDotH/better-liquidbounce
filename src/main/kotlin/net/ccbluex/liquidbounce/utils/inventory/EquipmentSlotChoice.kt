@@ -20,7 +20,7 @@
 package net.ccbluex.liquidbounce.utils.inventory
 
 import net.ccbluex.fastutil.enumSetOf
-import net.ccbluex.liquidbounce.config.types.list.Tagged
+import net.ccbluex.liquidbounce.common.Tagged
 import net.minecraft.core.component.DataComponents
 import net.minecraft.util.ARGB.opaque
 import net.minecraft.world.entity.EquipmentSlot

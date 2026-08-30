@@ -19,13 +19,9 @@
 package net.ccbluex.liquidbounce.features.module.modules.movement.elytrafly.modes
 
 import net.ccbluex.liquidbounce.config.types.group.Mode
-import net.ccbluex.liquidbounce.config.types.group.ModeValueGroup
-import net.ccbluex.liquidbounce.features.module.modules.movement.elytrafly.ModuleElytraFly
 
 abstract class ElytraFlyMode(name: String) : Mode(name) {
 
-    override val parent: ModeValueGroup<ElytraFlyMode>
-        get() = ModuleElytraFly.modes
 
     open fun onTick() {}
 

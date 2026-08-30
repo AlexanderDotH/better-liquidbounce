@@ -19,14 +19,17 @@
 
 package net.ccbluex.liquidbounce.features.module.modules.render.totemeffect.modes
 
-import net.ccbluex.liquidbounce.features.module.modules.render.totemeffect.ModuleTotemEffect.TotemPopSnapshot
-import net.ccbluex.liquidbounce.features.module.modules.render.totemeffect.TotemEffectColorSettings
-import net.ccbluex.liquidbounce.features.module.modules.render.totemeffect.TotemEffectMode
+import net.ccbluex.liquidbounce.config.types.group.ModeValueGroup
+import net.ccbluex.liquidbounce.features.module.modules.render.totemeffect.config.TotemEffectColorSettings
+import net.ccbluex.liquidbounce.features.module.modules.render.totemeffect.model.TotemPopSnapshot
+import net.ccbluex.liquidbounce.features.module.modules.render.totemeffect.runtime.TotemEffectMode
+import net.ccbluex.liquidbounce.features.module.modules.render.totemeffect.runtime.TotemEffectRuntime
 import net.ccbluex.liquidbounce.render.WorldRenderEnvironment
 import net.ccbluex.liquidbounce.render.drawGradientCircle
 import net.ccbluex.liquidbounce.render.withPositionRelativeToCamera
 
-internal object TotemEffectShockwave : TotemEffectMode("Shockwave") {
+internal class TotemEffectShockwave(parent: ModeValueGroup<*>, runtime: TotemEffectRuntime) :
+    TotemEffectMode("Shockwave", parent, runtime) {
 
     private val radius by floatRange("radius", 2f..2.2f, 0.1f..10f)
     private val color = TotemEffectColorSettings()

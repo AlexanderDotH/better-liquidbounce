@@ -20,18 +20,18 @@ package net.ccbluex.liquidbounce.features.marketplace
 
 import net.ccbluex.liquidbounce.api.models.marketplace.MarketplaceItem
 import net.ccbluex.liquidbounce.api.models.marketplace.MarketplaceItemType
+import net.ccbluex.liquidbounce.common.task.Task
 import net.ccbluex.liquidbounce.config.ConfigSystem
 import net.ccbluex.liquidbounce.config.types.Config
 import net.ccbluex.liquidbounce.config.types.ValueType
 import net.ccbluex.liquidbounce.event.EventListener
 import net.ccbluex.liquidbounce.features.command.Command
-import net.ccbluex.liquidbounce.integration.task.type.Task
 import net.ccbluex.liquidbounce.lang.translation
-import net.ccbluex.liquidbounce.utils.client.chat
+import net.ccbluex.liquidbounce.features.chat.chat
 import net.ccbluex.liquidbounce.utils.client.clientLogger
-import net.ccbluex.liquidbounce.utils.client.markAsError
-import net.ccbluex.liquidbounce.utils.client.regular
-import net.ccbluex.liquidbounce.utils.client.variable
+import net.ccbluex.liquidbounce.utils.text.markAsError
+import net.ccbluex.liquidbounce.utils.text.regular
+import net.ccbluex.liquidbounce.utils.text.variable
 import java.io.File
 
 /**
@@ -117,7 +117,7 @@ object MarketplaceManager : Config("marketplace"), EventListener {
         ConfigSystem.store(this)
 
         // Reload the item type's manager.
-        item.type.reload()
+        MarketplaceContentReloadBridge.reload(item.type)
     }
 
 }

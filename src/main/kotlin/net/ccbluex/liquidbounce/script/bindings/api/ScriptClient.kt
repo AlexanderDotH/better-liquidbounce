@@ -23,8 +23,8 @@ import net.ccbluex.liquidbounce.event.EventManager
 import net.ccbluex.liquidbounce.features.command.CommandManager
 import net.ccbluex.liquidbounce.features.module.ModuleManager
 import net.ccbluex.liquidbounce.script.ScriptManager
-import net.ccbluex.liquidbounce.utils.client.chat
-import net.ccbluex.liquidbounce.utils.combat.CombatManager
+import net.ccbluex.liquidbounce.features.chat.chat
+import net.ccbluex.liquidbounce.features.combat.runtime.CombatManager
 
 /**
  * The main hub of the ScriptAPI client that provides access to a useful set of members.

@@ -19,7 +19,7 @@
 package net.ccbluex.liquidbounce.features.module.modules.combat.backtrack
 
 import net.ccbluex.liquidbounce.config.types.group.ToggleableValueGroup
-import net.ccbluex.liquidbounce.config.types.list.Tagged
+import net.ccbluex.liquidbounce.common.Tagged
 import net.ccbluex.liquidbounce.config.utils.percentageChance
 import net.ccbluex.liquidbounce.event.events.AttackEntityEvent
 import net.ccbluex.liquidbounce.event.events.BlinkPacketEvent
@@ -38,22 +38,13 @@ import net.ccbluex.liquidbounce.features.blink.esp.BlinkEspWireframe
 import net.ccbluex.liquidbounce.features.module.ClientModule
 import net.ccbluex.liquidbounce.features.module.ModuleCategories
 import net.ccbluex.liquidbounce.features.module.modules.combat.velocity.mode.VelocityReduce
+import net.ccbluex.liquidbounce.features.rotation.contract.RotationLagState
 import net.ccbluex.liquidbounce.utils.client.Chronometer
 import net.ccbluex.liquidbounce.utils.client.inGame
-import net.ccbluex.liquidbounce.utils.combat.findEnemy
-import net.ccbluex.liquidbounce.utils.combat.shouldBeAttacked
+import net.ccbluex.liquidbounce.features.combat.runtime.findEnemy
+import net.ccbluex.liquidbounce.features.combat.runtime.shouldBeAttacked
 import net.ccbluex.liquidbounce.utils.entity.boxedDistanceTo
 import net.ccbluex.liquidbounce.utils.entity.rotation
-import net.ccbluex.liquidbounce.utils.entity.squareBoxedDistanceTo
-import net.ccbluex.liquidbounce.utils.entity.squaredBoxedDistanceTo
-import net.minecraft.network.protocol.common.ClientboundDisconnectPacket
-import net.minecraft.network.protocol.game.ClientboundPlayerPositionPacket
-import net.minecraft.network.protocol.game.ClientboundSetHealthPacket
-import net.minecraft.network.protocol.game.ClientboundSoundPacket
-import net.minecraft.network.protocol.game.ClientboundSystemChatPacket
-import net.minecraft.network.protocol.game.ServerboundChatCommandPacket
-import net.minecraft.network.protocol.game.ServerboundChatPacket
-import net.minecraft.sounds.SoundEvents
 import net.minecraft.world.entity.Entity
 import net.minecraft.world.entity.LivingEntity
 import net.minecraft.world.phys.Vec3
@@ -100,78 +91,23 @@ object ModuleBacktrack : ClientModule("Backtrack", ModuleCategories.COMBAT) {
 
     private var target: Entity? = null
     private val position = TrackedEntityPosition()
+    private val packetQueue = BacktrackPacketQueue(
+        shouldCancelPackets = ::shouldCancelPackets,
+        hasQueuedIncoming = ::hasQueuedIncoming,
+        trackedTarget = { target },
+        position = position,
+        clear = { clear(true) },
+    )
 
     var currentDelay = delay.random()
 
+    init {
+        RotationLagState.bindBacktrackLag { isLagging() }
+    }
+
     @Suppress("unused")
     private val queuePacketHandler = handler<BlinkPacketEvent> { event ->
-        if (event.origin != TransferOrigin.INCOMING) {
-            return@handler
-        }
-
-        if (VelocityReduce.ownsIncomingBlinkQueue) {
-            return@handler
-        }
-
-        val packet = event.packet
-        val shouldCancel = shouldCancelPackets()
-        val hasQueuedIncoming = hasQueuedIncoming()
-
-        if (packet == null) {
-            if (shouldCancel || hasQueuedIncoming) {
-                event.action = BlinkManager.Action.PASS
-            }
-            return@handler
-        }
-
-        if (!hasQueuedIncoming && !shouldCancel) {
-            return@handler
-        }
-
-        when (packet) {
-            // Ignore message-related packets
-            is ServerboundChatPacket, is ClientboundSystemChatPacket, is ServerboundChatCommandPacket -> {
-                event.action = BlinkManager.Action.PASS
-                return@handler
-            }
-
-            // Flush on teleport or disconnect
-            is ClientboundPlayerPositionPacket, is ClientboundDisconnectPacket -> {
-                clear(true)
-                return@handler
-            }
-
-            // Ignore own hurt sounds
-            is ClientboundSoundPacket -> {
-                if (packet.sound.value() == SoundEvents.PLAYER_HURT) {
-                    event.action = BlinkManager.Action.PASS
-                    return@handler
-                }
-            }
-
-            // Flush on own death
-            is ClientboundSetHealthPacket -> {
-                if (packet.health <= 0) {
-                    clear(true)
-                    return@handler
-                }
-            }
-        }
-
-        // Update box position with these packets
-        val target = target ?: return@handler
-        val pos = position.handlePacket(packet, world, target)
-        if (pos != null) {
-            // Is the target's actual position closer than its tracked position?
-            if (target.squareBoxedDistanceTo(player, pos) < target.squaredBoxedDistanceTo(player)) {
-                // Process all packets. We want to be able to hit the enemy, not the opposite.
-                event.action = BlinkManager.Action.FLUSH
-                // And stop right here. No need to cancel further packets.
-                return@handler
-            }
-        }
-
-        event.action = BlinkManager.Action.QUEUE
+        packetQueue.handle(event)
     }
 
     private fun getEspData(): BlinkEspData? {

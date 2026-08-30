@@ -20,12 +20,12 @@ package net.ccbluex.liquidbounce.features.module.modules.movement.speed.modes.de
 
 import net.ccbluex.liquidbounce.config.types.group.Mode
 import net.ccbluex.liquidbounce.config.types.group.ModeValueGroup
-import net.ccbluex.liquidbounce.config.types.list.Tagged
+import net.ccbluex.liquidbounce.common.Tagged
 import net.ccbluex.liquidbounce.event.events.MovementInputEvent
 import net.ccbluex.liquidbounce.event.events.PacketEvent
 import net.ccbluex.liquidbounce.event.handler
 import net.ccbluex.liquidbounce.event.tickHandler
-import net.ccbluex.liquidbounce.features.module.modules.movement.speed.ModuleSpeed
+import net.ccbluex.liquidbounce.features.module.modules.movement.speed.runtime.SpeedModuleControl
 import net.ccbluex.liquidbounce.utils.entity.horizontalSpeed
 import net.ccbluex.liquidbounce.utils.entity.moving
 import net.ccbluex.liquidbounce.utils.entity.withStrafe
@@ -88,7 +88,7 @@ class SpeedDetectorBypass(override val parent: ModeValueGroup<*>) : Mode("Detect
             return@handler
         }
 
-        if (ModuleSpeed.doOptimizationsPreventJump()) {
+        if (SpeedModuleControl.doOptimizationsPreventJump()) {
             return@handler
         }
 

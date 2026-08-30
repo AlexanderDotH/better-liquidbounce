@@ -19,7 +19,7 @@
 
 package net.ccbluex.liquidbounce.render.engine.font
 
-import net.ccbluex.liquidbounce.config.types.list.Tagged
+import net.ccbluex.liquidbounce.common.Tagged
 
 enum class HorizontalAnchor(override val tag: String) : Tagged {
     START("Start") {

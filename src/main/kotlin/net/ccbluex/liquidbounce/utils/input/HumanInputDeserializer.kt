@@ -20,9 +20,6 @@ package net.ccbluex.liquidbounce.utils.input
 
 import com.mojang.blaze3d.platform.InputConstants
 import com.mojang.brigadier.StringReader
-import net.ccbluex.liquidbounce.features.module.ClientModule
-import net.ccbluex.liquidbounce.features.module.ModuleManager
-import net.ccbluex.liquidbounce.render.engine.type.Color4b
 import net.ccbluex.liquidbounce.utils.item.getOrNull
 import net.minecraft.core.Registry
 import net.minecraft.resources.Identifier
@@ -52,14 +49,6 @@ object HumanInputDeserializer {
     }
     val textArrayDeserializer = StringDeserializer { parseArray(it, textDeserializer) }
 
-    val colorDeserializer = StringDeserializer {
-        if (it.startsWith('#')) {
-            Color4b.fromHex(it)
-        } else {
-            Color4b(it.toInt())
-        }
-    }
-
     fun <T : Any> registryItemDeserializer(key: ResourceKey<Registry<T>>) = StringDeserializer {
         val registry = key.getOrNull() ?: error("No registry '$key'")
         val item = registry.getOptional(Identifier.read(StringReader(it))).getOrNull()
@@ -71,12 +60,6 @@ object HumanInputDeserializer {
         val item = registry.getOptional(Identifier.read(StringReader(it))).getOrNull()
 
         requireNotNull(item) { "Unknown item '$it'" }
-    }
-
-    val clientModuleDeserializer: StringDeserializer<ClientModule> = StringDeserializer {
-        val module = ModuleManager[it]
-
-        requireNotNull(module) { "Unknown module '$it'" }
     }
 
     val keyDeserializer: StringDeserializer<InputConstants.Key> = StringDeserializer(::inputByName)

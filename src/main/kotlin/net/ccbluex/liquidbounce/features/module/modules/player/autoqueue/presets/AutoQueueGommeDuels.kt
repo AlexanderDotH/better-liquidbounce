@@ -30,9 +30,9 @@ import net.ccbluex.liquidbounce.features.module.modules.combat.killaura.ModuleKi
 import net.ccbluex.liquidbounce.features.module.modules.player.autoqueue.ModuleAutoQueue
 import net.ccbluex.liquidbounce.features.module.modules.player.autoqueue.ModuleAutoQueue.presets
 import net.ccbluex.liquidbounce.utils.client.SilentHotbar
-import net.ccbluex.liquidbounce.utils.client.chat
-import net.ccbluex.liquidbounce.utils.client.notification
-import net.ccbluex.liquidbounce.utils.client.regular
+import net.ccbluex.liquidbounce.features.chat.chat
+import net.ccbluex.liquidbounce.features.chat.notification
+import net.ccbluex.liquidbounce.utils.text.regular
 import net.ccbluex.liquidbounce.utils.entity.boxedDistanceTo
 import net.ccbluex.liquidbounce.utils.entity.interactEntity
 import net.ccbluex.liquidbounce.utils.inventory.Slots

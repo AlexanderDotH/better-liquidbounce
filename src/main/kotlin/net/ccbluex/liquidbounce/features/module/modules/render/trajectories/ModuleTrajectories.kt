@@ -18,8 +18,8 @@
  */
 package net.ccbluex.liquidbounce.features.module.modules.render.trajectories
 
-import net.ccbluex.liquidbounce.config.types.list.Tagged
-import net.ccbluex.liquidbounce.event.events.WorldRenderEvent
+import net.ccbluex.liquidbounce.common.Tagged
+import net.ccbluex.liquidbounce.render.events.WorldRenderEvent
 import net.ccbluex.liquidbounce.event.handler
 import net.ccbluex.liquidbounce.features.module.ClientModule
 import net.ccbluex.liquidbounce.features.module.ModuleCategories
@@ -30,18 +30,17 @@ import net.ccbluex.liquidbounce.render.engine.type.Color4b
 import net.ccbluex.liquidbounce.render.renderEnvironment
 import net.ccbluex.liquidbounce.utils.aiming.RotationManager
 import net.ccbluex.liquidbounce.utils.aiming.data.Rotation
-import net.ccbluex.liquidbounce.utils.entity.handItems
 import net.ccbluex.liquidbounce.utils.entity.rotation
 import net.ccbluex.liquidbounce.utils.math.dot
 import net.ccbluex.liquidbounce.utils.math.sq
 import net.ccbluex.liquidbounce.utils.render.trajectory.EntityTrajectoryResolver
-import net.ccbluex.liquidbounce.utils.render.trajectory.HeldItemTrajectoryResolver
-import net.ccbluex.liquidbounce.utils.render.trajectory.TrajectoryInfoRenderer
-import net.ccbluex.liquidbounce.utils.render.trajectory.TrajectoryDisplayResolver
+import net.ccbluex.liquidbounce.render.trajectory.TrajectoryInfoRenderer
+import net.ccbluex.liquidbounce.utils.render.trajectory.TrajectoryShotDescriptor
+import net.ccbluex.liquidbounce.render.trajectory.TrajectoryDisplayResolver
 import net.ccbluex.liquidbounce.utils.render.trajectory.TrajectoryType
 import net.minecraft.world.entity.TraceableEntity
 import net.minecraft.world.entity.player.Player
-import net.minecraft.world.item.FishingRodItem
+import net.minecraft.world.item.ItemStack
 import net.minecraft.world.phys.Vec3
 
 /**
@@ -168,68 +167,63 @@ object ModuleTrajectories : ClientModule("Trajectories", ModuleCategories.RENDER
         otherPlayer: Player,
         partialTicks: Float,
     ) {
-        val shouldFilterHeldFishingRod = otherPlayer.fishing != null &&
-            activeTrajectoryOther &&
-            TrajectoryType.FishingBobber in trajectoryTypes
-
-        val (trajectoryShotDescriptors, stack) = otherPlayer.handItems.firstNotNullOfOrNull { stack ->
-            if (shouldFilterHeldFishingRod && stack.item is FishingRodItem) {
-                return@firstNotNullOfOrNull null
-            }
-
-            HeldItemTrajectoryResolver.resolveHeldItemShots(
-                otherPlayer,
-                stack,
-                alwaysShowBow,
-                includeMultiShot = showMultiShot
-            )?.let {
-                it to stack
-            }
-        } ?: return
-
-        val rotation = if (otherPlayer === player) {
-            if (ModuleFreeCam.running) {
-                RotationManager.serverRotation
-            } else {
-                RotationManager.activeRotationTarget?.rotation
-                    ?: RotationManager.currentRotation ?: otherPlayer.rotation
-            }
-        } else {
-            otherPlayer.rotation
+        val filterFishingRod = shouldFilterHeldFishingRod(
+            otherPlayer.fishing != null,
+            activeTrajectoryOther,
+            TrajectoryType.FishingBobber in trajectoryTypes,
+        )
+        val (shotDescriptors, stack) = findHeldTrajectory(
+            otherPlayer,
+            filterFishingRod,
+            alwaysShowBow,
+            showMultiShot,
+        ) ?: return
+        val rotation = resolveTrajectoryRotation(otherPlayer)
+        shotDescriptors.forEach { descriptor ->
+            drawHypotheticalShot(otherPlayer, partialTicks, rotation, stack, descriptor)
         }
+    }
 
-        trajectoryShotDescriptors.forEach { shotDescriptor ->
-            if (shotDescriptor.trajectoryType !in trajectoryTypes) {
-                return@forEach
-            }
+    private fun resolveTrajectoryRotation(otherPlayer: Player): Rotation {
+        if (otherPlayer !== player) return otherPlayer.rotation
+        if (ModuleFreeCam.running) return RotationManager.serverRotation
+        return RotationManager.activeRotationTarget?.rotation
+            ?: RotationManager.currentRotation
+            ?: otherPlayer.rotation
+    }
 
-            val shotRotation = Rotation(
-                yaw = rotation.yaw + shotDescriptor.yawOffsetDegrees,
-                pitch = rotation.pitch,
-                isNormalized = rotation.isNormalized
-            )
-
-            val renderer = TrajectoryInfoRenderer.getHypotheticalTrajectory(
-                simulationOwner = otherPlayer,
-                icon = if (shotDescriptor.icon.isEmpty) stack else shotDescriptor.icon,
-                trajectoryInfo = shotDescriptor.trajectoryInfo,
-                trajectoryType = shotDescriptor.trajectoryType,
-                rotation = shotRotation,
-                partialTicks = partialTicks
-            )
-
-            simulationResults += renderer to renderer.drawTrajectoryForProjectile(
-                maxSimulatedTicks,
-                partialTicks,
-                trajectoryColor = TrajectoryDisplayResolver.resolveTrajectoryColor(
-                    trajectoryType = shotDescriptor.trajectoryType,
-                    colorSource = shotDescriptor.colorSource,
-                ),
-                blockHitColor = Color4b(0, 160, 255, 150),
-                entityHitColor = Color4b.RED.alpha(100),
-                lineWidth = lineWidth,
-            )
-        }
+    private fun WorldRenderEnvironment.drawHypotheticalShot(
+        otherPlayer: Player,
+        partialTicks: Float,
+        rotation: Rotation,
+        stack: ItemStack,
+        descriptor: TrajectoryShotDescriptor,
+    ) {
+        if (descriptor.trajectoryType !in trajectoryTypes) return
+        val shotRotation = Rotation(
+            yaw = rotation.yaw + descriptor.yawOffsetDegrees,
+            pitch = rotation.pitch,
+            isNormalized = rotation.isNormalized,
+        )
+        val renderer = TrajectoryInfoRenderer.getHypotheticalTrajectory(
+            simulationOwner = otherPlayer,
+            icon = if (descriptor.icon.isEmpty) stack else descriptor.icon,
+            trajectoryInfo = descriptor.trajectoryInfo,
+            trajectoryType = descriptor.trajectoryType,
+            rotation = shotRotation,
+            partialTicks = partialTicks,
+        )
+        simulationResults += renderer to renderer.drawTrajectoryForProjectile(
+            maxSimulatedTicks,
+            partialTicks,
+            trajectoryColor = TrajectoryDisplayResolver.resolveTrajectoryColor(
+                trajectoryType = descriptor.trajectoryType,
+                colorSource = descriptor.colorSource,
+            ),
+            blockHitColor = Color4b(0, 160, 255, 150),
+            entityHitColor = Color4b.RED.alpha(100),
+            lineWidth = lineWidth,
+        )
     }
 
     private enum class Show(

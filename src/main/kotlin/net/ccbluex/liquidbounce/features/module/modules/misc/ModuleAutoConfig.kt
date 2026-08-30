@@ -20,7 +20,7 @@
 package net.ccbluex.liquidbounce.features.module.modules.misc
 
 import kotlinx.coroutines.launch
-import net.ccbluex.liquidbounce.config.autoconfig.AutoConfig
+import net.ccbluex.liquidbounce.features.autoconfig.AutoConfig
 import net.ccbluex.liquidbounce.event.eventListenerScope
 import net.ccbluex.liquidbounce.event.events.NotificationEvent
 import net.ccbluex.liquidbounce.event.events.ServerConnectEvent
@@ -29,9 +29,9 @@ import net.ccbluex.liquidbounce.features.misc.HideAppearance
 import net.ccbluex.liquidbounce.features.module.ClientModule
 import net.ccbluex.liquidbounce.features.module.ModuleCategories
 import net.ccbluex.liquidbounce.utils.text.dropPort
-import net.ccbluex.liquidbounce.utils.client.markAsError
-import net.ccbluex.liquidbounce.utils.client.notification
-import net.ccbluex.liquidbounce.utils.client.regular
+import net.ccbluex.liquidbounce.utils.text.markAsError
+import net.ccbluex.liquidbounce.features.chat.notification
+import net.ccbluex.liquidbounce.utils.text.regular
 import net.ccbluex.liquidbounce.utils.text.rootDomain
 import net.minecraft.client.gui.screens.ConnectScreen
 
@@ -99,7 +99,7 @@ object ModuleAutoConfig : ClientModule(
         address: String,
         connectScreen: ConnectScreen? = null
     ) {
-        if (blacklistedServer.any { address.endsWith(it, true) }) {
+        if (isBlacklisted(address)) {
             notification(
                 "Auto Config", "This server is blacklisted.",
                 NotificationEvent.Severity.INFO
@@ -107,15 +107,7 @@ object ModuleAutoConfig : ClientModule(
             return
         }
 
-        // Get config with the shortest name, as it is most likely the correct one.
-        // There can be multiple configs for the same server, but with different names
-        // and the global config is likely named e.g "hypixel", while the more specific ones are named
-        // "hypixel-csgo", "hypixel-legit", etc.
-        val autoConfig = (AutoConfig.configs ?: return).filter { config ->
-            config.serverAddress?.rootDomain().equals(address, true) ||
-                config.serverAddress.equals(address, true)
-        }.minByOrNull { config -> config.name.length }
-
+        val autoConfig = selectServerConfig(address)
         if (autoConfig == null) {
             notification(
                 "Auto Config", "There is no known config for $address.",
@@ -125,16 +117,16 @@ object ModuleAutoConfig : ClientModule(
         }
 
         connectScreen?.updateStatus(regular(message("loading", address)))
-        runCatching {
-            AutoConfig.loadAutoConfig(autoConfig)
-        }.onFailure { error ->
+        runCatching { AutoConfig.loadAutoConfig(autoConfig) }
+            .onFailure { error ->
             logger.error("Failed to load config ${autoConfig.name} for $address.", error)
             connectScreen?.updateStatus(markAsError(message("failed", address)))
             notification(
                 "Auto Config", "Failed to load config ${autoConfig.name}.",
                 NotificationEvent.Severity.ERROR
             )
-        }.onSuccess {
+        }
+            .onSuccess {
             connectScreen?.updateStatus(regular(message("loaded", address)))
             notification(
                 "Auto Config", "Successfully loaded config ${autoConfig.name}.",
@@ -142,6 +134,16 @@ object ModuleAutoConfig : ClientModule(
             )
         }
     }
+
+    private fun isBlacklisted(address: String): Boolean =
+        blacklistedServer.any { address.endsWith(it, true) }
+
+    private fun selectServerConfig(address: String) = AutoConfig.configs
+        ?.filter { config ->
+            config.serverAddress?.rootDomain().equals(address, true) ||
+                config.serverAddress.equals(address, true)
+        }
+        ?.minByOrNull { config -> config.name.length }
 
     /**
      * Overwrites the condition requirement for being in-game

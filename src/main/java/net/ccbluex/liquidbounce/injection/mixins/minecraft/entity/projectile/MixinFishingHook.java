@@ -19,8 +19,7 @@
 package net.ccbluex.liquidbounce.injection.mixins.minecraft.entity.projectile;
 
 import com.llamalad7.mixinextras.injector.v2.WrapWithCondition;
-import net.ccbluex.liquidbounce.features.module.modules.movement.ModuleNoPush;
-import net.ccbluex.liquidbounce.features.module.modules.movement.NoPushBy;
+import net.ccbluex.liquidbounce.interfaces.ClientLevelFeatureBridge;
 import net.minecraft.client.Minecraft;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.projectile.FishingHook;
@@ -38,7 +37,7 @@ public abstract class MixinFishingHook {
 
     @WrapWithCondition(method = "handleEntityEvent", at = @At(value = "INVOKE", target = "Lnet/minecraft/world/entity/projectile/FishingHook;pullEntity(Lnet/minecraft/world/entity/Entity;)V"))
     private boolean hookNoPushByFishingRod(FishingHook instance, Entity entity) {
-        return entity != Minecraft.getInstance().player || ModuleNoPush.canPush(NoPushBy.FISHING_ROD);
+        return entity != Minecraft.getInstance().player || ClientLevelFeatureBridge.canPushFishingRod();
     }
 
 }

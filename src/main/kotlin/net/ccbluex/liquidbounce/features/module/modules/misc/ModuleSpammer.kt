@@ -29,11 +29,11 @@ import net.ccbluex.fastutil.longListOf
 import net.ccbluex.liquidbounce.api.core.ioScope
 import net.ccbluex.liquidbounce.config.types.group.Mode
 import net.ccbluex.liquidbounce.config.types.group.ModeValueGroup
-import net.ccbluex.liquidbounce.config.types.list.Tagged
+import net.ccbluex.liquidbounce.common.Tagged
 import net.ccbluex.liquidbounce.features.module.ClientModule
 import net.ccbluex.liquidbounce.features.module.ModuleCategories
-import net.ccbluex.liquidbounce.utils.client.chat
-import net.ccbluex.liquidbounce.utils.client.markAsError
+import net.ccbluex.liquidbounce.features.chat.chat
+import net.ccbluex.liquidbounce.utils.text.markAsError
 import net.ccbluex.liquidbounce.utils.io.skipLine
 import net.ccbluex.liquidbounce.utils.kotlin.mapString
 import net.ccbluex.liquidbounce.utils.kotlin.random

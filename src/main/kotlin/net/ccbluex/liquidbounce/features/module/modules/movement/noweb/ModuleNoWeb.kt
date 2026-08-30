@@ -29,7 +29,8 @@ import net.ccbluex.liquidbounce.features.module.modules.movement.noweb.modes.NoW
 import net.ccbluex.liquidbounce.features.module.modules.movement.noweb.modes.NoWebIntave14
 import net.ccbluex.liquidbounce.features.module.modules.movement.noweb.modes.NoWebPlaceWater
 import net.ccbluex.liquidbounce.features.module.modules.movement.noweb.modes.NoWebStrafe
-import net.ccbluex.liquidbounce.utils.client.notification
+import net.ccbluex.liquidbounce.features.module.modules.movement.noweb.runtime.NoWebModuleProvider
+import net.ccbluex.liquidbounce.features.chat.notification
 import net.minecraft.core.BlockPos
 import net.minecraft.world.level.block.WebBlock
 
@@ -39,6 +40,10 @@ import net.minecraft.world.level.block.WebBlock
  * Disables web slowdown.
  */
 object ModuleNoWeb : ClientModule("NoWeb", ModuleCategories.MOVEMENT) {
+
+    init {
+        NoWebModuleProvider.bind(this)
+    }
 
     val modes = choices(
         "Mode", NoWebAir, arrayOf(

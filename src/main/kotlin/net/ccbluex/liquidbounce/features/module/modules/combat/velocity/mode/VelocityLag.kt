@@ -29,7 +29,7 @@ import net.ccbluex.liquidbounce.event.handler
 import net.ccbluex.liquidbounce.event.sequenceHandler
 import net.ccbluex.liquidbounce.event.waitTicks
 import net.ccbluex.liquidbounce.features.blink.BlinkManager
-import net.ccbluex.liquidbounce.features.blink.BlinkManager.Action
+import net.ccbluex.liquidbounce.event.events.BlinkPacketAction as Action
 import net.ccbluex.liquidbounce.utils.network.isLocalPlayerVelocity
 import net.minecraft.network.protocol.common.ClientboundKeepAlivePacket
 

@@ -30,11 +30,11 @@ import net.ccbluex.liquidbounce.features.module.modules.world.traps.traps.Igniti
 import net.ccbluex.liquidbounce.features.module.modules.world.traps.traps.TrapPlayerSimulation
 import net.ccbluex.liquidbounce.features.module.modules.world.traps.traps.WebTrapPlanner
 import net.ccbluex.liquidbounce.utils.aiming.RotationManager
-import net.ccbluex.liquidbounce.utils.aiming.RotationsValueGroup
-import net.ccbluex.liquidbounce.utils.block.doPlacement
+import net.ccbluex.liquidbounce.features.rotation.RotationsValueGroup
+import net.ccbluex.liquidbounce.features.block.runtime.doPlacement
 import net.ccbluex.liquidbounce.utils.client.SilentHotbar
-import net.ccbluex.liquidbounce.utils.combat.CombatManager
-import net.ccbluex.liquidbounce.utils.combat.TargetTracker
+import net.ccbluex.liquidbounce.features.combat.runtime.CombatManager
+import net.ccbluex.liquidbounce.features.combat.runtime.TargetTracker
 import net.ccbluex.liquidbounce.utils.entity.rotation
 import net.ccbluex.liquidbounce.utils.kotlin.Priority
 import net.ccbluex.liquidbounce.utils.raytracing.traceFromPlayer

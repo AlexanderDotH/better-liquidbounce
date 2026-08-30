@@ -23,7 +23,7 @@ import net.ccbluex.liquidbounce.event.handler
 import net.ccbluex.liquidbounce.features.module.ClientModule
 import net.ccbluex.liquidbounce.features.module.ModuleCategories
 import net.ccbluex.liquidbounce.utils.inventory.InventoryAction
-import net.ccbluex.liquidbounce.utils.inventory.PlayerInventoryConstraints
+import net.ccbluex.liquidbounce.features.inventory.PlayerInventoryConstraints
 import net.ccbluex.liquidbounce.utils.inventory.findEmptyStorageSlotsInInventory
 import net.ccbluex.liquidbounce.utils.inventory.findItemsInContainer
 import net.ccbluex.liquidbounce.utils.inventory.findNonEmptyStorageSlotsInInventory

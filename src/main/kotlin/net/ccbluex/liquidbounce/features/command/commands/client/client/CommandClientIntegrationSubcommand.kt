@@ -19,18 +19,16 @@
 package net.ccbluex.liquidbounce.features.command.commands.client.client
 
 import net.ccbluex.liquidbounce.features.command.builder.CommandBuilder
-import net.ccbluex.liquidbounce.integration.screen.CustomScreenType
-import net.ccbluex.liquidbounce.integration.screen.ScreenManager
-import net.ccbluex.liquidbounce.integration.theme.ThemeManager
-import net.ccbluex.liquidbounce.utils.client.MessageMetadata
-import net.ccbluex.liquidbounce.utils.client.chat
-import net.ccbluex.liquidbounce.utils.client.copyable
-import net.ccbluex.liquidbounce.utils.client.italic
-import net.ccbluex.liquidbounce.utils.client.onClick
-import net.ccbluex.liquidbounce.utils.client.onHover
-import net.ccbluex.liquidbounce.utils.client.regular
-import net.ccbluex.liquidbounce.utils.client.underline
-import net.ccbluex.liquidbounce.utils.client.variable
+import net.ccbluex.liquidbounce.features.command.commands.client.client.runtime.ClientCommandRuntimeBridge
+import net.ccbluex.liquidbounce.features.chat.MessageMetadata
+import net.ccbluex.liquidbounce.features.chat.chat
+import net.ccbluex.liquidbounce.utils.text.copyable
+import net.ccbluex.liquidbounce.utils.text.italic
+import net.ccbluex.liquidbounce.utils.text.onClick
+import net.ccbluex.liquidbounce.utils.text.onHover
+import net.ccbluex.liquidbounce.utils.text.regular
+import net.ccbluex.liquidbounce.utils.text.underline
+import net.ccbluex.liquidbounce.utils.text.variable
 import net.minecraft.network.chat.ClickEvent
 import net.minecraft.network.chat.HoverEvent
 import java.net.URI
@@ -45,14 +43,14 @@ object CommandClientIntegrationSubcommand {
     private fun resetSubcommand() = CommandBuilder.begin("reset")
         .handler {
             chat(regular("Resetting client JCEF browser..."))
-            ScreenManager.update()
+            ClientCommandRuntimeBridge.resetIntegration()
         }.build()
 
     private fun menuSubcommand() = CommandBuilder.begin("menu")
         .alias("url")
         .handler {
             chat(variable("Client Integration"))
-            val baseUrl = ThemeManager.getScreenLocation().url
+            val baseUrl = ClientCommandRuntimeBridge.integrationBaseUrl()
 
             chat(
                 regular("Base URL: ")
@@ -73,11 +71,9 @@ object CommandClientIntegrationSubcommand {
 
             chat(metadata = MessageMetadata(prefix = false))
             chat(regular("Integration Menu:"))
-            for (screenType in CustomScreenType.entries) {
-                val url = runCatching {
-                    ThemeManager.getScreenLocation(screenType, true)
-                }.getOrNull()?.url ?: continue
-                val upperFirstName = screenType.routeName.replaceFirstChar { it.uppercase() }
+            for (link in ClientCommandRuntimeBridge.integrationLinks()) {
+                val url = link.url
+                val upperFirstName = link.routeName.replaceFirstChar { it.uppercase() }
 
                 chat(
                     regular("-> $upperFirstName (")

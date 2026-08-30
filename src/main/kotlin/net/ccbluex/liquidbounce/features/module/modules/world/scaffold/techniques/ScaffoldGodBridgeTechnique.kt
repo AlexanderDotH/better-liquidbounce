@@ -19,7 +19,7 @@
 package net.ccbluex.liquidbounce.features.module.modules.world.scaffold.techniques
 
 import com.google.common.base.Suppliers
-import net.ccbluex.liquidbounce.config.types.list.Tagged
+import net.ccbluex.liquidbounce.common.Tagged
 import net.ccbluex.liquidbounce.features.module.modules.render.ModuleDebug.debugParameter
 import net.ccbluex.liquidbounce.features.module.modules.world.scaffold.ModuleScaffold
 import net.ccbluex.liquidbounce.features.module.modules.world.scaffold.ModuleScaffold.getTargetedPosition
@@ -28,16 +28,16 @@ import net.ccbluex.liquidbounce.features.module.modules.world.scaffold.features.
 import net.ccbluex.liquidbounce.features.module.modules.world.scaffold.features.ScaffoldLedgeExtension
 import net.ccbluex.liquidbounce.utils.aiming.data.Rotation
 import net.ccbluex.liquidbounce.utils.block.state
-import net.ccbluex.liquidbounce.utils.block.targetfinding.BlockOffsetOptions
-import net.ccbluex.liquidbounce.utils.block.targetfinding.BlockPlacementTarget
-import net.ccbluex.liquidbounce.utils.block.targetfinding.BlockPlacementTargetFindingOptions
-import net.ccbluex.liquidbounce.utils.block.targetfinding.BlockPosOffsets
-import net.ccbluex.liquidbounce.utils.block.targetfinding.CenterTargetPositionFactory
-import net.ccbluex.liquidbounce.utils.block.targetfinding.FaceHandlingOptions
-import net.ccbluex.liquidbounce.utils.block.targetfinding.PlayerLocationOnPlacement
-import net.ccbluex.liquidbounce.utils.block.targetfinding.findBestBlockPlacementTarget
+import net.ccbluex.liquidbounce.features.block.config.BlockOffsetOptions
+import net.ccbluex.liquidbounce.features.block.contract.BlockPlacementTarget
+import net.ccbluex.liquidbounce.features.block.config.BlockPlacementTargetFindingOptions
+import net.ccbluex.liquidbounce.features.block.config.BlockPosOffsets
+import net.ccbluex.liquidbounce.features.block.planner.CenterTargetPositionFactory
+import net.ccbluex.liquidbounce.features.block.config.FaceHandlingOptions
+import net.ccbluex.liquidbounce.features.block.config.PlayerLocationOnPlacement
+import net.ccbluex.liquidbounce.features.block.planner.findBestBlockPlacementTarget
 import net.ccbluex.liquidbounce.utils.math.toRadians
-import net.ccbluex.liquidbounce.utils.entity.PlayerSimulationCache
+import net.ccbluex.liquidbounce.features.simulation.PlayerSimulationCache
 import net.ccbluex.liquidbounce.utils.entity.getMovementDirectionOfInput
 import net.ccbluex.liquidbounce.utils.math.geometry.Line
 import net.ccbluex.liquidbounce.utils.math.toBlockPos
@@ -47,7 +47,6 @@ import net.minecraft.core.Direction
 import net.minecraft.world.entity.Pose
 import net.minecraft.world.item.ItemStack
 import net.minecraft.world.phys.Vec3
-import java.util.EnumSet
 import java.util.function.Supplier
 import kotlin.math.cos
 import kotlin.math.floor
@@ -58,7 +57,7 @@ object ScaffoldGodBridgeTechnique : ScaffoldTechnique("GodBridge"), ScaffoldLedg
     private const val VANILLA_GRAVITY = 0.08
     private const val VANILLA_VERTICAL_DRAG = 0.98
 
-    private enum class Mode(override val tag: String, val creator: Supplier<LedgeAction>) : Tagged {
+    internal enum class Mode(override val tag: String, val creator: Supplier<LedgeAction>) : Tagged {
         JUMP("Jump", LedgeAction(jump = true)),
         SNEAK("Sneak", { LedgeAction(sneakTime = sneakTime.random()) }),
         /**
@@ -91,40 +90,37 @@ object ScaffoldGodBridgeTechnique : ScaffoldTechnique("GodBridge"), ScaffoldLedg
 
         debugParameter("Snapshot Ledged") { snapshotOne.clipLedged }
 
-        return if (snapshotOne.clipLedged) {
-            val cameraPosition = snapshotOne.pos.add(0.0, player.eyeHeight.toDouble(), 0.0)
-            val currentCrosshairTarget = traceFromPoint(start = cameraPosition, direction = rotation.directionVector)
+        if (!snapshotOne.clipLedged) {
+            return LedgeAction.NO_LEDGE
+        }
 
-            if (target == null) {
-                return LedgeAction.NO_LEDGE
-            }
+        val cameraPosition = snapshotOne.pos.add(0.0, player.eyeHeight.toDouble(), 0.0)
+        val currentCrosshairTarget = traceFromPoint(start = cameraPosition, direction = rotation.directionVector)
 
-            val targetFulfillsRequirements = target.doesCrosshairTargetMatchRequirements(currentCrosshairTarget)
-            val isValidCrosshairTarget = ModuleScaffold.isValidCrosshairTarget(currentCrosshairTarget)
+        if (target == null) return LedgeAction.NO_LEDGE
 
-            debugParameter("targetFulfillsRequirements") { targetFulfillsRequirements }
-            debugParameter("isValidCrosshairTarget") { isValidCrosshairTarget }
+        val targetFulfillsRequirements = target.doesCrosshairTargetMatchRequirements(currentCrosshairTarget)
+        val isValidCrosshairTarget = ModuleScaffold.isValidCrosshairTarget(currentCrosshairTarget)
 
-            // Does the crosshair target meet the requirements?
-            if (targetFulfillsRequirements && isValidCrosshairTarget) {
-                return LedgeAction.NO_LEDGE
-            }
+        debugParameter("targetFulfillsRequirements") { targetFulfillsRequirements }
+        debugParameter("isValidCrosshairTarget") { isValidCrosshairTarget }
 
-            // If the crosshair target does not meet the requirements,
-            // we need to prevent the player from falling off the ledge e.g. by jumping or sneaking.
-            val currentMode = if (ModuleScaffold.blockCount < forceSneakBelowCount) Mode.SNEAK else modes.random()
-            val effectiveMode = if (currentMode == Mode.JUMP && canJumpTwoBlocksHigh()) {
-                val filtered = EnumSet.copyOf(modes).apply { remove(Mode.JUMP) }
-                filtered.randomOrNull() ?: Mode.SNEAK
-            } else {
-                currentMode
-            }
+        // Does the crosshair target meet the requirements?
+        if (targetFulfillsRequirements && isValidCrosshairTarget) {
+            return LedgeAction.NO_LEDGE
+        }
 
-            effectiveMode.creator.get().also {
-                debugParameter("LastLedgeAction") { it }
-            }
-        } else {
-            LedgeAction.NO_LEDGE
+        // If the crosshair target does not meet the requirements,
+        // we need to prevent the player from falling off the ledge e.g. by jumping or sneaking.
+        val currentMode = if (ModuleScaffold.blockCount < forceSneakBelowCount) Mode.SNEAK else modes.random()
+        val effectiveMode = GodBridgeLedgeModeSelector.select(
+            currentMode = currentMode,
+            availableModes = modes,
+            canJumpTwoBlocksHigh = ::canJumpTwoBlocksHigh,
+        )
+
+        return effectiveMode.creator.get().also {
+            debugParameter("LastLedgeAction") { it }
         }
     }
 

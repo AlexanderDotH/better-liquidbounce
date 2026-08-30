@@ -21,7 +21,6 @@ package net.ccbluex.liquidbounce.injection.mixins.minecraft.render;
 
 import com.llamalad7.mixinextras.injector.v2.WrapWithCondition;
 import com.mojang.blaze3d.vertex.PoseStack;
-import net.ccbluex.liquidbounce.features.module.modules.render.DoRender;
 import net.ccbluex.liquidbounce.features.module.modules.render.ModuleAntiBlind;
 import net.minecraft.client.model.Model;
 import net.minecraft.client.renderer.SubmitNodeCollector;
@@ -40,6 +39,6 @@ public abstract class MixinEnchantTableRenderer {
             at = @At(value = "INVOKE", target = "Lnet/minecraft/client/renderer/SubmitNodeCollector;submitModel(Lnet/minecraft/client/model/Model;Ljava/lang/Object;Lcom/mojang/blaze3d/vertex/PoseStack;IIILnet/minecraft/client/resources/model/sprite/SpriteId;Lnet/minecraft/client/resources/model/sprite/SpriteGetter;ILnet/minecraft/client/renderer/feature/ModelFeatureRenderer$CrumblingOverlay;)V")
     )
     private boolean hookRenderBook(SubmitNodeCollector instance, Model model, Object o, PoseStack poseStack, int i1, int i2, int i3, SpriteId spriteId, SpriteGetter spriteGetter, int i, ModelFeatureRenderer.CrumblingOverlay crumblingOverlay) {
-        return ModuleAntiBlind.canRender(DoRender.ENCHANT_TABLE_BOOK);
+        return ModuleAntiBlind.canRenderEnchantTableBook();
     }
 }

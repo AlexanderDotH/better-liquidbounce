@@ -20,14 +20,13 @@ package net.ccbluex.liquidbounce.features.module.modules.world.autobuild
 
 import net.ccbluex.liquidbounce.event.events.RotationUpdateEvent
 import net.ccbluex.liquidbounce.event.handler
+import net.ccbluex.liquidbounce.features.chat.chat
 import net.ccbluex.liquidbounce.features.module.modules.world.autobuild.ModuleAutoBuild.placer
 import net.ccbluex.liquidbounce.utils.block.stateOrEmpty
-import net.ccbluex.liquidbounce.utils.client.chat
-import net.ccbluex.liquidbounce.utils.client.markAsError
 import net.ccbluex.liquidbounce.utils.inventory.HotbarItemSlot
 import net.ccbluex.liquidbounce.utils.inventory.Slots
+import net.ccbluex.liquidbounce.utils.text.markAsError
 import net.minecraft.core.BlockPos
-import net.minecraft.core.Direction
 import net.minecraft.world.item.BlockItem
 import net.minecraft.world.item.Items
 import net.minecraft.world.level.block.Blocks
@@ -39,7 +38,7 @@ object PortalMode : ModuleAutoBuild.AutoBuildMode("Portal") {
 
     override fun enabled() {
         phase = Phase.BUILD
-        portal = getPortal()
+        portal = PortalCandidateSelector.findBest(BlockPos.containing(player.position()))
         if (portal == null) {
             chat(markAsError(ModuleAutoBuild.message("noPosition")), ModuleAutoBuild)
             ModuleAutoBuild.enabled = false
@@ -71,36 +70,6 @@ object PortalMode : ModuleAutoBuild.AutoBuildMode("Portal") {
     override fun disabled() {
         placer.support.blockedPositions.clear()
         portal = null
-    }
-
-    @Suppress("NestedBlockDepth", "CognitiveComplexMethod")
-    private fun getPortal(): NetherPortal? {
-        var result: NetherPortal? = null
-        val pos = BlockPos.containing(player.position())
-        for (direction in Direction.BY_2D_DATA) {
-            for (yOffset in -1..0) {
-                for (dirOffset in 0 downTo  -1) {
-                    val portalOrigin = pos.mutable().move(direction)
-                    val rotated = direction.clockWise
-                    if (dirOffset == -1) {
-                        portalOrigin.move(rotated.opposite)
-                    }
-                    if (yOffset == -1) {
-                        portalOrigin.move(Direction.DOWN)
-                    }
-
-                    val portal = NetherPortal(portalOrigin, yOffset == -1, direction, rotated)
-                    portal.calculateScore()
-                    if (!portal.isValid()) continue
-
-                    if (result == null || result.score < portal.score) {
-                        result = portal
-                    }
-                }
-            }
-        }
-
-        return result
     }
 
     override fun getSlot(): HotbarItemSlot? {

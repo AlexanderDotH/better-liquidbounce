@@ -4,7 +4,6 @@
     import {createEventDispatcher, onDestroy, onMount} from "svelte";
     import {
         Chart,
-        type Chart as ChartJS,
         LinearScale,
         LineController,
         LineElement,
@@ -16,6 +15,17 @@
     import dragDataPlugin from "chartjs-plugin-dragdata";
     import ExpandArrow from "./common/ExpandArrow.svelte";
     import {setItem} from "../../../integration/persistent_storage";
+    import {
+        clampCurveValue,
+        CURVE_EDGE_MARGIN,
+        CURVE_EPSILON,
+        curvePosition,
+        ensureCurveEndpoints,
+        lockCurveEdgePoint,
+        sortCurvePoints,
+        type CurveChart,
+    } from "./curveModel";
+    import {createCurveChartConfiguration} from "./curveChartConfig.ts";
 
     export let setting: ModuleSetting;
     export let path: string;
@@ -29,17 +39,12 @@
 
     $: setItem(thisPath, expanded.toString());
 
-    type TChart = ChartJS<'line', ScatterDataPoint[], unknown>;
-
     let canvasElement: HTMLCanvasElement;
-    let chart: TChart | null = null;
+    let chart: CurveChart | null = null;
 
     Chart.register(LinearScale, PointElement, LineElement, LineController, ScatterController, dragDataPlugin);
 
     let isDragging = false;
-    const EPS = 1e-9;
-    // Points at the exact edges of the x-axis are locked. This margin prevents additional points from being locked.
-    const EDGE_MARGIN = 1e-6;
     let themeObserver: MutationObserver | null = null;
 
     function getThemeColor(name: string) {
@@ -73,14 +78,6 @@
         chart.update();
     }
 
-    function clamp(v: number, min: number, max: number) {
-        return Math.min(Math.max(v, min), max)
-    }
-
-    function sortPoints(arr: ScatterDataPoint[]) {
-        return arr.sort((a, b) => a.x - b.x);
-    }
-
     function updateValue() {
         if (!chart) return;
         const ds = chart.data.datasets[0] as any;
@@ -95,161 +92,38 @@
     function ensureEndpoints() {
         if (!chart) return;
 
-        const dataset = chart.data.datasets[0];
-
-        const findAtX = (x: number) => dataset.data.find((p: ScatterDataPoint) => Math.abs(p.x - x) <= EPS);
-
-        if (findAtX(cSetting.xAxis.range.from) === undefined) {
-            dataset.data.push({x: cSetting.xAxis.range.from, y: cSetting.yAxis.range.from / 2});
-        }
-        if (findAtX(cSetting.xAxis.range.to) === undefined) {
-            dataset.data.push({x: cSetting.xAxis.range.to, y: cSetting.yAxis.range.from / 2});
-        }
-
-        for (let p of dataset.data) {
-            if (Math.abs(p.x - cSetting.xAxis.range.from) <= EPS) {
-                p.x = cSetting.xAxis.range.from;
-            }
-            if (Math.abs(p.x - cSetting.xAxis.range.to) <= EPS) {
-                p.x = cSetting.xAxis.range.to;
-            }
-        }
-
-        sortPoints(dataset.data);
+        ensureCurveEndpoints(
+            chart.data.datasets[0].data,
+            cSetting.xAxis.range,
+            cSetting.yAxis.range,
+        );
     }
 
-    /**
-     * Finds the clicked x and y position within the chart's canvas.
-     * @param e The mouse event to find the position of.
-     * @param c The chart to find the position within.
-     */
-    function getPositionInChart(e: MouseEvent, c: TChart) {
-        const rect = (c.canvas as HTMLCanvasElement).getBoundingClientRect();
-        const xPixel = e.clientX - rect.left;
-        const yPixel = e.clientY - rect.top;
-        const xs = c.scales.x as any;
-        const ys = c.scales.y as any;
-        return {
-            xPixel, yPixel,
-            x: xs.getValueForPixel(xPixel),
-            y: ys.getValueForPixel(yPixel)
-        };
+    function handleCurveDrag(_event: unknown, datasetIndex: number, index: number, value: Point | number | null): void {
+        if (!chart) return;
+        const previousPoint = chart.data.datasets[datasetIndex].data[index];
+        lockCurveEdgePoint(previousPoint, value as Point, cSetting.xAxis.range, cSetting.yAxis.range);
     }
 
-    function lockEdgePoints(previousPoint: Point, currentPoint: Point) {
-        const minOpen = cSetting.xAxis.range.from + EDGE_MARGIN;
-        const maxOpen = cSetting.xAxis.range.to - EDGE_MARGIN;
-
-        // Determine endpoint by X position (non-endpoints can never equal xAxis.range.from/xAxis.range.to due to open-interval clamp)
-        const isMinEndpoint = Math.abs(previousPoint.x - cSetting.xAxis.range.from) <= EPS;
-        const isMaxEndpoint = Math.abs(previousPoint.x - cSetting.xAxis.range.to) <= EPS;
-
-        if (isMinEndpoint) {
-            currentPoint.x = cSetting.xAxis.range.from; // lock X
-        } else if (isMaxEndpoint) {
-            currentPoint.x = cSetting.xAxis.range.to; // lock X
-        } else {
-            currentPoint.x = clamp(currentPoint.x, minOpen, maxOpen); // keep away from exact edges
-        }
-
-        currentPoint.y = clamp(currentPoint.y, cSetting.yAxis.range.from, cSetting.yAxis.range.to);
+    function handleCurveDragEnd(_event: unknown, datasetIndex: number, index: number, value: Point | number | null): void {
+        if (!chart) return;
+        const dataset = chart.data.datasets[datasetIndex];
+        lockCurveEdgePoint(dataset.data[index], value as Point, cSetting.xAxis.range, cSetting.yAxis.range);
+        sortCurvePoints(dataset.data);
+        chart.update();
+        isDragging = false;
+        ensureEndpoints();
+        chart.update();
+        updateValue();
     }
 
     onMount(() => {
         const ctx = canvasElement.getContext("2d")!;
-
-        chart = new Chart(ctx, {
-            type: "line",
-            data: {
-                datasets: [{
-                    type: "line",
-                    data: sortPoints(cSetting.value.map(point => ({x: point.x, y: point.y}))),
-                    showLine: true,
-                    parsing: false,
-                    borderWidth: 2,
-                    borderColor: getThemeColor("--clickgui-curve-accent-color"),
-                    pointRadius: 5,
-                    pointBackgroundColor: getThemeColor("--clickgui-curve-accent-color"),
-                    pointBorderWidth: 0,
-                    pointHoverRadius: 6,
-                    pointHoverBackgroundColor: getThemeColor("--clickgui-curve-accent-color"),
-                    tension: cSetting.tension
-                }]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                scales: {
-                    x: {
-                        type: "linear",
-                        min: cSetting.xAxis.range.from,
-                        max: cSetting.xAxis.range.to,
-                        grid: {
-                            color: getThemeColor("--clickgui-curve-grid-color")
-                        },
-                        ticks: {
-                            color: getThemeColor("--clickgui-curve-axis-color")
-                        },
-                        title: {
-                            display: true,
-                            text: cSetting.xAxis.label,
-                            color: getThemeColor("--clickgui-curve-axis-color")
-                        }
-                    },
-                    y: {
-                        type: "linear",
-                        min: cSetting.yAxis.range.from,
-                        max: cSetting.yAxis.range.to,
-                        grid: {
-                            color: getThemeColor("--clickgui-curve-grid-color")
-                        },
-                        ticks: {
-                            color: getThemeColor("--clickgui-curve-axis-color")
-                        },
-                        title: {
-                            display: true,
-                            text: cSetting.yAxis.label,
-                            color: getThemeColor("--clickgui-curve-axis-color")
-                        }
-                    }
-                },
-                plugins: {
-                    legend: {display: false},
-                    tooltip: {enabled: false},
-                    dragData: {
-                        dragX: true,
-                        onDragStart: () => {
-                            isDragging = true;
-                        },
-                        onDrag: (_e, datasetIndex, index, value) => {
-                            if (!chart) return;
-
-                            const previousPoint = chart.data.datasets[datasetIndex].data[index];
-                            const currentPoint = value as Point;
-
-                            lockEdgePoints(previousPoint, currentPoint);
-                        },
-                        onDragEnd: (_e, datasetIndex, index, value) => {
-                            if (!chart) return;
-
-                            const dataset = chart.data.datasets[datasetIndex];
-                            const previousPoint = dataset.data[index];
-                            const currentPoint = value as Point;
-
-                            lockEdgePoints(previousPoint, currentPoint);
-                            sortPoints(dataset.data);
-
-                            chart.update();
-
-                            isDragging = false;
-                            ensureEndpoints(); // ensure end points still exist and snap to exact min/max
-                            chart.update();
-                            updateValue();
-                        }
-                    }
-                }
-            }
-        });
+        chart = new Chart(ctx, createCurveChartConfiguration(cSetting, getThemeColor, {
+            onDragStart: () => isDragging = true,
+            onDrag: handleCurveDrag,
+            onDragEnd: handleCurveDragEnd,
+        }));
 
         // Ensure endpoints exist and snap exactly to min/max at startup
         ensureEndpoints();
@@ -269,16 +143,16 @@
     function addPoint(e: MouseEvent) {
         if (!chart || isDragging) return;
 
-        const {x, y} = getPositionInChart(e, chart);
-        const minOpen = cSetting.xAxis.range.from + EDGE_MARGIN;
-        const maxOpen = cSetting.xAxis.range.to - EDGE_MARGIN;
+        const {x, y} = curvePosition(e, chart);
+        const minOpen = cSetting.xAxis.range.from + CURVE_EDGE_MARGIN;
+        const maxOpen = cSetting.xAxis.range.to - CURVE_EDGE_MARGIN;
 
-        const nx = clamp(x, minOpen, maxOpen);
-        const ny = clamp(y, cSetting.yAxis.range.from, cSetting.yAxis.range.to);
+        const nx = clampCurveValue(x as number, minOpen, maxOpen);
+        const ny = clampCurveValue(y as number, cSetting.yAxis.range.from, cSetting.yAxis.range.to);
 
         const dataset = chart.data.datasets[0];
         dataset.data.push({x: nx, y: ny});
-        sortPoints(dataset.data);
+        sortCurvePoints(dataset.data);
         ensureEndpoints();
         chart.update();
         updateValue();
@@ -297,11 +171,11 @@
         const p = dataset.data[index];
 
         // Don't remove the required endpoints
-        if (Math.abs(p.x - cSetting.xAxis.range.from) <= EPS) return;
-        if (Math.abs(p.x - cSetting.xAxis.range.to) <= EPS) return;
+        if (Math.abs(p.x - cSetting.xAxis.range.from) <= CURVE_EPSILON) return;
+        if (Math.abs(p.x - cSetting.xAxis.range.to) <= CURVE_EPSILON) return;
 
         dataset.data.splice(index, 1);
-        sortPoints(dataset.data);
+        sortCurvePoints(dataset.data);
         ensureEndpoints();
         chart.update();
         updateValue();
@@ -329,41 +203,5 @@
 </div>
 
 <style lang="scss">
-
-  .setting {
-    padding: var(--clickgui-setting-padding, 7px 0);
-    position: relative;
-  }
-
-  .canvas-wrapper {
-    height: 0;
-    opacity: 0;
-    overflow: hidden;
-    will-change: height, opacity;
-    transition:
-      ease height var(--clickgui-setting-transition-duration, 0.2s),
-      ease opacity var(--clickgui-setting-transition-duration, 0.2s);
-
-    &.visible {
-      height: var(--clickgui-curve-height, 180px);
-      opacity: 1;
-    }
-  }
-
-  .title {
-    color: var(--clickgui-text-color);
-    font-size: var(--clickgui-control-font-size, 12px);
-    font-weight: 600;
-  }
-
-  .head {
-    display: flex;
-    justify-content: space-between;
-    transition: ease margin-bottom var(--clickgui-setting-transition-duration, .2s);
-
-    &.expanded {
-      margin-bottom: var(--clickgui-setting-expanded-gap, 10px);
-    }
-  }
-
+  @use "./CurveSetting.styles";
 </style>

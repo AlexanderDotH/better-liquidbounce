@@ -22,12 +22,14 @@ import net.ccbluex.liquidbounce.config.types.group.ToggleableValueGroup
 import net.ccbluex.liquidbounce.features.module.modules.combat.crystalaura.ModuleCrystalAura
 import net.ccbluex.liquidbounce.features.module.modules.combat.crystalaura.SubmoduleIdPredict
 import net.ccbluex.liquidbounce.features.module.modules.combat.crystalaura.SwitchMode
+import net.ccbluex.liquidbounce.features.module.modules.combat.crystalaura.geometry.findClosestPointOnBlockInLineWithCrystal
+import net.ccbluex.liquidbounce.features.module.modules.combat.crystalaura.geometry.predictedCrystalBox
+import net.ccbluex.liquidbounce.features.module.modules.render.ModuleDebug
 import net.ccbluex.liquidbounce.render.engine.type.Color4b
-import net.ccbluex.liquidbounce.utils.aiming.NoRotationMode
+import net.ccbluex.liquidbounce.features.rotation.NoRotationMode
 import net.ccbluex.liquidbounce.utils.aiming.RotationManager
 import net.ccbluex.liquidbounce.utils.aiming.data.Rotation
 import net.ccbluex.liquidbounce.utils.aiming.data.RotationWithVector
-import net.ccbluex.liquidbounce.utils.aiming.utils.findClosestPointOnBlockInLineWithCrystal
 import net.ccbluex.liquidbounce.utils.aiming.utils.raytraceUpperBlockSide
 import net.ccbluex.liquidbounce.utils.block.SwingMode
 import net.ccbluex.liquidbounce.utils.block.stateOrEmpty
@@ -36,13 +38,18 @@ import net.ccbluex.liquidbounce.utils.network.clickBlockWithSlot
 import net.ccbluex.liquidbounce.utils.inventory.Slots
 import net.ccbluex.liquidbounce.utils.inventory.findClosestSlot
 import net.ccbluex.liquidbounce.utils.raytracing.raytraceBlock
-import net.ccbluex.liquidbounce.utils.render.placement.PlacementRenderer
+import net.ccbluex.liquidbounce.render.placement.PlacementRenderer
 import net.minecraft.core.BlockPos
 import net.minecraft.core.Direction
 import net.minecraft.world.item.Items
 import net.minecraft.world.phys.BlockHitResult
 import net.minecraft.world.phys.HitResult
 import kotlin.math.max
+
+private data class CrystalPlacementRotation(
+    val rotation: RotationWithVector,
+    val side: Direction,
+)
 
 object SubmoduleCrystalPlacer : ToggleableValueGroup(ModuleCrystalAura, "Place", true) {
 
@@ -91,21 +98,23 @@ object SubmoduleCrystalPlacer : ToggleableValueGroup(ModuleCrystalAura, "Place",
     // that when the ca switches between two players very fast and one place is invalid it would fail
     private var previousRotations = ArrayDeque<Pair<Rotation, Rotation>>(2)
 
-    @Suppress("LongMethod", "CognitiveComplexMethod")
     fun tick(excludeIds: IntArray? = null) {
-        if (!enabled || !chronometer.hasAtLeastElapsed(delay.toLong())) {
-            return
-        }
-
-        // if we don't have crystals, we don't need to run the method
+        if (!canAttemptPlacement()) return
         getSlot() ?: return
-
         CrystalAuraPlaceTargetFactory.updateTarget(excludeIds)
-
         removeFromRenderer()
-
         val targetPos = CrystalAuraPlaceTargetFactory.placementTarget ?: return
+        val (rotation, side) = resolvePlacementRotation(targetPos) ?: return
+        if (!prepareUnrotatedHitResult(rotation, targetPos)) return
+        addToRenderer()
+        updatePrevious(rotation)
+        queuePlacing(rotation, targetPos, side)
+    }
 
+    private fun canAttemptPlacement(): Boolean =
+        enabled && chronometer.hasAtLeastElapsed(delay.toLong())
+
+    private fun resolvePlacementRotation(targetPos: BlockPos): CrystalPlacementRotation? {
         val notSameRotation = RotationManager.serverRotation != previousRotations.lastOrNull()?.first
         val rotationsNotToMatch = if (notSameRotation && jitter) {
             previousRotations.map { it.second }
@@ -113,41 +122,46 @@ object SubmoduleCrystalPlacer : ToggleableValueGroup(ModuleCrystalAura, "Place",
             null
         }
 
-        var side = Direction.UP
-        val rotation = if (onlyAbove) {
-            raytraceUpperBlockSide(
+        return if (onlyAbove) {
+            val rotation = raytraceUpperBlockSide(
                 player.eyePosition,
                 range.toDouble(),
                 wallsRange.toDouble(),
                 targetPos,
-                rotationsNotToMatch = rotationsNotToMatch
-            )
+                rotationsNotToMatch = rotationsNotToMatch,
+            ) ?: return null
+            CrystalPlacementRotation(rotation, Direction.UP)
         } else {
+            val predictedCrystal = predictedCrystalBox(targetPos)
+            mc.execute {
+                ModuleDebug.debugGeometry(
+                    ModuleCrystalAura,
+                    "predictedCrystal",
+                    ModuleDebug.DebuggedBox(predictedCrystal, Color4b.RED.fade(0.4f)),
+                )
+            }
             val data = findClosestPointOnBlockInLineWithCrystal(
                 player.eyePosition,
                 range.toDouble(),
                 wallsRange.toDouble(),
                 targetPos,
                 notFacingAway,
-                rotationsNotToMatch
-            ) ?: return
-            side = data.second
-
-            data.first
-        } ?: return
-
-        if (ModuleCrystalAura.rotationMode.activeMode is NoRotationMode) {
-            blockHitResult = raytraceBlock(
-                getMaxRange().toDouble(),
-                rotation.rotation,
-                targetPos,
-                targetPos.stateOrEmpty
-            ) ?: return
+                rotationsNotToMatch,
+            ) ?: return null
+            CrystalPlacementRotation(data.first, data.second)
         }
+    }
 
-        addToRenderer()
-        updatePrevious(rotation)
-        queuePlacing(rotation, targetPos, side)
+    private fun prepareUnrotatedHitResult(rotation: RotationWithVector, targetPos: BlockPos): Boolean {
+        if (ModuleCrystalAura.rotationMode.activeMode !is NoRotationMode) return true
+
+        blockHitResult = raytraceBlock(
+            getMaxRange().toDouble(),
+            rotation.rotation,
+            targetPos,
+            targetPos.stateOrEmpty,
+        ) ?: return false
+        return true
     }
 
     private fun queuePlacing(rotation: RotationWithVector, targetPos: BlockPos, side: Direction) {
@@ -169,7 +183,7 @@ object SubmoduleCrystalPlacer : ToggleableValueGroup(ModuleCrystalAura, "Place",
                 blockHitResult?.withDirection(side) ?: return@rotate,
                 getSlot() ?: return@rotate,
                 swingMode,
-                switchMode,
+                switchMode.slotSwitchPolicy,
                 sequenced
             )
 

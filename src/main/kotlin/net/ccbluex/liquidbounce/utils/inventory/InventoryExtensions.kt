@@ -35,7 +35,7 @@ val isInContainerScreen
 
 val canCloseMainInventory
     get() = !isInInventoryScreen && mc.player?.containerMenu?.isPlayerInventory == true
-        && InventoryManager.isInventoryOpen
+        && InventoryRuntimeHooks.isInventoryOpen
 
 val AbstractContainerScreen<*>?.syncId
     get() = this?.menu?.containerId ?: 0

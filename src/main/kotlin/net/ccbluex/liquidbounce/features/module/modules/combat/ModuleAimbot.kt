@@ -18,10 +18,10 @@
  */
 package net.ccbluex.liquidbounce.features.module.modules.combat
 
-import net.ccbluex.liquidbounce.config.types.list.Tagged
+import net.ccbluex.liquidbounce.common.Tagged
 import net.ccbluex.liquidbounce.event.events.MouseRotationEvent
 import net.ccbluex.liquidbounce.event.events.RotationUpdateEvent
-import net.ccbluex.liquidbounce.event.events.WorldRenderEvent
+import net.ccbluex.liquidbounce.render.events.WorldRenderEvent
 import net.ccbluex.liquidbounce.event.handler
 import net.ccbluex.liquidbounce.features.module.ClientModule
 import net.ccbluex.liquidbounce.features.module.ModuleCategories
@@ -33,20 +33,20 @@ import net.ccbluex.liquidbounce.utils.aiming.RotationTarget
 import net.ccbluex.liquidbounce.utils.aiming.data.Rotation
 import net.ccbluex.liquidbounce.utils.aiming.data.RotationWithVector
 import net.ccbluex.liquidbounce.utils.aiming.features.MovementCorrection
-import net.ccbluex.liquidbounce.utils.aiming.features.processors.anglesmooth.impl.InterpolationAngleSmooth
-import net.ccbluex.liquidbounce.utils.aiming.features.processors.anglesmooth.impl.LinearAngleSmooth
-import net.ccbluex.liquidbounce.utils.aiming.features.processors.anglesmooth.impl.SigmoidAngleSmooth
-import net.ccbluex.liquidbounce.utils.aiming.point.PointTracker
+import net.ccbluex.liquidbounce.features.rotation.processors.anglesmooth.impl.InterpolationAngleSmooth
+import net.ccbluex.liquidbounce.features.rotation.processors.anglesmooth.impl.LinearAngleSmooth
+import net.ccbluex.liquidbounce.features.rotation.processors.anglesmooth.impl.SigmoidAngleSmooth
+import net.ccbluex.liquidbounce.features.aiming.point.PointTracker
 import net.ccbluex.liquidbounce.utils.aiming.preference.LeastDifferencePreference
 import net.ccbluex.liquidbounce.utils.aiming.utils.RotationUtil
 import net.ccbluex.liquidbounce.utils.aiming.utils.raytraceBox
 import net.ccbluex.liquidbounce.utils.aiming.utils.setRotation
 import net.ccbluex.liquidbounce.utils.client.Timer
-import net.ccbluex.liquidbounce.utils.combat.TargetPriority
-import net.ccbluex.liquidbounce.utils.combat.TargetTracker
+import net.ccbluex.liquidbounce.features.combat.runtime.TargetPriority
+import net.ccbluex.liquidbounce.features.combat.runtime.TargetTracker
 import net.ccbluex.liquidbounce.utils.entity.rotation
-import net.ccbluex.liquidbounce.utils.inventory.InventoryManager
-import net.ccbluex.liquidbounce.utils.render.TargetRenderer
+import net.ccbluex.liquidbounce.features.inventory.InventoryManager
+import net.ccbluex.liquidbounce.render.target.TargetRenderer
 import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen
 import net.minecraft.world.entity.Entity
 
@@ -62,7 +62,7 @@ object ModuleAimbot : ClientModule("Aimbot", ModuleCategories.COMBAT, aliases = 
     val targetTracker = tree(TargetTracker(TargetPriority.DIRECTION, range = range))
 
     init {
-        tree(TargetRenderer(this, targetTracker))
+        tree(TargetRenderer(this, targetTracker::target))
     }
     private val pointTracker = tree(PointTracker(this))
 

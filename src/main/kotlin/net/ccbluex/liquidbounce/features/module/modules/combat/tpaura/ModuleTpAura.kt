@@ -20,7 +20,7 @@ package net.ccbluex.liquidbounce.features.module.modules.combat.tpaura
 
 import net.ccbluex.liquidbounce.config.types.group.Mode
 import net.ccbluex.liquidbounce.config.types.group.ModeValueGroup
-import net.ccbluex.liquidbounce.event.events.WorldRenderEvent
+import net.ccbluex.liquidbounce.render.events.WorldRenderEvent
 import net.ccbluex.liquidbounce.event.handler
 import net.ccbluex.liquidbounce.event.tickHandler
 import net.ccbluex.liquidbounce.features.module.ClientModule
@@ -30,14 +30,14 @@ import net.ccbluex.liquidbounce.features.module.modules.combat.tpaura.modes.Imme
 import net.ccbluex.liquidbounce.render.engine.type.Color4b
 import net.ccbluex.liquidbounce.utils.aiming.RotationManager
 import net.ccbluex.liquidbounce.utils.block.SwingMode
-import net.ccbluex.liquidbounce.utils.clicking.Clicker
+import net.ccbluex.liquidbounce.features.clicking.Clicker
 import net.ccbluex.liquidbounce.utils.client.Chronometer
-import net.ccbluex.liquidbounce.utils.combat.TargetPriority
-import net.ccbluex.liquidbounce.utils.combat.TargetSelector
-import net.ccbluex.liquidbounce.utils.combat.attackEntity
+import net.ccbluex.liquidbounce.features.combat.runtime.TargetPriority
+import net.ccbluex.liquidbounce.features.combat.runtime.TargetSelector
+import net.ccbluex.liquidbounce.features.combat.runtime.attackEntity
 import net.ccbluex.liquidbounce.utils.entity.rotation
 import net.ccbluex.liquidbounce.utils.entity.squaredBoxedDistanceTo
-import net.ccbluex.liquidbounce.utils.render.WireframePlayer
+import net.ccbluex.liquidbounce.render.wireframe.WireframePlayer
 import net.minecraft.world.phys.Vec3
 
 object ModuleTpAura : ClientModule("TpAura", ModuleCategories.COMBAT, disableOnQuit = true) {

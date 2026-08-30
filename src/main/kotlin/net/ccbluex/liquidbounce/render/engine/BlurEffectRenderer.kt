@@ -18,36 +18,37 @@
  */
 package net.ccbluex.liquidbounce.render.engine
 
+import com.mojang.blaze3d.buffers.GpuBufferSlice
 import com.mojang.blaze3d.buffers.Std140Builder
+import com.mojang.blaze3d.pipeline.RenderTarget
 import com.mojang.blaze3d.systems.RenderSystem
 import com.mojang.blaze3d.textures.FilterMode
-import net.ccbluex.liquidbounce.LiquidBounce
+import com.mojang.blaze3d.textures.GpuTextureView
 import net.ccbluex.liquidbounce.event.EventListener
-import net.ccbluex.liquidbounce.features.module.MinecraftShortcuts
-import net.ccbluex.liquidbounce.features.module.modules.player.cheststealer.features.FeatureSilentScreen
-import net.ccbluex.liquidbounce.features.module.modules.render.ModuleHud
 import net.ccbluex.liquidbounce.render.ClientRenderPipelines
 import net.ccbluex.liquidbounce.render.ClientUniformDefine
+import net.ccbluex.liquidbounce.render.RENDER_CLIENT_NAME
 import net.ccbluex.liquidbounce.render.buffers.CachedUniform
 import net.ccbluex.liquidbounce.render.createRenderPass
 import net.ccbluex.liquidbounce.utils.client.Chronometer
 import net.ccbluex.liquidbounce.utils.client.inGame
+import net.ccbluex.liquidbounce.utils.client.mc
 import net.ccbluex.liquidbounce.utils.math.Easing
 import net.minecraft.client.gui.screens.ChatScreen
 import kotlin.math.ceil
 import kotlin.math.exp
 
-object BlurEffectRenderer : MinecraftShortcuts, EventListener {
+object BlurEffectRenderer : EventListener {
 
     var isDrawingHudFramebuffer = false
 
     val overlayRenderTargetHolder = LazyRenderTargetHolder(
-        "${LiquidBounce.CLIENT_NAME} BlurOverlay",
+        "$RENDER_CLIENT_NAME BlurOverlay",
         useDepth = true,
     )
 
     private val intermediateTarget = LazyRenderTargetHolder(
-        "${LiquidBounce.CLIENT_NAME} BlurIntermediate",
+        "$RENDER_CLIENT_NAME BlurIntermediate",
         useDepth = false,
     )
 
@@ -70,10 +71,10 @@ object BlurEffectRenderer : MinecraftShortcuts, EventListener {
     }
 
     private fun hasNoFullScreen(): Boolean =
-        mc.gui.screen() == null || mc.gui.screen() is ChatScreen || FeatureSilentScreen.shouldHide
+        mc.gui.screen() == null || mc.gui.screen() is ChatScreen || BlurEffectPolicy.shouldHideScreen()
 
     fun shouldDrawBlur(): Boolean = inGame && hasNoFullScreen() &&
-        ModuleHud.running && ModuleHud.isBlurEffectActive
+        BlurEffectPolicy.shouldRenderHudBlur()
 
     fun blitBlurOverlay() {
         if (!isDrawingHudFramebuffer) {
@@ -81,29 +82,44 @@ object BlurEffectRenderer : MinecraftShortcuts, EventListener {
         }
         isDrawingHudFramebuffer = false
 
-        val sigma = getSigma()
-        val alphaBlendRange = ModuleHud.Blur.alphaBlendRange
+        val state = BlurEffectPolicy.state()
+        val sigma = getSigma(state.sigma)
         val kernelRadius = calculateKernelRadius(sigma)
         val blendUniform = blurBlendUniform.get(
-            BlurBlendUniform(alphaBlendRange.start, alphaBlendRange.endInclusive)
+            BlurBlendUniform(state.alphaBlendStart, state.alphaBlendEnd)
         )
         val kernelUniform = blurKernelUniform.get(BlurKernelUniform(sigma, kernelRadius))
 
         val mainTarget = mc.gameRenderer.mainRenderTarget()
-        val mainTexture = mainTarget.colorTextureView
-        val overlayTexture = overlayRenderTargetHolder.get()!!.colorTextureView
+        val mainTexture = mainTarget.colorTextureView ?: return
+        val overlayTexture = overlayRenderTargetHolder.get()?.colorTextureView ?: return
 
-        // Pass 1: Horizontal Gaussian blur into intermediate target
         val intermediate = intermediateTarget.initAndGet()
-        intermediate.createRenderPass({ "GUI blur H pass" })
-            .use { pass ->
-                pass.setPipeline(ClientRenderPipelines.GuiBlurH)
-                pass.bindTexture("texture0", mainTexture, overlaySampler)
-                pass.setUniform(ClientUniformDefine.GUI_BLUR_KERNEL.uboName, kernelUniform)
-                pass.draw(3, 1, 0, 0)
-            }
+        renderHorizontalPass(intermediate, mainTexture, kernelUniform)
+        renderVerticalPass(mainTarget, intermediate, overlayTexture, blendUniform, kernelUniform)
+        renderOverlayPass(mainTexture, overlayTexture)
+    }
 
-        // Pass 2: Vertical Gaussian blur + overlay composite into main target
+    private fun renderHorizontalPass(
+        intermediate: RenderTarget,
+        mainTexture: GpuTextureView,
+        kernelUniform: GpuBufferSlice,
+    ) {
+        intermediate.createRenderPass({ "GUI blur H pass" }).use { pass ->
+            pass.setPipeline(ClientRenderPipelines.GuiBlurH)
+            pass.bindTexture("texture0", mainTexture, overlaySampler)
+            pass.setUniform(ClientUniformDefine.GUI_BLUR_KERNEL.uboName, kernelUniform)
+            pass.draw(3, 1, 0, 0)
+        }
+    }
+
+    private fun renderVerticalPass(
+        mainTarget: RenderTarget,
+        intermediate: RenderTarget,
+        overlayTexture: GpuTextureView,
+        blendUniform: GpuBufferSlice,
+        kernelUniform: GpuBufferSlice,
+    ) {
         mainTarget.createRenderPass({ "GUI blur V pass" })
             .use { pass ->
                 pass.setPipeline(ClientRenderPipelines.GuiBlurV)
@@ -113,10 +129,13 @@ object BlurEffectRenderer : MinecraftShortcuts, EventListener {
                 pass.setUniform(ClientUniformDefine.GUI_BLUR_KERNEL.uboName, kernelUniform)
                 pass.draw(3, 1, 0, 0)
             }
+    }
 
-        // Blit overlay texture on top
-        mainTexture!!
-            .createRenderPass({ "GUI blur overlay blit pass" })
+    private fun renderOverlayPass(
+        mainTexture: GpuTextureView,
+        overlayTexture: GpuTextureView,
+    ) {
+        mainTexture.createRenderPass({ "GUI blur overlay blit pass" })
             .use { pass ->
                 pass.setPipeline(ClientRenderPipelines.JCEF.Blit)
                 pass.bindTexture("InSampler", overlayTexture, overlaySampler)
@@ -140,8 +159,8 @@ object BlurEffectRenderer : MinecraftShortcuts, EventListener {
         }
     }
 
-    private fun getSigma(): Float {
-        return (ModuleHud.Blur.sigma * getBlurRadiusFactor()).coerceAtLeast(1.0F)
+    private fun getSigma(configuredSigma: Float): Float {
+        return (configuredSigma * getBlurRadiusFactor()).coerceAtLeast(1.0F)
     }
 
     private fun calculateKernelRadius(sigma: Float): Int {

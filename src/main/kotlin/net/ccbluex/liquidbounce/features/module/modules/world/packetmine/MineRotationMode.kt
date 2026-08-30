@@ -18,7 +18,7 @@
  */
 package net.ccbluex.liquidbounce.features.module.modules.world.packetmine
 
-import net.ccbluex.liquidbounce.config.types.list.Tagged
+import net.ccbluex.liquidbounce.common.Tagged
 
 /**
  * Determines how rotating is handled.

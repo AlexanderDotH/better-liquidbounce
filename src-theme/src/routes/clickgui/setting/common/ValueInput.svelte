@@ -1,6 +1,6 @@
 <script lang="ts">
     import {createEventDispatcher} from "svelte";
-    import {cefTextInput} from "./cefTextInput";
+    import {cefTextInput} from "../../../../integration/input/cefTextInput";
 
     export let value: number;
     export let valueType: "int" | "float";

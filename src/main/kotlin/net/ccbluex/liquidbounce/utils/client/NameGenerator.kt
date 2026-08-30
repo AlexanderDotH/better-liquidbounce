@@ -23,7 +23,7 @@ import it.unimi.dsi.fastutil.chars.Char2CharArrayMap
 import it.unimi.dsi.fastutil.ints.IntCharPair
 import net.ccbluex.fastutil.component1
 import net.ccbluex.fastutil.component2
-import net.ccbluex.liquidbounce.LiquidBounce
+import net.ccbluex.liquidbounce.common.clientResourceOrNull
 import net.ccbluex.liquidbounce.utils.kotlin.subList
 import kotlin.random.Random
 
@@ -36,10 +36,9 @@ private val LEET_MAP = Char2CharArrayMap(
 )
 
 private fun loadLines(name: String): List<String> {
-    val resourceName = "/resources/liquidbounce/data/usernames/$name"
-    val inputStream =
-        LiquidBounce::class.java.getResourceAsStream(resourceName)
-            ?: error("Failed to load resource $resourceName")
+    val resourceName = "data/usernames/$name"
+    val inputStream = clientResourceOrNull(resourceName)
+        ?: error("Failed to load resource /resources/liquidbounce/$resourceName")
 
     return inputStream.bufferedReader().use { it.readLines() }
 }

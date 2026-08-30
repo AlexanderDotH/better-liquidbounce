@@ -20,7 +20,7 @@
 package net.ccbluex.liquidbounce.injection.mixins.minecraft.text;
 
 import com.llamalad7.mixinextras.injector.ModifyExpressionValue;
-import net.ccbluex.liquidbounce.lang.LanguageManager;
+import net.ccbluex.liquidbounce.features.language.LanguageLookupHook;
 import net.ccbluex.liquidbounce.lang.LanguageText;
 import net.minecraft.locale.Language;
 import net.minecraft.network.chat.contents.TranslatableContents;
@@ -33,7 +33,7 @@ public abstract class MixinTranslatableContents {
     @ModifyExpressionValue(method = "decompose", at = @At(value = "INVOKE", target = "Lnet/minecraft/locale/Language;getInstance()Lnet/minecraft/locale/Language;"))
     private Language hookClientTranslations(Language original) {
         if ((Object) this instanceof LanguageText) {
-            return LanguageManager.INSTANCE.getLanguage();
+            return LanguageLookupHook.currentLanguage();
         } else {
             return original;
         }

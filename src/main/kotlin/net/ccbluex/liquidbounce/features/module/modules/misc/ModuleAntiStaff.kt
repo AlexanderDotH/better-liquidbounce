@@ -29,13 +29,13 @@ import net.ccbluex.liquidbounce.event.sequenceHandler
 import net.ccbluex.liquidbounce.event.tickUntil
 import net.ccbluex.liquidbounce.features.module.ClientModule
 import net.ccbluex.liquidbounce.features.module.ModuleCategories
-import net.ccbluex.liquidbounce.utils.client.MessageMetadata
-import net.ccbluex.liquidbounce.utils.client.chat
+import net.ccbluex.liquidbounce.features.chat.MessageMetadata
+import net.ccbluex.liquidbounce.features.chat.chat
 import net.ccbluex.liquidbounce.utils.text.dropPort
 import net.ccbluex.liquidbounce.utils.client.inGame
-import net.ccbluex.liquidbounce.utils.client.notification
+import net.ccbluex.liquidbounce.features.chat.notification
 import net.ccbluex.liquidbounce.utils.text.rootDomain
-import net.ccbluex.liquidbounce.utils.client.warning
+import net.ccbluex.liquidbounce.utils.text.warning
 import net.minecraft.network.protocol.game.ClientboundPlayerInfoUpdatePacket
 
 /**

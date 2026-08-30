@@ -21,13 +21,13 @@ package net.ccbluex.liquidbounce.features.module.modules.movement.noslow.modes.b
 
 import net.ccbluex.liquidbounce.config.types.group.Mode
 import net.ccbluex.liquidbounce.config.types.group.ModeValueGroup
-import net.ccbluex.liquidbounce.config.types.list.Tagged
+import net.ccbluex.liquidbounce.common.Tagged
 import net.ccbluex.liquidbounce.event.EventState
 import net.ccbluex.liquidbounce.event.events.PlayerNetworkMovementTickEvent
 import net.ccbluex.liquidbounce.event.handler
 import net.ccbluex.liquidbounce.features.module.modules.movement.noslow.modes.blocking.NoSlowBlock.modes
-import net.ccbluex.liquidbounce.utils.client.InteractionTracker.blockingHand
-import net.ccbluex.liquidbounce.utils.client.InteractionTracker.untracked
+import net.ccbluex.liquidbounce.features.interaction.InteractionTracker.blockingHand
+import net.ccbluex.liquidbounce.features.interaction.InteractionTracker.untracked
 import net.ccbluex.liquidbounce.utils.network.sendHeldItemChange
 import net.minecraft.network.protocol.game.ServerboundSetCarriedItemPacket
 import net.minecraft.network.protocol.game.ServerboundUseItemPacket

@@ -18,8 +18,8 @@
  */
 package net.ccbluex.liquidbounce.features.module.modules.combat.killaura
 
-import net.ccbluex.liquidbounce.config.types.list.Tagged
-import net.ccbluex.liquidbounce.utils.aiming.RotationsValueGroup
+import net.ccbluex.liquidbounce.common.Tagged
+import net.ccbluex.liquidbounce.features.rotation.RotationsValueGroup
 
 object KillAuraRotationsValueGroup : RotationsValueGroup(ModuleKillAura, combatSpecific = true) {
 

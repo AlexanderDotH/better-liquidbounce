@@ -26,59 +26,12 @@ import net.ccbluex.liquidbounce.utils.client.mc
 import net.ccbluex.liquidbounce.utils.entity.getMovementDirectionOfInput
 import net.ccbluex.liquidbounce.utils.math.copy
 import net.ccbluex.liquidbounce.utils.math.geometry.Line
-import net.ccbluex.liquidbounce.utils.math.isLikelyZero
 import net.ccbluex.liquidbounce.utils.math.plus
 import net.ccbluex.liquidbounce.utils.movement.DirectionalInput
 import net.ccbluex.liquidbounce.utils.movement.getDegreesRelativeToView
 import net.ccbluex.liquidbounce.utils.movement.getDirectionalInputForDegrees
 import net.ccbluex.liquidbounce.utils.raytracing.rayTraceCollidingBlocks
 import net.minecraft.world.phys.Vec3
-
-data class DodgePlan(
-    val directionalInput: DirectionalInput,
-    /**
-     * Should the player jump at the next possible time?
-     */
-    val shouldJump: Boolean,
-    val yawChange: Float?,
-    val useTimer: Boolean,
-)
-
-data class DodgePlannerConfig(
-    val allowRotations: Boolean,
-)
-
-fun planEvasion(
-    config: DodgePlannerConfig,
-    inflictedHit: ModuleAutoDodge.HitInfo,
-): DodgePlan? {
-    val player = mc.player!!
-    val arrowVelocity2d = inflictedHit.arrowVelocity.copy(y = 0.0)
-    if (arrowVelocity2d.isLikelyZero) {
-        return null
-    }
-
-    val arrowLine =
-        Line(
-            inflictedHit.prevArrowPos.copy(y = 0.0),
-            arrowVelocity2d,
-        )
-
-    val playerPos2d = player.position().copy(y = 0.0)
-    val nearestPointOnArrowLine = arrowLine.getNearestPointTo(playerPos2d)
-    val distanceToArrowLine = nearestPointOnArrowLine.distanceTo(playerPos2d)
-
-    // Check if we are in the danger zone. If we are not in the danger zone there is no need to dodge (yet).
-    if (distanceToArrowLine > DodgePlanner.SAFE_DISTANCE_WITH_PADDING) {
-        return null
-    }
-
-    val optimalDodgePosition = findOptimalDodgePosition(arrowLine)
-
-    val positionRelativeToPlayer = optimalDodgePosition.subtract(playerPos2d)
-
-    return DodgePlanner(config, inflictedHit, distanceToArrowLine, positionRelativeToPlayer).plan()
-}
 
 class DodgePlanner(
     private val config: DodgePlannerConfig,

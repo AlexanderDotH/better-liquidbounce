@@ -56,13 +56,19 @@ class VolumetricFogShaderContractTest {
     fun `renderer composites one fog volume pass over sharp terrain`() {
         val renderer = read(VOLUME_RENDERER)
         val pipelines = read(PIPELINES)
+        val settings = read(VOLUME_SETTINGS)
+        val interactionBridge = read(INTERACTION_BRIDGE)
+        val nuker = read(NUKER)
 
         assertTrue(renderer.contains("object CustomFogVolumeRenderer"))
         assertTrue(renderer.contains("ClientRenderPipelines.FogVolume"))
         assertTrue(renderer.contains("IrisPipelineBypass.run"))
         assertTrue(renderer.contains("VolumetricFogLayerSettings.from"))
-        assertTrue(renderer.contains("ModuleNuker.running"))
-        assertTrue(renderer.contains("volumetricInteractionStrength"))
+        assertTrue(renderer.contains("val volume = CustomFogRenderBridge.volumeSettings()"))
+        assertTrue(renderer.contains("volumetricInteractionStrength(volume.interactionActive)"))
+        assertTrue(settings.contains("interactionActive = CustomFogInteractionBridge.active()"))
+        assertTrue(interactionBridge.contains("fun active(): Boolean = provider.active()"))
+        assertTrue(nuker.contains("CustomFogInteractionBridge.install { running }"))
         assertTrue(renderer.contains("DistantHorizonsDepthTextureProvider.resolve"))
         assertTrue(renderer.contains("bindTexture(\"DhDepthSampler\""))
         assertTrue(renderer.contains("distantHorizonsDepth?.inverseMvmProjection"))
@@ -99,7 +105,14 @@ class VolumetricFogShaderContractTest {
             "src/main/resources/resources/liquidbounce/shaders/fog/volumetric_fog.frag"
         const val VOLUME_RENDERER =
             "src/main/kotlin/net/ccbluex/liquidbounce/render/engine/CustomFogVolumeRenderer.kt"
+        const val VOLUME_SETTINGS =
+            "src/main/kotlin/net/ccbluex/liquidbounce/features/module/modules/render/customambience/" +
+                "CustomAmbienceFogSettings.kt"
+        const val INTERACTION_BRIDGE =
+            "src/main/kotlin/net/ccbluex/liquidbounce/render/engine/CustomFogInteractionBridge.kt"
+        const val NUKER =
+            "src/main/kotlin/net/ccbluex/liquidbounce/features/module/modules/world/nuker/ModuleNuker.kt"
         const val PIPELINES =
-            "src/main/kotlin/net/ccbluex/liquidbounce/render/ClientRenderPipelines.kt"
+            "src/main/kotlin/net/ccbluex/liquidbounce/render/FogPipelineDefinitions.kt"
     }
 }

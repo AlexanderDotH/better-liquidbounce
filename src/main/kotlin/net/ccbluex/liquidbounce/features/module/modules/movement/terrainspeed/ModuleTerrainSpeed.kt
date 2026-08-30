@@ -22,6 +22,7 @@ import net.ccbluex.liquidbounce.features.module.ClientModule
 import net.ccbluex.liquidbounce.features.module.ModuleCategories
 import net.ccbluex.liquidbounce.features.module.modules.movement.terrainspeed.fastclimb.FastClimb
 import net.ccbluex.liquidbounce.features.module.modules.movement.terrainspeed.icespeed.IceSpeed
+import net.ccbluex.liquidbounce.features.module.modules.movement.terrainspeed.runtime.TerrainSpeedModuleProvider
 import net.ccbluex.liquidbounce.features.module.modules.movement.terrainspeed.waterspeed.WaterSpeed
 
 /**
@@ -32,6 +33,7 @@ import net.ccbluex.liquidbounce.features.module.modules.movement.terrainspeed.wa
 object ModuleTerrainSpeed : ClientModule("TerrainSpeed", ModuleCategories.MOVEMENT, aliases = listOf("FastClimb")) {
 
     init {
+        TerrainSpeedModuleProvider.bind(this)
         tree(FastClimb)
         tree(IceSpeed)
         tree(WaterSpeed)

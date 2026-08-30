@@ -21,7 +21,7 @@ package net.ccbluex.liquidbounce.features.module.modules.combat.killaura
 import net.ccbluex.liquidbounce.features.module.modules.combat.ModuleAutoWeapon
 import net.ccbluex.liquidbounce.utils.client.isOlderThanOrEqual1_8
 import net.ccbluex.liquidbounce.utils.client.player
-import net.ccbluex.liquidbounce.utils.combat.TargetTracker
+import net.ccbluex.liquidbounce.features.combat.runtime.TargetTracker
 import net.ccbluex.liquidbounce.utils.entity.wouldBlockHit
 import net.ccbluex.liquidbounce.utils.item.isAxe
 import net.minecraft.world.entity.LivingEntity
@@ -55,3 +55,42 @@ object KillAuraTargetTracker : TargetTracker(fovRange = 0f..365f) {
     }
 
 }
+
+internal fun calculateKillAuraTargetingRange(
+    delegateKillAuraAttacks: Boolean,
+    normalMaximumRange: Float,
+    reachHitAvailable: Boolean,
+    reachHitMaximumRange: Float,
+    spearKillRunning: Boolean = false,
+    spearKillMaximumRange: Float = 0f,
+    maceKillRunning: Boolean = false,
+    maceKillMaximumRange: Float = 0f,
+): Float = if (!delegateKillAuraAttacks) {
+    normalMaximumRange
+} else {
+    maxOf(
+        normalMaximumRange,
+        reachHitMaximumRange.takeIf { reachHitAvailable } ?: 0f,
+        spearKillMaximumRange.takeIf { spearKillRunning } ?: 0f,
+        maceKillMaximumRange.takeIf { maceKillRunning } ?: 0f,
+    )
+}
+
+internal data class KillAuraSpearTargetSelectionSnapshot(
+    val selectionEvaluated: Boolean,
+    val trackedTargetPresent: Boolean,
+    val trackedTargetValid: Boolean,
+    val trackedTargetUsesSpearKill: Boolean,
+    val trackedTargetOwnedByAnotherRoute: Boolean,
+    val spearKillRouteActive: Boolean,
+)
+
+internal val KillAuraSpearTargetSelectionSnapshot.shouldReacquire: Boolean
+    get() = when {
+        spearKillRouteActive -> false
+        !selectionEvaluated -> true
+        !trackedTargetPresent -> false
+        !trackedTargetValid -> true
+        trackedTargetUsesSpearKill || trackedTargetOwnedByAnotherRoute -> false
+        else -> true
+    }

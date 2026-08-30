@@ -19,9 +19,7 @@
 package net.ccbluex.liquidbounce.features.module.modules.movement.fly.modes.vanilla
 
 import net.ccbluex.liquidbounce.config.types.group.Mode
-import net.ccbluex.liquidbounce.config.types.group.ModeValueGroup
 import net.ccbluex.liquidbounce.event.tickHandler
-import net.ccbluex.liquidbounce.features.module.modules.movement.fly.ModuleFly
 import net.ccbluex.liquidbounce.features.module.modules.movement.fly.automation.FlyAutomationCapabilities
 import net.ccbluex.liquidbounce.features.module.modules.movement.fly.automation.FlyAutomationKind
 import net.ccbluex.liquidbounce.features.module.modules.movement.fly.automation.FlyAutomationProfile
@@ -37,8 +35,6 @@ import net.minecraft.network.protocol.game.ServerboundMovePlayerPacket
  */
 internal object FlyAntiKickFly : Mode("AntiKickFly"), FlyAutomationProfile {
 
-    override val parent: ModeValueGroup<*>
-        get() = ModuleFly.modes
 
     private var floorY = 0.0
 

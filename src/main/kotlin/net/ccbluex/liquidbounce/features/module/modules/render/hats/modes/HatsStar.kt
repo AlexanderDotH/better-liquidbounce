@@ -19,9 +19,12 @@
 
 package net.ccbluex.liquidbounce.features.module.modules.render.hats.modes
 
+import com.mojang.blaze3d.vertex.PoseStack
+import com.mojang.blaze3d.vertex.VertexConsumer
 import net.ccbluex.liquidbounce.config.types.group.ValueGroup
-import net.ccbluex.liquidbounce.features.module.modules.render.hats.HatsColorSettings
-import net.ccbluex.liquidbounce.features.module.modules.render.hats.HatsMode
+import net.ccbluex.liquidbounce.config.types.group.ModeValueGroup
+import net.ccbluex.liquidbounce.features.module.modules.render.hats.config.HatsColorSettings
+import net.ccbluex.liquidbounce.features.module.modules.render.hats.runtime.HatsMode
 import net.ccbluex.liquidbounce.render.ClientRenderPipelines
 import net.ccbluex.liquidbounce.render.WorldRenderEnvironment
 import net.ccbluex.liquidbounce.render.addTorusQuad
@@ -35,7 +38,7 @@ import kotlin.math.pow
 /**
  * @author minecrrrr
  */
-internal object HatsStar : HatsMode("Star") {
+internal class HatsStar(parent: ModeValueGroup<*>) : HatsMode("Star", parent) {
 
     private val colors = HatsColorSettings()
 
@@ -56,50 +59,41 @@ internal object HatsStar : HatsMode("Star") {
         val rotAngle = getRotationAngle(HatStarSettings.spinSpeed)
         withHatRotation(rotAngle) {
             drawCustomMesh(ClientRenderPipelines.quads(noDepthTest = true)) { matrix ->
-                val points = HatStarSettings.pointsCount
-                val outerSegments = points * 32
-                val innerSegments = 12
+                drawStar(matrix, isHurt)
+            }
+        }
+    }
 
-                for (mainI in 0 until outerSegments) {
-
-                    val outerCurAngleStar = segmentAngle(mainI, outerSegments)
-                    val outerNextAngleStar = segmentAngle(mainI + 1, outerSegments)
-
-                    val curRadius = getStarRadius(
-                        outerCurAngleStar,
-                        HatStarSettings.outerRadius,
-                        points,
-                        HatStarSettings.sharpness,
-                        1.75F,
-                    )
-                    val nextRadius = getStarRadius(
-                        outerNextAngleStar,
-                        HatStarSettings.outerRadius,
-                        points,
-                        HatStarSettings.sharpness,
-                        1.75F,
-                    )
-
-                    val color = if (!isHurt) {
-                        colors
-                            .getCurrentStepColor(outerCurAngleStar)
-                    } else {
-                        Color4b(255, 0, 0, colors.firstColor.a)
-                    }
-                    for (innerI in 0 until innerSegments) {
-                        addTorusQuad(
-                            matrix,
-                            innerSegments,
-                            outerCurAngleStar,
-                            outerNextAngleStar,
-                            curRadius,
-                            nextRadius,
-                            HatStarSettings.innerRadius,
-                            innerI,
-                            color,
-                        )
-                    }
-                }
+    private fun VertexConsumer.drawStar(matrix: PoseStack.Pose, isHurt: Boolean) {
+        val points = HatStarSettings.pointsCount
+        val outerSegments = points * 32
+        val innerSegments = 12
+        for (outerIndex in 0 until outerSegments) {
+            val currentAngle = segmentAngle(outerIndex, outerSegments)
+            val nextAngle = segmentAngle(outerIndex + 1, outerSegments)
+            val currentRadius = getStarRadius(
+                currentAngle, HatStarSettings.outerRadius, points, HatStarSettings.sharpness, 1.75F,
+            )
+            val nextRadius = getStarRadius(
+                nextAngle, HatStarSettings.outerRadius, points, HatStarSettings.sharpness, 1.75F,
+            )
+            val color = if (isHurt) {
+                Color4b(255, 0, 0, colors.firstColor.a)
+            } else {
+                colors.getCurrentStepColor(currentAngle)
+            }
+            for (innerIndex in 0 until innerSegments) {
+                addTorusQuad(
+                    matrix,
+                    innerSegments,
+                    currentAngle,
+                    nextAngle,
+                    currentRadius,
+                    nextRadius,
+                    HatStarSettings.innerRadius,
+                    innerIndex,
+                    color,
+                )
             }
         }
     }

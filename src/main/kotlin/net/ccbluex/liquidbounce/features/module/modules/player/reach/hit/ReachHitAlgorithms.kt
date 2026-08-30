@@ -20,7 +20,7 @@ package net.ccbluex.liquidbounce.features.module.modules.player.reach.hit
 
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.withContext
-import net.ccbluex.liquidbounce.config.types.list.Tagged
+import net.ccbluex.liquidbounce.common.Tagged
 import net.ccbluex.liquidbounce.utils.math.sq
 import net.ccbluex.liquidbounce.utils.movement.buildLinearTeleportPath
 import net.minecraft.world.phys.Vec3

@@ -24,8 +24,8 @@ import net.ccbluex.liquidbounce.event.events.ChatReceiveEvent
 import net.ccbluex.liquidbounce.event.handler
 import net.ccbluex.liquidbounce.interfaces.GuiMessageAddition
 import net.ccbluex.liquidbounce.interfaces.GuiMessageLineAddition
-import net.ccbluex.liquidbounce.utils.client.MessageMetadata
-import net.ccbluex.liquidbounce.utils.client.chat
+import net.ccbluex.liquidbounce.features.chat.MessageMetadata
+import net.ccbluex.liquidbounce.features.chat.chat
 import net.ccbluex.liquidbounce.utils.text.TextBuilder
 import net.ccbluex.liquidbounce.utils.text.asPlainText
 import net.minecraft.ChatFormatting

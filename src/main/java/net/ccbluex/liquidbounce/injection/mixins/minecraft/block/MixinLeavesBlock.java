@@ -19,7 +19,6 @@
 
 package net.ccbluex.liquidbounce.injection.mixins.minecraft.block;
 
-import net.ccbluex.liquidbounce.features.module.modules.render.DoRender;
 import net.ccbluex.liquidbounce.features.module.modules.render.ModuleAntiBlind;
 import net.minecraft.core.BlockPos;
 import net.minecraft.util.RandomSource;
@@ -41,7 +40,7 @@ public abstract class MixinLeavesBlock {
 
     @Inject(method = "makeFallingLeavesParticles", at = @At("HEAD"), cancellable = true)
     private void hookFallingLeaves(Level level, BlockPos pos, RandomSource random, BlockState belowState, BlockPos below, CallbackInfo ci) {
-        if (!ModuleAntiBlind.canRender(DoRender.FALLING_LEAVES)) {
+        if (!ModuleAntiBlind.canRenderFallingLeaves()) {
             ci.cancel();
         }
     }

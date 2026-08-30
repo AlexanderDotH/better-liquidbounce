@@ -19,15 +19,18 @@
 
 package net.ccbluex.liquidbounce.features.module.modules.`fun`.amnesia
 
+import net.ccbluex.liquidbounce.features.module.modules.`fun`.amnesia.playermodel.PlayerModelFakeSpinbotState
+import net.ccbluex.liquidbounce.render.playermodel.PlayerModelVisualTransform
+
 import net.ccbluex.liquidbounce.config.types.group.ToggleableValueGroup
 import net.ccbluex.liquidbounce.event.events.GameRenderEvent
 import net.ccbluex.liquidbounce.event.handler
-import net.ccbluex.liquidbounce.features.module.modules.`fun`.ModuleAmnesia
+import net.ccbluex.liquidbounce.features.module.modules.`fun`.amnesia.contract.AmnesiaRuntimeBridge
 import net.ccbluex.liquidbounce.utils.client.mc
 import net.minecraft.world.entity.LivingEntity
 
 object FakeSpinbot : ToggleableValueGroup(
-    ModuleAmnesia,
+    null,
     "FakeSpinbot",
     false,
     aliases = listOf("Fake Spinbot"),
@@ -46,7 +49,7 @@ object FakeSpinbot : ToggleableValueGroup(
             return@handler
         }
 
-        val target = ModuleAmnesia.findTarget() ?: run {
+        val target = AmnesiaRuntimeBridge.findTarget() ?: run {
             PlayerModelFakeSpinbotState.reset()
             return@handler
         }

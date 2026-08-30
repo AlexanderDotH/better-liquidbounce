@@ -20,11 +20,11 @@
 package net.ccbluex.liquidbounce.event.events
 
 import net.ccbluex.liquidbounce.annotations.Tag
+import net.ccbluex.liquidbounce.common.entity.EntityTargetClassification
+import net.ccbluex.liquidbounce.common.entity.EntityTargetingInfo
+import net.ccbluex.liquidbounce.common.interop.ThemeColorPayload
 import net.ccbluex.liquidbounce.event.CancellableEvent
 import net.ccbluex.liquidbounce.event.Event
-import net.ccbluex.liquidbounce.render.engine.type.Color4b
-import net.ccbluex.liquidbounce.utils.combat.EntityTargetClassification
-import net.ccbluex.liquidbounce.utils.combat.EntityTargetingInfo
 import net.ccbluex.liquidbounce.utils.kotlin.Priority
 import net.ccbluex.liquidbounce.utils.kotlin.PriorityField
 import net.minecraft.world.entity.Entity
@@ -44,7 +44,7 @@ class EntityHealthUpdateEvent(val entity: LivingEntity, val old: Float, val new:
 
 @Tag("tagEntityEvent")
 class TagEntityEvent(val entity: Entity, var targetingInfo: EntityTargetingInfo) : Event() {
-    val color: PriorityField<Color4b?> = PriorityField(null, Priority.NOT_IMPORTANT)
+    val color: PriorityField<ThemeColorPayload?> = PriorityField(null, Priority.NOT_IMPORTANT)
 
     /**
      * Don't start combat this target
@@ -66,7 +66,7 @@ class TagEntityEvent(val entity: Entity, var targetingInfo: EntityTargetingInfo)
         this.targetingInfo = targetingInfo.copy(isFriend = true)
     }
 
-    fun color(col: Color4b, priority: Priority) {
+    fun color(col: ThemeColorPayload, priority: Priority) {
         this.color.trySet(col, priority)
     }
 }

@@ -22,6 +22,7 @@ import net.ccbluex.liquidbounce.features.module.ClientModule
 import net.ccbluex.liquidbounce.features.module.ModuleCategories
 import net.ccbluex.liquidbounce.features.module.modules.combat.aimbot.autobow.AutoBowAimbotFeature
 import net.ccbluex.liquidbounce.features.module.modules.combat.aimbot.autobow.AutoBowAutoShootFeature
+import net.ccbluex.liquidbounce.features.module.modules.combat.aimbot.autobow.AutoBowFeatureOwner
 import net.ccbluex.liquidbounce.features.module.modules.combat.aimbot.autobow.AutoBowFastChargeFeature
 import net.ccbluex.liquidbounce.utils.client.Chronometer
 import net.minecraft.world.item.BowItem
@@ -33,13 +34,26 @@ import java.util.Random
  * Automatically shoots with your bow when it's fully charged
  *  + and make it possible to shoot faster
  */
-object ModuleAutoBow : ClientModule("AutoBow", ModuleCategories.COMBAT, aliases = listOf("BowAssist", "BowAimbot")) {
+object ModuleAutoBow :
+    ClientModule("AutoBow", ModuleCategories.COMBAT, aliases = listOf("BowAssist", "BowAimbot")),
+    AutoBowFeatureOwner {
+
     val random = Random()
 
     /**
      * Keeps track of the last bow shot that has taken place
      */
     val lastShotTimer = Chronometer()
+
+    private val aimbotFeature = AutoBowAimbotFeature(this)
+    private val autoShootFeature = AutoBowAutoShootFeature(this, aimbotFeature)
+    private val fastChargeFeature = AutoBowFastChargeFeature(this)
+
+    override fun nextChargeRandomGaussian(): Double = random.nextGaussian()
+
+    override fun hasShotDelayElapsed(delayMillis: Long): Boolean = lastShotTimer.hasElapsed(delayMillis)
+
+    override fun recordShot() = lastShotTimer.reset()
 
     @JvmStatic
     fun onStopUsingItem() {
@@ -49,12 +63,12 @@ object ModuleAutoBow : ClientModule("AutoBow", ModuleCategories.COMBAT, aliases 
     }
 
     override fun onDisabled() {
-        AutoBowAimbotFeature.targetTracker.reset()
+        aimbotFeature.targetTracker.reset()
     }
 
     init {
-        tree(AutoBowAutoShootFeature)
-        tree(AutoBowAimbotFeature)
-        tree(AutoBowFastChargeFeature)
+        tree(autoShootFeature)
+        tree(aimbotFeature)
+        tree(fastChargeFeature)
     }
 }

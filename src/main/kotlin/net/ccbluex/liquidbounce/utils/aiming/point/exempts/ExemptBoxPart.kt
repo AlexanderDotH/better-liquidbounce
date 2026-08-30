@@ -19,7 +19,7 @@
 
 package net.ccbluex.liquidbounce.utils.aiming.point.exempts
 
-import net.ccbluex.liquidbounce.config.types.list.Tagged
+import net.ccbluex.liquidbounce.common.Tagged
 import net.minecraft.world.phys.Vec3
 
 enum class ExemptBoxPart(override val tag: String) : Tagged, ExemptPoint {

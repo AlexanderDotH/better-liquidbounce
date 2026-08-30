@@ -18,7 +18,7 @@
  */
 package net.ccbluex.liquidbounce.features.module.modules.movement.elytrafly.modes
 
-import net.ccbluex.liquidbounce.features.module.modules.movement.elytrafly.ModuleElytraFly
+import net.ccbluex.liquidbounce.features.module.modules.movement.elytrafly.runtime.ElytraFlyRuntime
 import net.ccbluex.liquidbounce.utils.entity.moving
 import net.ccbluex.liquidbounce.utils.entity.withStrafe
 
@@ -27,13 +27,13 @@ internal object ElytraFlyModeVanilla : ElytraFlyMode("Vanilla") {
     override fun onTick() {
         if (player.moving) {
             player.deltaMovement = player.deltaMovement.withStrafe(
-                speed = ModuleElytraFly.Speed.horizontal.toDouble()
+                speed = ElytraFlyRuntime.horizontalSpeed.toDouble()
             )
         }
 
         player.deltaMovement.y = when {
-            mc.options.keyJump.isDown -> ModuleElytraFly.Speed.vertical.toDouble()
-            mc.options.keyShift.isDown -> -ModuleElytraFly.Speed.vertical.toDouble()
+            mc.options.keyJump.isDown -> ElytraFlyRuntime.verticalSpeed.toDouble()
+            mc.options.keyShift.isDown -> -ElytraFlyRuntime.verticalSpeed.toDouble()
             else -> return
         }
     }

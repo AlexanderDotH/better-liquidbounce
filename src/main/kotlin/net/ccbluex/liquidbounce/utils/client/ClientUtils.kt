@@ -18,7 +18,7 @@
  */
 package net.ccbluex.liquidbounce.utils.client
 
-import net.ccbluex.liquidbounce.LiquidBounce.CLIENT_NAME
+import net.ccbluex.liquidbounce.common.ClientBuildMetadata
 import net.minecraft.client.Minecraft
 import net.minecraft.util.Util
 import org.apache.logging.log4j.LogManager
@@ -27,9 +27,9 @@ import org.apache.logging.log4j.Logger
 /**
  * Get a [Logger] with client name prefix
  */
-internal fun clientLogger(name: String): Logger = LogManager.getLogger("$CLIENT_NAME/$name")
+internal fun clientLogger(name: String): Logger = LogManager.getLogger("${ClientBuildMetadata.NAME}/$name")
 
-val logger: Logger = LogManager.getLogger(CLIENT_NAME)
+val logger: Logger = LogManager.getLogger(ClientBuildMetadata.NAME)
 
 val inGame: Boolean
     get() = Minecraft.getInstance()?.let { mc -> mc.player != null && mc.level != null } == true

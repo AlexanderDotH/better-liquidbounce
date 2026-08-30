@@ -18,11 +18,6 @@
  */
 package net.ccbluex.liquidbounce.features.module.modules.misc.debugrecorder
 
-import net.ccbluex.liquidbounce.config.ConfigSystem
-import net.ccbluex.liquidbounce.config.gson.adapter.toUnderlinedString
-import net.ccbluex.liquidbounce.config.gson.fileGson
-import net.ccbluex.liquidbounce.config.types.group.Mode
-import net.ccbluex.liquidbounce.config.types.group.ModeValueGroup
 import net.ccbluex.liquidbounce.features.module.ClientModule
 import net.ccbluex.liquidbounce.features.module.ModuleCategories
 import net.ccbluex.liquidbounce.features.module.modules.misc.debugrecorder.modes.AimDebugRecorder
@@ -31,18 +26,6 @@ import net.ccbluex.liquidbounce.features.module.modules.misc.debugrecorder.modes
 import net.ccbluex.liquidbounce.features.module.modules.misc.debugrecorder.modes.DebugCombatRecorder
 import net.ccbluex.liquidbounce.features.module.modules.misc.debugrecorder.modes.DebugCombatTrainerRecorder
 import net.ccbluex.liquidbounce.features.module.modules.misc.debugrecorder.modes.GenericDebugRecorder
-import net.ccbluex.liquidbounce.utils.text.asText
-import net.ccbluex.liquidbounce.utils.client.chat
-import net.ccbluex.liquidbounce.utils.client.markAsError
-import net.ccbluex.liquidbounce.utils.client.onClick
-import net.ccbluex.liquidbounce.utils.client.onHover
-import net.ccbluex.liquidbounce.utils.client.regular
-import net.ccbluex.liquidbounce.utils.client.underline
-import net.ccbluex.liquidbounce.utils.client.variable
-import net.minecraft.network.chat.ClickEvent
-import net.minecraft.network.chat.HoverEvent
-import java.io.File
-import java.time.LocalDateTime
 
 object ModuleDebugRecorder : ClientModule("DebugRecorder", ModuleCategories.MISC, disableOnQuit = true) {
 
@@ -61,70 +44,4 @@ object ModuleDebugRecorder : ClientModule("DebugRecorder", ModuleCategories.MISC
         BoxDebugRecorder
     ))
 
-    abstract class DebugRecorderMode<T>(name: String) : Mode(name) {
-        override val parent: ModeValueGroup<*>
-            get() = modes
-
-        val folder = ConfigSystem.rootFolder.resolve("debug-recorder/$name").apply {
-            mkdirs()
-        }
-
-        protected val packets = mutableListOf<T>()
-
-        protected fun recordPacket(packet: T) {
-            if (!this.isSelected) {
-                return
-            }
-
-            packets.add(packet)
-        }
-
-        protected open val fileExtension: String get() = "json"
-
-        protected open fun writePackets(file: File) {
-            file.bufferedWriter().use { writer ->
-                // No indent as default
-                fileGson.toJson(this.packets, writer)
-            }
-        }
-
-        override fun enable() {
-            this.packets.clear()
-            chat(regular("Recording "), variable(name), regular("..."))
-        }
-
-        override fun disable() {
-            if (this.packets.isEmpty()) {
-                chat(regular("No packets recorded."))
-                return
-            }
-
-            runCatching {
-                // Create parent folder
-                folder.mkdirs()
-
-                val baseName = LocalDateTime.now().toUnderlinedString()
-                var file = folder.resolve("$baseName.$fileExtension")
-
-                var idx = 0
-                while (file.exists()) {
-                    file = folder.resolve("${baseName}_${idx++}.$fileExtension")
-                }
-
-                writePackets(file)
-                file.absolutePath
-            }.onFailure {
-                chat(markAsError("Failed to write log to file $it"))
-            }.onSuccess { path ->
-                val text = path.asText()
-                    .underline(true)
-                    .onHover(HoverEvent.ShowText(regular("Browse...")))
-                    .onClick(ClickEvent.OpenFile(path))
-
-                chat(regular("Log was written to "), text, regular("."))
-            }
-
-            this.packets.clear()
-        }
-    }
 }

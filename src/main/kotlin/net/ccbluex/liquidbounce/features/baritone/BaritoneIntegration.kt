@@ -24,7 +24,7 @@ import net.ccbluex.liquidbounce.features.baritone.core.BaritoneLifecycleEvent
 import net.ccbluex.liquidbounce.features.baritone.flight.runtime.BaritoneFlightRuntimeConfig
 import net.ccbluex.liquidbounce.features.module.modules.player.ModuleBaritone
 import net.ccbluex.liquidbounce.event.events.NotificationEvent
-import net.ccbluex.liquidbounce.utils.client.notification
+import net.ccbluex.liquidbounce.features.chat.notification
 import net.ccbluex.liquidbounce.utils.kotlin.EventPriorityConvention.FIRST_PRIORITY
 
 /** Composition root and LiquidBounce lifecycle boundary for the third-party Baritone adapter. */

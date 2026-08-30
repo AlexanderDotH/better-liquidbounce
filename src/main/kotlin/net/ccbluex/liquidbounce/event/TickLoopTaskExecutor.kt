@@ -18,7 +18,7 @@
  */
 package net.ccbluex.liquidbounce.event
 
-import net.ccbluex.liquidbounce.LiquidBounce.CLIENT_NAME
+import net.ccbluex.liquidbounce.common.ClientBuildMetadata
 import net.ccbluex.liquidbounce.utils.client.mc
 import net.minecraft.ReportedException
 import org.slf4j.LoggerFactory
@@ -28,7 +28,7 @@ import org.slf4j.LoggerFactory
  */
 object TickLoopTaskExecutor {
 
-    private val logger = LoggerFactory.getLogger("$CLIENT_NAME/TickLoopTaskExecutor")
+    private val logger = LoggerFactory.getLogger("${ClientBuildMetadata.NAME}/TickLoopTaskExecutor")
 
     @Volatile
     var isInTickLoop = false

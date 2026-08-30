@@ -19,10 +19,8 @@
 package net.ccbluex.liquidbounce.features.module.modules.movement.spider.modes
 
 import net.ccbluex.liquidbounce.config.types.group.Mode
-import net.ccbluex.liquidbounce.config.types.group.ModeValueGroup
 import net.ccbluex.liquidbounce.event.tickHandler
 import net.ccbluex.liquidbounce.event.waitTicks
-import net.ccbluex.liquidbounce.features.module.modules.movement.spider.ModuleSpider
 
 /**
  * Spider Bypass for Vulcan 2.8.8
@@ -38,8 +36,6 @@ import net.ccbluex.liquidbounce.features.module.modules.movement.spider.ModuleSp
  */
 internal object SpiderVulcan288 : Mode("Vulcan288") {
 
-    override val parent: ModeValueGroup<Mode>
-        get() = ModuleSpider.modes
 
     private var requiresStop = false
 

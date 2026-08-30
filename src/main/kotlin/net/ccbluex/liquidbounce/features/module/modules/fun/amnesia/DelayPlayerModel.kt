@@ -19,13 +19,15 @@
 
 package net.ccbluex.liquidbounce.features.module.modules.`fun`.amnesia
 
+import net.ccbluex.liquidbounce.features.module.modules.`fun`.amnesia.playermodel.PlayerModelDelayState
+
 import net.ccbluex.liquidbounce.config.types.group.ToggleableValueGroup
 import net.ccbluex.liquidbounce.event.events.GameRenderEvent
 import net.ccbluex.liquidbounce.event.handler
-import net.ccbluex.liquidbounce.features.module.modules.`fun`.ModuleAmnesia
+import net.ccbluex.liquidbounce.features.module.modules.`fun`.amnesia.contract.AmnesiaRuntimeBridge
 import net.ccbluex.liquidbounce.utils.client.mc
 
-object DelayPlayerModel : ToggleableValueGroup(ModuleAmnesia, "DelayPlayerModel", false) {
+object DelayPlayerModel : ToggleableValueGroup(null, "DelayPlayerModel", false) {
 
     internal val updateInterval by int("UpdateInterval", 500, 50..5000, "ms")
     internal val smoothDuration by int("SmoothDuration", 200, 50..2000, "ms")
@@ -37,7 +39,7 @@ object DelayPlayerModel : ToggleableValueGroup(ModuleAmnesia, "DelayPlayerModel"
             return@handler
         }
 
-        val target = ModuleAmnesia.findTarget() ?: run {
+        val target = AmnesiaRuntimeBridge.findTarget() ?: run {
             PlayerModelDelayState.reset()
             return@handler
         }

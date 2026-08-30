@@ -19,16 +19,12 @@
 package net.ccbluex.liquidbounce.integration.theme
 
 import com.mojang.blaze3d.GpuFormat
-import com.mojang.blaze3d.pipeline.ColorTargetState
 import com.mojang.blaze3d.pipeline.RenderPipeline
 import com.mojang.blaze3d.platform.NativeImage
 import com.mojang.blaze3d.systems.RenderSystem
 import com.mojang.blaze3d.textures.FilterMode
 import com.mojang.blaze3d.textures.GpuTexture
 import com.mojang.blaze3d.textures.GpuTextureView
-import net.ccbluex.liquidbounce.LiquidBounce
-import net.ccbluex.liquidbounce.render.ClientRenderPipelines.screenQuadSnippet
-import net.ccbluex.liquidbounce.render.ClientRenderPipelines.withUniformBuffer
 import net.ccbluex.liquidbounce.render.ClientUniformDefine
 import net.ccbluex.liquidbounce.render.createRenderPass
 import net.ccbluex.liquidbounce.render.drawBlitOnCurrentLayer
@@ -36,17 +32,15 @@ import net.ccbluex.liquidbounce.render.drawTexQuad
 import net.ccbluex.liquidbounce.utils.client.clientStartDurationMs
 import net.ccbluex.liquidbounce.utils.client.gpuDevice
 import net.ccbluex.liquidbounce.utils.client.mc
-import net.ccbluex.liquidbounce.utils.kotlin.optional
 import net.ccbluex.liquidbounce.utils.render.asTexture
 import net.ccbluex.liquidbounce.utils.render.asTextureSetup
-import net.ccbluex.liquidbounce.utils.render.asView
+import net.ccbluex.liquidbounce.render.buffer.asView
 import net.ccbluex.liquidbounce.utils.render.textureSetup
-import net.ccbluex.liquidbounce.utils.render.writeStd140
+import net.ccbluex.liquidbounce.render.buffer.writeStd140
 import net.minecraft.client.gui.GuiGraphicsExtractor
 import net.minecraft.client.gui.render.TextureSetup
 import net.minecraft.resources.Identifier
 import java.io.Closeable
-import java.util.Locale
 
 sealed interface ThemeBackground : Closeable {
 
@@ -208,21 +202,8 @@ sealed interface ThemeBackground : Closeable {
                 background: Background,
                 fragmentShader: String,
             ): Shader {
-                val bgName = background.name.lowercase(Locale.US)
-                val themeName = metadata.name.lowercase(Locale.US)
-
-                val fshId = LiquidBounce.identifier("shader/fsh/theme-bg-$themeName-$bgName")
-
-                val pipeline = RenderPipeline.Builder()
-                    .withLocation(LiquidBounce.identifier("pipeline/theme-bg-$themeName"))
-                    .screenQuadSnippet()
-                    .withFragmentShader(fshId)
-                    .withUniformBuffer(ClientUniformDefine.THEME_BACKGROUND)
-                    .withColorTargetState(ColorTargetState.DEFAULT)
-                    .withDepthStencilState(optional())
-                    .build()
-
-                return Shader(metadata, pipeline, fshId, fragmentShader)
+                val resources = ThemeShaderBackgroundPipelineFactory.build(metadata, background)
+                return Shader(metadata, resources.pipeline, resources.fragmentShaderId, fragmentShader)
             }
         }
     }

@@ -30,24 +30,20 @@ import net.ccbluex.liquidbounce.features.module.modules.exploit.ModulePortalMenu
 import net.ccbluex.liquidbounce.features.module.modules.movement.ModuleEntityControl;
 import net.ccbluex.liquidbounce.features.module.modules.movement.ModuleNoPush;
 import net.ccbluex.liquidbounce.features.module.modules.movement.ModuleSprint;
-import net.ccbluex.liquidbounce.features.module.modules.movement.NoPushBy;
 import net.ccbluex.liquidbounce.features.module.modules.movement.noslow.ModuleNoSlow;
 import net.ccbluex.liquidbounce.features.module.modules.player.ModuleNoEntityInteract;
-import net.ccbluex.liquidbounce.features.module.modules.player.ModuleReach;
 import net.ccbluex.liquidbounce.features.module.modules.render.ModuleFreeCam;
 import net.ccbluex.liquidbounce.features.module.modules.render.ModuleNoSwing;
-import net.ccbluex.liquidbounce.features.module.modules.world.ModuleLiquidPlace;
+import net.ccbluex.liquidbounce.injection.hooks.LocalPlayerRaycastHook;
 import net.ccbluex.liquidbounce.integration.interop.protocol.rest.v1.game.PlayerData;
 import net.ccbluex.liquidbounce.integration.interop.protocol.rest.v1.game.PlayerInventoryData;
 import net.ccbluex.liquidbounce.integration.theme.component.ModernContextualBar;
-import net.ccbluex.liquidbounce.integration.theme.component.ModernContextualBarSnapshot;
+import net.ccbluex.liquidbounce.common.interop.ModernContextualBarSnapshot;
 import net.ccbluex.liquidbounce.integration.screen.ScreenManager;
 import net.ccbluex.liquidbounce.interfaces.LocalPlayerAddition;
 import net.ccbluex.liquidbounce.utils.aiming.RotationManager;
 import net.ccbluex.liquidbounce.utils.aiming.data.Rotation;
 import net.ccbluex.liquidbounce.utils.movement.DirectionalInput;
-import net.ccbluex.liquidbounce.utils.raytracing.EntityRaytracingKt;
-import net.ccbluex.liquidbounce.utils.raytracing.RaytracingKt;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Gui;
 import net.minecraft.client.gui.screens.Screen;
@@ -58,7 +54,6 @@ import net.minecraft.network.protocol.game.ServerboundSwingPacket;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.MoverType;
-import net.minecraft.world.level.ClipContext;
 import net.minecraft.world.phys.EntityHitResult;
 import net.minecraft.world.phys.HitResult;
 import net.minecraft.world.phys.Vec2;
@@ -210,7 +205,7 @@ public abstract class MixinLocalPlayer extends MixinPlayer implements LocalPlaye
      */
     @Inject(method = "moveTowardsClosestSpace", at = @At("HEAD"), cancellable = true)
     private void hookPushOut(double x, double z, CallbackInfo ci) {
-        if (!ModuleNoPush.canPush(NoPushBy.BLOCKS)) {
+        if (!ModuleNoPush.canPushBlocks()) {
             ci.cancel();
             return;
         }
@@ -271,42 +266,8 @@ public abstract class MixinLocalPlayer extends MixinPlayer implements LocalPlaye
      */
     @ModifyExpressionValue(method = "pick(Lnet/minecraft/world/entity/Entity;DDF)Lnet/minecraft/world/phys/HitResult;", at = @At(value = "INVOKE", target = "Lnet/minecraft/world/entity/Entity;pick(DFZ)Lnet/minecraft/world/phys/HitResult;"))
     private static HitResult hookRaycast(HitResult original, Entity camera, double blockInteractionRange, double entityInteractionRange, float tickDelta) {
-        if (camera != Minecraft.getInstance().player) {
-            return original;
-        }
-
-        var cameraRotation = new Rotation(camera.getViewYRot(tickDelta), camera.getViewXRot(tickDelta), true);
-
-        Rotation rotation;
-        if (ModuleFreeCam.INSTANCE.getRunning()) {
-            var serverRotation = RotationManager.INSTANCE.getServerRotation();
-            rotation = ModuleFreeCam.INSTANCE.shouldDisableCameraInteract() ? serverRotation : cameraRotation;
-        } else if (RotationManager.INSTANCE.getCurrentRotation() != null) {
-            rotation = RotationManager.INSTANCE.getCurrentRotation();
-        } else {
-            rotation = cameraRotation;
-        }
-
-        // Through Walls Reach
-        if (ModuleReach.INSTANCE.getRunning()) {
-            var throughWallsRange = ModuleReach.INSTANCE.getEntity().getInteractionThroughWallsRange();
-
-            if (throughWallsRange > 0.0) {
-                var hitEntityResult = EntityRaytracingKt.findEntityInCrosshair(throughWallsRange, rotation, null);
-
-                if (hitEntityResult != null && hitEntityResult.getType() == HitResult.Type.ENTITY) {
-                    return hitEntityResult;
-                }
-            }
-        }
-
-
-        return RaytracingKt.traceFromPlayer(
-            rotation,
-            Math.max(blockInteractionRange, entityInteractionRange),
-            ClipContext.Block.OUTLINE,
-            ModuleLiquidPlace.INSTANCE.getRunning() ? ClipContext.Fluid.ANY : ClipContext.Fluid.NONE,
-            tickDelta
+        return LocalPlayerRaycastHook.modify(
+            original, camera, blockInteractionRange, entityInteractionRange, tickDelta
         );
     }
 

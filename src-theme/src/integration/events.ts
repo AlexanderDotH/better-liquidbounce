@@ -1,23 +1,56 @@
-import type {
-    BedState,
-    ConfigurableSetting,
-    ContextualBarData,
-    HudComponent,
-    ItemStack,
-    MinecraftKey,
-    MinecraftKeyboardKey,
-    MinecraftMouseKey,
-    PlayerData,
-    Proxy,
-    Screen,
-    Server,
-    Session,
-    Setting,
-    StatusEffect,
-    TextComponent,
-} from "./types";
 import type {BaritoneLogEvent, BaritoneRouteEvent, BaritoneStateEvent} from "./baritone";
-
+import type {
+    ThemeColorChangeEvent,
+    ClickGuiValueChangeEvent,
+    HudValueChangeEvent,
+    ModuleToggleEvent,
+    KeyboardKeyEvent,
+    MouseButtonEvent,
+    KeyboardCharEvent,
+    ScaleFactorChangeEvent,
+    ComponentsUpdateEvent,
+} from "./events/client";
+import type {
+    ClientPlayerDataEvent,
+    ContextualBarEvent,
+    ClientPlayerEffectEvent,
+    OverlayMessageEvent,
+    NotificationEvent,
+    KeyEvent,
+    TargetChangeEvent,
+    BlockCountChangeEvent,
+    BedStateChangeEvent,
+} from "./events/hud";
+import type {
+    AccountManagerAdditionEvent,
+    AccountManagerRemovalEvent,
+    AccountManagerMessageEvent,
+    AccountManagerLoginEvent,
+    ServerPingedEvent,
+    ClientPlayerInventoryEvent,
+    ProxyCheckResultEvent,
+    SpaceSeperatedNamesChangeEvent,
+    BrowserUrlChangeEvent,
+    ValueChangedEvent,
+} from "./events/accounts";
+import type {
+    ClickGuiScaleChangeEvent,
+    ModuleActivationEvent,
+    GameModeChangeEvent,
+    ClientChatStateChangeEvent,
+    ClientChatMessageEvent,
+    ClientChatErrorEvent,
+    SessionEvent,
+    ChatSendEvent,
+    ChatReceiveEvent,
+    FpsChangeEvent,
+    TitleEventTitle,
+    TitleEventSubtitle,
+    TitleEventFade,
+    TitleEventClear,
+    ClosedCaptionsEvent,
+    VirtualScreenEvent,
+} from "./events/game";
 
 export interface EventMap {
     socketReady: void;
@@ -87,234 +120,7 @@ export interface EventMap {
     death: void;
 }
 
-export interface ThemeColorChangeEvent {
-    themeId: string;
-    name: "Accent" | "Tint";
-    value: number;
-}
-
-export interface ClickGuiValueChangeEvent {
-    configurable: ConfigurableSetting;
-}
-
-export interface HudValueChangeEvent {
-    configurable: ConfigurableSetting;
-}
-
-export interface ModuleToggleEvent {
-    moduleName: string;
-    hidden: boolean;
-    enabled: boolean;
-}
-
-export interface KeyboardKeyEvent {
-    keyCode: number;
-    scanCode: number;
-    action: number;
-    mods: number;
-    key: MinecraftKeyboardKey;
-    screen: Screen | undefined;
-}
-
-export interface MouseButtonEvent {
-    key: MinecraftMouseKey;
-    button: number;
-    action: number;
-    mods: number;
-    screen: Screen | undefined;
-}
-
-export interface KeyboardCharEvent {
-    codePoint: number;
-}
-
-export interface ScaleFactorChangeEvent {
-    scaleFactor: number;
-}
-
-export type ComponentsUpdateEvent =
-    | {
-        source: "native";
-        components: HudComponent[];
-    }
-    | {
-        source: "theme";
-        themeId: string;
-        components: HudComponent[];
-    };
-
-export interface ClientPlayerDataEvent {
-    playerData: PlayerData;
-}
-
-export interface ContextualBarEvent {
-    contextualBar: ContextualBarData;
-}
-
-export interface ClientPlayerEffectEvent {
-    effects: StatusEffect[];
-}
-
-export interface OverlayMessageEvent {
-    text: TextComponent | string;
-    tinted: boolean;
-}
-
-export type NotificationSeverity = "INFO" | "SUCCESS" | "ERROR" | "ENABLED" | "DISABLED";
-
-export interface NotificationEvent {
-    title: string;
-    message: string;
-    severity: NotificationSeverity;
-}
-
-export interface KeyEvent {
-    key: MinecraftKey;
-    action: number;
-}
-
-export interface TargetChangeEvent {
-    target: PlayerData | null;
-}
-
-export interface BlockCountChangeEvent {
-    nextBlock?: string;
-    count?: number;
-}
-
-export interface BedStateChangeEvent {
-    bedStates: BedState[];
-}
-
-export interface AccountManagerAdditionEvent {
-    username: string | null;
-    error: string | null;
-}
-
-export interface AccountManagerRemovalEvent {
-    username: string | null;
-}
-
-export interface AccountManagerMessageEvent {
-    message: string;
-}
-
-export interface AccountManagerLoginEvent {
-    username: string | null;
-    error: string | null;
-}
-
-export interface ServerPingedEvent {
-    server: Server;
-}
-
-export interface ClientPlayerInventoryEvent {
-    inventory: PlayerInventory;
-}
-
-export interface PlayerInventory {
-    armor: ItemStack[];
-    main: ItemStack[];
-    crafting: ItemStack[];
-    enderChest: ItemStack[];
-}
-
-export interface ProxyCheckResultEvent {
-    proxy: Proxy | null;
-    error: string | null;
-}
-
-export interface SpaceSeperatedNamesChangeEvent {
-    value: boolean;
-}
-
-export interface BrowserUrlChangeEvent {
-    index: number;
-    url: string;
-}
-
-export interface ValueChangedEvent {
-    value: Setting<any>;
-}
-
-export interface ClickGuiScaleChangeEvent {
-    value: number;
-}
-
-export interface ModuleActivationEvent {
-    moduleName: string;
-}
-
-export interface GameModeChangeEvent {
-    gameMode: "survival" | "creative" | "adventure" | "spectator";
-}
-
-export interface ClientChatStateChangeEvent {
-    state: "connecting" | "connected" | "logon" | "loggedIn" | "disconnected" | "authenticationFailed";
-}
-
-export interface ClientChatMessageEvent {
-    user: {
-        name: string;
-        uuid: string;
-    };
-    message: string;
-    chatGroup: "PublicChat" | "PrivateChat";
-    // Not "public"/"private" because the EnumChoiceSerializer in Kotlin ignores @SerializedName annotations, bug?
-}
-
-export interface ClientChatErrorEvent {
-    error: string;
-}
-
-export interface SessionEvent {
-    session: Session;
-}
-
-export interface ChatSendEvent {
-    message: string;
-}
-
-export interface ChatReceiveEvent {
-    message: string;
-    textData: TextComponent;
-    type: "ChatMessage" | "DisguisedChatMessage" | "GameMessage";
-}
-
-export interface FpsChangeEvent {
-    fps: number;
-}
-
-export interface TitleEventTitle {
-    text: TextComponent | string | null;
-}
-
-export interface TitleEventSubtitle {
-    text: TextComponent | string | null;
-}
-
-export interface TitleEventFade {
-    fadeInTicks: number;
-    stayTicks: number;
-    fadeOutTicks: number;
-}
-
-export interface TitleEventClear {
-    reset: boolean;
-}
-
-export interface ClosedCaptionsEvent {
-    entries: ClosedCaptionEntry[];
-}
-
-export interface ClosedCaptionEntry {
-    text: TextComponent | string;
-    direction: "NONE" | "LEFT" | "RIGHT";
-    textColor: number;
-    backgroundColor: number;
-}
-
-export interface VirtualScreenEvent {
-    type: string;
-    action: "open" | "close";
-}
+export * from "./events/accounts";
+export * from "./events/client";
+export * from "./events/game";
+export * from "./events/hud";

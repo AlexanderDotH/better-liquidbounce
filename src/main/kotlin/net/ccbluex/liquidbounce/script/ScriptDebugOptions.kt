@@ -19,7 +19,7 @@
 
 package net.ccbluex.liquidbounce.script
 
-import net.ccbluex.liquidbounce.config.types.list.Tagged
+import net.ccbluex.liquidbounce.common.Tagged
 
 data class ScriptDebugOptions(
     val enabled: Boolean = false,

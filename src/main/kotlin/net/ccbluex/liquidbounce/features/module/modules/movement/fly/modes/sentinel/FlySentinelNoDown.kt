@@ -19,12 +19,10 @@
 package net.ccbluex.liquidbounce.features.module.modules.movement.fly.modes.sentinel
 
 import net.ccbluex.liquidbounce.config.types.group.Mode
-import net.ccbluex.liquidbounce.config.types.group.ModeValueGroup
 import net.ccbluex.liquidbounce.config.types.group.ToggleableValueGroup
 import net.ccbluex.liquidbounce.event.events.PacketEvent
 import net.ccbluex.liquidbounce.event.handler
 import net.ccbluex.liquidbounce.event.tickHandler
-import net.ccbluex.liquidbounce.features.module.modules.movement.fly.ModuleFly
 import net.ccbluex.liquidbounce.features.module.modules.movement.fly.automation.FlyAutomationCapabilities
 import net.ccbluex.liquidbounce.features.module.modules.movement.fly.automation.FlyAutomationKind
 import net.ccbluex.liquidbounce.features.module.modules.movement.fly.automation.FlyAutomationProfile
@@ -34,7 +32,7 @@ import net.ccbluex.liquidbounce.features.module.modules.movement.fly.modes.flyAu
 import net.ccbluex.liquidbounce.features.module.modules.movement.fly.modes.revive.setReviveFlySpeed
 import net.ccbluex.liquidbounce.features.module.modules.movement.fly.modes.revive.stopReviveFlySpeed
 import net.ccbluex.liquidbounce.features.module.modules.movement.sentinel.isSentinelOutgoingMovementPacket
-import net.ccbluex.liquidbounce.utils.network.sendPacketSilently
+import net.ccbluex.liquidbounce.features.network.sendPacketSilently
 import net.minecraft.core.BlockPos
 import net.minecraft.network.protocol.game.ServerboundMovePlayerPacket
 import net.minecraft.network.protocol.game.ServerboundSetCarriedItemPacket
@@ -54,8 +52,6 @@ internal object FlySentinelNoDown : Mode("SentinelNoDown"), FlyAutomationProfile
         val angle by float("Angle", 35f, 0f..60f, "degrees")
     }
 
-    override val parent: ModeValueGroup<*>
-        get() = ModuleFly.modes
 
     init {
         tree(FakeStrafe)

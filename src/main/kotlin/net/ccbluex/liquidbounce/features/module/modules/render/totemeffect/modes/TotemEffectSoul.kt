@@ -20,10 +20,12 @@
 package net.ccbluex.liquidbounce.features.module.modules.render.totemeffect.modes
 
 import net.ccbluex.liquidbounce.config.types.group.ToggleableValueGroup
-import net.ccbluex.liquidbounce.config.types.list.Tagged
-import net.ccbluex.liquidbounce.features.module.modules.render.totemeffect.ModuleTotemEffect.TotemPopSnapshot
-import net.ccbluex.liquidbounce.features.module.modules.render.totemeffect.TotemEffectColorSettings
-import net.ccbluex.liquidbounce.features.module.modules.render.totemeffect.TotemEffectMode
+import net.ccbluex.liquidbounce.common.Tagged
+import net.ccbluex.liquidbounce.config.types.group.ModeValueGroup
+import net.ccbluex.liquidbounce.features.module.modules.render.totemeffect.config.TotemEffectColorSettings
+import net.ccbluex.liquidbounce.features.module.modules.render.totemeffect.model.TotemPopSnapshot
+import net.ccbluex.liquidbounce.features.module.modules.render.totemeffect.runtime.TotemEffectMode
+import net.ccbluex.liquidbounce.features.module.modules.render.totemeffect.runtime.TotemEffectRuntime
 import net.ccbluex.liquidbounce.render.ClientRenderPipelines
 import net.ccbluex.liquidbounce.render.WorldRenderEnvironment
 import net.ccbluex.liquidbounce.render.addTorusQuad
@@ -31,14 +33,17 @@ import net.ccbluex.liquidbounce.render.drawCustomMesh
 import net.ccbluex.liquidbounce.render.engine.type.Color4b
 import net.ccbluex.liquidbounce.render.segmentAngle
 import net.ccbluex.liquidbounce.render.withPositionRelativeToCamera
-import net.ccbluex.liquidbounce.utils.render.WireframePlayer
+import net.ccbluex.liquidbounce.render.wireframe.WireframePlayer
 import net.minecraft.world.phys.Vec3
 
-internal object TotemEffectSoul : TotemEffectMode("Soul") {
+internal class TotemEffectSoul(parent: ModeValueGroup<*>, runtime: TotemEffectRuntime) :
+    TotemEffectMode("Soul", parent, runtime) {
 
     private val colors = TotemEffectColorSettings()
     private val toggleHalo by boolean("Halo", false)
-    private object YMotion : ToggleableValueGroup(this, "YMotion", true) {
+    private val yMotion = YMotion()
+
+    private inner class YMotion : ToggleableValueGroup(this@TotemEffectSoul, "YMotion", true) {
         val soulYMotion by float("SoulYMotion", 0.75f, 0.1f..10f)
         val animBy by enumChoice("AnimBy", AnimBy.AGE)
     }
@@ -46,7 +51,7 @@ internal object TotemEffectSoul : TotemEffectMode("Soul") {
     private val wireframePlayer = WireframePlayer()
 
     init {
-        tree(YMotion)
+        tree(yMotion)
         tree(colors)
     }
 
@@ -60,14 +65,14 @@ internal object TotemEffectSoul : TotemEffectMode("Soul") {
         val inner = colors.innerColor.alpha(alpha)
         val outer = if (colors.sync) inner else colors.outerColor.alpha(alpha)
 
-        val anim = if (YMotion.enabled) {
-            when (YMotion.animBy) {
+        val anim = if (yMotion.enabled) {
+            when (yMotion.animBy) {
                 AnimBy.PROGRESS -> progress.toDouble()
                 AnimBy.AGE -> age.toDouble()
             }
         } else { 0.0 }
 
-        val targetPos = entity.pos.add(0.0, (anim * YMotion.soulYMotion), -0.1)
+        val targetPos = entity.pos.add(0.0, (anim * yMotion.soulYMotion), -0.1)
 
         wireframePlayer.pos = targetPos
         wireframePlayer.xRot = entity.xRot

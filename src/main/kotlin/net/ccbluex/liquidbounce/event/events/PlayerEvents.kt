@@ -23,7 +23,7 @@ import net.ccbluex.liquidbounce.annotations.Tag
 import net.ccbluex.liquidbounce.event.CancellableEvent
 import net.ccbluex.liquidbounce.event.Event
 import net.ccbluex.liquidbounce.event.EventState
-import net.ccbluex.liquidbounce.integration.interop.protocol.event.WebSocketEvent
+import net.ccbluex.liquidbounce.event.WebSocketEvent
 import net.minecraft.tags.TagKey
 import net.minecraft.world.InteractionHand
 import net.minecraft.world.InteractionResult

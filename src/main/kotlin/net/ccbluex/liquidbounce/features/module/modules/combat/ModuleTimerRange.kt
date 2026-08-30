@@ -27,7 +27,7 @@ import net.ccbluex.liquidbounce.features.module.ModuleCategories
 import net.ccbluex.liquidbounce.features.module.modules.combat.killaura.ModuleKillAura
 import net.ccbluex.liquidbounce.utils.client.Timer
 import net.ccbluex.liquidbounce.utils.client.Timer.timerSpeed
-import net.ccbluex.liquidbounce.utils.combat.findEnemy
+import net.ccbluex.liquidbounce.features.combat.runtime.findEnemy
 import net.ccbluex.liquidbounce.utils.kotlin.Priority
 import net.minecraft.network.protocol.game.ClientboundPlayerPositionPacket
 

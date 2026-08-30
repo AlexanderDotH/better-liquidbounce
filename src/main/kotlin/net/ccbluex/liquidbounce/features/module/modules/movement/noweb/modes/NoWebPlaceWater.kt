@@ -19,54 +19,40 @@
 package net.ccbluex.liquidbounce.features.module.modules.movement.noweb.modes
 
 import it.unimi.dsi.fastutil.objects.ObjectLinkedOpenHashSet
-import net.ccbluex.fastutil.objectLinkedSetOf
 import net.ccbluex.liquidbounce.config.types.group.ToggleableValueGroup
 import net.ccbluex.liquidbounce.event.events.GameTickEvent
 import net.ccbluex.liquidbounce.event.events.RotationUpdateEvent
 import net.ccbluex.liquidbounce.event.events.WorldChangeEvent
 import net.ccbluex.liquidbounce.event.handler
-import net.ccbluex.liquidbounce.features.module.modules.movement.noweb.ModuleNoWeb
-import net.ccbluex.liquidbounce.features.module.modules.movement.noweb.NoWebMode
+import net.ccbluex.liquidbounce.features.module.modules.movement.noweb.runtime.NoWebModuleProvider
 import net.ccbluex.liquidbounce.utils.aiming.RotationManager
-import net.ccbluex.liquidbounce.utils.aiming.RotationsValueGroup
+import net.ccbluex.liquidbounce.features.rotation.RotationsValueGroup
 import net.ccbluex.liquidbounce.utils.aiming.data.Rotation
 import net.ccbluex.liquidbounce.utils.block.DIRECTIONS_EXCLUDING_DOWN
-import net.ccbluex.liquidbounce.utils.block.doPlacement
+import net.ccbluex.liquidbounce.features.block.runtime.doPlacement
 import net.ccbluex.liquidbounce.utils.block.immutable
 import net.ccbluex.liquidbounce.utils.block.liquid.TimedPickupTracker
-import net.ccbluex.liquidbounce.utils.block.liquid.planPlacementAtPos
+import net.ccbluex.liquidbounce.features.block.planner.planPlacementAtPos
 import net.ccbluex.liquidbounce.utils.block.state
-import net.ccbluex.liquidbounce.utils.block.targetBlockPos
 import net.ccbluex.liquidbounce.utils.client.SilentHotbar
 import net.ccbluex.liquidbounce.utils.entity.rotation
 import net.ccbluex.liquidbounce.utils.inventory.HotbarItemSlot
 import net.ccbluex.liquidbounce.utils.inventory.Slots
 import net.ccbluex.liquidbounce.utils.inventory.findClosestSlot
 import net.ccbluex.liquidbounce.utils.kotlin.Priority
-import net.ccbluex.liquidbounce.utils.math.centerOnSide
-import net.ccbluex.liquidbounce.utils.math.sq
 import net.ccbluex.liquidbounce.utils.raytracing.traceFromPlayer
-import net.ccbluex.liquidbounce.utils.world.waterEvaporates
 import net.minecraft.core.BlockPos
 import net.minecraft.core.Direction
+import net.minecraft.world.attribute.EnvironmentAttributes
 import net.minecraft.world.item.Items
 import net.minecraft.world.level.ClipContext
 import net.minecraft.world.level.block.WebBlock
-import net.minecraft.world.level.material.Fluids
 import net.minecraft.world.phys.AABB
 import net.minecraft.world.phys.BlockHitResult
 import net.minecraft.world.phys.HitResult
 import net.minecraft.world.phys.Vec3
 
-/**
- * TODO: fix water fluid not spread to break the cobweb
- */
-@Suppress("TooManyFunctions")
 object NoWebPlaceWater : NoWebMode("PlaceWater") {
-    private const val MAX_TRACKED_WEBS = 8
-    private const val PICKUP_TRACKER_CAPACITY = 16
-    private const val SAME_WEB_RETRY_DELAY_MS = 250L
-
     private object Pickup : ToggleableValueGroup(this@NoWebPlaceWater, "Pickup", true) {
         // Keep a hard lower bound so water has enough time to spread at least one block.
         val pickupSpan by floatRange("PickupSpan", 0.8F..3.0F, 0.5F..20.0F, "s")
@@ -76,20 +62,13 @@ object NoWebPlaceWater : NoWebMode("PlaceWater") {
     private val pickupTracker = TimedPickupTracker(PICKUP_TRACKER_CAPACITY)
     private val trackedWebs = ObjectLinkedOpenHashSet<BlockPos>()
 
-    private var currentAction: UseAction? = null
+    private var currentAction: NoWebUseAction? = null
     private var lastSuccessfulWeb: BlockPos? = null
     private var lastSuccessfulAt = 0L
 
     init {
         tree(Pickup)
     }
-
-    private data class UseAction(
-        val slot: HotbarItemSlot,
-        val rotation: Rotation,
-        val resolveHitResult: (BlockHitResult) -> BlockHitResult?,
-        val onSuccess: (BlockHitResult) -> Unit,
-    )
 
     override fun disable() {
         SilentHotbar.resetSlot(this)
@@ -102,7 +81,6 @@ object NoWebPlaceWater : NoWebMode("PlaceWater") {
             trackedWebs.removeFirst()
         }
 
-        // Do not cancel web slowdown in this mode.
         return false
     }
 
@@ -115,7 +93,9 @@ object NoWebPlaceWater : NoWebMode("PlaceWater") {
     private val rotationUpdateHandler = handler<RotationUpdateEvent> {
         currentAction = null
 
-        if (world.waterEvaporates) {
+        val waterEvaporates = world.environmentAttributes()
+            .getDimensionValue(EnvironmentAttributes.WATER_EVAPORATES)
+        if (!allowsNoWebWaterPlacement(waterEvaporates)) {
             return@handler
         }
 
@@ -139,7 +119,7 @@ object NoWebPlaceWater : NoWebMode("PlaceWater") {
             action.rotation,
             valueGroup = rotations,
             priority = Priority.IMPORTANT_FOR_PLAYER_LIFE,
-            provider = ModuleNoWeb,
+            provider = NoWebModuleProvider.module,
         )
     }
 
@@ -169,16 +149,13 @@ object NoWebPlaceWater : NoWebMode("PlaceWater") {
     private fun buildPlaceAction(
         webPos: BlockPos,
         waterSlot: HotbarItemSlot,
-    ): UseAction? {
+    ): NoWebUseAction? {
         val webBox = AABB(webPos)
         val eyes = player.eyePosition
 
         return when {
-            // Eye inside web => top placement is usually blocked by the web volume, so prefer side usage.
             webBox.contains(eyes) -> buildDirectionalPlaceAction(webPos, waterSlot, DIRECTIONS_EXCLUDING_DOWN)
-            // Eye above web => standard "place on top" path is most reliable.
             eyes.y > webBox.maxY -> buildTopPlaceAction(webPos, waterSlot)
-            // Otherwise keep side-only fallback to avoid clicking through the lower half.
             else -> buildDirectionalPlaceAction(webPos, waterSlot, Direction.BY_2D_DATA)
         }
     }
@@ -186,10 +163,10 @@ object NoWebPlaceWater : NoWebMode("PlaceWater") {
     private fun buildTopPlaceAction(
         webPos: BlockPos,
         waterSlot: HotbarItemSlot,
-    ): UseAction? {
+    ): NoWebUseAction? {
         val plan = planPlacementAtPos(webPos.above(), waterSlot) ?: return null
 
-        return UseAction(
+        return NoWebUseAction(
             slot = plan.hotbarItemSlot,
             rotation = plan.placementTarget.rotation,
             resolveHitResult = { rayTraceResult ->
@@ -206,25 +183,26 @@ object NoWebPlaceWater : NoWebMode("PlaceWater") {
         webPos: BlockPos,
         waterSlot: HotbarItemSlot,
         directions: Array<Direction>,
-    ): UseAction? {
-        val side = pickBestSide(webPos, directions) ?: return null
-        val faceCenter = AABB(webPos).centerOnSide(side)
+    ): NoWebUseAction? {
+        val side = pickBestNoWebSide(webPos, directions, player.lookAngle) ?: return null
+        val faceCenter = noWebCenterOnSide(AABB(webPos), side)
         val fallbackHitResult = BlockHitResult(faceCenter, side, webPos, false)
 
-        return UseAction(
+        return NoWebUseAction(
             slot = waterSlot,
             rotation = Rotation.lookingAt(point = faceCenter, from = player.eyePosition),
             resolveHitResult = { rayTraceResult ->
-                resolveDirectionalPlacementHitResult(rayTraceResult, webPos, side, fallbackHitResult)
+                resolveNoWebDirectionalPlacementHitResult(rayTraceResult, webPos, side, fallbackHitResult)
             },
             onSuccess = { placementHitResult ->
                 markWebPlacementSuccess(webPos)
-                recordDirectionalWaterCandidates(webPos, side, placementHitResult)
+                noWebDirectionalWaterCandidates(webPos, side, placementHitResult)
+                    .forEach(pickupTracker::record)
             },
         )
     }
 
-    private fun buildPickupAction(): UseAction? {
+    private fun buildPickupAction(): NoWebUseAction? {
         if (!Pickup.enabled) {
             return null
         }
@@ -234,7 +212,7 @@ object NoWebPlaceWater : NoWebMode("PlaceWater") {
 
         pickupTracker.prune(pickupSpanEndMs, TimedPickupTracker.PickupFilter.WATER)
 
-        val maxRangeSq = player.blockInteractionRange().sq()
+        val maxRangeSq = noWebSquaredRange(player.blockInteractionRange())
         val pickupPos = pickupTracker.firstEligible(pickupSpanStartMs) { pos ->
             AABB(pos).distanceToSqr(player.eyePosition) <= maxRangeSq
         } ?: return null
@@ -242,11 +220,16 @@ object NoWebPlaceWater : NoWebMode("PlaceWater") {
         val bucketSlot = Slots.OffhandWithHotbar.findClosestSlot(Items.BUCKET) ?: return null
         val pickupCenter = Vec3.atCenterOf(pickupPos)
 
-        return UseAction(
+        return NoWebUseAction(
             slot = bucketSlot,
             rotation = Rotation.lookingAt(point = pickupCenter, from = player.eyePosition),
             resolveHitResult = { rayTraceResult ->
-                resolvePickupHitResult(rayTraceResult, pickupPos, pickupCenter)
+                resolveNoWebPickupHitResult(
+                    rayTraceResult,
+                    traceFromPlayer(fluid = ClipContext.Fluid.SOURCE_ONLY),
+                    pickupPos,
+                    pickupCenter,
+                )
             },
             onSuccess = {
                 pickupTracker.prune(0L, TimedPickupTracker.PickupFilter.WATER)
@@ -258,82 +241,6 @@ object NoWebPlaceWater : NoWebMode("PlaceWater") {
         lastSuccessfulWeb = webPos
         lastSuccessfulAt = System.currentTimeMillis()
         trackedWebs.remove(webPos)
-    }
-
-    private fun recordDirectionalWaterCandidates(
-        webPos: BlockPos,
-        side: Direction,
-        placementHitResult: BlockHitResult,
-    ) {
-        val sidePos = webPos.relative(side)
-        val inferredWaterPos = placementHitResult.targetBlockPos
-        val candidates = objectLinkedSetOf(inferredWaterPos, webPos, sidePos)
-
-        // Bucket placement near webs can resolve to adjacent cells depending on stance and hit face.
-        // Track all six neighbors to keep pickup robust without branching per edge-case.
-        for (direction in Direction.entries) {
-            candidates += webPos.relative(direction)
-        }
-
-        candidates.forEach(pickupTracker::record)
-    }
-
-    private fun resolveDirectionalPlacementHitResult(
-        rayTraceResult: BlockHitResult,
-        webPos: BlockPos,
-        side: Direction,
-        fallbackHitResult: BlockHitResult,
-    ): BlockHitResult {
-        if (rayTraceResult.type != HitResult.Type.BLOCK) {
-            return fallbackHitResult
-        }
-
-        val directWebFace = rayTraceResult.blockPos == webPos && rayTraceResult.direction == side
-        val oppositeAdjacentFace =
-            rayTraceResult.blockPos == webPos.relative(side) && rayTraceResult.direction == side.opposite
-
-        return if (directWebFace || oppositeAdjacentFace) rayTraceResult else fallbackHitResult
-    }
-
-    private fun resolvePickupHitResult(
-        rayTraceResult: BlockHitResult,
-        pickupPos: BlockPos,
-        pickupCenter: Vec3,
-    ): BlockHitResult {
-        val fluidTraceResult = traceFromPlayer(fluid = ClipContext.Fluid.SOURCE_ONLY)
-        return when {
-            // Prefer fluid-inclusive trace so we can hit source blocks hidden behind web geometry.
-            fluidTraceResult.type == HitResult.Type.BLOCK && fluidTraceResult.blockPos == pickupPos -> {
-                fluidTraceResult
-            }
-
-            rayTraceResult.type == HitResult.Type.BLOCK && rayTraceResult.blockPos == pickupPos -> {
-                rayTraceResult
-            }
-
-            rayTraceResult.type == HitResult.Type.BLOCK && rayTraceResult.targetBlockPos == pickupPos -> {
-                // We clicked the neighbor face but the target cell is the source block.
-                BlockHitResult(pickupCenter, rayTraceResult.direction.opposite, pickupPos, false)
-            }
-
-            // Final fallback keeps vanilla-style right-click on the expected source cell.
-            else -> BlockHitResult(pickupCenter, Direction.UP, pickupPos, false)
-        }
-    }
-
-    private fun pickBestSide(
-        webPos: BlockPos,
-        directions: Array<Direction>,
-    ): Direction? {
-        return directions
-            .filter { side ->
-                val adjacentState = webPos.relative(side).state ?: return@filter false
-                // Find a replaceable side to place water
-                adjacentState.isAir || adjacentState.fluidState.isSourceOfType(Fluids.LAVA)
-            }
-            .maxByOrNull { side ->
-                player.lookAngle.dot(side.unitVec3)
-            }
     }
 
     private fun resetState() {

@@ -10,10 +10,19 @@
  */
 package net.ccbluex.liquidbounce.features.module.modules.movement.vclip
 
+import net.minecraft.network.protocol.game.ServerboundPlayerCommandPacket
+
 internal enum class VClipDirection(val verticalSign: Int) {
     UP(1),
     DOWN(-1),
 }
+
+internal fun acceptsVClipControlInput(screenOpen: Boolean, remoteMovementOwned: Boolean): Boolean =
+    !screenOpen && !remoteMovementOwned
+
+internal val ServerboundPlayerCommandPacket.Action.isVClipRidingJumpAction: Boolean
+    get() = this == ServerboundPlayerCommandPacket.Action.START_RIDING_JUMP ||
+        this == ServerboundPlayerCommandPacket.Action.STOP_RIDING_JUMP
 
 internal class VClipInputController {
 

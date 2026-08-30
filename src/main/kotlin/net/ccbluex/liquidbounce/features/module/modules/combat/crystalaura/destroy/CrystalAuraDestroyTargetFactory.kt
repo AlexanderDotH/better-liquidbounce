@@ -24,7 +24,7 @@ import net.ccbluex.liquidbounce.features.module.modules.combat.crystalaura.destr
 import net.ccbluex.liquidbounce.features.module.modules.combat.crystalaura.destroy.SubmoduleCrystalDestroyer.range
 import net.ccbluex.liquidbounce.features.module.modules.combat.crystalaura.destroy.SubmoduleCrystalDestroyer.wallsRange
 import net.ccbluex.liquidbounce.utils.aiming.utils.canSeeBox
-import net.ccbluex.liquidbounce.utils.combat.getEntitiesBoxInRange
+import net.ccbluex.liquidbounce.features.combat.runtime.getEntitiesBoxInRange
 import net.ccbluex.liquidbounce.utils.math.sq
 import net.minecraft.world.entity.Entity
 import net.minecraft.world.entity.boss.enderdragon.EndCrystal

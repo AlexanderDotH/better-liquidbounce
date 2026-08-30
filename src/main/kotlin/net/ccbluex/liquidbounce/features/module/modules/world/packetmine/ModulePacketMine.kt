@@ -34,32 +34,14 @@ import net.ccbluex.liquidbounce.features.module.modules.world.packetmine.tool.Al
 import net.ccbluex.liquidbounce.features.module.modules.world.packetmine.tool.NeverToolMode
 import net.ccbluex.liquidbounce.features.module.modules.world.packetmine.tool.OnStopToolMode
 import net.ccbluex.liquidbounce.features.module.modules.world.packetmine.tool.PostStartToolMode
+import net.ccbluex.liquidbounce.features.rotation.RotationsValueGroup
 import net.ccbluex.liquidbounce.render.engine.type.Color4b
-import net.ccbluex.liquidbounce.utils.aiming.RotationManager
-import net.ccbluex.liquidbounce.utils.aiming.RotationsValueGroup
-import net.ccbluex.liquidbounce.utils.aiming.data.Rotation
-import net.ccbluex.liquidbounce.utils.aiming.utils.raytraceBlockRotation
+import net.ccbluex.liquidbounce.render.placement.PlacementRenderer
+import net.ccbluex.liquidbounce.render.progress.BreakingProgress
+import net.ccbluex.liquidbounce.render.progress.BreakingProgressRenderer
 import net.ccbluex.liquidbounce.utils.block.SwingMode
-import net.ccbluex.liquidbounce.utils.block.immutable
-import net.ccbluex.liquidbounce.utils.block.outlineBox
-import net.ccbluex.liquidbounce.utils.block.state
-import net.ccbluex.liquidbounce.utils.block.stateOrEmpty
-import net.ccbluex.liquidbounce.utils.client.Chronometer
 import net.ccbluex.liquidbounce.utils.inventory.HotbarItemSlot
-import net.ccbluex.liquidbounce.utils.kotlin.Priority
-import net.ccbluex.liquidbounce.utils.raytracing.raytraceBlock
-import net.ccbluex.liquidbounce.utils.render.BreakingProgress
-import net.ccbluex.liquidbounce.utils.render.BreakingProgressRenderer
-import net.ccbluex.liquidbounce.utils.render.placement.PlacementRenderer
 import net.minecraft.core.BlockPos
-import net.minecraft.network.protocol.game.ClientboundBlockUpdatePacket
-import net.minecraft.network.protocol.game.ClientboundSectionBlocksUpdatePacket
-import net.minecraft.network.protocol.game.ServerboundPlayerActionPacket
-import net.minecraft.world.InteractionHand
-import net.minecraft.world.level.block.state.BlockState
-import net.minecraft.world.phys.BlockHitResult
-import net.minecraft.world.phys.HitResult
-import kotlin.math.max
 
 /**
  * PacketMine module
@@ -68,7 +50,6 @@ import kotlin.math.max
  *
  * @author ccetl
  */
-@Suppress("TooManyFunctions")
 object ModulePacketMine : ClientModule("PacketMine", ModuleCategories.WORLD), BreakingProgress.Provider {
 
     val mode = modes(
@@ -80,8 +61,8 @@ object ModulePacketMine : ClientModule("PacketMine", ModuleCategories.WORLD), Br
         tagBy(this)
     }
 
-    private val range by float("Range", 4.5f, 1f..6f)
-    private val wallsRange by float("WallsRange", 4.5f, 0f..6f).onChange {
+    internal val range by float("Range", 4.5f, 1f..6f)
+    internal val wallsRange by float("WallsRange", 4.5f, 0f..6f).onChange {
         minOf(range, it)
     }
 
@@ -96,9 +77,9 @@ object ModulePacketMine : ClientModule("PacketMine", ModuleCategories.WORLD), Br
         arrayOf(AlwaysToolMode, PostStartToolMode, OnStopToolMode, NeverToolMode)
     )
 
-    private val rotationMode by enumChoice("Rotate", MineRotationMode.NEVER)
-    private val rotations = tree(RotationsValueGroup(this))
-    private val ignoreOpenInventory by boolean("IgnoreOpenInventory", true)
+    internal val rotationMode by enumChoice("Rotate", MineRotationMode.NEVER)
+    internal val rotations = tree(RotationsValueGroup(this))
+    internal val ignoreOpenInventory by boolean("IgnoreOpenInventory", true)
     val breakDamage by float("BreakDamage", 1f, 0f..2f)
     /**
      * Extra delay before starting the next target after sending `STOP_DESTROY_BLOCK`.
@@ -110,9 +91,9 @@ object ModulePacketMine : ClientModule("PacketMine", ModuleCategories.WORLD), Br
      *
      * @see net.minecraft.client.multiplayer.MultiPlayerGameMode.destroyDelay
      */
-    private val postBreakDelay by int("PostBreakDelay", 6, 0..10, "ticks")
+    internal val postBreakDelay by int("PostBreakDelay", 6, 0..10, "ticks")
     val abortAlwaysDown by boolean("AbortAlwaysDown", false)
-    private val selectDelay by int("SelectDelay", 200, 0..400, "ms")
+    internal val selectDelay by int("SelectDelay", 200, 0..400, "ms")
 
     val targetRenderer = tree(
         PlacementRenderer(
@@ -123,10 +104,8 @@ object ModulePacketMine : ClientModule("PacketMine", ModuleCategories.WORLD), Br
     )
     private val progressRenderer = targetRenderer.tree(BreakingProgressRenderer(targetRenderer, this))
 
-    private val chronometer = Chronometer()
-    private var rotation: Rotation? = null
-    private var tickCounter = 0L
-    private var nextAllowedStartTick = 0L
+    private val targetSelector = PacketMineTargetSelector()
+    private val runtime = PacketMineRuntime()
 
     /**
      * The current target of the module.
@@ -145,10 +124,6 @@ object ModulePacketMine : ClientModule("PacketMine", ModuleCategories.WORLD), Br
             field = value
         }
 
-    private fun shouldBlockTargetChange(mineTarget: MineTarget): Boolean {
-        return mode.activeMode.shouldPreventTargetChange(mineTarget)
-    }
-
     init {
         mode.onChanged {
             if (mc.level != null && mc.player != null) {
@@ -159,231 +134,35 @@ object ModulePacketMine : ClientModule("PacketMine", ModuleCategories.WORLD), Br
     }
 
     override fun onEnabled() {
-        nextAllowedStartTick = 0L
+        runtime.resetStartDelay()
         interaction.stopDestroyBlock()
     }
 
     override fun onDisabled() {
         targetRenderer.clearSilently()
-        nextAllowedStartTick = 0L
+        runtime.resetStartDelay()
         _target = null
     }
 
     @Suppress("unused")
     private val rotationUpdateHandler = handler<RotationUpdateEvent> {
-        val mineTarget = _target ?: return@handler
-        mineTarget.updateBlockState()
-        rotate(mineTarget)
+        runtime.onRotationUpdate()
     }
 
     @Suppress("unused")
     private val repeatable = handler<GameTickEvent> {
-        tickCounter++
-        val mineTarget = _target ?: return@handler
-        if (mineTarget.isInvalidOrOutOfRange()) {
-            _target = null
-            return@handler
-        }
-
-        mineTarget.updateBlockState()
-        handleBreaking(mineTarget)
+        runtime.onTick()
     }
 
-    private fun rotate(mineTarget: MineTarget) {
-        val rotate = rotationMode.shouldRotate(mineTarget)
-
-        val raytrace = raytraceBlockRotation(
-            player.eyePosition,
-            mineTarget.targetPos,
-            mineTarget.blockState,
-            range = range.toDouble(),
-            wallsRange = wallsRange.toDouble()
-        ) ?: run {
-            // don't do actions when the block is out of range
-            mineTarget.abort()
-            return
-        }
-
-        if (rotate) {
-            RotationManager.setRotationTarget(
-                raytrace.rotation,
-                considerInventory = !ignoreOpenInventory,
-                valueGroup = rotations,
-                Priority.IMPORTANT_FOR_USAGE_2,
-                ModulePacketMine
-            )
-        }
-
-        rotation = raytrace.rotation
-    }
-
-    @Suppress("ReturnCount")
-    private fun handleBreaking(mineTarget: MineTarget) {
-        // are we looking at the target?
-        val hit = raytraceBlock(
-            max(range, wallsRange).toDouble(),
-            RotationManager.serverRotation,
-            mineTarget.targetPos,
-            mineTarget.blockState
-        )
-
-        val invalidHit = hit == null || hit.type != HitResult.Type.BLOCK || hit.blockPos != mineTarget.targetPos
-        if (invalidHit && rotationMode.getFailProcedure(mineTarget).execute(mineTarget)) {
-            return
-        }
-
-        mineTarget.direction = raytraceBlock(
-            max(range, wallsRange).toDouble() + 1.0,
-            rotation = rotation ?: return,
-            pos = mineTarget.targetPos,
-            state = mineTarget.blockState
-        )?.direction ?: run {
-            // wrong rotations?? this should not happen!
-            FailProcedure.ABORT.execute(mineTarget)
-            return
-        }
-
-        if (player.isCreative) {
-            interaction.startPrediction(world) { sequence: Int ->
-                interaction.destroyBlock(mineTarget.targetPos)
-                ServerboundPlayerActionPacket(
-                    ServerboundPlayerActionPacket.Action.START_DESTROY_BLOCK,
-                    mineTarget.targetPos,
-                    mineTarget.direction!!,
-                    sequence
-                )
-            }
-
-            swingMode.swing(InteractionHand.MAIN_HAND)
-            return
-        }
-
-        val switchMode = switchMode.activeMode
-        val slot = switchMode.getSlot(mineTarget.blockState)
-        if (!mineTarget.started) {
-            if (tickCounter < nextAllowedStartTick) {
-                return
-            }
-            startBreaking(slot, mineTarget)
-        } else if (mode.activeMode.shouldUpdate(mineTarget, slot)) {
-            updateBreakingProgress(mineTarget, slot)
-            if (mineTarget.progress >= breakDamage && !mineTarget.finished) {
-                val finishReadyTick = mineTarget.finishReadyTick
-                if (finishReadyTick == null) {
-                    mineTarget.finishReadyTick = tickCounter
-                } else if (tickCounter > finishReadyTick) {
-                    nextAllowedStartTick = tickCounter + postBreakDelay
-                    mode.activeMode.finish(mineTarget)
-                    switchMode.getSwitchingMethod().switchBack()
-                }
-            }
-        }
-
-        switchMode.getSwitchingMethod().reset()
-    }
-
-    private fun startBreaking(slot: HotbarItemSlot?, mineTarget: MineTarget) {
-        switch(slot, mineTarget)
-        if (switchMode.activeMode.syncOnStart) {
-            interaction.ensureHasSentCarriedItem()
-        }
-
-        mode.activeMode.start(mineTarget)
-        mineTarget.started = true
-        mineTarget.finishReadyTick = null
-    }
-
-    private fun updateBreakingProgress(mineTarget: MineTarget, slot: HotbarItemSlot?) {
-        val switchMode = switchMode.activeMode
-        mineTarget.progress += switchMode.getBlockBreakingDelta(
-            mineTarget.targetPos,
-            mineTarget.blockState,
-            slot?.itemStack
-        )
-
-        switch(slot, mineTarget)
-        if (switchMode.getSwitchingMethod().shouldSync) {
-            interaction.ensureHasSentCarriedItem()
-        }
-
-        val f = if (breakDamage > 0f) {
-            mineTarget.progress.coerceIn(0f, breakDamage) / breakDamage * 0.5f
-        } else {
-            0.5f
-        }
-
-        val box = mineTarget.targetPos.outlineBox
-        val lengthX = box.xsize
-        val lengthY = box.ysize
-        val lengthZ = box.zsize
-        targetRenderer.updateBox(
-            mineTarget.targetPos,
-            box.inflate(
-                lengthX * (f - 0.5f),
-                lengthY * (f - 0.5f),
-                lengthZ * (f - 0.5f),
-            )
-        )
-    }
-
-    override fun breakingProgress(): BreakingProgress? {
-        val target = _target?.takeIf { it.started } ?: return null
-        val damage = breakDamage
-        val progress = if (damage > 0f) {
-            target.progress / damage
-        } else {
-            1f
-        }
-
-        return BreakingProgress(target.targetPos, progress.coerceIn(0f, 1f))
-    }
+    override fun breakingProgress() = PacketMineProgress.current()
 
     fun switch(slot: HotbarItemSlot?, mineTarget: MineTarget) {
-        if (slot == null) {
-            return
-        }
-
-        val switchMode = switchMode.activeMode
-        if (switchMode.shouldSwitch(mineTarget)) {
-            switchMode.getSwitchingMethod().switch(slot, mineTarget)
-        }
+        runtime.switch(slot, mineTarget)
     }
 
     @Suppress("unused")
     private val mouseButtonHandler = handler<MouseButtonEvent> { event ->
-        val openScreen = mc.gui.screen() != null
-        val unchangeableActive = !mode.activeMode.canManuallyChange && _target != null
-        if (openScreen || unchangeableActive || !player.abilities.mayBuild) {
-            return@handler
-        }
-
-        // without adding a little delay before being able to unselect / select again, selecting would be impossible
-        val hasTimePassed = chronometer.hasElapsed(selectDelay.toLong())
-        val hitResult = mc.hitResult
-        if (!event.isLeftButton || !hasTimePassed || hitResult == null || hitResult !is BlockHitResult) {
-            return@handler
-        }
-
-        val blockPos = hitResult.blockPos
-        val state = blockPos.stateOrEmpty
-        val activeTarget = _target
-
-        val shouldTargetBlock = mode.activeMode.shouldTarget(blockPos, state)
-        // stop when the block is clicked again
-        val isCancelledByUser = blockPos == activeTarget?.targetPos
-
-        if (activeTarget != null && shouldBlockTargetChange(activeTarget)) {
-            chronometer.reset()
-            return@handler
-        }
-
-        _target = if (shouldTargetBlock && world.worldBorder.isWithinBounds(blockPos) && !isCancelledByUser) {
-            MineTarget(blockPos.immutable)
-        } else {
-            null
-        }
-
-        chronometer.reset()
+        targetSelector.onMouseButton(event)
     }
 
     @Suppress("unused")
@@ -398,45 +177,11 @@ object ModulePacketMine : ClientModule("PacketMine", ModuleCategories.WORLD), Br
 
     @Suppress("unused")
     private val blockUpdateHandler = handler<PacketEvent> {
-        when (val packet = it.packet) {
-            is ClientboundBlockUpdatePacket -> {
-                mc.execute { updatePosOnChange(packet.pos, packet.blockState) }
-            }
-
-            is ClientboundSectionBlocksUpdatePacket -> {
-                mc.execute {
-                    packet.runUpdates(::updatePosOnChange)
-                }
-            }
-        }
-    }
-
-    private fun updatePosOnChange(pos: BlockPos, state: BlockState) {
-        val target = _target ?: return
-        if (pos != target.targetPos) {
-            return
-        }
-
-        if (state.isAir && mode.activeMode.stopOnStateChange) {
-            _target = null
-        }
+        targetSelector.onPacket(it.packet)
     }
 
     fun setTarget(blockPos: BlockPos) {
-        val state = blockPos.state
-        val shouldTargetBlock = state != null && mode.activeMode.shouldTarget(blockPos, state)
-        if (!shouldTargetBlock || !world.worldBorder.isWithinBounds(blockPos)) {
-            return
-        }
-
-        val activeTarget = _target
-        if (activeTarget != null && shouldBlockTargetChange(activeTarget)) {
-            return
-        }
-
-        if (activeTarget?.finished != false && mode.activeMode.canManuallyChange || activeTarget == null) {
-            _target = MineTarget(blockPos.immutable)
-        }
+        targetSelector.setTarget(blockPos)
     }
 
     @Suppress("FunctionNaming", "FunctionName")

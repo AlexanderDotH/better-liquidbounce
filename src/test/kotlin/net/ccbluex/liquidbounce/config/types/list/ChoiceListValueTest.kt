@@ -19,7 +19,8 @@
 
 package net.ccbluex.liquidbounce.config.types.list
 
-import net.ccbluex.liquidbounce.config.types.list.Tagged.Companion.makeLookupTable
+import net.ccbluex.liquidbounce.common.Tagged
+import net.ccbluex.liquidbounce.common.Tagged.Companion.makeLookupTable
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Test
 

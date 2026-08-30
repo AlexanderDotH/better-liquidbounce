@@ -19,6 +19,7 @@
 
 package net.ccbluex.liquidbounce.injection.mixins.minecraft.entity;
 
+import net.ccbluex.liquidbounce.common.EntityFluidTrackerAccess;
 import net.minecraft.world.phys.Vec3;
 import org.jspecify.annotations.NullMarked;
 import org.spongepowered.asm.mixin.Mixin;
@@ -26,29 +27,37 @@ import org.spongepowered.asm.mixin.gen.Accessor;
 
 @NullMarked
 @Mixin(targets = "net.minecraft.world.entity.EntityFluidInteraction$Tracker")
-public interface MixinEntityFluidInteractionTrackerAccessor {
+public interface MixinEntityFluidInteractionTrackerAccessor extends EntityFluidTrackerAccess {
 
+    @Override
     @Accessor("height")
     double height();
 
+    @Override
     @Accessor("height")
     void height(double height);
 
+    @Override
     @Accessor("eyesInside")
     boolean eyesInside();
 
+    @Override
     @Accessor("eyesInside")
     void eyesInside(boolean eyesInside);
 
+    @Override
     @Accessor("accumulatedCurrent")
     Vec3 accumulatedCurrent();
 
+    @Override
     @Accessor("accumulatedCurrent")
     void accumulatedCurrent(Vec3 accumulatedCurrent);
 
+    @Override
     @Accessor("currentCount")
     int currentCount();
 
+    @Override
     @Accessor("currentCount")
     void currentCount(int currentCount);
 

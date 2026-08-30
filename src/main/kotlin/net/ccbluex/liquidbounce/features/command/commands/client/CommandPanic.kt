@@ -19,15 +19,16 @@
 
 package net.ccbluex.liquidbounce.features.command.commands.client
 
-import net.ccbluex.liquidbounce.config.autoconfig.AutoConfig
+import net.ccbluex.liquidbounce.features.autoconfig.AutoConfig
 import net.ccbluex.liquidbounce.features.command.Command
 import net.ccbluex.liquidbounce.features.command.CommandException
 import net.ccbluex.liquidbounce.features.command.builder.CommandBuilder
 import net.ccbluex.liquidbounce.features.command.builder.ParameterBuilder
+import net.ccbluex.liquidbounce.features.module.ClientModule
 import net.ccbluex.liquidbounce.features.module.ModuleCategories
 import net.ccbluex.liquidbounce.features.module.ModuleManager
-import net.ccbluex.liquidbounce.utils.client.chat
-import net.ccbluex.liquidbounce.utils.client.regular
+import net.ccbluex.liquidbounce.features.chat.chat
+import net.ccbluex.liquidbounce.utils.text.regular
 import net.minecraft.network.chat.MutableComponent
 
 /**
@@ -48,39 +49,38 @@ object CommandPanic : Command.Factory {
                     .build()
             )
             .handler {
-                var modules = ModuleManager.filter { it.running }
-                val msg: MutableComponent
-
-                when (val type = args.getOrNull(0) as String? ?: "nonrender") {
-                    "all" -> msg = command.result("disabledAllModules")
-                    "nonrender" -> {
-                        modules = modules.filter {
-                            it.category != ModuleCategories.RENDER
-                        }
-                        msg = command.result("disabledAllCategoryModules", command.result("nonRender"))
-                    }
-
-                    else -> {
-                        val category = ModuleCategories.byName(type)
-                            ?: throw CommandException(command.result("categoryNotFound", type))
-                        modules = modules.filter { it.category == category }
-                        msg = command.result("disabledAllCategoryModules", category.tag)
-                    }
-                }
-
-                runCatching {
-                    AutoConfig.withLoading {
-                        for (module in modules) {
-                            module.enabled = false
-                        }
-                    }
-                }.onSuccess {
-                    chat(regular(msg), command)
-                }.onFailure {
-                    throw CommandException(command.result("panicFailed"))
-                }
+                executePanic(command, args)
             }
             .build()
+    }
+
+    private fun executePanic(command: Command, arguments: Array<out Any>) {
+        val type = arguments.getOrNull(0) as String? ?: "nonrender"
+        val (modules, message) = panicSelection(command, type)
+        runCatching {
+            AutoConfig.withLoading {
+                modules.forEach { module -> module.enabled = false }
+            }
+        }.onSuccess {
+            chat(regular(message), command)
+        }.onFailure {
+            throw CommandException(command.result("panicFailed"))
+        }
+    }
+
+    private fun panicSelection(command: Command, type: String): Pair<List<ClientModule>, MutableComponent> {
+        val running = ModuleManager.filter { module -> module.running }
+        if (type == "all") {
+            return running to command.result("disabledAllModules")
+        }
+        if (type == "nonrender") {
+            val modules = running.filter { module -> module.category != ModuleCategories.RENDER }
+            return modules to command.result("disabledAllCategoryModules", command.result("nonRender"))
+        }
+        val category = ModuleCategories.byName(type)
+            ?: throw CommandException(command.result("categoryNotFound", type))
+        return running.filter { module -> module.category == category } to
+            command.result("disabledAllCategoryModules", category.tag)
     }
 
 }

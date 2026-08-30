@@ -2,7 +2,7 @@
     import {createEventDispatcher} from "svelte";
     import type {ModuleSetting, TextSetting,} from "../../../integration/types";
     import {convertToSpacedString, spaceSeperatedNames} from "../../../theme/theme_config";
-    import {cefTextInput} from "./common/cefTextInput";
+    import {cefTextInput} from "../../../integration/input/cefTextInput";
 
     export let setting: ModuleSetting;
 

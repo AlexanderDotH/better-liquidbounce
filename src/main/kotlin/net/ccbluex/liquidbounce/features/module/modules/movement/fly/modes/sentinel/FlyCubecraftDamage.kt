@@ -20,29 +20,22 @@
 package net.ccbluex.liquidbounce.features.module.modules.movement.fly.modes.sentinel
 
 import net.ccbluex.liquidbounce.config.types.group.Mode
-import net.ccbluex.liquidbounce.config.types.group.ModeValueGroup
 import net.ccbluex.liquidbounce.config.types.group.ToggleableValueGroup
-import net.ccbluex.liquidbounce.config.types.list.Tagged
 import net.ccbluex.liquidbounce.event.events.PacketEvent
 import net.ccbluex.liquidbounce.event.events.TransferOrigin
 import net.ccbluex.liquidbounce.event.handler
 import net.ccbluex.liquidbounce.event.tickHandler
-import net.ccbluex.liquidbounce.features.module.modules.movement.fly.ModuleFly
 import net.ccbluex.liquidbounce.features.module.modules.movement.fly.automation.FlyAutomationCapabilities
 import net.ccbluex.liquidbounce.features.module.modules.movement.fly.automation.FlyAutomationKind
 import net.ccbluex.liquidbounce.features.module.modules.movement.fly.automation.FlyAutomationProfile
 import net.ccbluex.liquidbounce.features.module.modules.movement.fly.automation.FlyAutomationReadiness
 import net.ccbluex.liquidbounce.features.module.modules.movement.fly.modes.flyAutomationYaw
-import net.ccbluex.liquidbounce.features.module.modules.movement.speed.ModuleSpeed
+import net.ccbluex.liquidbounce.features.module.modules.movement.speed.contract.SpeedState
 import net.ccbluex.liquidbounce.utils.kotlin.EventPriorityConvention
 import net.minecraft.network.protocol.game.ClientboundDamageEventPacket
 import net.minecraft.network.protocol.game.ClientboundSetEntityMotionPacket
 import net.minecraft.network.protocol.game.ServerboundMovePlayerPacket
-import net.minecraft.util.Mth
 import net.minecraft.world.phys.Vec3
-import kotlin.math.cos
-import kotlin.math.max
-import kotlin.math.sin
 
 /**
  * CubeCraft damage boost with a client-only look direction and a separately spoofed server yaw.
@@ -58,8 +51,6 @@ internal object FlyCubecraftDamage : Mode("CubecraftDamage"), FlyAutomationProfi
         val serverYawOffset by float("ServerYawOffset", 180f, 0f..180f, "degrees")
     }
 
-    override val parent: ModeValueGroup<*>
-        get() = ModuleFly.modes
 
     init {
         tree(FakeStrafe)
@@ -85,8 +76,8 @@ internal object FlyCubecraftDamage : Mode("CubecraftDamage"), FlyAutomationProfi
         }
 
     override fun enable() {
-        if (ModuleSpeed.enabled) {
-            ModuleSpeed.enabled = false
+        if (SpeedState.enabled) {
+            SpeedState.disable()
         }
 
         cycle = CubecraftDamageFlyCycle(player.y, damageTimeout)
@@ -193,31 +184,7 @@ internal object FlyCubecraftDamage : Mode("CubecraftDamage"), FlyAutomationProfi
             )
         )
 
-        when (damageMethod) {
-            CubecraftSelfDamageMethod.VERUS -> damageVerus()
-            CubecraftSelfDamageMethod.SENTINEL -> damageSentinel()
-        }
-    }
-
-    private fun damageVerus() {
-        sendPosition(player.y, onGround = false)
-        sendPosition(player.y + VERUS_VERTICAL_OFFSET, onGround = false)
-        sendPosition(player.y, onGround = false)
-        sendPosition(player.y, onGround = true)
-    }
-
-    private fun damageSentinel() {
-        val baseY = player.y
-        var offsetY = SENTINEL_INITIAL_OFFSET
-        var motionY = 0.0
-
-        while (offsetY > 0.0) {
-            sendPosition(baseY + offsetY, onGround = offsetY == SENTINEL_INITIAL_OFFSET)
-            offsetY += motionY
-            motionY = (motionY - SENTINEL_GRAVITY) * SENTINEL_DRAG
-        }
-
-        sendPosition(baseY, onGround = true)
+        performCubecraftSelfDamage(damageMethod, player.y, ::sendPosition)
     }
 
     private fun sendPosition(y: Double, onGround: Boolean) {
@@ -255,134 +222,4 @@ internal object FlyCubecraftDamage : Mode("CubecraftDamage"), FlyAutomationProfi
         )
     }
 
-    private const val VERUS_VERTICAL_OFFSET = 3.25
-    private const val SENTINEL_INITIAL_OFFSET = 4.0
-    private const val SENTINEL_GRAVITY = 0.08
-    private const val SENTINEL_DRAG = 0.98
-
-}
-
-internal enum class CubecraftSelfDamageMethod(override val tag: String) : Tagged {
-    VERUS("Verus"),
-    SENTINEL("Sentinel"),
-}
-
-internal enum class CubecraftDamageFlyAction {
-    NONE,
-    TRIGGER_DAMAGE,
-    APPLY_BOOST,
-    RESTORE_YAW,
-}
-
-internal class CubecraftDamageFlyCycle(
-    startY: Double,
-    private val timeoutTicks: Int,
-) {
-
-    private enum class State {
-        ARMED,
-        AWAITING_DAMAGE,
-        HURT,
-    }
-
-    private var state = State.ARMED
-    private var startY = startY
-    private var remainingTicks = timeoutTicks
-
-    val acceptsVelocity: Boolean
-        get() = state != State.ARMED
-
-    val boostActive: Boolean
-        get() = state == State.HURT
-
-    val spoofServerYaw: Boolean
-        get() = state != State.ARMED
-
-    init {
-        require(timeoutTicks > 0) { "Timeout must be positive" }
-    }
-
-    fun tick(
-        currentY: Double,
-        hurtTime: Int,
-        damageConfirmed: Boolean = false,
-    ): CubecraftDamageFlyAction {
-        return when (state) {
-            State.ARMED -> when {
-                damageConfirmed || hurtTime > 0 -> beginHurt(currentY)
-                currentY < startY - HEIGHT_EPSILON -> {
-                    state = State.AWAITING_DAMAGE
-                    remainingTicks = timeoutTicks
-                    CubecraftDamageFlyAction.TRIGGER_DAMAGE
-                }
-                else -> CubecraftDamageFlyAction.NONE
-            }
-            State.AWAITING_DAMAGE -> {
-                if (damageConfirmed || hurtTime > 0) {
-                    beginHurt(currentY)
-                } else {
-                    remainingTicks--
-                    if (remainingTicks <= 0) {
-                        rearm(currentY)
-                        CubecraftDamageFlyAction.RESTORE_YAW
-                    } else {
-                        CubecraftDamageFlyAction.NONE
-                    }
-                }
-            }
-            State.HURT -> {
-                if (hurtTime <= 0 && !damageConfirmed) {
-                    rearm(currentY)
-                    CubecraftDamageFlyAction.RESTORE_YAW
-                } else {
-                    CubecraftDamageFlyAction.NONE
-                }
-            }
-        }
-    }
-
-    fun cancel() {
-        state = State.ARMED
-    }
-
-    private fun beginHurt(currentY: Double): CubecraftDamageFlyAction {
-        startY = currentY
-        state = State.HURT
-        return CubecraftDamageFlyAction.APPLY_BOOST
-    }
-
-    private fun rearm(currentY: Double) {
-        startY = currentY
-        state = State.ARMED
-    }
-
-    private companion object {
-        const val HEIGHT_EPSILON = 0.01
-    }
-
-}
-
-internal fun cubecraftDamageServerYaw(
-    clientYaw: Float,
-    fakeStrafe: Boolean,
-    yawOffset: Float,
-): Float {
-    return Mth.wrapDegrees(clientYaw + if (fakeStrafe) yawOffset else 0f)
-}
-
-internal fun redirectCubecraftDamageKnockback(
-    velocity: Vec3,
-    clientYaw: Float,
-    minimumHorizontalSpeed: Double,
-    minimumVerticalSpeed: Double,
-): Vec3 {
-    val horizontalSpeed = max(velocity.horizontalDistance(), minimumHorizontalSpeed)
-    val verticalSpeed = max(velocity.y, minimumVerticalSpeed)
-    val yawRadians = Math.toRadians(clientYaw.toDouble())
-
-    return Vec3(
-        -sin(yawRadians) * horizontalSpeed,
-        verticalSpeed,
-        cos(yawRadians) * horizontalSpeed,
-    )
 }

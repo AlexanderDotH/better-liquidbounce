@@ -18,35 +18,24 @@
  */
 package net.ccbluex.liquidbounce.features.module.modules.movement
 
-import net.ccbluex.liquidbounce.config.types.list.Tagged
 import net.ccbluex.liquidbounce.event.events.BlockShapeEvent
 import net.ccbluex.liquidbounce.event.events.MovementInputEvent
 import net.ccbluex.liquidbounce.event.handler
 import net.ccbluex.liquidbounce.features.module.ClientModule
 import net.ccbluex.liquidbounce.features.module.ModuleCategories
 import net.ccbluex.liquidbounce.features.module.modules.movement.avoidhazards.AvoidHazardInputPlanner
-import net.ccbluex.liquidbounce.features.module.modules.movement.avoidhazards.isLadderClimbState
-import net.ccbluex.liquidbounce.utils.block.getBlock
+import net.ccbluex.liquidbounce.features.module.modules.movement.avoidhazards.AvoidHazardCollision
+import net.ccbluex.liquidbounce.features.module.modules.movement.avoidhazards.Avoid
+import net.ccbluex.liquidbounce.features.module.modules.movement.avoidhazards.AvoidMode
+import net.ccbluex.liquidbounce.features.module.modules.movement.avoidhazards.isLadderClimbStateAt
 import net.ccbluex.liquidbounce.utils.block.state
 import net.ccbluex.liquidbounce.utils.entity.SimulatedPlayer
-import net.ccbluex.liquidbounce.utils.entity.isOnMagmaBlock
 import net.ccbluex.liquidbounce.utils.kotlin.EventPriorityConvention.SAFETY_FEATURE
-import net.ccbluex.liquidbounce.utils.math.iterateBlockPos
 import net.ccbluex.liquidbounce.utils.math.toBlockPos
 import net.ccbluex.liquidbounce.utils.movement.DirectionalInput
 import net.minecraft.client.multiplayer.ClientLevel
 import net.minecraft.core.BlockPos
-import net.minecraft.world.level.block.BasePressurePlateBlock
 import net.minecraft.world.level.block.Block
-import net.minecraft.world.level.block.CactusBlock
-import net.minecraft.world.level.block.FireBlock
-import net.minecraft.world.level.block.MagmaBlock
-import net.minecraft.world.level.block.PowderSnowBlock
-import net.minecraft.world.level.block.SweetBerryBushBlock
-import net.minecraft.world.level.block.WebBlock
-import net.minecraft.world.level.block.WitherRoseBlock
-import net.minecraft.world.level.material.FluidState
-import net.minecraft.world.level.material.Fluids
 import net.minecraft.world.phys.AABB
 import net.minecraft.world.phys.shapes.Shapes
 
@@ -63,7 +52,6 @@ object ModuleAvoidHazards : ClientModule("AvoidHazards", ModuleCategories.MOVEME
     val cobWebs get() = Avoid.COBWEB in avoid
 
     private const val MOVEMENT_PREDICTION_TICKS = 2
-    private const val CACTUS_BLOCK_MARGIN = 0.001
 
     @Suppress("MagicNumber")
     private val UNSAFE_BLOCK_CAP = Block.box(
@@ -139,8 +127,8 @@ object ModuleAvoidHazards : ClientModule("AvoidHazards", ModuleCategories.MOVEME
                     wouldEnterLadderClimbState(simulatedPlayer)
 
             if (enteredLadder ||
-                isHazardCollision(currentBoundingBox, level, avoidModes) ||
-                isHazardCollision(sweptBoundingBox, level, avoidModes)
+                AvoidHazardCollision.isUnsafe(currentBoundingBox, level, avoidModes) ||
+                AvoidHazardCollision.isUnsafe(sweptBoundingBox, level, avoidModes)
             ) {
                 return false
             }
@@ -162,102 +150,4 @@ object ModuleAvoidHazards : ClientModule("AvoidHazards", ModuleCategories.MOVEME
         return isLadderClimbStateAt(simulatedPlayer.pos.toBlockPos())
     }
 
-    private fun isLadderClimbStateAt(pos: BlockPos): Boolean {
-        val currentState = pos.state ?: return false
-        return isLadderClimbState(currentState, pos.below().state)
-    }
-
-    @Suppress("CognitiveComplexMethod")
-    private fun isHazardCollision(
-        boundingBox: AABB,
-        level: ClientLevel,
-        avoidModes: Collection<Avoid>
-    ): Boolean {
-        if (Avoid.MAGMA in avoidModes && boundingBox.isOnMagmaBlock()) {
-            return true
-        }
-
-        return boundingBox.iterateBlockPos().any { pos ->
-            val blockState = pos.state ?: return@any false
-            val fluidState = blockState.fluidState
-            val block = blockState.block
-
-            avoidModes.any { avoidMode ->
-                when (avoidMode) {
-                    Avoid.MAGMA -> false
-                    Avoid.LAVA -> {
-                        if (!avoidMode.test(block, fluidState, pos)) {
-                            false
-                        } else {
-                            val fluidShape = fluidState.getShape(level, pos)
-                            !fluidShape.isEmpty && boundingBox.intersects(fluidShape.bounds().move(pos))
-                        }
-                    }
-                    Avoid.CACTI -> {
-                        if (!avoidMode.test(block, fluidState, pos)) {
-                            false
-                        } else {
-                            // Cactus damage is handled by entity-inside logic, which can trigger on block-cell
-                            // contact. Use the whole block cell for conservative prediction.
-                            val expandedBox = boundingBox.inflate(CACTUS_BLOCK_MARGIN, 0.0, CACTUS_BLOCK_MARGIN)
-                            expandedBox.intersects(pos)
-                        }
-                    }
-                    else -> {
-                        if (!avoidMode.test(block, fluidState, pos)) {
-                            false
-                        } else {
-                            val shape = blockState.getShape(level, pos)
-                            !shape.isEmpty && boundingBox.intersects(shape.bounds().move(pos))
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    private enum class AvoidMode(
-        override val tag: String,
-        override val tagAliases: List<String> = emptyList(),
-    ) : Tagged {
-        SHAPE("Shape"),
-        INPUT("Input", listOf("Movement")),
-    }
-
-    private enum class Avoid(
-        override val tag: String,
-        val fullCube: Boolean = true,
-        val test: (block: Block, fluidState: FluidState, pos: BlockPos) -> Boolean
-    ) : Tagged {
-        CACTI("Cacti", test = { block, _, _ ->
-            block is CactusBlock
-        }),
-        BERRY_BUSH("BerryBush", test = { block, _, _ ->
-            block is SweetBerryBushBlock
-        }),
-        FIRE("Fire", test = { block, _, _ ->
-            block is FireBlock
-        }),
-        COBWEB("Cobwebs", test = { block, _, _ ->
-            block is WebBlock
-        }),
-        LADDERS("Ladders", test = { _, _, pos ->
-            isLadderClimbStateAt(pos)
-        }),
-        PRESSURE_PLATES("PressurePlates", fullCube = false, test = { block, _, _ ->
-            block is BasePressurePlateBlock
-        }),
-        MAGMA("MagmaBlocks", fullCube = false, test = { _, _, pos ->
-            pos.below().getBlock() is MagmaBlock
-        }),
-        LAVA("Lava", test = { _, fluidState, _ ->
-            fluidState.`is`(Fluids.LAVA) || fluidState.`is`(Fluids.FLOWING_LAVA)
-        }),
-        WITHER_ROSE("WitherRose", test = { block, _, _ ->
-            block is WitherRoseBlock
-        }),
-        POWDER_SNOW("PowderSnow", test = { block, _, _ ->
-            block is PowderSnowBlock
-        })
-    }
 }

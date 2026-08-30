@@ -1,7 +1,7 @@
 <script lang="ts">
     import VirtualList from "./VirtualList.svelte";
     import type {NamedItem} from "../../../../integration/types.ts";
-    import {cefTextInput} from "../common/cefTextInput";
+    import {cefTextInput} from "../../../../integration/input/cefTextInput";
 
     export let items: NamedItem[];
 

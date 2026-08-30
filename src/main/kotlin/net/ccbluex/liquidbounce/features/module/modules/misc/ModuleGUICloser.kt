@@ -20,15 +20,15 @@
 package net.ccbluex.liquidbounce.features.module.modules.misc
 
 import net.ccbluex.liquidbounce.config.ConfigSystem
-import net.ccbluex.liquidbounce.config.types.list.Tagged
+import net.ccbluex.liquidbounce.common.Tagged
 import net.ccbluex.liquidbounce.event.events.ScreenEvent
 import net.ccbluex.liquidbounce.event.handler
 import net.ccbluex.liquidbounce.features.module.ClientModule
 import net.ccbluex.liquidbounce.features.module.ModuleCategories
-import net.ccbluex.liquidbounce.utils.client.chat
-import net.ccbluex.liquidbounce.utils.client.copyable
-import net.ccbluex.liquidbounce.utils.client.highlight
-import net.ccbluex.liquidbounce.utils.client.regular
+import net.ccbluex.liquidbounce.features.chat.chat
+import net.ccbluex.liquidbounce.utils.text.copyable
+import net.ccbluex.liquidbounce.utils.text.highlight
+import net.ccbluex.liquidbounce.utils.text.regular
 import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen
 import net.minecraft.network.chat.Component
 

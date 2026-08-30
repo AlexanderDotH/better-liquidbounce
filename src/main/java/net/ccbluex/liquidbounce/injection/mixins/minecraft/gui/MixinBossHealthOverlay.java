@@ -18,7 +18,6 @@
  */
 package net.ccbluex.liquidbounce.injection.mixins.minecraft.gui;
 
-import net.ccbluex.liquidbounce.features.module.modules.render.DoRender;
 import net.ccbluex.liquidbounce.features.module.modules.render.ModuleAntiBlind;
 import net.minecraft.client.gui.components.BossHealthOverlay;
 import org.spongepowered.asm.mixin.Mixin;
@@ -31,7 +30,7 @@ public abstract class MixinBossHealthOverlay {
 
     @Inject(method = "extractRenderState", at = @At("HEAD"), cancellable = true)
     private void hookRenderStatusEffectOverlay(CallbackInfo ci) {
-        if (!ModuleAntiBlind.canRender(DoRender.BOSS_BARS)) {
+        if (!ModuleAntiBlind.canRenderBossBars()) {
             ci.cancel();
         }
     }

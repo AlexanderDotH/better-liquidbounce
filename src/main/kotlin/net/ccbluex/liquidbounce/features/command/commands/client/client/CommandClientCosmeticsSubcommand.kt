@@ -19,13 +19,13 @@
 package net.ccbluex.liquidbounce.features.command.commands.client.client
 
 import kotlinx.coroutines.suspendCancellableCoroutine
-import net.ccbluex.liquidbounce.features.command.CommandExecutor.suspendHandler
+import net.ccbluex.liquidbounce.features.command.CommandRuntime.suspendHandler
 import net.ccbluex.liquidbounce.features.command.builder.CommandBuilder
 import net.ccbluex.liquidbounce.features.cosmetic.ClientAccountManager
 import net.ccbluex.liquidbounce.features.cosmetic.CosmeticService
 import net.ccbluex.liquidbounce.utils.client.browseUrl
-import net.ccbluex.liquidbounce.utils.client.chat
-import net.ccbluex.liquidbounce.utils.client.regular
+import net.ccbluex.liquidbounce.features.chat.chat
+import net.ccbluex.liquidbounce.utils.text.regular
 import kotlin.coroutines.resume
 
 object CommandClientCosmeticsSubcommand {

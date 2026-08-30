@@ -26,7 +26,8 @@ import net.ccbluex.liquidbounce.config.gson.stategies.Exclude
 import net.ccbluex.liquidbounce.config.gson.stategies.ProtocolExclude
 import net.ccbluex.liquidbounce.config.types.Value
 import net.ccbluex.liquidbounce.config.types.ValueType
-import net.ccbluex.liquidbounce.config.types.list.Tagged.Companion.makeLookupTable
+import net.ccbluex.liquidbounce.common.Tagged
+import net.ccbluex.liquidbounce.common.Tagged.Companion.makeLookupTable
 import java.util.SequencedSet
 
 class MultiChoiceListValue<T : Tagged>(

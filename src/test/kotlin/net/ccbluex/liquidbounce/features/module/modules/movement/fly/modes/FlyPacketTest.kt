@@ -191,6 +191,21 @@ class FlyPacketTest {
     }
 
     @Test
+    fun `ordinary final packet rejects and clears a plan with an undelivered auxiliary`() {
+        val auxiliary = ServerboundMovePlayerPacket.StatusOnly(false, false)
+        val vanillaFinal = ServerboundMovePlayerPacket.Pos(4.0, 70.0, -2.0, false, false)
+        val tracker = PacketFlyDeliveryTracker<ServerboundMovePlayerPacket>()
+        tracker.stage(listOf(auxiliary))
+        tracker.expectFinalPacket(vanillaFinal)
+
+        val result = tracker.confirm(vanillaFinal, delivered = true)
+
+        assertEquals(PacketFlyDeliveryResult.FINAL_REJECTED, result)
+        assertFalse(tracker.active)
+        assertEquals(0, tracker.deliveredAuxiliaryCount)
+    }
+
+    @Test
     fun `ordinary final packet must preserve the collision resolved endpoint`() {
         val endpoint = Vec3(4.0, 70.0, -2.0)
 

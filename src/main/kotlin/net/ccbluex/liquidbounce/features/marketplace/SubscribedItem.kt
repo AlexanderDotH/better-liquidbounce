@@ -21,15 +21,15 @@ package net.ccbluex.liquidbounce.features.marketplace
 
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import net.ccbluex.liquidbounce.LiquidBounce.logger
 import net.ccbluex.liquidbounce.api.core.HttpClient.download
+import net.ccbluex.liquidbounce.common.task.ResourceTask
 import net.ccbluex.liquidbounce.api.models.marketplace.MarketplaceItem
 import net.ccbluex.liquidbounce.api.models.marketplace.MarketplaceItemStatus
 import net.ccbluex.liquidbounce.api.models.marketplace.MarketplaceItemType
 import net.ccbluex.liquidbounce.api.services.marketplace.MarketplaceApi
 import net.ccbluex.liquidbounce.config.ConfigSystem
-import net.ccbluex.liquidbounce.integration.task.type.ResourceTask
-import net.ccbluex.liquidbounce.mcef.listeners.OkHttpProgressInterceptor
+import net.ccbluex.liquidbounce.api.core.HttpProgressListener
+import net.ccbluex.liquidbounce.utils.client.logger
 import net.ccbluex.liquidbounce.utils.io.extractZip
 import net.ccbluex.liquidbounce.utils.kotlin.MinecraftDispatcher
 import java.io.File
@@ -113,61 +113,73 @@ data class SubscribedItem(val name: String, val id: Int, val type: MarketplaceIt
     }
 
     suspend fun install(revisionId: Int, subTask: ResourceTask? = null) {
-        // The revision is already installed, no need to install it again.
-        if (revisionId == installedRevisionId) {
-            return
-        }
+        if (revisionId == installedRevisionId) return
+        prepareItemDirectory()
+        val paths = revisionPaths(revisionId)
+        installRevision(revisionId, paths, subTask)
+        deletePreviousRevision(paths.previousRevisionDir)
+        reloadItemType()
+    }
 
+    private fun prepareItemDirectory() {
         check(itemDir.exists() && !itemDir.isFile || itemDir.mkdirs()) {
             itemDir.delete()
             "Failed to create item root directory"
         }
+    }
 
-        val revisionUrl = MarketplaceApi.downloadRevision(id, revisionId)
+    private fun revisionPaths(revisionId: Int): RevisionPaths {
         val revisionArchiveFile = itemDir.resolve("$id.zip")
         check(!revisionArchiveFile.exists() || revisionArchiveFile.delete()) {
             "Failed to delete existing revision file"
         }
+        return RevisionPaths(
+            downloadUrl = MarketplaceApi.downloadRevision(id, revisionId),
+            archiveFile = revisionArchiveFile,
+            revisionDir = itemDir.resolve(revisionId.toString()),
+            previousRevisionDir = installedRevisionId?.let { itemDir.resolve(it.toString()) },
+        )
+    }
 
-        val revisionDir = itemDir.resolve(revisionId.toString())
-        val previousRevisionDir = installedRevisionId?.let { itemDir.resolve(it.toString()) }
-
+    private suspend fun installRevision(revisionId: Int, paths: RevisionPaths, subTask: ResourceTask?) {
         try {
-            val taskProgressUpdater = subTask?.let { subTask ->
-                OkHttpProgressInterceptor.ProgressListener { bytesRead, contentLength, _ ->
-                    subTask.update(bytesRead, contentLength)
-                }
-            }
-
             withContext(Dispatchers.IO) {
-                download(revisionUrl, revisionArchiveFile, progressListener = taskProgressUpdater)
+                download(paths.downloadUrl, paths.archiveFile, progressListener = progressListener(subTask))
                 // TODO: Check checksum
-                extractZip(revisionArchiveFile, revisionDir)
+                extractZip(paths.archiveFile, paths.revisionDir)
             }
-
             installedRevisionId = revisionId
             ConfigSystem.store(MarketplaceManager)
         } catch (exception: Exception) {
-            if (revisionDir.exists()) {
-                revisionDir.deleteRecursively()
-            }
-
+            if (paths.revisionDir.exists()) paths.revisionDir.deleteRecursively()
             throw exception
         } finally {
-            revisionArchiveFile.delete()
+            paths.archiveFile.delete()
         }
+    }
 
+    private fun progressListener(subTask: ResourceTask?) = subTask?.let {
+        HttpProgressListener { bytesRead, contentLength, _ -> it.update(bytesRead, contentLength) }
+    }
+
+    private fun deletePreviousRevision(previousRevisionDir: File?) {
         try {
             previousRevisionDir?.deleteRecursively()
         } catch (exception: Exception) {
             logger.warn("Failed to delete previous revision directory", exception)
         }
+    }
 
-        // Reload the item type's manager on the render thread.
+    private suspend fun reloadItemType() {
         withContext(MinecraftDispatcher) {
-            type.reload()
+            MarketplaceContentReloadBridge.reload(type)
         }
     }
 
-
+    private data class RevisionPaths(
+        val downloadUrl: String,
+        val archiveFile: File,
+        val revisionDir: File,
+        val previousRevisionDir: File?,
+    )
 }

@@ -21,27 +21,15 @@ import net.ccbluex.liquidbounce.features.litematica.integration.api.LitematicaPo
 import net.ccbluex.liquidbounce.features.module.ClientModule
 import net.ccbluex.liquidbounce.features.module.MinecraftShortcuts
 import net.ccbluex.liquidbounce.utils.aiming.RotationManager
-import net.ccbluex.liquidbounce.utils.aiming.RotationsValueGroup
-import net.ccbluex.liquidbounce.utils.aiming.data.Rotation
-import net.ccbluex.liquidbounce.utils.aiming.utils.raytraceBlockRotation
+import net.ccbluex.liquidbounce.features.rotation.RotationsValueGroup
 import net.ccbluex.liquidbounce.utils.block.SwingMode
-import net.ccbluex.liquidbounce.utils.block.doBreak
-import net.ccbluex.liquidbounce.utils.block.doPlacement
+import net.ccbluex.liquidbounce.features.block.runtime.doBreak
+import net.ccbluex.liquidbounce.features.block.runtime.doPlacement
 import net.ccbluex.liquidbounce.utils.client.SilentHotbar
 import net.ccbluex.liquidbounce.utils.client.SilentHotbarSelectionPolicy
 import net.ccbluex.liquidbounce.utils.inventory.HotbarItemSlot
-import net.ccbluex.liquidbounce.utils.inventory.Slots
-import net.ccbluex.liquidbounce.utils.inventory.findClosestSlot
 import net.ccbluex.liquidbounce.utils.kotlin.Priority
-import net.ccbluex.liquidbounce.utils.raytracing.raytraceBlock
 import net.ccbluex.liquidbounce.utils.raytracing.traceFromPlayer
-import net.minecraft.core.Direction
-import net.minecraft.core.registries.BuiltInRegistries
-import net.minecraft.resources.Identifier
-import net.minecraft.world.item.Item
-import net.minecraft.world.item.Items
-import net.minecraft.world.phys.BlockHitResult
-import net.minecraft.world.phys.Vec3
 
 enum class LitematicaExecutionResult {
     SUBMITTED,
@@ -49,12 +37,13 @@ enum class LitematicaExecutionResult {
     UNAVAILABLE,
 }
 
-@Suppress("TooManyFunctions")
 class MinecraftLitematicaActionDriver(
     private val module: ClientModule,
     private val rotations: RotationsValueGroup,
 ) : MinecraftShortcuts {
 
+    private val preparer = LitematicaActionPreparer()
+    private val slotResolver = LitematicaMaterialSlotResolver()
     private var prepared: PreparedAction? = null
 
     fun requestAim(
@@ -62,7 +51,7 @@ class MinecraftLitematicaActionDriver(
         interaction: LitematicaCellInteractionSnapshot?,
         range: Double,
     ): Boolean {
-        val prepared = prepare(action, interaction, range) ?: return false
+        val prepared = preparer.prepare(action, interaction, range) ?: return false
         this.prepared = prepared
         RotationManager.setRotationTarget(
             rotation = prepared.rotation,
@@ -93,7 +82,7 @@ class MinecraftLitematicaActionDriver(
         resetDelayTicks: Int,
     ): LitematicaExecutionResult {
         val prepared = prepared?.takeIf { it.action == action } ?: return LitematicaExecutionResult.UNAVAILABLE
-        val slot = findSlot(action, materialId) ?: return LitematicaExecutionResult.UNAVAILABLE
+        val slot = slotResolver.findSlot(action, materialId) ?: return LitematicaExecutionResult.UNAVAILABLE
         if (!select(slot, resetDelayTicks)) return LitematicaExecutionResult.UNAVAILABLE
 
         return when (action.kind) {
@@ -134,73 +123,6 @@ class MinecraftLitematicaActionDriver(
         prepared = null
     }
 
-    private fun prepare(
-        action: LitematicaPrintAction,
-        interaction: LitematicaCellInteractionSnapshot?,
-        range: Double,
-    ): PreparedAction? = when (action.kind) {
-        LitematicaActionKind.BREAK -> prepareBreak(action, range)
-        LitematicaActionKind.FLUID_PICKUP,
-        LitematicaActionKind.FLUID_PLACE,
-        -> prepareFluid(action, interaction)
-        LitematicaActionKind.PLACE,
-        LitematicaActionKind.AIR_PLACE,
-        -> preparePlacement(action, interaction)
-    }
-
-    private fun prepareBreak(action: LitematicaPrintAction, range: Double): PreparedAction? {
-        val position = action.target.toBlockPos()
-        val state = world.getBlockState(position)
-        val target = raytraceBlockRotation(player.eyePosition, position, state, range, range) ?: return null
-        val hit = raytraceBlock(range + 1.0, target.rotation, position, state) ?: return null
-        return PreparedAction(action, target.rotation, hit, null, null)
-    }
-
-    private fun prepareFluid(
-        action: LitematicaPrintAction,
-        interaction: LitematicaCellInteractionSnapshot?,
-    ): PreparedAction? {
-        val position = action.target.toBlockPos()
-        if (action.kind == LitematicaActionKind.FLUID_PLACE) {
-            val neighbor = interaction?.neighborHitResult ?: return null
-            return PreparedAction(
-                action = action,
-                rotation = Rotation.lookingAt(interaction.rotationTarget, player.eyePosition),
-                hitResult = neighbor,
-                interaction = interaction,
-                strategy = LitematicaEasyPlaceStrategy.NEIGHBOR,
-            )
-        }
-        val point = Vec3.atCenterOf(position)
-        return PreparedAction(
-            action = action,
-            rotation = Rotation.lookingAt(point, player.eyePosition),
-            hitResult = BlockHitResult(point, Direction.UP, position, false),
-            interaction = null,
-            strategy = null,
-        )
-    }
-
-    private fun preparePlacement(
-        action: LitematicaPrintAction,
-        interaction: LitematicaCellInteractionSnapshot?,
-    ): PreparedAction? {
-        interaction ?: return null
-        if (action.kind != LitematicaActionKind.AIR_PLACE && interaction.neighborHitResult == null) return null
-        val strategy = if (interaction.neighborHitResult != null) {
-            LitematicaEasyPlaceStrategy.NEIGHBOR
-        } else {
-            LitematicaEasyPlaceStrategy.DIRECT_AIR_PLACE
-        }
-        return PreparedAction(
-            action = action,
-            rotation = Rotation.lookingAt(interaction.rotationTarget, player.eyePosition),
-            hitResult = interaction.neighborHitResult,
-            interaction = interaction,
-            strategy = strategy,
-        )
-    }
-
     private fun executeEasyPlace(
         prepared: PreparedAction,
         slot: HotbarItemSlot,
@@ -231,18 +153,6 @@ class MinecraftLitematicaActionDriver(
         }
     }
 
-    private fun findSlot(action: LitematicaPrintAction, materialId: String?): HotbarItemSlot? {
-        val item = when (action.kind) {
-            LitematicaActionKind.BREAK -> return HotbarItemSlot(player.inventory.selectedSlot)
-            LitematicaActionKind.FLUID_PICKUP -> Items.BUCKET
-            LitematicaActionKind.FLUID_PLACE -> fluidBucket(action.desired.id)
-            LitematicaActionKind.PLACE,
-            LitematicaActionKind.AIR_PLACE,
-            -> materialId?.let(::registryItem)
-        } ?: return null
-        return Slots.OffhandWithHotbar.findClosestSlot(item)
-    }
-
     private fun select(slot: HotbarItemSlot, resetDelayTicks: Int): Boolean =
         slot.isOffHand || SilentHotbar.selectSlotSilently(
             module,
@@ -250,26 +160,6 @@ class MinecraftLitematicaActionDriver(
             resetDelayTicks.coerceAtLeast(1),
             SilentHotbarSelectionPolicy.SERVER_ONLY,
         )
-
-    private fun registryItem(id: String): Item? {
-        val identifier = Identifier.tryParse(id) ?: return null
-        if (!BuiltInRegistries.ITEM.containsKey(identifier)) return null
-        return BuiltInRegistries.ITEM.getValue(identifier)
-    }
-
-    private fun fluidBucket(fluidId: String): Item? = when (fluidId) {
-        "minecraft:water" -> Items.WATER_BUCKET
-        "minecraft:lava" -> Items.LAVA_BUCKET
-        else -> null
-    }
-
-    private data class PreparedAction(
-        val action: LitematicaPrintAction,
-        val rotation: Rotation,
-        val hitResult: BlockHitResult?,
-        val interaction: LitematicaCellInteractionSnapshot?,
-        val strategy: LitematicaEasyPlaceStrategy?,
-    )
 
     private companion object {
         const val ROTATION_TOLERANCE = 2.0f

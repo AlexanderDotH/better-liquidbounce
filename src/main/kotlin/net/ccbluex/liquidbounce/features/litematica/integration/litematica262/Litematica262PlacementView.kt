@@ -10,42 +10,16 @@
  */
 package net.ccbluex.liquidbounce.features.litematica.integration.litematica262
 
-import fi.dy.masa.litematica.data.DataManager
-import fi.dy.masa.litematica.schematic.container.LitematicaBlockStateContainer
 import fi.dy.masa.litematica.schematic.placement.SchematicPlacement
 import fi.dy.masa.litematica.schematic.placement.SubRegionPlacement
-import fi.dy.masa.litematica.util.PositionUtils
 import net.ccbluex.liquidbounce.features.litematica.domain.LitematicaBounds
 import net.ccbluex.liquidbounce.features.litematica.domain.LitematicaPlacementId
 import net.ccbluex.liquidbounce.features.litematica.domain.LitematicaPosition
 import net.ccbluex.liquidbounce.features.litematica.integration.api.LitematicaPlacementMetadataSnapshot
 import net.minecraft.core.BlockPos
-import net.minecraft.nbt.CompoundTag
-import net.minecraft.world.level.block.Blocks
-import net.minecraft.world.level.block.Mirror
-import net.minecraft.world.level.block.Rotation
 import net.minecraft.world.level.block.state.BlockState
-import kotlin.math.abs
 import kotlin.math.max
 import kotlin.math.min
-
-internal class Litematica262PlacementIndex private constructor(
-    val views: List<Litematica262PlacementView>,
-) {
-    val metadata: List<LitematicaPlacementMetadataSnapshot> = views.map(Litematica262PlacementView::metadata)
-    val fingerprint: Int = views.map(Litematica262PlacementView::fingerprint).hashCode()
-
-    fun placement(id: LitematicaPlacementId): SchematicPlacement? =
-        views.firstOrNull { it.metadata.id == id }?.placement
-
-    companion object {
-        fun capture(): Litematica262PlacementIndex {
-            val layer = Litematica262RenderLayer.snapshot()
-            val placements = DataManager.getSchematicPlacementManager().allSchematicsPlacements
-            return Litematica262PlacementIndex(placements.mapNotNull { Litematica262PlacementView.create(it, layer) })
-        }
-    }
-}
 
 internal class Litematica262PlacementView private constructor(
     val placement: SchematicPlacement,
@@ -66,7 +40,6 @@ internal class Litematica262PlacementView private constructor(
         ): Litematica262PlacementView? {
             val allBoxes = placement.getSubRegionBoxes(SubRegionPlacement.RequiredEnabled.ANY)
             if (allBoxes.isEmpty()) return null
-            val renderedBoxes = placement.getSubRegionBoxes(SubRegionPlacement.RequiredEnabled.RENDERING_ENABLED)
             val bounds = allBoxes.values.mapNotNull { box ->
                 val first = box.pos1 ?: return@mapNotNull null
                 val second = box.pos2 ?: return@mapNotNull null
@@ -74,20 +47,33 @@ internal class Litematica262PlacementView private constructor(
             }.reduceOrNull(::enclosing) ?: return null
             val id = LitematicaPlacementId(placement.hashId.toString())
             val name = placement.name.takeIf(String::isNotBlank) ?: "Placement ${id.value.take(8)}"
+            val rendered = captureRenderedSubRegions(placement)
             val metadata = LitematicaPlacementMetadataSnapshot(
                 id = id,
                 name = name,
                 enabled = placement.isEnabled,
-                rendered = renderLayer.renderingEnabled && placement.isRenderingEnabled && renderedBoxes.isNotEmpty(),
+                rendered = renderLayer.renderingEnabled && placement.isRenderingEnabled && rendered.hasBoxes,
                 bounds = bounds,
                 renderLayer = renderLayer.layer,
             )
+            val fingerprint = listOf(
+                metadata,
+                placement.origin,
+                placement.mirror,
+                placement.rotation,
+                rendered.views.map(SubRegionView::fingerprint),
+            ).hashCode()
+            return Litematica262PlacementView(placement, metadata, rendered.views, fingerprint)
+        }
+
+        private fun captureRenderedSubRegions(placement: SchematicPlacement): RenderedSubRegions {
+            val boxes = placement.getSubRegionBoxes(SubRegionPlacement.RequiredEnabled.RENDERING_ENABLED)
             val schematic = placement.schematic
-            val subRegions = renderedBoxes.keys.mapNotNull { regionName ->
+            val views = boxes.keys.mapNotNull { regionName ->
                 val relative = placement.getRelativeSubRegionPlacement(regionName) ?: return@mapNotNull null
                 val size = schematic.getAreaSize(regionName) ?: return@mapNotNull null
                 val container = schematic.getSubRegionContainer(regionName) ?: return@mapNotNull null
-                val box = renderedBoxes[regionName] ?: return@mapNotNull null
+                val box = boxes[regionName] ?: return@mapNotNull null
                 val first = box.pos1 ?: return@mapNotNull null
                 val second = box.pos2 ?: return@mapNotNull null
                 SubRegionView.create(
@@ -99,15 +85,13 @@ internal class Litematica262PlacementView private constructor(
                     blockBounds(first, second),
                 )
             }
-            val fingerprint = listOf(
-                metadata,
-                placement.origin,
-                placement.mirror,
-                placement.rotation,
-                subRegions.map(SubRegionView::fingerprint),
-            ).hashCode()
-            return Litematica262PlacementView(placement, metadata, subRegions, fingerprint)
+            return RenderedSubRegions(boxes.isNotEmpty(), views)
         }
+
+        private data class RenderedSubRegions(
+            val hasBoxes: Boolean,
+            val views: List<SubRegionView>,
+        )
 
         private fun blockBounds(first: BlockPos, second: BlockPos) = LitematicaBounds(
             min = LitematicaPosition(min(first.x, second.x), min(first.y, second.y), min(first.z, second.z)),
@@ -133,111 +117,6 @@ internal class Litematica262PlacementView private constructor(
         val reproducible: Boolean,
     )
 
-    private class SubRegionView(
-        private val placement: SchematicPlacement,
-        private val relative: SubRegionPlacement,
-        private val size: BlockPos,
-        private val container: LitematicaBlockStateContainer,
-        private val blockEntities: Map<BlockPos, CompoundTag>,
-        private val bounds: LitematicaBounds,
-        private val minRelative: BlockPos,
-        private val transformedRegionPosition: BlockPos,
-    ) {
-        val fingerprint: Int = listOf(
-            relative.name,
-            relative.pos,
-            relative.mirror,
-            relative.rotation,
-            relative.isEnabled,
-            relative.isRenderingEnabled,
-            size,
-            bounds,
-        ).hashCode()
-
-        fun desiredAt(worldPosition: BlockPos): DesiredCell? {
-            if (!bounds.contains(worldPosition.toPosition())) return null
-            val local = localPosition(worldPosition)
-            if (local.x !in 0 until abs(size.x) || local.y !in 0 until abs(size.y) || local.z !in 0 until abs(size.z)) {
-                return null
-            }
-            var state = container.get(local.x, local.y, local.z)
-            if (state.block === Blocks.STRUCTURE_VOID) return null
-            state = transformState(state)
-            return DesiredCell(
-                state = state,
-                reproducible = blockEntities[local]?.hasCustomData() != true,
-            )
-        }
-
-        private fun localPosition(worldPosition: BlockPos): BlockPos {
-            val transformed = worldPosition.subtract(placement.origin).subtract(transformedRegionPosition)
-            val withoutSub = PositionUtils.getReverseTransformedBlockPos(
-                transformed,
-                relative.mirror,
-                relative.rotation,
-            )
-            val withoutMain = PositionUtils.getReverseTransformedBlockPos(
-                withoutSub,
-                placement.mirror,
-                placement.rotation,
-            )
-            return BlockPos(
-                withoutMain.x - minRelative.x + relative.pos.x,
-                withoutMain.y - minRelative.y + relative.pos.y,
-                withoutMain.z - minRelative.z + relative.pos.z,
-            )
-        }
-
-        private fun transformState(source: BlockState): BlockState {
-            var state = source
-            if (placement.mirror != Mirror.NONE) state = state.mirror(placement.mirror)
-            val subMirror = adjustedSubMirror()
-            if (subMirror != Mirror.NONE) state = state.mirror(subMirror)
-            val rotation = placement.rotation.getRotated(relative.rotation)
-            if (rotation != Rotation.NONE) state = state.rotate(rotation)
-            return state
-        }
-
-        private fun adjustedSubMirror(): Mirror {
-            val mirror = relative.mirror
-            if (mirror == Mirror.NONE || placement.rotation !in QUARTER_TURNS) return mirror
-            return if (mirror == Mirror.FRONT_BACK) Mirror.LEFT_RIGHT else Mirror.FRONT_BACK
-        }
-
-        companion object {
-            private val QUARTER_TURNS = setOf(Rotation.CLOCKWISE_90, Rotation.COUNTERCLOCKWISE_90)
-            private val POSITION_ONLY_NBT = setOf("id", "x", "y", "z", "keepPacked")
-
-            fun create(
-                placement: SchematicPlacement,
-                relative: SubRegionPlacement,
-                size: BlockPos,
-                container: LitematicaBlockStateContainer,
-                blockEntities: Map<BlockPos, CompoundTag>,
-                bounds: LitematicaBounds,
-            ): SubRegionView {
-                val end = PositionUtils.getRelativeEndPositionFromAreaSize(size).offset(relative.pos)
-                val minRelative = PositionUtils.getMinCorner(relative.pos, end)
-                val transformedRegion = PositionUtils.getTransformedBlockPos(
-                    relative.pos,
-                    placement.mirror,
-                    placement.rotation,
-                )
-                return SubRegionView(
-                    placement,
-                    relative,
-                    size,
-                    container,
-                    blockEntities,
-                    bounds,
-                    minRelative,
-                    transformedRegion,
-                )
-            }
-
-            private fun CompoundTag.hasCustomData(): Boolean = keySet().any { it !in POSITION_ONLY_NBT }
-        }
-    }
 }
 
 private fun BlockPos.toPosition() = LitematicaPosition(x, y, z)

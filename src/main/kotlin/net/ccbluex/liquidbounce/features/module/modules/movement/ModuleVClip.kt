@@ -20,7 +20,7 @@ import net.ccbluex.liquidbounce.event.events.NotificationEvent
 import net.ccbluex.liquidbounce.event.events.PacketEvent
 import net.ccbluex.liquidbounce.event.events.PlayerJumpEvent
 import net.ccbluex.liquidbounce.event.events.TransferOrigin
-import net.ccbluex.liquidbounce.event.events.WorldRenderEvent
+import net.ccbluex.liquidbounce.render.events.WorldRenderEvent
 import net.ccbluex.liquidbounce.event.handler
 import net.ccbluex.liquidbounce.features.module.ClientModule
 import net.ccbluex.liquidbounce.features.module.ModuleCategories
@@ -40,10 +40,13 @@ import net.ccbluex.liquidbounce.features.module.modules.movement.vclip.VClipPosi
 import net.ccbluex.liquidbounce.features.module.modules.movement.vclip.VClipSmartTarget
 import net.ccbluex.liquidbounce.features.module.modules.movement.vclip.VClipTargetMode
 import net.ccbluex.liquidbounce.features.module.modules.movement.vclip.VClipVanillaMode
+import net.ccbluex.liquidbounce.features.module.modules.movement.vclip.acceptsVClipControlInput
+import net.ccbluex.liquidbounce.features.module.modules.movement.vclip.isVClipRidingJumpAction
 import net.ccbluex.liquidbounce.features.module.modules.movement.vclip.migrateLegacyVClipBedrockSafety
+import net.ccbluex.liquidbounce.features.module.modules.movement.vclip.runtime.VClipMovementTransport
 import net.ccbluex.liquidbounce.render.drawBlockSelection
 import net.ccbluex.liquidbounce.render.renderEnvironment
-import net.ccbluex.liquidbounce.utils.client.notification
+import net.ccbluex.liquidbounce.features.chat.notification
 import net.ccbluex.liquidbounce.utils.kotlin.EventPriorityConvention.READ_FINAL_STATE
 import net.ccbluex.liquidbounce.utils.movement.remote.RemoteMovementOwnership
 import net.minecraft.network.protocol.game.ServerboundMovePlayerPacket
@@ -77,6 +80,8 @@ object ModuleVClip : ClientModule(
     private val inputController = VClipInputController()
     private val packetDeliveryTracker = VClipPacketDeliveryTracker()
     private var landingIndicators = emptyList<VClipLandingIndicatorState>()
+
+    init { VClipMovementTransport.bind(::sendMovementPacket) }
 
     override fun prepareDeserialize(jsonObject: JsonObject) {
         super.prepareDeserialize(jsonObject)
@@ -155,7 +160,7 @@ object ModuleVClip : ClientModule(
             return@handler
         }
 
-        finalizeProtectedMovement(event)
+        packetDeliveryTracker.finalizeProtectedMovement(event)
         when (val packet = event.packet) {
             is ServerboundPlayerInputPacket -> {
                 val suppression = inputSuppression()
@@ -166,7 +171,7 @@ object ModuleVClip : ClientModule(
                 }
             }
             is ServerboundPlayerCommandPacket -> if (
-                packet.action.isRidingJumpAction &&
+                packet.action.isVClipRidingJumpAction &&
                 inputSuppression().jump
             ) {
                 event.cancelEvent()
@@ -230,19 +235,4 @@ object ModuleVClip : ClientModule(
         return VClipInputSuppression.resolve(smartLockActive, modifierHeld)
     }
 
-    private fun finalizeProtectedMovement(event: PacketEvent) {
-        val packet = event.packet as? ServerboundMovePlayerPacket ?: return
-        if (!packetDeliveryTracker.reassertRequiredState(packet)) {
-            return
-        }
-
-        packetDeliveryTracker.confirmFinalState(packet, event.isCancelled)
-    }
-
-    private val ServerboundPlayerCommandPacket.Action.isRidingJumpAction: Boolean
-        get() = this == ServerboundPlayerCommandPacket.Action.START_RIDING_JUMP ||
-            this == ServerboundPlayerCommandPacket.Action.STOP_RIDING_JUMP
 }
-
-internal fun acceptsVClipControlInput(screenOpen: Boolean, remoteMovementOwned: Boolean): Boolean =
-    !screenOpen && !remoteMovementOwned

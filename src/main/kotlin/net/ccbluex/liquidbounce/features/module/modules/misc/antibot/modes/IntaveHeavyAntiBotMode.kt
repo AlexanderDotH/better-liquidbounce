@@ -21,7 +21,7 @@ package net.ccbluex.liquidbounce.features.module.modules.misc.antibot.modes
 import net.ccbluex.fastutil.objectHashSetOf
 import net.ccbluex.liquidbounce.event.events.PacketEvent
 import net.ccbluex.liquidbounce.event.handler
-import net.ccbluex.liquidbounce.features.module.modules.misc.antibot.ModuleAntiBot
+import net.ccbluex.liquidbounce.features.module.modules.misc.antibot.contract.AntiBotProfileBridge
 import net.minecraft.network.protocol.game.ClientboundPlayerInfoRemovePacket
 import net.minecraft.network.protocol.game.ClientboundPlayerInfoUpdatePacket
 import net.minecraft.world.entity.player.Player
@@ -108,7 +108,7 @@ object IntaveHeavyAntiBotMode : AntiBotMode("IntaveHeavy") {
         for (entry in entries) {
             val profile = entry.profile ?: continue
 
-            if (entry.latency < 2 || ModuleAntiBot.isGameProfileUnique(profile)) {
+            if (entry.latency < 2 || AntiBotProfileBridge.isUnique(profile)) {
                 continue
             }
 

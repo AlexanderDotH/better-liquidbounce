@@ -26,7 +26,7 @@ import java.io.IOException
  */
 @Throws(IOException::class)
 fun BufferedSource.readNbsData(): NbsData {
-    val header = readNbsHeader()
+    val header = NbsHeaderReader(this).read()
     val noteBlocks = mutableListOf<NbsNoteBlock>()
 
     // Parse note blocks
@@ -58,84 +58,6 @@ fun BufferedSource.readNbsData(): NbsData {
     }
 
     return NbsData(header = header, noteBlocks = noteBlocks)
-}
-
-@Suppress("detekt:LongMethod")
-@Throws(IOException::class)
-private fun BufferedSource.readNbsHeader(): NbsHeader {
-    // Determine the format by reading the first short
-    val firstShort = this.readShortLe()
-    val version: Byte
-    val vanillaInstrumentCount: Byte
-    val songLength: Short
-
-    if (firstShort.toInt() == 0) {
-        // New format
-        version = this.readByte()
-        vanillaInstrumentCount = this.readByte()
-        songLength = if (version >= 3) this.readShortLe() else 0
-    } else {
-        // Old format
-        songLength = firstShort
-        vanillaInstrumentCount = 10 // Default for old format (instruments 0-9)
-        version = 0
-    }
-
-    // Read common header fields
-    val layerCount = this.readShortLe() // Song height in old format
-    val songName = this.readString()
-    val songAuthor = this.readString()
-    val songOriginalAuthor = this.readString()
-    val songDescription = this.readString()
-    val tempo = this.readShortLe()
-    val autoSaving = this.readByte()
-    val autoSavingDuration = this.readByte()
-    val timeSignature = this.readByte()
-    val minutesSpent = this.readIntLe()
-    val leftClicks = this.readIntLe()
-    val rightClicks = this.readIntLe()
-    val noteBlocksAdded = this.readIntLe() // Blocks added in old format
-    val noteBlocksRemoved = this.readIntLe() // Blocks removed in old format
-    val midiFileName = this.readString()
-
-    // New format-specific fields (loop settings)
-    var loopOnOff: Byte = 0
-    var maxLoopCount: Byte = 0
-    var loopStartTick: Short = 0
-    if (version >= 4) {
-        loopOnOff = this.readByte()
-        maxLoopCount = this.readByte()
-        loopStartTick = this.readShortLe()
-    }
-
-    return NbsHeader(
-        version = version,
-        vanillaInstrumentCount = vanillaInstrumentCount,
-        songLength = songLength,
-        layerCount = layerCount,
-        songName = songName,
-        songAuthor = songAuthor,
-        songOriginalAuthor = songOriginalAuthor,
-        songDescription = songDescription,
-        tempo = tempo,
-        autoSaving = autoSaving,
-        autoSavingDuration = autoSavingDuration,
-        timeSignature = timeSignature,
-        minutesSpent = minutesSpent,
-        leftClicks = leftClicks,
-        rightClicks = rightClicks,
-        noteBlocksAdded = noteBlocksAdded,
-        noteBlocksRemoved = noteBlocksRemoved,
-        midiFileName = midiFileName,
-        loopOnOff = loopOnOff,
-        maxLoopCount = maxLoopCount,
-        loopStartTick = loopStartTick,
-    )
-}
-
-@Throws(IOException::class)
-private fun BufferedSource.readString(): String {
-    return readUtf8(readIntLe().toLong())
 }
 
 @Throws(IOException::class)

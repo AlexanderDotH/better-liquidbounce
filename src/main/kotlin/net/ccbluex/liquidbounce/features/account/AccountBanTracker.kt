@@ -22,7 +22,6 @@ import net.ccbluex.liquidbounce.event.EventListener
 import net.ccbluex.liquidbounce.event.events.PacketEvent
 import net.ccbluex.liquidbounce.event.events.TransferOrigin
 import net.ccbluex.liquidbounce.event.handler
-import net.ccbluex.liquidbounce.utils.client.ServerObserver
 import net.ccbluex.liquidbounce.utils.client.mc
 import net.ccbluex.liquidbounce.utils.text.stripMinecraftColorCodes
 import net.minecraft.network.protocol.Packet
@@ -57,6 +56,8 @@ internal fun parseAccountBanMessage(message: String, now: Long = System.currentT
 
 object AccountBanTracker : EventListener {
 
+    private val serverEndpoint = AccountServerEndpoint
+
     @Suppress("unused")
     private val packetHandler = handler<PacketEvent> { event ->
         if (event.origin != TransferOrigin.INCOMING || !event.original) {
@@ -65,7 +66,7 @@ object AccountBanTracker : EventListener {
 
         val reason = disconnectReason(event.packet) ?: return@handler
         val ban = parseAccountBanMessage(reason) ?: return@handler
-        val serverName = ServerObserver.serverAddress?.host ?: return@handler
+        val serverName = serverEndpoint.serverName ?: return@handler
 
         mc.execute {
             AccountManager.trackCurrentAccountBan(serverName, ban.reason, ban.bannedUntil)

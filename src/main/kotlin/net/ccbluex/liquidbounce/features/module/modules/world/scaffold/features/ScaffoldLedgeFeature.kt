@@ -21,7 +21,7 @@ package net.ccbluex.liquidbounce.features.module.modules.world.scaffold.features
 import net.ccbluex.liquidbounce.features.module.modules.render.ModuleDebug
 import net.ccbluex.liquidbounce.features.module.modules.world.scaffold.ModuleScaffold
 import net.ccbluex.liquidbounce.utils.aiming.data.Rotation
-import net.ccbluex.liquidbounce.utils.block.targetfinding.BlockPlacementTarget
+import net.ccbluex.liquidbounce.features.block.contract.BlockPlacementTarget
 import net.ccbluex.liquidbounce.utils.client.player
 import net.ccbluex.liquidbounce.utils.entity.isCloseToEdge
 import kotlin.math.max

@@ -21,7 +21,7 @@ package net.ccbluex.liquidbounce.integration.screen.impl
 
 import net.ccbluex.liquidbounce.additions.setPosition
 import net.ccbluex.liquidbounce.features.module.modules.render.ModuleHud
-import net.ccbluex.liquidbounce.features.module.modules.render.shouldSuppressNativeClickGuiBackground
+import net.ccbluex.liquidbounce.features.module.modules.render.clickgui.shouldSuppressNativeClickGuiBackground
 import net.ccbluex.liquidbounce.integration.interop.protocol.rest.v1.game.isTyping
 import net.ccbluex.liquidbounce.integration.screen.CustomScreenType
 import net.ccbluex.liquidbounce.integration.screen.ScreenManager
@@ -85,7 +85,10 @@ class CustomStandaloneMinecraftScreen(
     }
 
     private fun suppressesNativeBackground() =
-        shouldSuppressNativeClickGuiBackground(screenType)
+        shouldSuppressNativeClickGuiBackground(
+            isClickGui = screenType == CustomScreenType.CLICK_GUI,
+            isBaritoneDashboard = screenType == CustomScreenType.BARITONE,
+        )
 
     private fun isHudEditorActive() =
         screenType == CustomScreenType.CLICK_GUI && ModuleHud.hudEditorSelected

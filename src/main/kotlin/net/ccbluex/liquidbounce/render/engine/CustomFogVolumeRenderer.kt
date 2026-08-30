@@ -19,15 +19,17 @@
 
 package net.ccbluex.liquidbounce.render.engine
 
+import net.ccbluex.liquidbounce.render.engine.distanthorizons.DistantHorizonsDepthTexture
+import net.ccbluex.liquidbounce.render.engine.distanthorizons.DistantHorizonsDepthTextureProvider
+import net.ccbluex.liquidbounce.render.engine.distanthorizons.DistantHorizonsFogDistanceMapping
+import net.ccbluex.liquidbounce.render.engine.distanthorizons.distantHorizonsFogSaturationDistance
+
 import com.mojang.blaze3d.pipeline.RenderTarget
 import com.mojang.blaze3d.systems.RenderSystem
 import com.mojang.blaze3d.textures.FilterMode
 import net.ccbluex.liquidbounce.event.EventListener
 import net.ccbluex.liquidbounce.event.events.ClientShutdownEvent
 import net.ccbluex.liquidbounce.event.handler
-import net.ccbluex.liquidbounce.features.module.MinecraftShortcuts
-import net.ccbluex.liquidbounce.features.module.modules.render.customambience.ModuleCustomAmbience.FogValueGroup
-import net.ccbluex.liquidbounce.features.module.modules.world.nuker.ModuleNuker
 import net.ccbluex.liquidbounce.render.ClientRenderPipelines
 import net.ccbluex.liquidbounce.render.ClientUniformDefine
 import net.ccbluex.liquidbounce.render.buffers.CachedUniform
@@ -43,7 +45,7 @@ import org.joml.Matrix4fc
 import org.joml.Vector4f
 
 /** Composites moving world-space fog without sampling or blurring the rendered terrain color. */
-object CustomFogVolumeRenderer : MinecraftShortcuts, EventListener {
+object CustomFogVolumeRenderer : EventListener {
 
     private val depthSampler = RenderSystem.getSamplerCache().getClampToEdge(FilterMode.NEAREST)
     private val volumeData = CachedUniform<FogVolumeUniform>(ClientUniformDefine.FOG_VOLUME) { value ->
@@ -81,13 +83,13 @@ object CustomFogVolumeRenderer : MinecraftShortcuts, EventListener {
 
     @JvmStatic
     fun render(target: RenderTarget, cameraState: CameraRenderState, projectionMatrix: Matrix4fc) {
-        if (!inGame || !FogValueGroup.shouldRenderVolume) return
+        if (!inGame || !CustomFogRenderBridge.activity().shouldRenderVolume) return
         if (target.width <= 0 || target.height <= 0) return
 
         val depthTexture = target.depthTextureView ?: return
         val distantHorizonsDepth = DistantHorizonsDepthTextureProvider.resolve(target.width, target.height)
         val dhDepthTexture = distantHorizonsDepth?.textureView ?: depthTexture
-        val fogData = cameraState.fogData.also(FogValueGroup::modifyFogData)
+        val fogData = cameraState.fogData.also(CustomFogRenderBridge::modifyFogData)
         val uniform = volumeData.get(snapshot(cameraState, projectionMatrix, fogData, distantHorizonsDepth))
 
         IrisPipelineBypass.run {
@@ -110,15 +112,8 @@ object CustomFogVolumeRenderer : MinecraftShortcuts, EventListener {
         fogData: FogData,
         distantHorizonsDepth: DistantHorizonsDepthTexture?,
     ): FogVolumeUniform {
-        val multiLayer = FogValueGroup.VolumetricFog.MultiLayerFog
+        val volume = CustomFogRenderBridge.volumeSettings()
         val maxDistance = volumetricFogMaxDistance(fogData.environmentalEnd, fogData.renderDistanceEnd)
-        val dhFogDistance = distantHorizonsFogSaturationDistance(
-            fogData.environmentalEnd,
-            fogData.renderDistanceEnd,
-        )
-        val dhDistanceMapping = distantHorizonsDepth?.let { depth ->
-            DistantHorizonsFogDistanceMapping.from(depth.nearClipPlane, depth.farClipPlane, dhFogDistance)
-        } ?: DistantHorizonsFogDistanceMapping.from(0f, 0f, dhFogDistance)
         return FogVolumeUniform(
             inverseProjection = Matrix4f(projectionMatrix).invert(),
             inverseViewRotation = Matrix4f(cameraState.viewRotationMatrix).invert(),
@@ -129,22 +124,35 @@ object CustomFogVolumeRenderer : MinecraftShortcuts, EventListener {
             cameraY = wrapVolumetricFogCoordinate(cameraState.pos.y),
             cameraZ = wrapVolumetricFogCoordinate(cameraState.pos.z),
             time = clientStartDurationMs / 1000f * VOLUME_SPEED,
-            strength = volumetricFogStrength(FogValueGroup.VolumetricFog.strength) *
-                volumetricInteractionStrength(ModuleNuker.running),
+            strength = volumetricFogStrength(volume.strength) *
+                volumetricInteractionStrength(volume.interactionActive),
             maxDistance = maxDistance,
-            cameraClearRadius = volumetricCameraClearRadius(FogValueGroup.VolumetricFog.cameraClearRadius),
+            cameraClearRadius = volumetricCameraClearRadius(volume.cameraClearRadius),
             zeroToOneDepth = gpuDevice.deviceInfo.isZZeroToOne,
             dhClearDepth = distantHorizonsDepth?.clearDepth,
             dhZeroToOneDepth = distantHorizonsDepth?.zeroToOneDepth == true,
-            dhDistanceMapping = dhDistanceMapping,
+            dhDistanceMapping = distanceMapping(fogData, distantHorizonsDepth),
             layers = VolumetricFogLayerSettings.from(
-                enabled = multiLayer.running,
-                spacing = multiLayer.layerSpacing,
-                groundDensity = multiLayer.groundDensity,
-                middleDensity = multiLayer.middleDensity,
-                upperDensity = multiLayer.upperDensity,
+                enabled = volume.layers.enabled,
+                spacing = volume.layers.spacing,
+                groundDensity = volume.layers.groundDensity,
+                middleDensity = volume.layers.middleDensity,
+                upperDensity = volume.layers.upperDensity,
             ),
         )
+    }
+
+    private fun distanceMapping(
+        fogData: FogData,
+        depth: DistantHorizonsDepthTexture?,
+    ): DistantHorizonsFogDistanceMapping {
+        val saturationDistance = distantHorizonsFogSaturationDistance(
+            fogData.environmentalEnd,
+            fogData.renderDistanceEnd,
+        )
+        return depth?.let {
+            DistantHorizonsFogDistanceMapping.from(it.nearClipPlane, it.farClipPlane, saturationDistance)
+        } ?: DistantHorizonsFogDistanceMapping.from(0f, 0f, saturationDistance)
     }
 
     @Suppress("unused")

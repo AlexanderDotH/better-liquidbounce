@@ -18,39 +18,16 @@
  */
 package net.ccbluex.liquidbounce.integration.interop
 
-import io.ktor.server.application.install
 import io.ktor.server.engine.EmbeddedServer
 import io.ktor.server.engine.embeddedServer
-import io.ktor.server.http.content.singlePageApplication
-import io.ktor.server.http.content.staticFiles
 import io.ktor.server.netty.Netty
-import io.ktor.server.plugins.compression.Compression
-import io.ktor.server.plugins.statuspages.StatusPages
-import io.ktor.server.response.respond
-import io.ktor.server.routing.Route
-import io.ktor.server.routing.get
-import io.ktor.server.routing.routing
-import io.ktor.server.websocket.WebSockets
-import io.ktor.server.websocket.pingPeriod
-import io.ktor.server.websocket.webSocket
-import net.ccbluex.liquidbounce.LiquidBounce
-import net.ccbluex.liquidbounce.config.gson.interopGson
-import net.ccbluex.liquidbounce.features.marketplace.MarketplaceManager
-import net.ccbluex.liquidbounce.integration.interop.middleware.AuthPlugin
-import net.ccbluex.liquidbounce.integration.interop.middleware.isWebSocketAuthenticated
 import net.ccbluex.liquidbounce.integration.interop.protocol.event.SocketEventListener
-import net.ccbluex.liquidbounce.integration.interop.protocol.event.WebSocketSessionManager
-import net.ccbluex.liquidbounce.integration.interop.protocol.rest.v1.registerInteropFunctions
-import net.ccbluex.liquidbounce.integration.interop.protocol.rest.v1.respondJsonWriter
-import net.ccbluex.liquidbounce.integration.theme.Theme
-import net.ccbluex.liquidbounce.integration.theme.ThemeManager
 import net.ccbluex.liquidbounce.utils.client.env
 import net.ccbluex.liquidbounce.utils.client.error.ErrorHandler
 import net.ccbluex.liquidbounce.utils.client.logger
 import org.apache.commons.lang3.RandomStringUtils
 import java.net.BindException
 import java.net.ServerSocket
-import kotlin.time.Duration.Companion.seconds
 
 /**
  * A client server implementation.
@@ -95,61 +72,7 @@ object ClientInteropServer {
     private suspend fun startServer(port: Int, authCode: String): Int {
         return try {
             val engine = embeddedServer(Netty, host = "127.0.0.1", port = port) {
-                install(StatusPages) {
-                    exception<HttpStatusException> { call, cause ->
-                        call.respond(cause.status, cause.body)
-                    }
-                }
-
-                installGson(interopGson)
-
-                installCors()
-
-                install(Compression) {
-                    default()
-                }
-
-                install(AuthPlugin) {
-                    this.authCode = authCode
-                }
-
-                install(WebSockets) {
-                    this.pingPeriod = 15.seconds
-                }
-
-                routing {
-                    // WebSocket endpoint
-                    webSocket("/") {
-                        val authenticated = isWebSocketAuthenticated(this, authCode)
-                            || ThemeManager.isThemeExternal
-                        if (!authenticated) {
-                            logger.warn("[Interop] Unauthenticated web socket upgrade request")
-                            return@webSocket
-                        }
-
-                        WebSocketSessionManager.add(this)
-
-                        try {
-                            this.closeReason.await()
-                        } finally {
-                            WebSocketSessionManager.remove(this)
-                        }
-                    }
-
-                    rootResponse()
-
-                    registerInteropFunctions()
-
-                    // Static file serving
-                    staticFiles("/local", ThemeManager.themesFolder)
-                    staticFiles("/marketplace", MarketplaceManager.marketplaceRoot)
-
-                    singlePageApplication {
-                        applicationRoute = "/${Theme.Origin.RESOURCE.tag}/${LiquidBounce.CLIENT_NAME.lowercase()}"
-                        filesPath = "resources/liquidbounce/themes/${LiquidBounce.CLIENT_NAME.lowercase()}"
-                        useResources = true
-                    }
-                }
+                configureClientInterop(authCode)
             }
 
             engine.start(wait = false)
@@ -166,16 +89,6 @@ object ClientInteropServer {
             startServer((15001..17000).random(), authCode)
         } catch (exception: Exception) {
             ErrorHandler.fatal(exception, additionalMessage = "Start interop server")
-        }
-    }
-
-    private fun Route.rootResponse() = get("/") {
-        call.respondJsonWriter {
-            beginObject()
-            name("name").value(LiquidBounce.CLIENT_NAME)
-            name("version").value(LiquidBounce.clientVersion)
-            name("author").value(LiquidBounce.CLIENT_AUTHOR)
-            endObject()
         }
     }
 

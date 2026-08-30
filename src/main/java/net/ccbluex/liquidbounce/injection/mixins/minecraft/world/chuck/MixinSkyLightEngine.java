@@ -19,7 +19,6 @@
 
 package net.ccbluex.liquidbounce.injection.mixins.minecraft.world.chuck;
 
-import net.ccbluex.liquidbounce.features.module.modules.render.DoRender;
 import net.ccbluex.liquidbounce.features.module.modules.render.ModuleAntiBlind;
 import net.minecraft.world.level.lighting.SkyLightEngine;
 import org.spongepowered.asm.mixin.Mixin;
@@ -31,7 +30,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 public abstract class MixinSkyLightEngine {
     @Inject(at = @At("HEAD"), method = "propagateIncrease", cancellable = true)
     private void hookNoBlindSkyLightUpdates(long blockPos, long l, int lightLevel, CallbackInfo ci) {
-        if (!ModuleAntiBlind.canRender(DoRender.SKYLIGHT_UPDATES)) {
+        if (!ModuleAntiBlind.canRenderSkylightUpdates()) {
             ci.cancel();
         }
     }

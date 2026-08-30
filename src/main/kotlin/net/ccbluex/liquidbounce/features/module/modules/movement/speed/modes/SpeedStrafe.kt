@@ -62,7 +62,7 @@ class SpeedStrafe(override val parent: ModeValueGroup<*>) : Mode("Strafe") {
                 return@handler
             }
 
-            event.action = BlinkManager.Action.QUEUE
+            event.action = net.ccbluex.liquidbounce.event.events.BlinkPacketAction.QUEUE
         }
 
     }

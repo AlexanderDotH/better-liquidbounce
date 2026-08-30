@@ -23,7 +23,7 @@ import com.google.common.collect.Ordering
 import net.ccbluex.fastutil.mapToArray
 import net.ccbluex.fastutil.synchronized
 import net.ccbluex.liquidbounce.config.types.group.ValueGroup
-import net.ccbluex.liquidbounce.event.events.WorldRenderEvent
+import net.ccbluex.liquidbounce.render.events.WorldRenderEvent
 import net.ccbluex.liquidbounce.event.handler
 import net.ccbluex.liquidbounce.features.module.ClientModule
 import net.ccbluex.liquidbounce.features.module.ModuleCategories
@@ -32,7 +32,7 @@ import net.ccbluex.liquidbounce.render.drawBox
 import net.ccbluex.liquidbounce.render.engine.type.Color4b
 import net.ccbluex.liquidbounce.render.renderEnvironment
 import net.ccbluex.liquidbounce.utils.block.AbstractBlockLocationTracker
-import net.ccbluex.liquidbounce.utils.block.ChunkScanner
+import net.ccbluex.liquidbounce.features.block.runtime.ChunkScanner
 import net.ccbluex.liquidbounce.utils.collection.blockSortedSetOf
 import net.ccbluex.liquidbounce.utils.item.getBlock
 import net.ccbluex.liquidbounce.utils.math.center

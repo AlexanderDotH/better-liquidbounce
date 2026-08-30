@@ -20,7 +20,7 @@
 package net.ccbluex.liquidbounce.features.module.modules.player.autobuff
 
 import net.ccbluex.liquidbounce.config.types.group.ToggleableValueGroup
-import net.ccbluex.liquidbounce.config.types.list.Tagged
+import net.ccbluex.liquidbounce.common.Tagged
 import net.ccbluex.liquidbounce.event.events.ScheduleInventoryActionEvent
 import net.ccbluex.liquidbounce.event.handler
 import net.ccbluex.liquidbounce.event.tickHandler
@@ -32,9 +32,9 @@ import net.ccbluex.liquidbounce.features.module.modules.player.autobuff.features
 import net.ccbluex.liquidbounce.features.module.modules.player.autobuff.features.Pot
 import net.ccbluex.liquidbounce.features.module.modules.player.autobuff.features.Refill
 import net.ccbluex.liquidbounce.features.module.modules.player.autobuff.features.Soup
-import net.ccbluex.liquidbounce.utils.aiming.RotationsValueGroup
+import net.ccbluex.liquidbounce.features.rotation.RotationsValueGroup
 import net.ccbluex.liquidbounce.utils.client.SilentHotbar
-import net.ccbluex.liquidbounce.utils.combat.CombatManager
+import net.ccbluex.liquidbounce.features.combat.runtime.CombatManager
 
 object ModuleAutoBuff : ClientModule(
     name = "AutoBuff",

@@ -21,40 +21,31 @@ package net.ccbluex.liquidbounce.features.module.modules.render.hats
 
 import net.ccbluex.liquidbounce.features.module.ClientModule
 import net.ccbluex.liquidbounce.features.module.ModuleCategories
+import net.ccbluex.liquidbounce.features.module.modules.render.hats.config.HatsHeightOffset
 import net.ccbluex.liquidbounce.features.module.modules.render.hats.modes.HatsCone
 import net.ccbluex.liquidbounce.features.module.modules.render.hats.modes.HatsFlower
 import net.ccbluex.liquidbounce.features.module.modules.render.hats.modes.HatsHalo
 import net.ccbluex.liquidbounce.features.module.modules.render.hats.modes.HatsImage
 import net.ccbluex.liquidbounce.features.module.modules.render.hats.modes.HatsOrbs
 import net.ccbluex.liquidbounce.features.module.modules.render.hats.modes.HatsStar
-import net.ccbluex.liquidbounce.render.utils.AnimatedValueGroup
-import org.joml.Vector2f
 
 /**
  * @author minecrrrr
  */
 object ModuleHats : ClientModule("Hats", ModuleCategories.RENDER) {
 
-    object HeightOffset : AnimatedValueGroup("HeightOffset") {
-        override val curve = curve("Height") {
-            "Progress" x 0f..1f
-            "Offset" y 0f..2f
-            points(Vector2f(0f, 0.2f), Vector2f(1f, 0.2f))
-        }
-    }
-
     init {
-        tree(HeightOffset)
+        tree(HatsHeightOffset)
     }
 
-    val modes = choices("Mode", 0) {
+    val modes = choices("Mode", 0) { parent ->
         arrayOf(
-            HatsCone,
-            HatsHalo,
-            HatsOrbs,
-            HatsFlower,
-            HatsStar,
-            HatsImage,
+            HatsCone(parent),
+            HatsHalo(parent),
+            HatsOrbs(parent),
+            HatsFlower(parent),
+            HatsStar(parent),
+            HatsImage(parent),
         )
     }.apply { tagBy(this) }
 

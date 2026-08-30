@@ -22,7 +22,6 @@ package net.ccbluex.liquidbounce.render
 import com.mojang.blaze3d.shaders.ShaderSource
 import com.mojang.blaze3d.shaders.ShaderType
 import it.unimi.dsi.fastutil.objects.Object2ObjectOpenHashMap
-import net.ccbluex.liquidbounce.LiquidBounce
 import net.minecraft.resources.Identifier
 
 sealed class ClientShaders(val type: ShaderType) : ShaderSource {
@@ -163,10 +162,10 @@ sealed class ClientShaders(val type: ShaderType) : ShaderSource {
     }
 
     private fun newShader(id: String, path: String): Identifier {
-        val k = LiquidBounce.identifier("shader/$id")
+        val k = renderIdentifier("shader/$id")
         shaders.put(
             k,
-            LiquidBounce.resourceToString(path),
+            renderResourceToString(path),
         )?.let { error("Duplicated shader: $k") }
         return k
     }

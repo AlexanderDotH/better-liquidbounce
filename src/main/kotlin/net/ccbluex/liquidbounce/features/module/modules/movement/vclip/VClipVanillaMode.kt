@@ -10,7 +10,7 @@
  */
 package net.ccbluex.liquidbounce.features.module.modules.movement.vclip
 
-import net.ccbluex.liquidbounce.features.module.modules.movement.ModuleVClip
+import net.ccbluex.liquidbounce.features.module.modules.movement.vclip.runtime.VClipMovementTransport
 import net.minecraft.world.entity.Entity
 
 internal object VClipVanillaMode : VClipMovementMode("Vanilla") {
@@ -40,7 +40,7 @@ internal object VClipVanillaMode : VClipMovementMode("Vanilla") {
             player.yRot,
             player.xRot,
             player.horizontalCollision,
-            ModuleVClip::sendMovementPacket,
+            VClipMovementTransport::sendMovementPacket,
         )
         if (!emission.completed) {
             return VClipClipResult.FALL_PROTECTION_UNAVAILABLE

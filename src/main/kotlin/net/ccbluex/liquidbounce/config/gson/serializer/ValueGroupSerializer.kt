@@ -26,7 +26,7 @@ import net.ccbluex.liquidbounce.config.types.group.ModeValueGroup
 import net.ccbluex.liquidbounce.config.types.group.ValueGroup
 import net.ccbluex.liquidbounce.utils.client.logger
 import net.ccbluex.liquidbounce.utils.text.toLowerCamelCase
-import net.ccbluex.liquidbounce.utils.render.Alignment
+import net.ccbluex.liquidbounce.config.types.group.Alignment
 import java.lang.reflect.Type
 
 class ValueGroupSerializer(
@@ -62,8 +62,7 @@ class ValueGroupSerializer(
         /**
          * Serialize a [ValueGroup] to a read-only [JsonObject]
          *
-         * Used for interop communication by [ReadOnlyComponentSerializer]
-         * and [ReadOnlyThemeSerializer].
+         * Used for read-only component and theme interop communication.
          */
         @JvmStatic
         fun serializeReadOnly(

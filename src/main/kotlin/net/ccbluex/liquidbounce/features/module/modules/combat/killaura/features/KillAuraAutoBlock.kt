@@ -18,10 +18,8 @@
  */
 package net.ccbluex.liquidbounce.features.module.modules.combat.killaura.features
 
-import com.google.gson.JsonArray
-import com.google.gson.JsonObject
 import net.ccbluex.liquidbounce.config.types.group.ToggleableValueGroup
-import net.ccbluex.liquidbounce.config.types.list.Tagged
+import net.ccbluex.liquidbounce.common.Tagged
 import net.ccbluex.liquidbounce.config.utils.percentageChance
 import net.ccbluex.liquidbounce.event.events.BlinkPacketEvent
 import net.ccbluex.liquidbounce.event.events.GameTickEvent
@@ -29,7 +27,6 @@ import net.ccbluex.liquidbounce.event.events.PacketEvent
 import net.ccbluex.liquidbounce.event.events.TransferOrigin
 import net.ccbluex.liquidbounce.event.events.WorldChangeEvent
 import net.ccbluex.liquidbounce.event.handler
-import net.ccbluex.liquidbounce.features.blink.BlinkManager
 import net.ccbluex.liquidbounce.features.module.modules.combat.ModuleSwordBlock
 import net.ccbluex.liquidbounce.features.module.modules.combat.killaura.ModuleKillAura
 import net.ccbluex.liquidbounce.features.module.modules.combat.killaura.ModuleKillAura.RaycastMode.TRACE_ALL
@@ -43,11 +40,10 @@ import net.ccbluex.liquidbounce.utils.aiming.RotationManager
 import net.ccbluex.liquidbounce.utils.aiming.data.Rotation
 import net.ccbluex.liquidbounce.utils.client.isOlderThanOrEqual1_8
 import net.ccbluex.liquidbounce.utils.client.isBlocksAttacksExisting
-import net.ccbluex.liquidbounce.utils.network.releaseUsingItemInTickLoop
+import net.ccbluex.liquidbounce.features.network.releaseUsingItemInTickLoop
 import net.ccbluex.liquidbounce.utils.network.sendHeldItemChange
 import net.ccbluex.liquidbounce.utils.network.sendSwapItemWithOffhand
-import net.ccbluex.liquidbounce.utils.combat.shouldBeAttacked
-import net.ccbluex.liquidbounce.utils.entity.box
+import net.ccbluex.liquidbounce.features.combat.runtime.shouldBeAttacked
 import net.ccbluex.liquidbounce.utils.entity.interactBlock
 import net.ccbluex.liquidbounce.utils.entity.interactBlockLikeVanilla
 import net.ccbluex.liquidbounce.utils.entity.interactEntity
@@ -55,15 +51,11 @@ import net.ccbluex.liquidbounce.utils.entity.interactEntityLikeVanilla
 import net.ccbluex.liquidbounce.utils.entity.isBlockingServerside
 import net.ccbluex.liquidbounce.utils.entity.isSlowDueToUsingItem
 import net.ccbluex.liquidbounce.utils.entity.rotation
-import net.ccbluex.liquidbounce.utils.entity.squaredBoxedDistanceTo
 import net.ccbluex.liquidbounce.utils.entity.useItem
 import net.ccbluex.liquidbounce.utils.entity.useItemStrict
-import net.ccbluex.liquidbounce.utils.input.InputTracker.isPressedOnAny
+import net.ccbluex.liquidbounce.features.input.InputTracker.isPressedOnAny
 import net.ccbluex.liquidbounce.utils.item.isSword
-import net.ccbluex.liquidbounce.utils.math.firstHit
-import net.ccbluex.liquidbounce.utils.math.sq
 import net.ccbluex.liquidbounce.utils.raytracing.findEntityInCrosshair
-import net.ccbluex.liquidbounce.utils.raytracing.hasLineOfSight
 import net.ccbluex.liquidbounce.utils.raytracing.traceFromPlayer
 import net.minecraft.client.renderer.ItemInHandRenderer
 import net.minecraft.network.protocol.game.ServerboundPlayerActionPacket
@@ -73,7 +65,6 @@ import net.minecraft.world.InteractionHand
 import net.minecraft.world.InteractionResult
 import net.minecraft.world.item.ItemUseAnimation
 import net.minecraft.world.phys.HitResult
-import kotlin.jvm.optionals.getOrNull
 
 object KillAuraAutoBlock : ToggleableValueGroup(ModuleKillAura, "AutoBlocking", false) {
 
@@ -106,35 +97,8 @@ object KillAuraAutoBlock : ToggleableValueGroup(ModuleKillAura, "AutoBlocking", 
     private val prioritizeBlocking by boolean("PrioritizeBlocking", true)
     val onScanRange by boolean("OnScanRange", true)
 
-    /**
-     * Check if we are in danger by going through all possible targets and checking if they are looking at us.
-     */
-    private object OnlyWhenInDanger : ToggleableValueGroup(this, "OnlyWhenInDanger", false) {
-        private val tolerance by float("Tolerance", 0.3f, 0f..1f, "blocks")
-        private val forceActiveRange by floatRange("ForceActiveRange", 0f..1f, 0f..6f)
-
-        fun isInDanger(): Boolean {
-            return this.enabled && targetTracker.targets().any { target ->
-                val interactionRange = range.interactionRange.toDouble()
-                if (player.squaredBoxedDistanceTo(target) > interactionRange.sq()) {
-                    return@any false
-                }
-
-                val eyes = target.eyePosition
-                val lookEnd = eyes.add(target.rotation.directionVector.scale(interactionRange))
-                val toleratedBox = player.box.inflate(tolerance.toDouble())
-                val hitPosition = toleratedBox.firstHit(eyes, lookEnd) ?: return@any false
-                val distance = eyes.distanceTo(hitPosition)
-
-                distance in forceActiveRange ||
-                    distance <= range.interactionThroughWallsRange ||
-                    distance <= interactionRange && hasLineOfSight(eyes, hitPosition, target)
-            }
-        }
-    }
-
     init {
-        tree(OnlyWhenInDanger)
+        tree(KillAuraBlockDanger)
     }
 
     /** For 1.9~1.21.4 protocol on 1.8 server, server will send a shield to your offhand on using item */
@@ -196,7 +160,7 @@ object KillAuraAutoBlock : ToggleableValueGroup(ModuleKillAura, "AutoBlocking", 
             }
 
             // If we haven't blocked, and we are in danger, prioritize blocking
-            return !hasBlockedSinceAttack && (!OnlyWhenInDanger.enabled || isInDanger)
+            return !hasBlockedSinceAttack && (!KillAuraBlockDanger.enabled || isInDanger)
         }
 
     override fun onDisabled() {
@@ -220,25 +184,9 @@ object KillAuraAutoBlock : ToggleableValueGroup(ModuleKillAura, "AutoBlocking", 
     /**
      * Starts blocking.
      */
-    @Suppress("ReturnCount", "CognitiveComplexMethod")
+    @Suppress("ReturnCount")
     fun startBlocking(): Boolean {
-        if (!running) {
-            return false
-        }
-
-        if (OnlyWhenInDanger.enabled && !isInDanger) {
-            this.stopBlocking()
-            return false
-        }
-
-        if (player.isUsingItem) {
-            hasBlockedSinceAttack = true
-            return false
-        }
-
-        if (!chance.asBoolean) {
-            return false
-        }
+        if (!prepareToStartBlocking()) return false
 
         val blockHand = findBlockableHand() ?: return false
         val rotation = RotationManager.currentRotation ?: player.rotation
@@ -246,10 +194,7 @@ object KillAuraAutoBlock : ToggleableValueGroup(ModuleKillAura, "AutoBlocking", 
 
         when (blockMode) {
             BlockMode.INTERACT -> if (interactWithFacing(rotation, blockHand)) {
-                reblockTicks = reblockTicksRange.random()
-                blockVisual = true
-                enforcedBlockingHand = blockHand
-                hasBlockedSinceAttack = true
+                recordBlockingStarted(blockHand, showVisualBeforeHand = true)
                 return true
             }
             BlockMode.FAKE -> {
@@ -259,15 +204,37 @@ object KillAuraAutoBlock : ToggleableValueGroup(ModuleKillAura, "AutoBlocking", 
             else -> { }
         }
 
-        // Interact with the item in the block hand
         if (genericUseItem(rotation, blockHand)) {
-            reblockTicks = reblockTicksRange.random()
-            enforcedBlockingHand = blockHand
-            hasBlockedSinceAttack = true
+            recordBlockingStarted(blockHand, showVisualBeforeHand = false)
         }
 
         blockVisual = true
         return true
+    }
+
+    private fun prepareToStartBlocking(): Boolean {
+        if (!running) {
+            return false
+        }
+
+        if (KillAuraBlockDanger.enabled && !isInDanger) {
+            this.stopBlocking()
+            return false
+        }
+
+        if (player.isUsingItem) {
+            hasBlockedSinceAttack = true
+            return false
+        }
+
+        return chance.asBoolean
+    }
+
+    private fun recordBlockingStarted(blockHand: InteractionHand, showVisualBeforeHand: Boolean) {
+        reblockTicks = reblockTicksRange.random()
+        if (showVisualBeforeHand) blockVisual = true
+        enforcedBlockingHand = blockHand
+        hasBlockedSinceAttack = true
     }
 
     private var flushTicks = 0
@@ -280,7 +247,7 @@ object KillAuraAutoBlock : ToggleableValueGroup(ModuleKillAura, "AutoBlocking", 
             blockingTicks++
         }
 
-        isInDanger = OnlyWhenInDanger.isInDanger()
+        isInDanger = KillAuraBlockDanger.isInDanger()
         debugParameter("IsInDanger") { isInDanger }
         debugParameter("blockingTicks") { blockingTicks }
         debugParameter("isBlocking") { player.isBlocking }
@@ -317,7 +284,7 @@ object KillAuraAutoBlock : ToggleableValueGroup(ModuleKillAura, "AutoBlocking", 
             flushTicks >= blink -> flush("Timed out")
 
             // Start to queue
-            else -> event.action = BlinkManager.Action.QUEUE
+            else -> event.action = net.ccbluex.liquidbounce.event.events.BlinkPacketAction.QUEUE
         }
     }
 
@@ -339,42 +306,36 @@ object KillAuraAutoBlock : ToggleableValueGroup(ModuleKillAura, "AutoBlocking", 
         pauseOnUnblockTicks = pauseOnUnblockTicksRange.random()
 
         return when (unblockMode) {
-            UnblockMode.STOP_USING_ITEM -> {
-                interaction.releaseUsingItemInTickLoop()
-                enforcedBlockingHand = null
-                true
-            }
-
-            // Not working when blocking with offhand
-            UnblockMode.CHANGE_SLOT -> {
-                val currentSlot = player.inventory.selectedSlot
-                val nextSlot = (currentSlot + 1) % 9
-                network.sendHeldItemChange(nextSlot)
-                network.sendHeldItemChange(currentSlot)
-                if (enforcedBlockingHand == InteractionHand.MAIN_HAND) {
-                    enforcedBlockingHand = null
-                    true
-                } else {
-                    false
-                }
-            }
-
-            // Not working when server doesn't have offhand
-            UnblockMode.SWAP_HAND -> {
-                network.sendSwapItemWithOffhand()
-                network.sendSwapItemWithOffhand()
-                enforcedBlockingHand = null
-                true
-            }
-
-            UnblockMode.NONE -> if (!pauses) {
-                interaction.releaseUsingItemInTickLoop()
-                enforcedBlockingHand = null
-                true
-            } else {
-                false
-            }
+            UnblockMode.STOP_USING_ITEM -> releaseBlocking()
+            UnblockMode.CHANGE_SLOT -> changeSlotToUnblock()
+            UnblockMode.SWAP_HAND -> swapHandsToUnblock()
+            UnblockMode.NONE -> !pauses && releaseBlocking()
         }
+    }
+
+    private fun releaseBlocking(): Boolean {
+        interaction.releaseUsingItemInTickLoop()
+        enforcedBlockingHand = null
+        return true
+    }
+
+    /** Not working when blocking with offhand. */
+    private fun changeSlotToUnblock(): Boolean {
+        val currentSlot = player.inventory.selectedSlot
+        val nextSlot = (currentSlot + 1) % 9
+        network.sendHeldItemChange(nextSlot)
+        network.sendHeldItemChange(currentSlot)
+        if (enforcedBlockingHand != InteractionHand.MAIN_HAND) return false
+        enforcedBlockingHand = null
+        return true
+    }
+
+    /** Not working when the server does not have an offhand. */
+    private fun swapHandsToUnblock(): Boolean {
+        network.sendSwapItemWithOffhand()
+        network.sendSwapItemWithOffhand()
+        enforcedBlockingHand = null
+        return true
     }
 
     @Suppress("unused")

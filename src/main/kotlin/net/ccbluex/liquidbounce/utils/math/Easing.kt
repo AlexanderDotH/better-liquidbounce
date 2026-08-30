@@ -18,7 +18,7 @@
  */
 package net.ccbluex.liquidbounce.utils.math
 
-import net.ccbluex.liquidbounce.config.types.list.Tagged
+import net.ccbluex.liquidbounce.common.Tagged
 import kotlin.math.pow
 
 /**

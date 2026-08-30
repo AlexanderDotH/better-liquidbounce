@@ -18,7 +18,7 @@ import net.ccbluex.liquidbounce.features.module.modules.world.seedcracker.SeedCa
 import net.ccbluex.liquidbounce.features.module.modules.world.seedcracker.SeedCrackerConflictReport
 import net.ccbluex.liquidbounce.features.module.modules.world.seedcracker.StructureType
 import net.ccbluex.liquidbounce.test.MinecraftBootstrap
-import net.ccbluex.liquidbounce.utils.render.Alignment
+import net.ccbluex.liquidbounce.config.types.group.Alignment
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertTrue

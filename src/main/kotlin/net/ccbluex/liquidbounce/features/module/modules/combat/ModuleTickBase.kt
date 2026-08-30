@@ -18,28 +18,29 @@
  */
 package net.ccbluex.liquidbounce.features.module.modules.combat
 
-import net.ccbluex.liquidbounce.config.types.list.Tagged
 import net.ccbluex.liquidbounce.event.events.MovementInputEvent
 import net.ccbluex.liquidbounce.event.events.PacketEvent
 import net.ccbluex.liquidbounce.event.events.PlayerTickEvent
-import net.ccbluex.liquidbounce.event.events.WorldRenderEvent
+import net.ccbluex.liquidbounce.render.events.WorldRenderEvent
 import net.ccbluex.liquidbounce.event.handler
 import net.ccbluex.liquidbounce.event.tickHandler
 import net.ccbluex.liquidbounce.event.waitTicks
 import net.ccbluex.liquidbounce.features.module.ClientModule
 import net.ccbluex.liquidbounce.features.module.ModuleCategories
 import net.ccbluex.liquidbounce.features.module.modules.combat.killaura.ModuleKillAura
+import net.ccbluex.liquidbounce.features.module.modules.combat.tickbase.TickBaseCall
+import net.ccbluex.liquidbounce.features.module.modules.combat.tickbase.TickBaseMode
+import net.ccbluex.liquidbounce.features.module.modules.combat.tickbase.TickData
 import net.ccbluex.liquidbounce.features.module.modules.player.ModuleBlink
 import net.ccbluex.liquidbounce.features.module.modules.render.ModuleDebug.debugParameter
 import net.ccbluex.liquidbounce.render.drawLineStrip
 import net.ccbluex.liquidbounce.render.engine.type.Color4b
 import net.ccbluex.liquidbounce.render.renderEnvironment
 import net.ccbluex.liquidbounce.render.utils.MutableVertexList
-import net.ccbluex.liquidbounce.utils.combat.findEnemy
-import net.ccbluex.liquidbounce.utils.entity.PlayerSimulationCache
+import net.ccbluex.liquidbounce.features.combat.runtime.findEnemy
+import net.ccbluex.liquidbounce.features.simulation.PlayerSimulationCache
 import net.ccbluex.liquidbounce.utils.math.sq
 import net.minecraft.network.protocol.game.ClientboundPlayerPositionPacket
-import net.minecraft.world.phys.Vec3
 import kotlin.math.min
 
 /**
@@ -241,46 +242,6 @@ internal object ModuleTickBase : ClientModule("TickBase", ModuleCategories.COMBA
         if (it.packet is ClientboundPlayerPositionPacket && pauseOnFlag) {
             tickBalance = 0f
         }
-    }
-
-    @JvmRecord
-    private data class TickData(
-        val position: Vec3,
-        val fallDistance: Double,
-        val velocity: Vec3,
-        val onGround: Boolean
-    )
-
-    private enum class TickBaseMode(override val tag: String) : Tagged {
-        PAST("Past"),
-        FUTURE("Future")
-    }
-
-    @Suppress("unused")
-    private enum class TickBaseCall(
-        override val tag: String,
-        private val tick: Runnable
-    ) : Tagged {
-
-        /**
-         * Runs a full game tick.
-         *
-         * TODO: Cancel full game ticks after this,
-         *   not just the player ticks.
-         */
-        GAME("Game", { mc.tick() }),
-
-        /**
-         * This will NOT update the game tick,
-         * but only the player tick - that means
-         * e.g. Rotation Manager will not update either.
-         *
-         * This was the previous default behavior of the TickBase,
-         * so it is kept for compatibility reasons.
-         */
-        PLAYER("Player", { player.tick() });
-
-        fun tick() = tick.run()
     }
 
 }

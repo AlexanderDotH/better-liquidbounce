@@ -18,6 +18,8 @@
  */
 package net.ccbluex.liquidbounce.features.module.modules.movement.autododge
 
+import net.ccbluex.liquidbounce.features.module.modules.movement.autododge.spearteleport.SpearTeleportDirection
+
 import net.ccbluex.liquidbounce.utils.movement.DirectionalInput
 import kotlin.random.Random
 import kotlin.test.Test

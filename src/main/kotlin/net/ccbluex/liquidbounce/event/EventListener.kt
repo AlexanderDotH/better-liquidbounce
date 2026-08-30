@@ -18,8 +18,9 @@
  */
 package net.ccbluex.liquidbounce.event
 
-import net.ccbluex.liquidbounce.features.misc.DebuggedOwner
-import net.ccbluex.liquidbounce.features.misc.HideAppearance.isDestructed
+import net.ccbluex.liquidbounce.common.debug.DebuggedOwner
+import net.ccbluex.liquidbounce.common.runtime.ClientDestructionState
+import net.ccbluex.liquidbounce.common.runtime.RunningOwner
 import net.ccbluex.liquidbounce.utils.text.asPlainText
 import net.ccbluex.liquidbounce.utils.text.plus
 import net.ccbluex.liquidbounce.utils.text.textOf
@@ -36,7 +37,7 @@ class EventHook<T : Event>(
     val handler: Consumer<T>,
 )
 
-interface EventListener : DebuggedOwner {
+interface EventListener : DebuggedOwner, RunningOwner {
 
     /**
      * Returns whether the listenable is running or not, this is based on the parent listenable
@@ -47,8 +48,8 @@ interface EventListener : DebuggedOwner {
      *
      * This can be ignored by handlers when [ignoreNotRunning] is set to true on the [EventHook].
      */
-    val running: Boolean
-        get() = parent()?.running ?: !isDestructed
+    override val running: Boolean
+        get() = parent()?.running ?: !ClientDestructionState.isDestructed()
 
     /**
      * Parent [EventListener]

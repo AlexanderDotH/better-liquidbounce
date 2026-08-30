@@ -24,9 +24,9 @@ import net.ccbluex.liquidbounce.event.handler
 import net.ccbluex.liquidbounce.event.tickHandler
 import net.ccbluex.liquidbounce.features.module.ClientModule
 import net.ccbluex.liquidbounce.features.module.ModuleCategories
-import net.ccbluex.liquidbounce.utils.block.hole.HoleManager
-import net.ccbluex.liquidbounce.utils.block.hole.HoleManagerSubscriber
-import net.ccbluex.liquidbounce.utils.block.hole.HoleTracker
+import net.ccbluex.liquidbounce.features.block.hole.HoleManager
+import net.ccbluex.liquidbounce.features.block.hole.HoleManagerSubscriber
+import net.ccbluex.liquidbounce.features.block.hole.HoleTracker
 import net.ccbluex.liquidbounce.utils.input.InputBind
 import net.ccbluex.liquidbounce.utils.math.boundingBox
 import net.ccbluex.liquidbounce.utils.math.centerOnSide

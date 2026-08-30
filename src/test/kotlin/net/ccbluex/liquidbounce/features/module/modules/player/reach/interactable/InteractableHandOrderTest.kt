@@ -10,6 +10,7 @@
  */
 package net.ccbluex.liquidbounce.features.module.modules.player.reach.interactable
 
+import net.ccbluex.liquidbounce.features.module.modules.player.reach.contract.interactWithVanillaHandOrder
 import net.minecraft.world.InteractionHand
 import net.minecraft.world.InteractionResult
 import org.junit.jupiter.api.Assertions.assertEquals
@@ -38,6 +39,19 @@ class InteractableHandOrderTest {
         val committed = interactWithVanillaHandOrder { hand ->
             hands += hand
             InteractionResult.SUCCESS
+        }
+
+        assertTrue(committed)
+        assertEquals(listOf(InteractionHand.MAIN_HAND), hands)
+    }
+
+    @Test
+    fun `failed main-hand interaction remains committed and stops before offhand`() {
+        val hands = mutableListOf<InteractionHand>()
+
+        val committed = interactWithVanillaHandOrder { hand ->
+            hands += hand
+            InteractionResult.FAIL
         }
 
         assertTrue(committed)

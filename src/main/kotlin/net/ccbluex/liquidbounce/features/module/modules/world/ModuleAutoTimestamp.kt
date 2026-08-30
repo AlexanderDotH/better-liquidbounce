@@ -23,7 +23,7 @@ import net.ccbluex.liquidbounce.event.handler
 import net.ccbluex.liquidbounce.features.module.ClientModule
 import net.ccbluex.liquidbounce.features.module.ModuleCategories
 import net.ccbluex.liquidbounce.features.module.modules.world.autotimestamp.AutoTimestampLines
-import net.ccbluex.liquidbounce.injection.mixins.minecraft.gui.MixinAbstractSignEditScreenAccessor
+import net.ccbluex.liquidbounce.interfaces.SignEditScreenAccess
 import net.minecraft.client.gui.screens.inventory.AbstractSignEditScreen
 import java.time.LocalDate
 
@@ -35,7 +35,7 @@ object ModuleAutoTimestamp : ClientModule("AutoTimestamp", ModuleCategories.WORL
     @Suppress("unused")
     private val screenHandler = handler<ScreenEvent> { event ->
         val screen = event.screen as? AbstractSignEditScreen ?: return@handler
-        val accessor = screen as MixinAbstractSignEditScreenAccessor
+        val accessor = screen as SignEditScreenAccess
         val maximumLineWidth = accessor.sign.maxTextLineWidth
         val playerName = player.gameProfile.name ?: mc.user.name
 

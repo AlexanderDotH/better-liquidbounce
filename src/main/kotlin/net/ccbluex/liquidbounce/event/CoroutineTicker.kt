@@ -21,7 +21,7 @@ package net.ccbluex.liquidbounce.event
 import it.unimi.dsi.fastutil.objects.ReferenceArrayList
 import kotlinx.coroutines.CancellableContinuation
 import kotlinx.coroutines.suspendCancellableCoroutine
-import net.ccbluex.liquidbounce.LiquidBounce.CLIENT_NAME
+import net.ccbluex.liquidbounce.common.ClientBuildMetadata
 import net.ccbluex.liquidbounce.utils.client.mc
 import net.minecraft.ReportedException
 import org.slf4j.LoggerFactory
@@ -32,7 +32,7 @@ import kotlin.coroutines.resume
 
 object CoroutineTicker {
 
-    private val logger = LoggerFactory.getLogger("$CLIENT_NAME/CoroutineTicker")
+    private val logger = LoggerFactory.getLogger("${ClientBuildMetadata.NAME}/CoroutineTicker")
 
     // Tracks nested Minecraft.tick() calls. Only the outermost tick may advance coroutine waiters.
     private var minecraftTickDepth = 0

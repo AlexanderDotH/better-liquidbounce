@@ -28,7 +28,7 @@ import net.ccbluex.liquidbounce.features.blink.BlinkManager
 import net.ccbluex.liquidbounce.features.module.modules.player.nofall.ModuleNoFall
 import net.ccbluex.liquidbounce.features.module.modules.render.ModuleDebug
 import net.ccbluex.liquidbounce.render.engine.type.Color4b
-import net.ccbluex.liquidbounce.utils.client.notification
+import net.ccbluex.liquidbounce.features.chat.notification
 import net.ccbluex.liquidbounce.utils.entity.SimulatedPlayer
 import net.ccbluex.liquidbounce.utils.movement.DirectionalInput
 import net.minecraft.network.protocol.game.ServerboundMovePlayerPacket
@@ -134,7 +134,7 @@ internal object NoFallBlink : NoFallMode("Blink") {
     @Suppress("unused")
     private val fakeLagHandler = handler<BlinkPacketEvent> { event ->
         if (event.origin == TransferOrigin.OUTGOING && blinkFall) {
-            event.action = BlinkManager.Action.QUEUE
+            event.action = net.ccbluex.liquidbounce.event.events.BlinkPacketAction.QUEUE
         }
     }
 

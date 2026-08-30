@@ -26,8 +26,7 @@ import net.ccbluex.liquidbounce.event.events.PlayerMoveEvent
 import net.ccbluex.liquidbounce.event.handler
 import net.ccbluex.liquidbounce.event.tickHandler
 import net.ccbluex.liquidbounce.event.tickUntil
-import net.ccbluex.liquidbounce.features.module.modules.movement.fly.ModuleFly
-import net.ccbluex.liquidbounce.features.module.modules.movement.fly.ModuleFly.modes
+import net.ccbluex.liquidbounce.features.module.modules.movement.fly.runtime.FlyModuleControl
 import net.ccbluex.liquidbounce.features.module.modules.movement.fly.automation.FlyAutomationCapabilities
 import net.ccbluex.liquidbounce.features.module.modules.movement.fly.automation.FlyAutomationEnd
 import net.ccbluex.liquidbounce.features.module.modules.movement.fly.automation.FlyAutomationKind
@@ -49,9 +48,6 @@ import net.minecraft.world.phys.Vec3
  * @author Nullable
  */
 internal object FlyVulcan286Teleport : Mode("Vulcan286-Teleport-18"), FlyAutomationProfile {
-
-    override val parent: ModeValueGroup<*>
-        get() = modes
 
     private var jumping = false
     private var flagged = false
@@ -141,7 +137,7 @@ internal object FlyVulcan286Teleport : Mode("Vulcan286-Teleport-18"), FlyAutomat
         }
 
         automaticEnd.mark("Vulcan teleport burst completed")
-        ModuleFly.enabled = false
+        FlyModuleControl.disable()
     }
 
 

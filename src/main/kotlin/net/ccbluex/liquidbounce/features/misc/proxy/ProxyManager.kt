@@ -20,6 +20,7 @@ package net.ccbluex.liquidbounce.features.misc.proxy
 
 import io.netty.handler.proxy.Socks5ProxyHandler
 import net.ccbluex.liquidbounce.config.ConfigSystem
+import net.ccbluex.liquidbounce.api.thirdparty.IpInfoApi
 import net.ccbluex.liquidbounce.config.types.Config
 import net.ccbluex.liquidbounce.config.types.ValueType
 import net.ccbluex.liquidbounce.event.EventListener
@@ -59,6 +60,7 @@ object ProxyManager : Config("proxy"), EventListener {
     }
 
     init {
+        IpInfoApi.installCurrentOverride { currentProxy?.ipInfo }
         ConfigSystem.root(this)
     }
 

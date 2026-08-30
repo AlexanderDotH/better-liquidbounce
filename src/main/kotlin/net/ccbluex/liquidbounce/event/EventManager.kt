@@ -18,7 +18,6 @@
  */
 package net.ccbluex.liquidbounce.event
 
-import it.unimi.dsi.fastutil.objects.Reference2ObjectOpenHashMap
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharedFlow
 import net.ccbluex.liquidbounce.event.events.AccountManagerAdditionResultEvent
@@ -125,6 +124,7 @@ import net.ccbluex.liquidbounce.event.events.ScreenRenderEvent
 import net.ccbluex.liquidbounce.event.events.SelectHotbarSlotSilentlyEvent
 import net.ccbluex.liquidbounce.event.events.ServerConnectEvent
 import net.ccbluex.liquidbounce.event.events.ServerPingedEvent
+import net.ccbluex.liquidbounce.event.events.ServerTransactionCaptureCompletedEvent
 import net.ccbluex.liquidbounce.event.events.SessionEvent
 import net.ccbluex.liquidbounce.event.events.SilentPacketSendEvent
 import net.ccbluex.liquidbounce.event.events.SpaceSeperatedNamesChangeEvent
@@ -143,11 +143,7 @@ import net.ccbluex.liquidbounce.event.events.WindowResizeEvent
 import net.ccbluex.liquidbounce.event.events.WorldChangeEvent
 import net.ccbluex.liquidbounce.event.events.WorldEntityRemoveEvent
 import net.ccbluex.liquidbounce.event.events.WorldFeatureSubmitEvent
-import net.ccbluex.liquidbounce.event.events.WorldRenderEvent
-import net.ccbluex.liquidbounce.features.misc.HideAppearance.isDestructed
-import net.ccbluex.liquidbounce.integration.interop.protocol.event.baritone.BaritoneLogEvent
-import net.ccbluex.liquidbounce.integration.interop.protocol.event.baritone.BaritoneRouteEvent
-import net.ccbluex.liquidbounce.integration.interop.protocol.event.baritone.BaritoneStateEvent
+import net.ccbluex.liquidbounce.common.runtime.ClientDestructionState
 import net.ccbluex.liquidbounce.utils.client.error.ErrorHandler
 import net.ccbluex.liquidbounce.utils.client.logger
 import net.minecraft.ReportedException
@@ -167,7 +163,6 @@ internal val ALL_EVENT_CLASSES: Array<Class<out Event>> = arrayOf(
     DisconnectEvent::class.java,
     GameRenderEvent::class.java,
     WorldFeatureSubmitEvent::class.java,
-    WorldRenderEvent::class.java,
     OverlayRenderEvent::class.java,
     ScreenRenderEvent::class.java,
     WindowResizeEvent::class.java,
@@ -220,6 +215,7 @@ internal val ALL_EVENT_CLASSES: Array<Class<out Event>> = arrayOf(
     PipelineEvent::class.java,
     PacketEvent::class.java,
     SilentPacketSendEvent::class.java,
+    ServerTransactionCaptureCompletedEvent::class.java,
     ClientStartEvent::class.java,
     ClientShutdownEvent::class.java,
     ClientLanguageChangedEvent::class.java,
@@ -237,9 +233,6 @@ internal val ALL_EVENT_CLASSES: Array<Class<out Event>> = arrayOf(
     AccountManagerRemovalResultEvent::class.java,
     AccountManagerLoginResultEvent::class.java,
     VirtualScreenEvent::class.java,
-    BaritoneStateEvent::class.java,
-    BaritoneRouteEvent::class.java,
-    BaritoneLogEvent::class.java,
     FpsChangeEvent::class.java,
     FpsLimitEvent::class.java,
     ClientPlayerDataEvent::class.java,
@@ -296,15 +289,23 @@ inline fun <reified E : Event> eventFlow(): SharedFlow<E> =
  */
 object EventManager {
 
-    private val registry: Map<Class<out Event>, EventHookRegistry<in Event>> =
-        ALL_EVENT_CLASSES.associateWithTo(
-            Reference2ObjectOpenHashMap(ALL_EVENT_CLASSES.size)
-        ) { EventHookRegistry() }
+    private val registry: RuntimeEventRegistry<EventHookRegistry<in Event>> =
+        RuntimeEventRegistry(ALL_EVENT_CLASSES, ::registerEventClass) { EventHookRegistry() }
 
-    private val flows: Map<Class<out Event>, MutableSharedFlow<Event>> =
-        ALL_EVENT_CLASSES.associateWithTo(
-            Reference2ObjectOpenHashMap(ALL_EVENT_CLASSES.size)
-        ) { MutableSharedFlow(replay = 0, extraBufferCapacity = 0) }
+    private val flows: RuntimeEventRegistry<MutableSharedFlow<Event>> =
+        RuntimeEventRegistry(ALL_EVENT_CLASSES, ::registerEventClass) {
+            MutableSharedFlow(replay = 0, extraBufferCapacity = 0)
+        }
+
+    @Synchronized
+    fun registerEventClass(eventClass: Class<out Event>) {
+        registerEventMetadata(eventClass)
+        registry.putIfAbsent(eventClass, EventHookRegistry())
+        flows.putIfAbsent(eventClass, MutableSharedFlow(replay = 0, extraBufferCapacity = 0))
+    }
+
+    @Synchronized
+    internal fun registeredEventClasses(): Array<Class<out Event>> = registry.keys.toTypedArray()
 
     /**
      * Used by handler methods
@@ -347,7 +348,7 @@ object EventManager {
      * @param event to call
      */
     fun <T : Event> callEvent(event: T): T {
-        if (isDestructed) {
+        if (ClientDestructionState.isDestructed()) {
             return event
         }
 

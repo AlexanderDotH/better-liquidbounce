@@ -23,18 +23,18 @@ import net.ccbluex.fastutil.referenceHashSetOf
 import net.ccbluex.liquidbounce.config.types.group.ToggleableValueGroup
 import net.ccbluex.liquidbounce.event.events.BlockSlipperinessMultiplierEvent
 import net.ccbluex.liquidbounce.event.handler
-import net.ccbluex.liquidbounce.features.module.modules.movement.terrainspeed.ModuleTerrainSpeed
 import net.ccbluex.liquidbounce.features.module.modules.movement.terrainspeed.icespeed.IceSpeed.Motion.horizontalMotion
+import net.ccbluex.liquidbounce.features.module.modules.movement.terrainspeed.runtime.TerrainSpeedModuleProvider
 import net.minecraft.world.level.block.Blocks
 
 /**
  * Ice Speed allows you to manipulate slipperiness speed
  */
-internal object IceSpeed : ToggleableValueGroup(ModuleTerrainSpeed, "IceSpeed", true) {
+internal object IceSpeed : ToggleableValueGroup(name = "IceSpeed", enabled = true) {
 
     private val slipperiness by float("Slipperiness", 0.6f, 0.3f..1f)
 
-    private object Motion : ToggleableValueGroup(ModuleTerrainSpeed, "Motion", false) {
+    private object Motion : ToggleableValueGroup(TerrainSpeedModuleProvider.module, "Motion", false) {
         val horizontalMotion by float("Motion", 0.5f, 0.2f..1.5f)
     }
 

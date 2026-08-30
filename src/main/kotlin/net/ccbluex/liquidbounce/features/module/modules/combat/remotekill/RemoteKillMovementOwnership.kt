@@ -1,0 +1,56 @@
+/*
+ * This file is part of LiquidBounce (https://github.com/CCBlueX/LiquidBounce)
+ *
+ * Copyright (c) 2015 - 2026 CCBlueX
+ *
+ * LiquidBounce is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * LiquidBounce is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with LiquidBounce. If not, see <https://www.gnu.org/licenses/>.
+ */
+
+package net.ccbluex.liquidbounce.features.module.modules.combat.remotekill
+
+import net.ccbluex.liquidbounce.utils.movement.remote.RemoteMovementOwnership
+
+/**
+ * Process-wide packet-movement ownership for weapon-neutral remote-kill routes.
+ *
+ * Consumers such as movement helpers only need [active]. Route engines keep one exclusive lease so
+ * handoff/recovery cannot briefly expose the route as unowned, and every terminal path closes its
+ * lease idempotently.
+ */
+internal object RemoteKillMovementOwnership {
+
+    val active: Boolean
+        get() = RemoteMovementOwnership.active
+
+    val currentOwner: String?
+        get() = RemoteMovementOwnership.currentOwner
+
+    val leaseCount: Int
+        get() = RemoteMovementOwnership.leaseCount
+
+    fun acquire(owner: String): Lease = Lease(RemoteMovementOwnership.acquire(owner))
+
+    /** Atomically reserves the one remote movement pipeline, or returns null without side effects. */
+    fun tryAcquire(owner: String): Lease? = RemoteMovementOwnership.tryAcquire(owner)?.let(::Lease)
+
+    internal class Lease internal constructor(
+        private val delegate: RemoteMovementOwnership.Lease,
+    ) : AutoCloseable {
+
+        val active: Boolean
+            get() = delegate.active
+
+        override fun close() = delegate.close()
+    }
+}

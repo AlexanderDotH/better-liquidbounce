@@ -20,6 +20,7 @@
 package net.ccbluex.liquidbounce.injection.mixins.minecraft.entity;
 
 import java.util.Map;
+import net.ccbluex.liquidbounce.common.EntityFluidInteractionAccess;
 import net.minecraft.tags.TagKey;
 import net.minecraft.world.entity.EntityFluidInteraction;
 import net.minecraft.world.level.material.Fluid;
@@ -29,8 +30,9 @@ import org.spongepowered.asm.mixin.gen.Accessor;
 
 @NullMarked
 @Mixin(EntityFluidInteraction.class)
-public interface MixinEntityFluidInteractionAccessor {
+public interface MixinEntityFluidInteractionAccessor extends EntityFluidInteractionAccess {
 
+    @Override
     @Accessor("trackerByFluid")
     Map<TagKey<Fluid>, Object> trackerByFluid();
 

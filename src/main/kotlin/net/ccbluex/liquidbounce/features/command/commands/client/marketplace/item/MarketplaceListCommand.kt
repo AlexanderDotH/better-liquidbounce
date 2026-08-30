@@ -20,25 +20,17 @@ package net.ccbluex.liquidbounce.features.command.commands.client.marketplace.it
 
 import net.ccbluex.liquidbounce.api.models.marketplace.MarketplaceItemType
 import net.ccbluex.liquidbounce.api.services.marketplace.MarketplaceApi
-import net.ccbluex.liquidbounce.features.command.CommandExecutor.suspendHandler
+import net.ccbluex.liquidbounce.features.command.CommandRuntime.suspendHandler
 import net.ccbluex.liquidbounce.features.command.builder.ParameterBuilder
 import net.ccbluex.liquidbounce.features.command.builder.enumChoice
 import net.ccbluex.liquidbounce.features.command.dsl.addParam
 import net.ccbluex.liquidbounce.features.command.dsl.buildCommand
 import net.ccbluex.liquidbounce.features.command.dsl.cast
-import net.ccbluex.liquidbounce.features.marketplace.MarketplaceManager
-import net.ccbluex.liquidbounce.utils.client.chat
-import net.ccbluex.liquidbounce.utils.client.onClick
-import net.ccbluex.liquidbounce.utils.client.onHover
-import net.ccbluex.liquidbounce.utils.client.regular
-import net.ccbluex.liquidbounce.utils.client.variable
-import net.minecraft.network.chat.ClickEvent
-import net.minecraft.network.chat.HoverEvent
+import net.ccbluex.liquidbounce.features.command.commands.client.marketplace.presentation.renderMarketplaceItemPage
 
 /**
  * List marketplace items
  */
-@Suppress("CognitiveComplexMethod")
 fun marketplaceListCommand() = buildCommand("list") {
 
     val type = addParam {
@@ -63,39 +55,7 @@ fun marketplaceListCommand() = buildCommand("list") {
 
         val response = MarketplaceApi.getMarketplaceItems(page, 10, type = type, featured = featured)
 
-        if (response.items.isEmpty()) {
-            chat(regular(command.result("noItems")))
-            return@suspendHandler
-        }
-
-        chat(regular(command.result("header",
-            variable(page.toString()),
-            variable(response.pagination.pages.toString())
-        )))
-
-        for (item in response.items) {
-            val isSubscribed = MarketplaceManager.isSubscribed(item.id)
-            val action = if (isSubscribed) "unsubscribe" else "subscribe"
-            chat(
-                regular(
-                    command.result(
-                        "item",
-                        variable(item.id.toString()),
-                        variable("${item.name}${if (isSubscribed) "*" else ""}"),
-                        variable(item.type.toString().lowercase()),
-                        variable(if (item.featured) "★" else "")
-                    ).onClick(
-                        ClickEvent.SuggestCommand(
-                            ".marketplace $action ${item.id}"
-                        )
-                    ).onHover(
-                        HoverEvent.ShowText(
-                            variable(command.result("hover", variable(action), item.id))
-                        )
-                    )
-                )
-            )
-        }
+        command.renderMarketplaceItemPage("noItems", page, response.pagination.pages, response.items)
     }
 
 }

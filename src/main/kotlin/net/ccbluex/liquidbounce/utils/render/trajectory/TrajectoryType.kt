@@ -19,7 +19,7 @@
 
 package net.ccbluex.liquidbounce.utils.render.trajectory
 
-import net.ccbluex.liquidbounce.config.types.list.Tagged
+import net.ccbluex.liquidbounce.common.Tagged
 
 /**
  * @see net.minecraft.world.entity.projectile.ThrowableProjectile.tick

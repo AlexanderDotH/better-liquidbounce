@@ -20,7 +20,7 @@ package net.ccbluex.liquidbounce.features.module.modules.render.nametags
 
 import it.unimi.dsi.fastutil.objects.ObjectLinkedOpenHashSet
 import net.ccbluex.liquidbounce.config.types.group.ValueGroup
-import net.ccbluex.liquidbounce.config.types.list.Tagged
+import net.ccbluex.liquidbounce.common.Tagged
 import net.ccbluex.liquidbounce.features.module.modules.`fun`.ModuleAmnesia
 import net.ccbluex.liquidbounce.features.module.modules.misc.antibot.ModuleAntiBot
 import net.ccbluex.liquidbounce.features.module.modules.render.ModuleCombineMobs
@@ -29,7 +29,7 @@ import net.ccbluex.liquidbounce.utils.text.asPlainText
 import net.ccbluex.liquidbounce.utils.text.joinToText
 import net.ccbluex.liquidbounce.utils.client.player
 import net.ccbluex.liquidbounce.utils.text.textOf
-import net.ccbluex.liquidbounce.utils.combat.EntityTaggingManager
+import net.ccbluex.liquidbounce.features.combat.runtime.EntityTaggingManager
 import net.ccbluex.liquidbounce.utils.entity.getActualHealth
 import net.ccbluex.liquidbounce.utils.entity.hasHealthScoreboard
 import net.ccbluex.liquidbounce.utils.entity.ping

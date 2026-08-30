@@ -19,7 +19,7 @@
 package net.ccbluex.liquidbounce.features.module.modules.world
 
 import it.unimi.dsi.fastutil.objects.ObjectArraySet
-import net.ccbluex.liquidbounce.config.types.list.Tagged
+import net.ccbluex.liquidbounce.common.Tagged
 import net.ccbluex.liquidbounce.event.events.NotificationEvent
 import net.ccbluex.liquidbounce.event.events.PlayerMovementTickEvent
 import net.ccbluex.liquidbounce.event.handler
@@ -28,8 +28,8 @@ import net.ccbluex.liquidbounce.event.tickUntil
 import net.ccbluex.liquidbounce.features.module.ClientModule
 import net.ccbluex.liquidbounce.features.module.ModuleCategories
 import net.ccbluex.liquidbounce.features.module.modules.render.ModuleDebug.debugParameter
-import net.ccbluex.liquidbounce.utils.block.placer.BlockPlacer
-import net.ccbluex.liquidbounce.utils.client.notification
+import net.ccbluex.liquidbounce.features.block.placer.BlockPlacer
+import net.ccbluex.liquidbounce.features.chat.notification
 import net.ccbluex.liquidbounce.utils.collection.Filter
 import net.ccbluex.liquidbounce.utils.collection.blockSortedSetOf
 import net.ccbluex.liquidbounce.utils.inventory.HotbarItemSlot

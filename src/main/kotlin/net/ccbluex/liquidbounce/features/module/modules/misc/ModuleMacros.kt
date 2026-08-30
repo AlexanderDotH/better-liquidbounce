@@ -22,7 +22,7 @@ package net.ccbluex.liquidbounce.features.module.modules.misc
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import net.ccbluex.liquidbounce.config.types.group.ValueGroup
-import net.ccbluex.liquidbounce.config.types.list.Tagged
+import net.ccbluex.liquidbounce.common.Tagged
 import net.ccbluex.liquidbounce.config.utils.asRefreshable
 import net.ccbluex.liquidbounce.event.events.KeyEvent
 import net.ccbluex.liquidbounce.event.suspendHandler
@@ -31,11 +31,11 @@ import net.ccbluex.liquidbounce.features.module.ClientModule
 import net.ccbluex.liquidbounce.features.module.ModuleCategories
 import net.ccbluex.liquidbounce.utils.aiming.RotationManager
 import net.ccbluex.liquidbounce.utils.block.SwingMode
-import net.ccbluex.liquidbounce.utils.block.doPlacement
+import net.ccbluex.liquidbounce.features.block.runtime.doPlacement
 import net.ccbluex.liquidbounce.utils.client.SilentHotbar
 import net.ccbluex.liquidbounce.utils.client.clientStartDurationMs
 import net.ccbluex.liquidbounce.utils.network.sendChatOrCommand
-import net.ccbluex.liquidbounce.utils.inventory.SingleItemStackPickMode
+import net.ccbluex.liquidbounce.features.inventory.SingleItemStackPickMode
 import net.ccbluex.liquidbounce.utils.inventory.Slots
 import net.ccbluex.liquidbounce.utils.entity.useItem
 import net.ccbluex.liquidbounce.utils.entity.rotation

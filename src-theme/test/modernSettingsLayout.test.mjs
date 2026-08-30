@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import {readFile} from "node:fs/promises";
 import test from "node:test";
+import {readSourceWithStyles} from "./themeSource.mjs";
 
 const componentUrl = new URL(
     "../src/routes/clickgui/themes/modern/ModernSettings.svelte",
@@ -31,7 +32,7 @@ function cssBlock(source, selector) {
 }
 
 test("Global settings cards form compact balanced columns without row gaps", async () => {
-    const source = await readFile(componentUrl, "utf8");
+    const source = readSourceWithStyles(componentUrl);
     const settingsGrid = cssBlock(source, ".settings-grid");
     const settingCard = cssBlock(source, ".setting-card");
 

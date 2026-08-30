@@ -21,16 +21,16 @@ package net.ccbluex.liquidbounce.features.command.commands.client.marketplace.re
 import net.ccbluex.liquidbounce.api.services.marketplace.MarketplaceApi
 import net.ccbluex.liquidbounce.features.command.Command
 import net.ccbluex.liquidbounce.features.command.CommandException
-import net.ccbluex.liquidbounce.features.command.CommandExecutor.suspendHandler
+import net.ccbluex.liquidbounce.features.command.CommandRuntime.suspendHandler
 import net.ccbluex.liquidbounce.features.command.builder.CommandBuilder
 import net.ccbluex.liquidbounce.features.command.builder.ParameterBuilder
 import net.ccbluex.liquidbounce.features.command.preset.accountOrException
 import net.ccbluex.liquidbounce.features.cosmetic.ClientAccountManager
 import net.ccbluex.liquidbounce.lang.translation
-import net.ccbluex.liquidbounce.utils.client.chat
+import net.ccbluex.liquidbounce.features.chat.chat
 import net.ccbluex.liquidbounce.utils.client.logger
-import net.ccbluex.liquidbounce.utils.client.regular
-import net.ccbluex.liquidbounce.utils.client.variable
+import net.ccbluex.liquidbounce.utils.text.regular
+import net.ccbluex.liquidbounce.utils.text.variable
 import java.io.File
 
 /**
@@ -38,7 +38,6 @@ import java.io.File
  */
 object MarketplaceUploadRevisionCommand : Command.Factory {
 
-    @Suppress("LongMethod")
     override fun createCommand() = CommandBuilder
         .begin("upload")
         .parameter(
@@ -77,48 +76,54 @@ object MarketplaceUploadRevisionCommand : Command.Factory {
                 .optional()
                 .build()
         )
-        .suspendHandler {
-            val clientAccount = ClientAccountManager.accountOrException()
-
-            val id = args[0] as Int
-            val filePath = args[1] as String
-            val version = args[2] as String
-            val changelog = (args.getOrNull(3) as? Array<*>)?.joinToString(" ")
-            val dependencies = args.getOrNull(4) as? String
-
-            val file = File(filePath)
-            if (!file.exists()) {
-                throw CommandException(translation("liquidbounce.command.marketplace.error.fileNotFound", filePath))
-            }
-
-            try {
-                MarketplaceApi.createMarketplaceItemRevision(
-                    clientAccount.takeSession(),
-                    id,
-                    file,
-                    version,
-                    changelog,
-                    dependencies
-                )
-
-                chat(
-                    regular(
-                        command.result(
-                            "success",
-                            variable(version),
-                            variable(id.toString())
-                        )
-                    )
-                )
-            } catch (@Suppress("SwallowedException") e: Exception) {
-                logger.error("Failed to upload marketplace item revision", e)
-
-                throw CommandException(translation(
-                    "liquidbounce.command.marketplace.error.updateFailed",
-                    id.toString(),
-                    e.message ?: "Unknown error"
-                ))
-            }
-        }
+        .suspendHandler { uploadRevision() }
         .build()
+}
+
+private data class RevisionUpload(
+    val id: Int,
+    val file: File,
+    val version: String,
+    val changelog: String?,
+    val dependencies: String?,
+)
+
+private fun Command.Handler.Context.revisionUpload(): RevisionUpload {
+    val filePath = args[1] as String
+    val file = File(filePath)
+    if (!file.exists()) {
+        throw CommandException(translation("liquidbounce.command.marketplace.error.fileNotFound", filePath))
+    }
+    return RevisionUpload(
+        id = args[0] as Int,
+        file = file,
+        version = args[2] as String,
+        changelog = (args.getOrNull(3) as? Array<*>)?.joinToString(" "),
+        dependencies = args.getOrNull(4) as? String,
+    )
+}
+
+private suspend fun Command.Handler.Context.uploadRevision() {
+    val clientAccount = ClientAccountManager.accountOrException()
+    val upload = revisionUpload()
+    try {
+        MarketplaceApi.createMarketplaceItemRevision(
+            clientAccount.takeSession(),
+            upload.id,
+            upload.file,
+            upload.version,
+            upload.changelog,
+            upload.dependencies,
+        )
+        chat(regular(command.result("success", variable(upload.version), variable(upload.id.toString()))))
+    } catch (@Suppress("SwallowedException") exception: Exception) {
+        logger.error("Failed to upload marketplace item revision", exception)
+        throw CommandException(
+            translation(
+                "liquidbounce.command.marketplace.error.updateFailed",
+                upload.id.toString(),
+                exception.message ?: "Unknown error",
+            ),
+        )
+    }
 }

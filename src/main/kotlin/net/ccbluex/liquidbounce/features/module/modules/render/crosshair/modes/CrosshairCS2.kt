@@ -18,14 +18,15 @@
  */
 package net.ccbluex.liquidbounce.features.module.modules.render.crosshair.modes
 
+import net.ccbluex.liquidbounce.config.types.group.ModeValueGroup
 import net.ccbluex.liquidbounce.config.types.group.ValueGroup
 import net.ccbluex.liquidbounce.event.events.OverlayRenderEvent
-import net.ccbluex.liquidbounce.features.module.modules.render.crosshair.CrosshairColorSettings
-import net.ccbluex.liquidbounce.features.module.modules.render.crosshair.CrosshairMode
+import net.ccbluex.liquidbounce.features.module.modules.render.crosshair.config.CrosshairColorSettings
+import net.ccbluex.liquidbounce.features.module.modules.render.crosshair.runtime.CrosshairMode
 import net.ccbluex.liquidbounce.render.drawQuad
 import net.minecraft.util.Mth
 
-object CrosshairCS2 : CrosshairMode("CS2") {
+class CrosshairCS2(parent: ModeValueGroup<*>) : CrosshairMode("CS2", parent) {
 
     private object CrosshairSettings : ValueGroup("Crosshair") {
         val length by float("Length", 5f, 1f..20f)

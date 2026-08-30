@@ -22,8 +22,8 @@ import net.ccbluex.liquidbounce.features.module.modules.render.nametags.NametagE
 import net.ccbluex.liquidbounce.render.gui.ItemStackListRenderer.SingleItemStackRenderer
 import net.ccbluex.liquidbounce.render.engine.type.Vec3f
 import net.ccbluex.liquidbounce.utils.client.player
-import net.ccbluex.liquidbounce.utils.render.PlayerModelNametagHook
-import net.ccbluex.liquidbounce.utils.render.WorldToScreen
+import net.ccbluex.liquidbounce.render.playermodel.PlayerModelNametagHook
+import net.ccbluex.liquidbounce.render.WorldToScreen
 import net.ccbluex.liquidbounce.utils.text.PlainText
 import net.minecraft.network.chat.Component
 import net.minecraft.world.entity.Entity

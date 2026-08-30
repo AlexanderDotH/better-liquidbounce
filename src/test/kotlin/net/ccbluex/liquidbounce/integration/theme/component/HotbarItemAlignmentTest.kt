@@ -12,8 +12,8 @@
 package net.ccbluex.liquidbounce.integration.theme.component
 
 import net.ccbluex.liquidbounce.features.module.modules.render.HudTheme
-import net.ccbluex.liquidbounce.utils.render.Alignment.ScreenAxisX
-import net.ccbluex.liquidbounce.utils.render.Alignment.ScreenAxisY
+import net.ccbluex.liquidbounce.config.types.group.Alignment.ScreenAxisX
+import net.ccbluex.liquidbounce.config.types.group.Alignment.ScreenAxisY
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Test
 

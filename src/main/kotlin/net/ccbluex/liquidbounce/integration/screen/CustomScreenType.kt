@@ -21,6 +21,7 @@ package net.ccbluex.liquidbounce.integration.screen
 
 import com.google.common.base.Predicates
 import com.mojang.realmsclient.RealmsMainScreen
+import net.ccbluex.liquidbounce.common.interop.VirtualScreenTypePayload
 import net.ccbluex.liquidbounce.integration.screen.impl.CustomSharedMinecraftScreen
 import net.ccbluex.liquidbounce.integration.screen.impl.InternetExplorerScreen
 import net.ccbluex.liquidbounce.utils.client.mc
@@ -48,13 +49,13 @@ private val Screen.isLunar
     get() = javaClass.name.startsWith("com.moonsworth.lunar.") && mc.level == null
 
 enum class CustomScreenType(
-    val routeName: String,
+    override val routeName: String,
     private val recognizer: Predicate<Screen> = Predicates.alwaysFalse(),
     val isInGame: Boolean = false,
     private val open: Runnable = Runnable {
         mc.gui.setScreen(CustomSharedMinecraftScreen(byName(routeName)!!))
     }
-) {
+) : VirtualScreenTypePayload {
 
     HUD("hud", isInGame = true),
     CLICK_GUI("clickgui"),

@@ -21,7 +21,7 @@ package net.ccbluex.liquidbounce.features.module.modules.misc
 
 import com.mojang.blaze3d.platform.InputConstants
 import com.mojang.blaze3d.platform.Window
-import net.ccbluex.liquidbounce.config.types.list.Tagged
+import net.ccbluex.liquidbounce.common.Tagged
 import net.ccbluex.liquidbounce.features.module.ClientModule
 import net.ccbluex.liquidbounce.features.module.ModuleCategories
 import net.ccbluex.liquidbounce.utils.client.Chronometer

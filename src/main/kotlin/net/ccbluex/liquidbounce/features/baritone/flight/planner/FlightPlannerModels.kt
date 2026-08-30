@@ -16,17 +16,11 @@
  * You should have received a copy of the GNU General Public License
  * along with LiquidBounce. If not, see <https://www.gnu.org/licenses/>.
  */
-
 package net.ccbluex.liquidbounce.features.baritone.flight.planner
 
-import java.util.Collections
 import kotlin.math.sqrt
 
-data class FlightVec3(
-    val x: Double,
-    val y: Double,
-    val z: Double,
-) {
+data class FlightVec3(val x: Double, val y: Double, val z: Double) {
     init {
         require(x.isFinite() && y.isFinite() && z.isFinite()) { "Flight coordinates must be finite" }
     }
@@ -38,11 +32,7 @@ data class FlightVec3(
         return sqrt(deltaX * deltaX + deltaY * deltaY + deltaZ * deltaZ)
     }
 
-    internal operator fun plus(offset: FlightCell): FlightVec3 = FlightVec3(
-        x = x + offset.x,
-        y = y + offset.y,
-        z = z + offset.z,
-    )
+    internal operator fun plus(offset: FlightCell) = FlightVec3(x + offset.x, y + offset.y, z + offset.z)
 }
 
 data class FlightCell(val x: Int, val y: Int, val z: Int)
@@ -66,11 +56,10 @@ data class FlightAabb(
             overlaps(minY, maxY, other.minY, other.maxY) &&
             overlaps(minZ, maxZ, other.minZ, other.maxZ)
 
-    private fun overlaps(firstMin: Double, firstMax: Double, secondMin: Double, secondMax: Double): Boolean =
+    private fun overlaps(firstMin: Double, firstMax: Double, secondMin: Double, secondMax: Double) =
         firstMax > secondMin && firstMin < secondMax
 }
 
-/** Player collision offsets relative to the route point used as the movement anchor. */
 data class FlightBodyBounds(
     val minXOffset: Double,
     val minYOffset: Double,
@@ -89,9 +78,9 @@ data class FlightBodyBounds(
             maxZOffset,
         )
         require(coordinates.all(Double::isFinite)) { "Player collision offsets must be finite" }
-        require(
-            minXOffset < maxXOffset && minYOffset < maxYOffset && minZOffset < maxZOffset,
-        ) { "Player collision bounds must have volume" }
+        require(minXOffset < maxXOffset && minYOffset < maxYOffset && minZOffset < maxZOffset) {
+            "Player collision bounds must have volume"
+        }
     }
 
     internal fun at(position: FlightVec3) = FlightAabb(
@@ -108,139 +97,7 @@ data class FlightBodyBounds(
             require(width.isFinite() && width > 0.0) { "Player width must be positive and finite" }
             require(height.isFinite() && height > 0.0) { "Player height must be positive and finite" }
             require(depth.isFinite() && depth > 0.0) { "Player depth must be positive and finite" }
-            return FlightBodyBounds(
-                minXOffset = -width / 2.0,
-                minYOffset = 0.0,
-                minZOffset = -depth / 2.0,
-                maxXOffset = width / 2.0,
-                maxYOffset = height,
-                maxZOffset = depth / 2.0,
-            )
+            return FlightBodyBounds(-width / 2.0, 0.0, -depth / 2.0, width / 2.0, height, depth / 2.0)
         }
     }
 }
-
-@JvmInline
-value class FlightWorldRevision(val value: Long) {
-    init {
-        require(value >= 0L) { "Flight world revisions cannot be negative" }
-    }
-}
-
-data class FlightCaptureBounds(val min: FlightCell, val max: FlightCell) {
-    init {
-        require(min.x <= max.x && min.y <= max.y && min.z <= max.z) { "Invalid flight capture bounds" }
-    }
-}
-
-/** Live Minecraft capture is implemented outside the pure planner through this port. */
-fun interface FlightCollisionCapturePort {
-    fun capture(bounds: FlightCaptureBounds): FlightCollisionSnapshot
-}
-
-data class FlightTraversalCapabilities(
-    val horizontal: Boolean = true,
-    val ascend: Boolean = true,
-    val descend: Boolean = true,
-    val diagonal: Boolean = true,
-)
-
-data class FlightSearchLimits(
-    val maxExpandedNodes: Int = DEFAULT_MAX_EXPANDED_NODES,
-    val maxRouteCost: Double = DEFAULT_MAX_ROUTE_COST,
-    val maxLandingDrop: Int = DEFAULT_MAX_LANDING_DROP,
-) {
-    init {
-        require(maxExpandedNodes > 0) { "Flight search expansion budget must be positive" }
-        require(maxRouteCost.isFinite() && maxRouteCost > 0.0) { "Flight route cost budget must be positive" }
-        require(maxLandingDrop >= 0) { "Flight landing drop cannot be negative" }
-    }
-
-    companion object {
-        const val DEFAULT_MAX_EXPANDED_NODES = 4_096
-        const val DEFAULT_MAX_ROUTE_COST = 512.0
-        const val DEFAULT_MAX_LANDING_DROP = 32
-    }
-}
-
-data class FlightReplanKey(
-    val worldRevision: FlightWorldRevision,
-    val start: FlightVec3,
-    val goal: FlightVec3,
-    val body: FlightBodyBounds,
-    val capabilities: FlightTraversalCapabilities,
-    val limits: FlightSearchLimits,
-    val requireStandableGoal: Boolean,
-)
-
-data class FlightPlanRequest(
-    val snapshot: FlightCollisionSnapshot,
-    val start: FlightVec3,
-    val goal: FlightVec3,
-    val body: FlightBodyBounds,
-    val capabilities: FlightTraversalCapabilities = FlightTraversalCapabilities(),
-    val limits: FlightSearchLimits = FlightSearchLimits(),
-    val requireStandableGoal: Boolean = false,
-) {
-    val replanKey: FlightReplanKey
-        get() = FlightReplanKey(
-            worldRevision = snapshot.revision,
-            start = start,
-            goal = goal,
-            body = body,
-            capabilities = capabilities,
-            limits = limits,
-            requireStandableGoal = requireStandableGoal,
-        )
-}
-
-enum class FlightPlanStatus {
-    COMPLETE,
-    LOADED_FRONTIER,
-    BUDGET_EXHAUSTED,
-    NO_ROUTE,
-    START_BLOCKED,
-    GOAL_BLOCKED,
-}
-
-data class FlightRouteProgress(
-    val fraction: Double,
-    val distanceRemaining: Double,
-    val expandedNodes: Int,
-) {
-    init {
-        require(fraction.isFinite() && fraction in 0.0..1.0) { "Flight progress must be between zero and one" }
-        require(distanceRemaining.isFinite() && distanceRemaining >= 0.0) {
-            "Remaining flight distance must be finite and non-negative"
-        }
-        require(expandedNodes >= 0) { "Expanded flight nodes cannot be negative" }
-    }
-}
-
-class FlightRoute(
-    points: Collection<FlightVec3>,
-    val totalDistance: Double,
-    val progress: FlightRouteProgress,
-) {
-    val points: List<FlightVec3> = Collections.unmodifiableList(ArrayList(points))
-
-    init {
-        require(points.isNotEmpty()) { "Flight routes cannot be empty" }
-        require(totalDistance.isFinite() && totalDistance >= 0.0) { "Flight route distance must be valid" }
-    }
-
-    override fun equals(other: Any?): Boolean = other is FlightRoute &&
-        points == other.points && totalDistance == other.totalDistance && progress == other.progress
-
-    override fun hashCode(): Int = 31 * (31 * points.hashCode() + totalDistance.hashCode()) + progress.hashCode()
-
-    override fun toString(): String = "FlightRoute(points=$points, totalDistance=$totalDistance, progress=$progress)"
-}
-
-data class FlightPlanResult(
-    val status: FlightPlanStatus,
-    val snapshot: FlightCollisionSnapshot,
-    val route: FlightRoute? = null,
-    val landingAnchor: FlightVec3? = null,
-    val replanKey: FlightReplanKey,
-)

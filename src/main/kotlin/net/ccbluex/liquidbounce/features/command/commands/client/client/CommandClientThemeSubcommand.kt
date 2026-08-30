@@ -18,26 +18,24 @@
  */
 package net.ccbluex.liquidbounce.features.command.commands.client.client
 
-import net.ccbluex.liquidbounce.config.ConfigSystem
 import net.ccbluex.liquidbounce.features.command.CommandException
-import net.ccbluex.liquidbounce.features.command.CommandExecutor.suspendHandler
+import net.ccbluex.liquidbounce.features.command.CommandRuntime.suspendHandler
 import net.ccbluex.liquidbounce.features.command.CommandManager
 import net.ccbluex.liquidbounce.features.command.builder.CommandBuilder
 import net.ccbluex.liquidbounce.features.command.builder.ParameterBuilder
+import net.ccbluex.liquidbounce.features.command.commands.client.client.runtime.ClientCommandRuntimeBridge
 import net.ccbluex.liquidbounce.features.command.preset.pagedQuery
-import net.ccbluex.liquidbounce.integration.theme.Theme
-import net.ccbluex.liquidbounce.integration.theme.ThemeManager
 import net.ccbluex.liquidbounce.utils.text.asText
-import net.ccbluex.liquidbounce.utils.client.bold
-import net.ccbluex.liquidbounce.utils.client.chat
-import net.ccbluex.liquidbounce.utils.client.clickablePath
-import net.ccbluex.liquidbounce.utils.client.copyable
-import net.ccbluex.liquidbounce.utils.client.markAsError
-import net.ccbluex.liquidbounce.utils.client.onClick
-import net.ccbluex.liquidbounce.utils.client.onHover
-import net.ccbluex.liquidbounce.utils.client.regular
-import net.ccbluex.liquidbounce.utils.client.variable
-import net.ccbluex.liquidbounce.utils.client.withColor
+import net.ccbluex.liquidbounce.utils.text.bold
+import net.ccbluex.liquidbounce.features.chat.chat
+import net.ccbluex.liquidbounce.utils.text.clickablePath
+import net.ccbluex.liquidbounce.utils.text.copyable
+import net.ccbluex.liquidbounce.utils.text.markAsError
+import net.ccbluex.liquidbounce.utils.text.onClick
+import net.ccbluex.liquidbounce.utils.text.onHover
+import net.ccbluex.liquidbounce.utils.text.regular
+import net.ccbluex.liquidbounce.utils.text.variable
+import net.ccbluex.liquidbounce.utils.text.withColor
 import net.minecraft.ChatFormatting
 import net.minecraft.network.chat.ClickEvent
 import net.minecraft.network.chat.HoverEvent
@@ -54,15 +52,16 @@ object CommandClientThemeSubcommand {
         .build()
 
     private fun browseSubcommand() = CommandBuilder.begin("browse").handler {
-        Util.getPlatform().openFile(ThemeManager.themesFolder)
-        chat(regular("Location: "), clickablePath(ThemeManager.themesFolder))
+        val themesFolder = ClientCommandRuntimeBridge.themesFolder()
+        Util.getPlatform().openFile(themesFolder)
+        chat(regular("Location: "), clickablePath(themesFolder))
     }.build()
 
     private fun setSubcommand() = CommandBuilder.begin("set")
         .parameter(
             ParameterBuilder.begin<String>("theme")
                 .verifiedBy(ParameterBuilder.STRING_VALIDATOR).required()
-                .autocompletedFrom { ThemeManager.themeIds }
+                .autocompletedFrom(placeholdersProvider = ClientCommandRuntimeBridge::themeIds)
                 .build()
         )
         .suspendHandler {
@@ -86,19 +85,16 @@ object CommandClientThemeSubcommand {
                 }
 
                 // Loads the theme from the URL (will throw an exception if the theme is invalid)
-                Theme.load(url.toString())
+                ClientCommandRuntimeBridge.loadRemoteTheme(url.toString())
             } catch (_: IllegalArgumentException) {
-                ThemeManager.themes.find { it.metadata.id.equals(idOrUrl, true) }
+                ClientCommandRuntimeBridge.findTheme(idOrUrl)
                     ?: throw CommandException("No theme found with name \"$idOrUrl\"!".asText())
             }
 
-            runCatching {
-                ThemeManager.theme = theme
-                ConfigSystem.store(ThemeManager)
-            }.onFailure {
+            ClientCommandRuntimeBridge.activateTheme(theme).onFailure {
                 chat(markAsError("Failed to switch theme: ${it.message}"))
             }.onSuccess {
-                chat(regular("Switched theme to "), variable(theme.metadata.name).copyable(), regular("."))
+                chat(regular("Switched theme to "), variable(theme.description.name).copyable(), regular("."))
             }
         }.build()
 
@@ -109,28 +105,29 @@ object CommandClientThemeSubcommand {
                 "Available themes".asText().withColor(ChatFormatting.RED).bold(true)
             },
             items = {
-                ThemeManager.themes
+                ClientCommandRuntimeBridge.themes()
             },
             eachRow = { _, theme ->
+                val metadata = theme.description
                 regular("\u2B25 ".asText()
                     .withStyle(ChatFormatting.BLUE)
-                    .append(variable(theme.metadata.name))
+                    .append(variable(metadata.name))
                     .append(regular(" ("))
-                    .append(variable(theme.metadata.id))
+                    .append(variable(metadata.id))
                     .append(regular(" "))
-                    .append(variable(theme.metadata.version))
+                    .append(variable(metadata.version))
                     .append(regular(")"))
                     .append(regular(" by "))
-                    .append(variable(theme.metadata.authors.joinToString(separator = ", ")).copyable())
+                    .append(variable(metadata.authors.joinToString(separator = ", ")).copyable())
                     .append(regular(" from "))
-                    .append(variable(theme.origin.tag))
+                    .append(variable(metadata.origin))
                 ).onClick(
                     ClickEvent.SuggestCommand(
-                        "${CommandManager.GlobalSettings.prefix}client theme set ${theme.metadata.id}"
+                        "${CommandManager.GlobalSettings.prefix}client theme set ${metadata.id}"
                     )
                 ).onHover(
                     HoverEvent.ShowText(
-                        variable("Click to set theme \"${theme.metadata.name}\".")
+                        variable("Click to set theme \"${metadata.name}\".")
                     )
                 )
             }
@@ -138,11 +135,9 @@ object CommandClientThemeSubcommand {
 
     private fun reloadSubcommand() = CommandBuilder.begin("reload")
         .suspendHandler {
-            val prevCount = ThemeManager.themes.size
-
-            ThemeManager.load()
+            val result = ClientCommandRuntimeBridge.reloadThemes()
             chat(regular("Reloaded themes. "))
-            val diff = ThemeManager.themes.size - prevCount
+            val diff = result.currentCount - result.previousCount
             if (diff > 0) {
                 chat(regular("Added "), variable(diff.toString()), regular(" new theme(s)."))
             } else if (diff < 0) {

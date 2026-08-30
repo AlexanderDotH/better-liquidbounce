@@ -20,7 +20,7 @@ package net.ccbluex.liquidbounce.features.module.modules.render
 
 import net.ccbluex.liquidbounce.config.types.group.Mode
 import net.ccbluex.liquidbounce.config.types.group.ModeValueGroup
-import net.ccbluex.liquidbounce.event.events.WorldRenderEvent
+import net.ccbluex.liquidbounce.render.events.WorldRenderEvent
 import net.ccbluex.liquidbounce.event.handler
 import net.ccbluex.liquidbounce.features.module.ClientModule
 import net.ccbluex.liquidbounce.features.module.ModuleCategories
@@ -31,9 +31,9 @@ import net.ccbluex.liquidbounce.render.engine.type.Color4b
 import net.ccbluex.liquidbounce.render.renderEnvironment
 import net.ccbluex.liquidbounce.render.withPositionRelativeToCamera
 import net.ccbluex.liquidbounce.utils.block.hole.Hole
-import net.ccbluex.liquidbounce.utils.block.hole.HoleManager
-import net.ccbluex.liquidbounce.utils.block.hole.HoleManagerSubscriber
-import net.ccbluex.liquidbounce.utils.block.hole.HoleTracker
+import net.ccbluex.liquidbounce.features.block.hole.HoleManager
+import net.ccbluex.liquidbounce.features.block.hole.HoleManagerSubscriber
+import net.ccbluex.liquidbounce.features.block.hole.HoleTracker
 import net.ccbluex.liquidbounce.utils.math.box
 import net.minecraft.core.BlockPos
 import net.minecraft.core.Direction

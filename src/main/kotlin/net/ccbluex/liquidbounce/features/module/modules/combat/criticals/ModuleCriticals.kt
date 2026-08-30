@@ -20,10 +20,11 @@ package net.ccbluex.liquidbounce.features.module.modules.combat.criticals
 
 import net.ccbluex.liquidbounce.config.types.group.NoneMode
 import net.ccbluex.liquidbounce.config.types.group.ToggleableValueGroup
-import net.ccbluex.liquidbounce.config.types.list.Tagged
+import net.ccbluex.liquidbounce.common.Tagged
 import net.ccbluex.liquidbounce.event.events.AttackEntityEvent
 import net.ccbluex.liquidbounce.event.events.SprintEvent
 import net.ccbluex.liquidbounce.event.handler
+import net.ccbluex.liquidbounce.features.combat.contract.CombatRuntimeEnvironment
 import net.ccbluex.liquidbounce.features.module.ClientModule
 import net.ccbluex.liquidbounce.features.module.ModuleCategories
 import net.ccbluex.liquidbounce.features.module.modules.combat.criticals.modes.CriticalsBlink
@@ -34,9 +35,9 @@ import net.ccbluex.liquidbounce.features.module.modules.combat.criticals.modes.C
 import net.ccbluex.liquidbounce.features.module.modules.movement.fly.ModuleFly
 import net.ccbluex.liquidbounce.features.module.modules.movement.liquidwalk.ModuleLiquidWalk
 import net.ccbluex.liquidbounce.utils.block.collideBlockIntersects
-import net.ccbluex.liquidbounce.utils.clicking.Clicker
+import net.ccbluex.liquidbounce.features.clicking.Clicker
 import net.ccbluex.liquidbounce.utils.network.sendStopSprinting
-import net.ccbluex.liquidbounce.utils.combat.findEnemy
+import net.ccbluex.liquidbounce.features.combat.runtime.findEnemy
 import net.ccbluex.liquidbounce.utils.entity.box
 import net.ccbluex.liquidbounce.utils.kotlin.EventPriorityConvention.CRITICAL_MODIFICATION
 import net.minecraft.world.effect.MobEffects.BLINDNESS
@@ -52,6 +53,9 @@ import net.minecraft.world.level.block.WebBlock
  * Automatically crits every time you attack someone.
  */
 object ModuleCriticals : ClientModule("Criticals", ModuleCategories.COMBAT) {
+
+    @JvmStatic
+    fun usesNoGroundMode() = CriticalsNoGround.running
 
     val modes = choices("Mode", 1) {
         arrayOf(
@@ -152,6 +156,7 @@ object ModuleCriticals : ClientModule("Criticals", ModuleCategories.COMBAT) {
     init {
         tree(WhenSprinting)
         tree(VisualsValueGroup)
+        CombatRuntimeEnvironment.bindCriticalHit { ignoreSprint -> wouldDoCriticalHit(ignoreSprint) }
     }
 
     /**

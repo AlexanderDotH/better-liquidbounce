@@ -18,27 +18,27 @@
  */
 package net.ccbluex.liquidbounce.features.command.commands.client.client
 
-import net.ccbluex.liquidbounce.LiquidBounce
+import net.ccbluex.liquidbounce.common.ClientBuildMetadata
 import net.ccbluex.liquidbounce.features.command.builder.CommandBuilder
-import net.ccbluex.liquidbounce.utils.client.MessageMetadata
-import net.ccbluex.liquidbounce.utils.client.chat
-import net.ccbluex.liquidbounce.utils.client.regular
-import net.ccbluex.liquidbounce.utils.client.variable
+import net.ccbluex.liquidbounce.features.chat.MessageMetadata
+import net.ccbluex.liquidbounce.features.chat.chat
+import net.ccbluex.liquidbounce.utils.text.regular
+import net.ccbluex.liquidbounce.utils.text.variable
 
 object CommandClientInfoSubcommand {
     fun infoCommand() = CommandBuilder
         .begin("info")
         .handler {
             chat(
-                regular(command.result("clientName", variable(LiquidBounce.CLIENT_NAME))),
+                regular(command.result("clientName", variable(ClientBuildMetadata.NAME))),
                 metadata = MessageMetadata(prefix = false)
             )
             chat(
-                regular(command.result("clientVersion", variable(LiquidBounce.clientVersion))),
+                regular(command.result("clientVersion", variable(ClientBuildMetadata.version))),
                 metadata = MessageMetadata(prefix = false)
             )
             chat(
-                regular(command.result("clientAuthor", variable(LiquidBounce.CLIENT_AUTHOR))),
+                regular(command.result("clientAuthor", variable(ClientBuildMetadata.AUTHOR))),
                 metadata = MessageMetadata(prefix = false)
             )
         }.build()

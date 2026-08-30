@@ -20,16 +20,12 @@
 package net.ccbluex.liquidbounce.features.module.modules.movement.liquidwalk.modes
 
 import net.ccbluex.liquidbounce.config.types.group.Mode
-import net.ccbluex.liquidbounce.config.types.group.ModeValueGroup
 import net.ccbluex.liquidbounce.event.events.BlockShapeEvent
 import net.ccbluex.liquidbounce.event.events.PacketEvent
 import net.ccbluex.liquidbounce.event.events.PlayerJumpEvent
 import net.ccbluex.liquidbounce.event.events.TransferOrigin
 import net.ccbluex.liquidbounce.event.handler
 import net.ccbluex.liquidbounce.event.tickHandler
-import net.ccbluex.liquidbounce.features.module.modules.movement.liquidwalk.ModuleLiquidWalk
-import net.ccbluex.liquidbounce.features.module.modules.movement.liquidwalk.ModuleLiquidWalk.collidesWithAnythingElse
-import net.ccbluex.liquidbounce.features.module.modules.movement.liquidwalk.ModuleLiquidWalk.standingOnWater
 import net.ccbluex.liquidbounce.utils.block.isBlockAtPosition
 import net.ccbluex.liquidbounce.utils.entity.box
 import net.minecraft.network.protocol.game.ServerboundMovePlayerPacket
@@ -43,8 +39,6 @@ import net.minecraft.world.phys.shapes.Shapes
  */
 internal object LiquidWalkNoCheatPlus : Mode("NoCheatPlus") {
 
-    override val parent: ModeValueGroup<Mode>
-        get() = ModuleLiquidWalk.modes
 
     private var shiftDown = false
 
@@ -73,8 +67,8 @@ internal object LiquidWalkNoCheatPlus : Mode("NoCheatPlus") {
         if (event.origin == TransferOrigin.OUTGOING && packet is ServerboundMovePlayerPacket) {
             if (!mc.options.keyShift.isDown &&
                 !player.isInWater &&
-                standingOnWater() &&
-                !collidesWithAnythingElse()
+                standingOnWater(player) &&
+                !collidesWithAnythingElse(player)
                 ) {
                 if (shiftDown) {
                     packet.y -= 0.001
@@ -87,7 +81,7 @@ internal object LiquidWalkNoCheatPlus : Mode("NoCheatPlus") {
 
     @Suppress("unused")
     val jumpHandler = handler<PlayerJumpEvent> { event ->
-        if (standingOnWater()) {
+        if (standingOnWater(player)) {
             event.cancelEvent()
         }
     }

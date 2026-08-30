@@ -23,9 +23,9 @@ import net.ccbluex.liquidbounce.config.types.group.ToggleableValueGroup
 import net.ccbluex.liquidbounce.event.waitTicks
 import net.ccbluex.liquidbounce.features.module.modules.player.autobuff.ModuleAutoBuff.AutoSwap
 import net.ccbluex.liquidbounce.utils.client.SilentHotbar
-import net.ccbluex.liquidbounce.utils.combat.CombatManager
+import net.ccbluex.liquidbounce.features.combat.runtime.CombatManager
 import net.ccbluex.liquidbounce.utils.inventory.HotbarItemSlot
-import net.ccbluex.liquidbounce.utils.inventory.InventoryManager
+import net.ccbluex.liquidbounce.features.inventory.InventoryManager
 import net.ccbluex.liquidbounce.utils.inventory.Slots
 import net.ccbluex.liquidbounce.utils.inventory.findClosestSlot
 import net.minecraft.world.item.ItemStack
@@ -73,4 +73,3 @@ abstract class Buff(
     abstract suspend fun execute(slot: HotbarItemSlot)
 
 }
-

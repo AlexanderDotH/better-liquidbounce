@@ -20,17 +20,17 @@ package net.ccbluex.liquidbounce.features.module.modules.misc
 
 import net.ccbluex.liquidbounce.api.thirdparty.translator.TranslationResult
 import net.ccbluex.liquidbounce.config.types.group.ToggleableValueGroup
-import net.ccbluex.liquidbounce.config.types.list.Tagged
+import net.ccbluex.liquidbounce.common.Tagged
 import net.ccbluex.liquidbounce.event.events.TitleEvent
 import net.ccbluex.liquidbounce.event.suspendHandler
 import net.ccbluex.liquidbounce.features.global.GlobalSettingsAutoTranslate
 import net.ccbluex.liquidbounce.features.module.ClientModule
 import net.ccbluex.liquidbounce.features.module.ModuleCategories
 import net.ccbluex.liquidbounce.utils.text.asPlainText
-import net.ccbluex.liquidbounce.utils.client.chat
-import net.ccbluex.liquidbounce.utils.client.highlight
+import net.ccbluex.liquidbounce.features.chat.chat
+import net.ccbluex.liquidbounce.utils.text.highlight
 import net.ccbluex.liquidbounce.utils.client.mc
-import net.ccbluex.liquidbounce.utils.client.regular
+import net.ccbluex.liquidbounce.utils.text.regular
 import net.ccbluex.liquidbounce.utils.text.stripMinecraftColorCodes
 import net.minecraft.ChatFormatting
 import net.minecraft.client.gui.Gui

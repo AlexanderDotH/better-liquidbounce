@@ -20,11 +20,10 @@
 package net.ccbluex.liquidbounce.features.module.modules.movement.longjump.modes.nocheatplus
 
 import net.ccbluex.liquidbounce.config.types.group.Mode
-import net.ccbluex.liquidbounce.config.types.group.ModeValueGroup
 import net.ccbluex.liquidbounce.event.events.PlayerMoveEvent
 import net.ccbluex.liquidbounce.event.handler
 import net.ccbluex.liquidbounce.event.tickHandler
-import net.ccbluex.liquidbounce.features.module.modules.movement.longjump.ModuleLongJump
+import net.ccbluex.liquidbounce.features.module.modules.movement.longjump.runtime.LongJumpRuntime
 import net.ccbluex.liquidbounce.utils.entity.moving
 import net.ccbluex.liquidbounce.utils.math.multiply
 import net.ccbluex.liquidbounce.utils.movement.stopXZVelocity
@@ -35,22 +34,20 @@ import net.ccbluex.liquidbounce.utils.movement.stopXZVelocity
  * @testedOn eu.loyisa.cn
  */
 internal object NoCheatPlusBoost : Mode("NoCheatPlusBoost") {
-    override val parent: ModeValueGroup<*>
-        get() = ModuleLongJump.mode
 
     val ncpBoost by float("NCPBoost", 4.25f, 1f..10f)
 
     val repeatable = tickHandler {
-        if (ModuleLongJump.canBoost) {
+        if (LongJumpRuntime.canBoost) {
             player.deltaMovement =
                 player.deltaMovement.multiply(factorX = ncpBoost, factorZ = ncpBoost)
-            ModuleLongJump.boosted = true
+            LongJumpRuntime.boosted = true
         }
-        ModuleLongJump.canBoost = false
+        LongJumpRuntime.canBoost = false
     }
 
     val moveHandler = handler<PlayerMoveEvent> {
-        if (!player.moving && ModuleLongJump.jumped) {
+        if (!player.moving && LongJumpRuntime.jumped) {
             player.stopXZVelocity()
         }
     }

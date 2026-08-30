@@ -10,7 +10,7 @@
  */
 package net.ccbluex.liquidbounce.features.module.modules.movement.vclip
 
-import net.ccbluex.liquidbounce.utils.network.sendPacketSilently
+import net.ccbluex.liquidbounce.features.network.sendPacketSilently
 import net.minecraft.world.entity.Entity
 
 internal object VClipFoliaMode : VClipMovementMode("Folia") {

@@ -19,21 +19,13 @@
 
 package net.ccbluex.liquidbounce.features.module.modules.render.animations
 
-import com.mojang.blaze3d.vertex.PoseStack
-import com.mojang.math.Axis
-import net.ccbluex.liquidbounce.config.types.group.Mode
-import net.ccbluex.liquidbounce.config.types.group.ModeValueGroup
 import net.ccbluex.liquidbounce.config.types.group.ToggleableValueGroup
-import net.ccbluex.liquidbounce.config.types.list.Tagged
+import net.ccbluex.liquidbounce.common.Tagged
 import net.ccbluex.liquidbounce.event.events.PlayerStrideEvent
 import net.ccbluex.liquidbounce.event.handler
 import net.ccbluex.liquidbounce.features.module.ClientModule
 import net.ccbluex.liquidbounce.features.module.ModuleCategories
-import net.ccbluex.liquidbounce.utils.math.toRadians
-import net.minecraft.util.Mth
 import net.minecraft.world.InteractionHand
-import net.minecraft.world.entity.HumanoidArm
-import org.joml.Quaternionf
 
 fun shouldApplyOffHandTransform(
     hand: InteractionHand,
@@ -131,201 +123,10 @@ object ModuleAnimations : ClientModule("Animations", ModuleCategories.RENDER, al
         }
     }
 
-    /**
-     * A choice that aims to transform the held item transformation during the swing progress.
-     */
-
-
-    abstract class AnimationMode(name: String) : Mode(name) {
-
-        override val parent: ModeValueGroup<*>
-            get() = blockAnimationChoice
-
-        protected fun applySwingOffset(matrices: PoseStack, arm: HumanoidArm, swingProgress: Float) {
-            val armSide = if (arm == HumanoidArm.RIGHT) 1 else -1
-            val f = Mth.sin(swingProgress * swingProgress * Math.PI)
-            matrices.mulPose(Axis.YP.rotationDegrees(armSide.toFloat() * (45.0f + f * -20.0f)))
-            val g = Mth.sin(Mth.sqrt(swingProgress) * Math.PI)
-            matrices.mulPose(Axis.ZP.rotationDegrees(armSide.toFloat() * g * -20.0f))
-            matrices.mulPose(Axis.XP.rotationDegrees(g * -80.0f))
-            matrices.mulPose(Axis.YP.rotationDegrees(armSide.toFloat() * -45.0f))
-        }
-
-        abstract fun transform(matrices: PoseStack, arm: HumanoidArm, equipProgress: Float, swingProgress: Float)
-
-    }
-
-    /**
-     * This animation is based on the 1.7 animation. It is the closest to the original animation
-     * if not altered by the user.
-     *
-     * This animation is used in the ViaFabricPlus project.
-     * https://github.com/ViaVersion/ViaFabricPlus/blob/9eb2adf6265cf0ac9d2a17921791642f2b0cdd2c/src/main/java/de/florianmichael/viafabricplus/injection/mixin/fixes/minecraft/item/MixinHeldItemRenderer.java#L50-L60
-     */
-    object OneSevenAnimation : AnimationMode("1.7") {
-
-        private val translateY by float("Y", 0.1f, 0.05f..0.3f)
-        private val swingProgressScale by float("SwingScale", 0.9f, 0.1f..1.0f)
-
-        override fun transform(matrices: PoseStack, arm: HumanoidArm, equipProgress: Float, swingProgress: Float) {
-            matrices.translate(if (arm == HumanoidArm.RIGHT) -0.1f else 0.1f, translateY, 0.0f)
-            applySwingOffset(matrices, arm, swingProgress * swingProgressScale)
-        }
-
-    }
-
-    /**
-     * Based on the [applySwingOffset] but with a different transformation
-     * during swing progress to make it look like the [PushdownAnimation] from LiquidBounce Legacy.
-     *
-     * This animation is not the same as the original, but it is similar.
-     */
-    object PushdownAnimation : AnimationMode("Pushdown") {
-
-        override fun transform(matrices: PoseStack, arm: HumanoidArm, equipProgress: Float, swingProgress: Float) {
-            matrices.translate(if (arm == HumanoidArm.RIGHT) -0.1f else 0.1f, 0.1f, 0.0f)
-
-            val g = Mth.sin(Mth.sqrt(swingProgress) * Math.PI)
-            matrices.mulPose(
-                Axis.ZP.rotationDegrees(
-                    (if (arm == HumanoidArm.RIGHT) 1 else -1) * g * 10.0f
-                )
-            )
-            matrices.mulPose(Axis.XP.rotationDegrees(g * -35.0f))
-        }
-
-    }
-
-    object SigmaAnimation : AnimationMode("Sigma") {
-
-        private val translateY by float("Y", 0.1f, 0.05f..0.3f)
-
-        override fun transform(matrices: PoseStack, arm: HumanoidArm, equipProgress: Float, swingProgress: Float) {
-
-            val sine = Mth.sin(Mth.sqrt(swingProgress) * Math.PI)
-            val sideM = if (arm == HumanoidArm.RIGHT) 1.0f else -1.0f
-
-            val rot = Quaternionf().rotationAxis(
-                (-sine * 27.5f * sideM).toRadians(),
-                -8.0f * sideM,
-                0.0f,
-                9.0f
-            ).rotateAxis(
-                (-sine * 45.0f * sideM).toRadians(),
-                1.0f * sideM,
-                sine / 2.0f,
-                0.0f
-            )
-            matrices.mulPose(rot)
-
-            matrices.translate(0.0f, translateY, 0.0f)
-            applySwingOffset(matrices, arm, 0f)
-        }
-    }
-
-    object ExhibitionAnimation : AnimationMode("Exhibition") {
-
-        private val translateY by float("Y", 0.1f, 0.05f..0.3f)
-
-        override fun transform(matrices: PoseStack, arm: HumanoidArm, equipProgress: Float, swingProgress: Float) {
-
-            val sine = Mth.sin(Mth.sqrt(swingProgress) * Math.PI)
-            val sideM = if (arm == HumanoidArm.RIGHT) 1.0f else -1.0f
-
-            matrices.translate(0.0, -0.1, 0.0)
-
-            applySwingOffset(matrices, arm, 0f)
-
-            matrices.translate(0.1F, 0.4F, -0.1F)
-
-            val rot = Quaternionf().rotationAxis(
-                (-sine * 30.0F * sideM).toRadians(),
-                sine.div(2F),
-                0.0F,
-                9.0F
-            ).rotateAxis(
-                (-sine * 50.0F * sideM).toRadians(),
-                0.8F * sideM,
-                sine.div(2F),
-                0F
-            )
-            matrices.mulPose(rot)
-
-            matrices.translate(0.0f, translateY - 0.2f, 0.0f)
-
-        }
-
-    }
-
-    object AvatarAnimation : AnimationMode("Avatar") {
-
-        private val translateY by float("Y", 0.1f, 0.05f..0.3f)
-
-        override fun transform(matrices: PoseStack, arm: HumanoidArm, equipProgress: Float, swingProgress: Float) {
-
-            val sine = Mth.sin(Mth.sqrt(swingProgress) * Math.PI)
-            val sine1 = Mth.sin(swingProgress * swingProgress * Math.PI)
-            val sideM = if (arm == HumanoidArm.RIGHT) 1.0f else -1.0f
-
-            matrices.translate(0.2F * sideM, translateY, 0F)
-
-            val rot = Quaternionf().rotationAxis(
-                (0.0F * sideM).toRadians(),
-                0.0F,
-                1.0F,
-                0.0F
-            ).rotateY(
-                (sine1 * -20.0F * sideM).toRadians()
-            ).rotateZ(
-                (sine * -20.0F * sideM).toRadians()
-            ).rotateAxis(
-                (sine * -40.0F * sideM).toRadians(),
-                1.0F * sideM,
-                0.0F,
-                0.0F
-            )
-            matrices.mulPose(rot)
-
-            applySwingOffset(matrices, arm, 0f)
-        }
-    }
-
-    object DortwareAnimation : AnimationMode("Dortware") {
-
-        private val translateY by float("Y", 0.1f, 0.05f..0.3f)
-
-        override fun transform(matrices: PoseStack, arm: HumanoidArm, equipProgress: Float, swingProgress: Float) {
-
-            val sine = Mth.sin(Mth.sqrt(swingProgress) * Math.PI)
-            val sqrtSwing = Mth.sqrt(swingProgress)
-            val altSine = Mth.sin(sqrtSwing * Math.PI - 3)
-
-            val rot = Quaternionf().rotationAxis(
-                (-sine * 10).toRadians(),
-                0.0f,
-                15.0f,
-                200.0f
-            ).rotateAxis(
-                (-sine * 10f).toRadians(),
-                300.0f,
-                sine.div(2f),
-                1.0f
-            )
-            matrices.mulPose(rot)
-
-            matrices.translate(3.4, 0.3, -0.4)
-            matrices.translate(-2.10f, -0.2f, 0.1f)
-
-            val rot1 = Quaternionf().rotationAxis(
-                (altSine * 13.0f).toRadians(),
-                -10.0f,
-                -1.4f,
-                -10.0f
-            )
-            matrices.mulPose(rot1)
-
-            matrices.translate(if(arm == HumanoidArm.RIGHT) -1f else -2f, translateY, 0f)
-
-        }
-    }
+    object OneSevenAnimation : OneSevenAnimationMode()
+    object PushdownAnimation : PushdownAnimationMode()
+    object SigmaAnimation : SigmaAnimationMode()
+    object ExhibitionAnimation : ExhibitionAnimationMode()
+    object AvatarAnimation : AvatarAnimationMode()
+    object DortwareAnimation : DortwareAnimationMode()
 }

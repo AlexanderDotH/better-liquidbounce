@@ -11,6 +11,8 @@ repositories {
 
 dependencies {
     compileOnly("io.papermc.paper:paper-api:26.2.build.112-stable")
+    testImplementation("org.junit.jupiter:junit-jupiter:6.1.3")
+    testRuntimeOnly("org.junit.platform:junit-platform-launcher:6.1.3")
 }
 
 java {
@@ -25,4 +27,8 @@ tasks.jar {
 
 tasks.withType<JavaCompile>().configureEach {
     options.compilerArgs.add("-Xlint:deprecation")
+}
+
+tasks.test {
+    useJUnitPlatform()
 }

@@ -18,11 +18,10 @@
  */
 package net.ccbluex.liquidbounce.injection.mixins.minecraft.gui;
 
-import net.ccbluex.liquidbounce.LiquidBounce;
 import net.ccbluex.liquidbounce.additions.ScreenAddition;
-import net.ccbluex.liquidbounce.features.misc.HideAppearance;
-import net.ccbluex.liquidbounce.features.module.modules.player.cheststealer.features.FeatureSilentScreen;
-import net.ccbluex.liquidbounce.features.module.modules.render.DoRender;
+import net.ccbluex.liquidbounce.common.ClientLifecycleState;
+import net.ccbluex.liquidbounce.features.misc.HideAppearanceHook;
+import net.ccbluex.liquidbounce.features.module.modules.player.cheststealer.features.SilentScreenHook;
 import net.ccbluex.liquidbounce.features.module.modules.render.ModuleAntiBlind;
 import net.ccbluex.liquidbounce.integration.theme.ThemeManager;
 import net.ccbluex.liquidbounce.utils.text.RunnableClickEvent;
@@ -66,7 +65,7 @@ public abstract class MixinScreen implements ScreenAddition {
 
     @Inject(method = "init(II)V", at = @At("TAIL"))
     private void objInit(CallbackInfo ci) {
-        if (!LiquidBounce.INSTANCE.isInitialized()) {
+        if (!ClientLifecycleState.INSTANCE.isInitialized()) {
             return;
         }
 
@@ -75,7 +74,7 @@ public abstract class MixinScreen implements ScreenAddition {
 
     @Inject(method = "init()V", at = @At("TAIL"))
     protected void init(CallbackInfo ci) {
-        if (!LiquidBounce.INSTANCE.isInitialized()) {
+        if (!ClientLifecycleState.INSTANCE.isInitialized()) {
             return;
         }
 
@@ -84,22 +83,22 @@ public abstract class MixinScreen implements ScreenAddition {
 
     @Inject(method = "extractTransparentBackground", at = @At("HEAD"), cancellable = true)
     private void hookRenderInGameBackground(GuiGraphicsExtractor context, CallbackInfo ci) {
-        if (!ModuleAntiBlind.canRender(DoRender.GUI_BACKGROUND)) {
+        if (!ModuleAntiBlind.canRenderGuiBackground()) {
             ci.cancel();
         }
     }
 
     @Inject(method = "extractRenderStateWithTooltipAndSubtitles", at = @At("HEAD"), cancellable = true)
     private void cancelRenderByChestStealer(CallbackInfo ci) {
-        if (LiquidBounce.INSTANCE.isInitialized() && FeatureSilentScreen.INSTANCE.getShouldHide()) {
+        if (ClientLifecycleState.INSTANCE.isInitialized() && SilentScreenHook.shouldHide()) {
             ci.cancel();
         }
     }
 
     @Inject(method = "extractBackground", at = @At("HEAD"), cancellable = true)
     private void renderBackgroundTexture(GuiGraphicsExtractor context, int mouseX, int mouseY, float delta, CallbackInfo ci) {
-        if (this.minecraft != null && this.minecraft.level == null && !HideAppearance.INSTANCE.isHidingNow()) {
-            if (!LiquidBounce.INSTANCE.isInitialized()) {
+        if (this.minecraft != null && this.minecraft.level == null && !HideAppearanceHook.isHidingNow()) {
+            if (!ClientLifecycleState.INSTANCE.isInitialized()) {
                 return;
             }
 

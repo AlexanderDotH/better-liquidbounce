@@ -20,7 +20,7 @@ package net.ccbluex.liquidbounce.features.module.modules.misc
 
 import net.ccbluex.liquidbounce.config.types.group.ToggleableValueGroup
 import net.ccbluex.liquidbounce.config.types.group.ValueGroup
-import net.ccbluex.liquidbounce.config.types.list.Tagged
+import net.ccbluex.liquidbounce.common.Tagged
 import net.ccbluex.liquidbounce.features.chat.LiquidChatUsers
 import net.ccbluex.liquidbounce.features.module.ClientModule
 import net.ccbluex.liquidbounce.features.module.ModuleCategories
@@ -48,6 +48,15 @@ object ModuleBetterTab : ClientModule("BetterTab", ModuleCategories.RENDER) {
 
     @JvmStatic
     fun isVisible(visibility: Visibility) = visibility in this.visibility
+
+    @JvmStatic
+    fun isHeaderVisible() = isVisible(Visibility.HEADER)
+
+    @JvmStatic
+    fun isFooterVisible() = isVisible(Visibility.FOOTER)
+
+    @JvmStatic
+    fun isNameOnlyVisible() = isVisible(Visibility.NAME_ONLY)
 
     object Limits : ValueGroup("Limits") {
         val tabSize by int("TabSize", 80, 1..1000)

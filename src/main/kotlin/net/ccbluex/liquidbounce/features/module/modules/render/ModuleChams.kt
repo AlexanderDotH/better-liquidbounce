@@ -24,58 +24,39 @@ import com.mojang.blaze3d.pipeline.RenderPipeline
 import com.mojang.blaze3d.pipeline.RenderTarget
 import com.mojang.blaze3d.systems.RenderSystem
 import com.mojang.blaze3d.textures.FilterMode
-import it.unimi.dsi.fastutil.objects.ReferenceOpenHashSet
-import net.ccbluex.liquidbounce.LiquidBounce
 import net.ccbluex.liquidbounce.annotations.ValueClassCandidate
-import net.ccbluex.liquidbounce.config.types.list.Tagged
 import net.ccbluex.liquidbounce.config.types.group.Mode
 import net.ccbluex.liquidbounce.config.types.group.ModeValueGroup
+import net.ccbluex.liquidbounce.common.Tagged
 import net.ccbluex.liquidbounce.config.types.toTextureProperty
+import net.ccbluex.liquidbounce.features.combat.runtime.shouldBeShown
 import net.ccbluex.liquidbounce.features.module.ClientModule
 import net.ccbluex.liquidbounce.features.module.ModuleCategories
-import net.ccbluex.liquidbounce.injection.mixins.minecraft.render.MixinRenderTypeAccessor
+import net.ccbluex.liquidbounce.features.module.modules.render.chams.ChamsRenderCapture
 import net.ccbluex.liquidbounce.render.ClientRenderPipelines
 import net.ccbluex.liquidbounce.render.ClientRenderPipelines.screenQuadSnippet
 import net.ccbluex.liquidbounce.render.ClientUniformDefine
 import net.ccbluex.liquidbounce.render.buffers.CachedUniform
 import net.ccbluex.liquidbounce.render.createRenderPass
-import net.ccbluex.liquidbounce.render.engine.LazyRenderTargetHolder
-import net.ccbluex.liquidbounce.render.withOutputTarget
-import net.ccbluex.liquidbounce.utils.combat.shouldBeShown
 import net.ccbluex.liquidbounce.utils.io.PNG_AND_JPG
 import net.ccbluex.liquidbounce.utils.kotlin.optional
 import net.minecraft.client.renderer.BindGroupLayouts
 import net.minecraft.client.renderer.feature.ItemFeatureRenderer
-import net.minecraft.client.renderer.rendertype.OutputTarget
 import net.minecraft.client.renderer.rendertype.RenderType
-import net.minecraft.util.Util
 import net.minecraft.world.entity.Entity
 import org.joml.Vector2f
-import java.util.function.Function
 
 object ModuleChams : ClientModule("Chams", ModuleCategories.RENDER) {
 
     private val modes = choices("Mode", Normal, arrayOf(Normal, Image))
 
-    private val supportedRenderTypes: Set<String> = hashSetOf(
-        "armor_cutout_no_cull",
-        "armor_decal_cutout_no_cull",
-        "armor_entity_glint",
-        "entity_translucent",
-        "entity_cutout",
-        "entity_cutout_cull",
-        "entity_cutout_no_cull",
-        "entity_solid",
-        "entity_glint",
-        "glint",
-        "glint_translucent",
-        "item_cutout",
-        "item_translucent"
+    private val capture = ChamsRenderCapture(
+        moduleName = name,
+        enabled = { running },
+        shouldRenderEntity = { entity -> entity.shouldBeShown() },
+        composite = { target, chamsTarget -> modes.activeMode.render(target, chamsTarget) },
     )
-
-    private val renderTargetHolder = LazyRenderTargetHolder(this.name, useDepth = true)
     private val blitSampler = RenderSystem.getSamplerCache().getClampToEdge(FilterMode.NEAREST)
-    private val outputTarget = OutputTarget("liquidbounce_chams", renderTargetHolder)
 
     @ValueClassCandidate
     @JvmRecord
@@ -95,101 +76,34 @@ object ModuleChams : ClientModule("Chams", ModuleCategories.RENDER) {
             withDepthStencilState(optional())
         }
 
-    private val remapRenderType: Function<RenderType, RenderType> =
-        Util.memoize { original ->
-            val renderTypeAccessor = original as MixinRenderTypeAccessor
-
-            RenderType.create(
-                "liquidbounce_chams/${renderTypeAccessor.name}",
-                renderTypeAccessor.state.withOutputTarget(outputTarget),
-            )
-        }
-
-    private val heldItemEntityContext = ScopedValue.newInstance<Entity>()
-    private val heldItemSubmits = ReferenceOpenHashSet<ItemFeatureRenderer.Submit>()
-
-    private var dirty = false
-
-    private fun supports(renderType: RenderType): Boolean =
-        supportedRenderTypes.contains((renderType as MixinRenderTypeAccessor).name)
-
     /** Remaps an entity render type to the chams target when applicable. */
-    fun remapIfNeeded(renderType: RenderType, entity: Entity?): RenderType {
-        if (!running || !entity.shouldBeShown() || !supports(renderType)) {
-            return renderType
-        }
-
-        dirty = true
-        return remapRenderType.apply(renderType)
-    }
+    fun remapIfNeeded(renderType: RenderType, entity: Entity?): RenderType = capture.remapIfNeeded(renderType, entity)
 
     /** Runs a third-person held-item submission with the current entity bound. */
-    fun withHeldItemContext(entity: Entity?, block: Runnable) {
-        if (running && entity.shouldBeShown()) {
-            ScopedValue.where(heldItemEntityContext, entity).run(block)
-        } else {
-            block.run()
-        }
-    }
+    fun withHeldItemContext(entity: Entity?, block: Runnable) = capture.withHeldItemContext(entity, block)
 
     /** Marks an item submit as coming from the current held-item context. */
-    fun markHeldItemSubmitIfActive(submit: ItemFeatureRenderer.Submit) {
-        if (!heldItemEntityContext.isBound) {
-            return
-        }
-
-        heldItemSubmits.add(submit)
-    }
+    fun markHeldItemSubmitIfActive(submit: ItemFeatureRenderer.Submit) = capture.markHeldItemSubmitIfActive(submit)
 
     /** Returns whether the submit was created from a held-item context. */
-    fun isHeldItemSubmit(submit: ItemFeatureRenderer.Submit): Boolean =
-        heldItemSubmits.contains(submit)
+    fun isHeldItemSubmit(submit: ItemFeatureRenderer.Submit): Boolean = capture.isHeldItemSubmit(submit)
 
     /** Remaps a deferred held-item render type to the chams target when applicable. */
-    fun remapHeldItemRenderTypeIfNeeded(submit: ItemFeatureRenderer.Submit, renderType: RenderType): RenderType {
-        if (!isHeldItemSubmit(submit) || !supports(renderType)) {
-            return renderType
-        }
-
-        dirty = true
-        return remapRenderType.apply(renderType)
-    }
+    fun remapHeldItemRenderTypeIfNeeded(submit: ItemFeatureRenderer.Submit, renderType: RenderType): RenderType =
+        capture.remapHeldItemRenderTypeIfNeeded(submit, renderType)
 
     /** Remaps an immediate held-item render type using the current scoped entity. */
-    fun remapCurrentHeldItemRenderTypeIfNeeded(renderType: RenderType): RenderType {
-        val entity = if (heldItemEntityContext.isBound) heldItemEntityContext.get() else return renderType
-        return remapIfNeeded(renderType, entity)
-    }
+    fun remapCurrentHeldItemRenderTypeIfNeeded(renderType: RenderType): RenderType =
+        capture.remapCurrentHeldItemRenderTypeIfNeeded(renderType)
 
     /** Ensures the chams target exists before any remapped draws in this frame. */
-    fun beginFrameIfNeeded() {
-        if (!running || !dirty) {
-            return
-        }
-
-        renderTargetHolder.initAndGet()
-    }
+    fun beginFrameIfNeeded() = capture.beginFrameIfNeeded()
 
     /** Blits the accumulated chams target into the main render target. */
-    fun compositeIfNeeded(target: RenderTarget) {
-        if (!dirty) {
-            heldItemSubmits.clear()
-            return
-        }
-
-        dirty = false
-
-        try {
-            renderTargetHolder.get()?.let { modes.activeMode.render(target, it) }
-        } finally {
-            heldItemSubmits.clear()
-        }
-    }
+    fun compositeIfNeeded(target: RenderTarget) = capture.compositeIfNeeded(target)
 
     override fun onDisabled() {
-        dirty = false
-        heldItemSubmits.clear()
-        renderTargetHolder.close()
+        capture.close()
     }
 
     private object Normal : ChamsMode("Normal") {

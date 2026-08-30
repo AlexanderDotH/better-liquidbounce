@@ -20,7 +20,7 @@ package net.ccbluex.liquidbounce.features.module.modules.render
 
 import it.unimi.dsi.fastutil.objects.Reference2FloatOpenHashMap
 import net.ccbluex.liquidbounce.config.types.group.ValueGroup
-import net.ccbluex.liquidbounce.config.types.list.Tagged
+import net.ccbluex.liquidbounce.common.Tagged
 import net.ccbluex.liquidbounce.event.events.EntityHealthUpdateEvent
 import net.ccbluex.liquidbounce.event.events.GameTickEvent
 import net.ccbluex.liquidbounce.event.events.OverlayRenderEvent
@@ -32,7 +32,7 @@ import net.ccbluex.liquidbounce.render.engine.type.Color4b
 import net.ccbluex.liquidbounce.utils.kotlin.EventPriorityConvention.FIRST_PRIORITY
 import net.ccbluex.liquidbounce.utils.math.Easing
 import net.ccbluex.liquidbounce.utils.math.fma
-import net.ccbluex.liquidbounce.utils.render.WorldToScreen
+import net.ccbluex.liquidbounce.render.WorldToScreen
 import net.minecraft.world.entity.LivingEntity
 import net.minecraft.world.phys.Vec3
 import java.text.DecimalFormat

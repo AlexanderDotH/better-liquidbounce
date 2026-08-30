@@ -22,10 +22,10 @@ package net.ccbluex.liquidbounce.event.events
 import net.ccbluex.liquidbounce.annotations.Tag
 import net.ccbluex.liquidbounce.event.CancellableEvent
 import net.ccbluex.liquidbounce.event.Event
-import net.ccbluex.liquidbounce.integration.interop.protocol.event.WebSocketEvent
-import net.ccbluex.liquidbounce.integration.interop.protocol.rest.v1.game.PlayerData
-import net.ccbluex.liquidbounce.integration.interop.protocol.rest.v1.game.PlayerInventoryData
-import net.ccbluex.liquidbounce.integration.theme.component.ModernContextualBarSnapshot
+import net.ccbluex.liquidbounce.event.WebSocketEvent
+import net.ccbluex.liquidbounce.common.interop.ModernContextualBarSnapshot
+import net.ccbluex.liquidbounce.common.interop.PlayerDataPayload
+import net.ccbluex.liquidbounce.common.interop.PlayerInventoryDataPayload
 import net.minecraft.network.chat.Component
 import net.minecraft.world.effect.MobEffectInstance
 
@@ -39,7 +39,7 @@ class FpsLimitEvent(var fps: Int) : Event()
 
 @Tag("clientPlayerData")
 @Suppress("unused")
-class ClientPlayerDataEvent(val playerData: PlayerData) : Event(), WebSocketEvent
+class ClientPlayerDataEvent(val playerData: PlayerDataPayload) : Event(), WebSocketEvent
 
 @Tag("contextualBar")
 @Suppress("unused")
@@ -51,7 +51,7 @@ class ClientPlayerEffectEvent(val effects: List<MobEffectInstance>) : Event(), W
 
 @Tag("clientPlayerInventory")
 @Suppress("unused")
-class ClientPlayerInventoryEvent(val inventory: PlayerInventoryData) : Event(), WebSocketEvent
+class ClientPlayerInventoryEvent(val inventory: PlayerInventoryDataPayload) : Event(), WebSocketEvent
 
 sealed class TitleEvent : CancellableEvent(), WebSocketEvent {
     sealed class TextContent : TitleEvent() {

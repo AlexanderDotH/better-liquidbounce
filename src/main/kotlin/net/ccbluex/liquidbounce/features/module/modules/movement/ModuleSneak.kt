@@ -30,9 +30,9 @@ import net.ccbluex.liquidbounce.event.handler
 import net.ccbluex.liquidbounce.features.module.ClientModule
 import net.ccbluex.liquidbounce.features.module.ModuleCategories
 import net.ccbluex.liquidbounce.utils.client.isNewerThanOrEquals1_21_6
-import net.ccbluex.liquidbounce.utils.client.notification
-import net.ccbluex.liquidbounce.utils.network.send1_21_5StartSneaking
-import net.ccbluex.liquidbounce.utils.network.send1_21_5StopSneaking
+import net.ccbluex.liquidbounce.features.chat.notification
+import net.ccbluex.liquidbounce.utils.network.sendLegacyStartSneaking
+import net.ccbluex.liquidbounce.utils.network.sendLegacyStopSneaking
 import net.ccbluex.liquidbounce.utils.client.usesViaFabricPlus
 import net.ccbluex.liquidbounce.utils.entity.SimulatedPlayer
 import net.ccbluex.liquidbounce.utils.entity.immuneToMagmaBlocks
@@ -90,10 +90,10 @@ object ModuleSneak : ClientModule("Sneak", ModuleCategories.MOVEMENT) {
 
             val shouldSneak = !player.moving || !notDuringMove
             if (shouldSneak && !networkSneaking) {
-                network.send1_21_5StartSneaking()
+                network.sendLegacyStartSneaking()
                 networkSneaking = true
             } else if (!shouldSneak && networkSneaking) {
-                network.send1_21_5StopSneaking()
+                network.sendLegacyStopSneaking()
                 networkSneaking = false
             }
         }
@@ -109,7 +109,7 @@ object ModuleSneak : ClientModule("Sneak", ModuleCategories.MOVEMENT) {
 
         override fun disable() {
             if (networkSneaking) {
-                network.send1_21_5StopSneaking()
+                network.sendLegacyStopSneaking()
                 networkSneaking = false
             }
         }
@@ -144,14 +144,14 @@ object ModuleSneak : ClientModule("Sneak", ModuleCategories.MOVEMENT) {
             when (event.state) {
                 EventState.PRE -> {
                     if (networkSneaking) {
-                        network.send1_21_5StopSneaking()
+                        network.sendLegacyStopSneaking()
                         networkSneaking = false
                     }
                 }
 
                 EventState.POST -> {
                     if (!networkSneaking) {
-                        network.send1_21_5StartSneaking()
+                        network.sendLegacyStartSneaking()
                         networkSneaking = true
                     }
                 }
@@ -160,7 +160,7 @@ object ModuleSneak : ClientModule("Sneak", ModuleCategories.MOVEMENT) {
 
         override fun disable() {
             if (networkSneaking) {
-                network.send1_21_5StopSneaking()
+                network.sendLegacyStopSneaking()
                 networkSneaking = false
             }
         }

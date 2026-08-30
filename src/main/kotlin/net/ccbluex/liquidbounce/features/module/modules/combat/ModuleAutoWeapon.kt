@@ -19,7 +19,7 @@
 package net.ccbluex.liquidbounce.features.module.modules.combat
 
 import net.ccbluex.fastutil.enumSetOf
-import net.ccbluex.liquidbounce.config.types.list.Tagged
+import net.ccbluex.liquidbounce.common.Tagged
 import net.ccbluex.liquidbounce.event.events.AttackEntityEvent
 import net.ccbluex.liquidbounce.event.handler
 import net.ccbluex.liquidbounce.features.module.ClientModule

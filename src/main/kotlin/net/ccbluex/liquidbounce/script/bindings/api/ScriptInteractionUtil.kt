@@ -19,16 +19,16 @@
 package net.ccbluex.liquidbounce.script.bindings.api
 
 import net.ccbluex.liquidbounce.utils.block.SwingMode
-import net.ccbluex.liquidbounce.utils.block.doPlacement
-import net.ccbluex.liquidbounce.utils.block.targetfinding.BlockOffsetOptions
-import net.ccbluex.liquidbounce.utils.block.targetfinding.BlockPlacementTargetFindingOptions
-import net.ccbluex.liquidbounce.utils.block.targetfinding.CenterTargetPositionFactory
-import net.ccbluex.liquidbounce.utils.block.targetfinding.FaceHandlingOptions
-import net.ccbluex.liquidbounce.utils.block.targetfinding.PlayerLocationOnPlacement
-import net.ccbluex.liquidbounce.utils.block.targetfinding.findBestBlockPlacementTarget
+import net.ccbluex.liquidbounce.features.block.runtime.doPlacement
+import net.ccbluex.liquidbounce.features.block.config.BlockOffsetOptions
+import net.ccbluex.liquidbounce.features.block.config.BlockPlacementTargetFindingOptions
+import net.ccbluex.liquidbounce.features.block.planner.CenterTargetPositionFactory
+import net.ccbluex.liquidbounce.features.block.config.FaceHandlingOptions
+import net.ccbluex.liquidbounce.features.block.config.PlayerLocationOnPlacement
+import net.ccbluex.liquidbounce.features.block.planner.findBestBlockPlacementTarget
 import net.ccbluex.liquidbounce.utils.client.mc
 import net.ccbluex.liquidbounce.utils.client.player
-import net.ccbluex.liquidbounce.utils.combat.attackEntity
+import net.ccbluex.liquidbounce.features.combat.runtime.attackEntity
 import net.ccbluex.liquidbounce.utils.raytracing.traceFromPlayer
 import net.minecraft.core.BlockPos
 import net.minecraft.world.InteractionHand

@@ -19,111 +19,6 @@
 package net.ccbluex.liquidbounce.features.module.modules.movement.autododge
 
 import net.minecraft.network.protocol.game.ServerboundMovePlayerPacket
-import net.minecraft.world.phys.Vec3
-
-internal enum class AutoDodgePacketThreatType {
-    PROJECTILE,
-    MACE,
-    SPEAR,
-}
-
-internal enum class AutoDodgePacketRuntimeState(val debugName: String) {
-    IDLE("Idle"),
-    COOLDOWN("Cooldown"),
-    LEASE_UNAVAILABLE("LeaseUnavailable"),
-    CONNECTION_UNAVAILABLE("ConnectionUnavailable"),
-    SAFETY_REJECTED("SafetyRejected"),
-    BURST_REJECTED("BurstRejected"),
-    ARMED("Armed"),
-    SENDING_DESTINATION("SendingDestination"),
-    HOLDING("Holding"),
-    SENDING_RETURN("SendingReturn"),
-    SEND_FAILED("SendFailed"),
-    RETURNED("Returned"),
-}
-
-internal enum class AutoDodgePacketPreflightResult {
-    READY,
-    CONNECTION_UNAVAILABLE,
-    SAFETY_REJECTED,
-    BURST_REJECTED,
-}
-
-internal data class AutoDodgePacketEndpoint(
-    val position: Vec3,
-    val onGround: Boolean,
-    val horizontalCollision: Boolean,
-) {
-    init {
-        require(position.x.isFinite() && position.y.isFinite() && position.z.isFinite()) {
-            "An Auto-Dodge packet endpoint must be finite"
-        }
-    }
-}
-
-internal data class AutoDodgePacketRuntimeRequest(
-    val tick: Long,
-    val cooldownTicks: Int,
-    val holdTicks: Int,
-    val selectedThreat: AutoDodgePacketThreatType,
-    val threatEntityId: Int = 0,
-    val predictedImpactTick: Long = tick,
-    val dodgeAtTick: Long = tick,
-    val returnNotBeforeTick: Long = predictedImpactTick + holdTicks,
-    val destination: AutoDodgePacketEndpoint,
-) {
-    init {
-        require(cooldownTicks in AUTO_DODGE_PACKET_MIN_COOLDOWN_TICKS..AUTO_DODGE_PACKET_MAX_COOLDOWN_TICKS) {
-            "Auto-Dodge packet cooldown must be between $AUTO_DODGE_PACKET_MIN_COOLDOWN_TICKS and " +
-                "$AUTO_DODGE_PACKET_MAX_COOLDOWN_TICKS ticks"
-        }
-        require(holdTicks in AUTO_DODGE_PACKET_MIN_HOLD_TICKS..AUTO_DODGE_PACKET_MAX_HOLD_TICKS) {
-            "Auto-Dodge packet hold must be between $AUTO_DODGE_PACKET_MIN_HOLD_TICKS and " +
-                "$AUTO_DODGE_PACKET_MAX_HOLD_TICKS ticks"
-        }
-        require(predictedImpactTick >= tick) {
-            "Auto-Dodge predicted impact cannot precede the packet transmission tick"
-        }
-        require(dodgeAtTick <= tick) {
-            "Auto-Dodge cannot start before its predicted dodge tick"
-        }
-        require(returnNotBeforeTick >= predictedImpactTick) {
-            "Auto-Dodge cannot return before the predicted impact"
-        }
-    }
-
-    val threatKey = AutoDodgePacketThreatKey(selectedThreat, threatEntityId)
-}
-
-internal data class AutoDodgePacketBurst(
-    val origin: AutoDodgePacketEndpoint,
-    val destination: AutoDodgePacketEndpoint,
-    val destinationPacket: ServerboundMovePlayerPacket.Pos,
-    val returnPacket: ServerboundMovePlayerPacket.Pos,
-) {
-    companion object {
-        fun create(
-            origin: AutoDodgePacketEndpoint,
-            destination: AutoDodgePacketEndpoint,
-        ) = AutoDodgePacketBurst(
-            origin = origin,
-            destination = destination,
-            destinationPacket = destination.toPositionPacket(),
-            returnPacket = origin.toPositionPacket(),
-        )
-    }
-}
-
-internal data class AutoDodgePacketRuntimeDebug(
-    val state: AutoDodgePacketRuntimeState = AutoDodgePacketRuntimeState.IDLE,
-    val selectedThreat: AutoDodgePacketThreatType? = null,
-    val destination: Vec3? = null,
-    val predictedImpactTick: Long? = null,
-    val dodgeAtTick: Long? = null,
-    val holdUntilTick: Long? = null,
-    val lastSuccessfulBurstTick: Long? = null,
-    val lastSuccessfulDestination: Vec3? = null,
-)
 
 /**
  * Holds one collision-preflighted server-side dodge before returning exactly to the captured origin.
@@ -136,7 +31,7 @@ internal class AutoDodgePacketRuntime {
     var debug = AutoDodgePacketRuntimeDebug()
         private set
 
-    private var activeHold: ActiveHold? = null
+    private var activeHold: AutoDodgeActiveHold? = null
 
     val suppressesMovementPackets: Boolean
         get() = activeHold != null
@@ -190,54 +85,12 @@ internal class AutoDodgePacketRuntime {
             return false
         }
 
-        return startWithLease(request, burst, lease, preflight, sendPacket)
-    }
-
-    private fun startWithLease(
-        request: AutoDodgePacketRuntimeRequest,
-        burst: AutoDodgePacketBurst,
-        lease: AutoCloseable,
-        preflight: (AutoDodgePacketBurst) -> AutoDodgePacketPreflightResult,
-        sendPacket: (ServerboundMovePlayerPacket.Pos) -> Unit,
-    ): Boolean {
-        if (burst.origin.position == burst.destination.position) {
-            updateState(AutoDodgePacketRuntimeState.BURST_REJECTED)
-            lease.close()
-            return false
-        }
-        val preflightResult = try {
-            preflight(burst)
-        } catch (throwable: Throwable) {
-            updateState(AutoDodgePacketRuntimeState.BURST_REJECTED)
-            lease.close()
-            throw throwable
-        }
-        if (preflightResult != AutoDodgePacketPreflightResult.READY) {
-            updateState(preflightResult.runtimeState)
-            lease.close()
-            return false
-        }
-
-        updateState(AutoDodgePacketRuntimeState.SENDING_DESTINATION)
-        try {
-            sendPacket(burst.destinationPacket)
-        } catch (throwable: Throwable) {
-            updateState(AutoDodgePacketRuntimeState.SEND_FAILED)
-            lease.close()
-            throw throwable
-        }
-
-        val holdUntilTick = request.returnNotBeforeTick
-        activeHold = ActiveHold(
-            burst = burst,
-            threatKey = request.threatKey,
-            predictedImpactTick = request.predictedImpactTick,
-            holdUntilTick = holdUntilTick,
-            lease = lease,
-        )
+        val hold = startAutoDodgePacketHold(request, burst, lease, preflight, sendPacket, ::updateState)
+            ?: return false
+        activeHold = hold
         debug = debug.copy(
             state = AutoDodgePacketRuntimeState.HOLDING,
-            holdUntilTick = holdUntilTick,
+            holdUntilTick = hold.holdUntilTick,
         )
         return true
     }
@@ -355,34 +208,4 @@ internal class AutoDodgePacketRuntime {
         debug = debug.copy(holdUntilTick = null)
     }
 
-    private data class ActiveHold(
-        val burst: AutoDodgePacketBurst,
-        val threatKey: AutoDodgePacketThreatKey,
-        val predictedImpactTick: Long,
-        val holdUntilTick: Long,
-        val lease: AutoCloseable,
-    )
 }
-
-private val AutoDodgePacketPreflightResult.runtimeState: AutoDodgePacketRuntimeState
-    get() = when (this) {
-        AutoDodgePacketPreflightResult.READY -> AutoDodgePacketRuntimeState.IDLE
-        AutoDodgePacketPreflightResult.CONNECTION_UNAVAILABLE -> AutoDodgePacketRuntimeState.CONNECTION_UNAVAILABLE
-        AutoDodgePacketPreflightResult.SAFETY_REJECTED -> AutoDodgePacketRuntimeState.SAFETY_REJECTED
-        AutoDodgePacketPreflightResult.BURST_REJECTED -> AutoDodgePacketRuntimeState.BURST_REJECTED
-    }
-
-private fun AutoDodgePacketEndpoint.toPositionPacket() = ServerboundMovePlayerPacket.Pos(
-    position.x,
-    position.y,
-    position.z,
-    onGround,
-    horizontalCollision,
-)
-
-internal const val AUTO_DODGE_PACKET_MIN_COOLDOWN_TICKS = 1
-internal const val AUTO_DODGE_PACKET_MAX_COOLDOWN_TICKS = 20
-internal const val AUTO_DODGE_PACKET_MIN_HOLD_TICKS = 1
-internal const val AUTO_DODGE_PACKET_MAX_HOLD_TICKS = 20
-internal const val AUTO_DODGE_PACKET_DEFAULT_HOLD_TICKS = 2
-internal const val AUTO_DODGE_PACKET_MOVEMENT_OWNER = "AutoDodgePacket"

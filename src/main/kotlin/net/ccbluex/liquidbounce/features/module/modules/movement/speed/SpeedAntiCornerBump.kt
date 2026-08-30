@@ -24,6 +24,7 @@ import net.ccbluex.liquidbounce.utils.entity.SimulatedPlayer
 import net.ccbluex.liquidbounce.utils.entity.set
 import net.ccbluex.liquidbounce.utils.movement.DirectionalInput
 import net.minecraft.core.BlockPos
+import net.minecraft.world.entity.EntityDimensions
 import net.minecraft.world.entity.Pose
 import net.minecraft.world.level.block.state.BlockState
 import net.minecraft.world.phys.AABB
@@ -69,40 +70,27 @@ object SpeedAntiCornerBump : MinecraftShortcuts {
         simulatedPlayer: SimulatedPlayer,
         n: Int = 2,
     ): Int? {
-        // Times the player jumped. Starts at 1 because we already jump on the first tick() call.
         var jumpCount = 1
-        // Holds the last position where the player was on ground. The player is on ground when the method starts.
         var lastGroundPos = simulatedPlayer.pos
-
         for (tickIdx in 0..65) {
             simulatedPlayer.tick()
-
-            // Jump is already good. No need to change anything about it.
-            if (simulatedPlayer.onGround) {
-                if (jumpCount++ >= n) {
-                    break
-                }
-
-                lastGroundPos = simulatedPlayer.pos
-            }
-
-            if (simulatedPlayer.horizontalCollision) {
-                // If we hit the wall while going upwards, it doesn't make sense to delay, since we will hit the block
-                // anyway.
-                if (jumpCount == 1 && simulatedPlayer.deltaMovement.y > 0.0) {
-                    return null
-                }
-
-                // Check if it makes sense to try to jump on the block
-                if (!canJumpOnBlock(simulatedPlayer.pos, lastGroundPos)) {
-                    return null
-                }
-
-                return tickIdx
-            }
+            if (simulatedPlayer.onGround && jumpCount++ >= n) return null
+            if (simulatedPlayer.onGround) lastGroundPos = simulatedPlayer.pos
+            if (!simulatedPlayer.horizontalCollision) continue
+            return suggestedDelayAtCollision(simulatedPlayer, jumpCount, lastGroundPos, tickIdx)
         }
-
         return null
+    }
+
+    private fun suggestedDelayAtCollision(
+        simulatedPlayer: SimulatedPlayer,
+        jumpCount: Int,
+        lastGroundPos: Vec3,
+        tickIdx: Int,
+    ): Int? {
+        if (jumpCount == 1 && simulatedPlayer.deltaMovement.y > 0.0) return null
+        if (!canJumpOnBlock(simulatedPlayer.pos, lastGroundPos)) return null
+        return tickIdx
     }
 
     /**
@@ -126,48 +114,27 @@ object SpeedAntiCornerBump : MinecraftShortcuts {
             for (z in blockPos.z..blockPos2.z) {
                 jumpOnPos.x = x
                 jumpOnPos.z = z
-                val jumpOnState = jumpOnPos.stateOrEmpty
-
-                // Simple check that asserts that we can actually reach the block with a jump.
-                if (jumpOnPos.y + 1 - lastGroundPos.y > 1.3) {
-                    continue
-                }
-
-                if (!shouldJumpOnBlock(jumpOnPos, jumpOnState, box)) {
-                    continue
-                }
-                val posOneAboveJumpOnBlock = jumpOnPos.above(1)
-                val posTwoAboveJumpOnBlock = jumpOnPos.above(2)
-
-                // The player box if we had hit that jump perfectly.
-                val currentlyConsideredPlayerBox =
-                    playerDims.makeBoundingBox(collidingPos.x, jumpOnPos.y + 1.0, collidingPos.z)
-
-                val canEnterBlockAbove =
-                    canPlayerEnterBlockPos(
-                        posOneAboveJumpOnBlock,
-                        posOneAboveJumpOnBlock.stateOrEmpty,
-                        currentlyConsideredPlayerBox,
-                        tolerateLowBoundingBoxes = true,
-                    )
-                val canEnterBlockTwoAbove =
-                    canPlayerEnterBlockPos(
-                        posTwoAboveJumpOnBlock,
-                        posTwoAboveJumpOnBlock.stateOrEmpty,
-                        currentlyConsideredPlayerBox,
-                        tolerateLowBoundingBoxes = false,
-                    )
-
-                // We would not be able to stand on the block even if he had hit the jump perfectly.
-                if (!canEnterBlockAbove || !canEnterBlockTwoAbove) {
-                    continue
-                }
-
-                return true
+                if (canJumpAt(jumpOnPos, lastGroundPos, collidingPos, box, playerDims)) return true
             }
         }
-
         return false
+    }
+
+    private fun canJumpAt(
+        jumpOnPos: BlockPos,
+        lastGroundPos: Vec3,
+        collidingPos: Vec3,
+        collisionBox: AABB,
+        playerDimensions: EntityDimensions,
+    ): Boolean {
+        val jumpOnState = jumpOnPos.stateOrEmpty
+        if (jumpOnPos.y + 1 - lastGroundPos.y > 1.3) return false
+        if (!shouldJumpOnBlock(jumpOnPos, jumpOnState, collisionBox)) return false
+        val oneAbove = jumpOnPos.above(1)
+        val twoAbove = jumpOnPos.above(2)
+        val standingBox = playerDimensions.makeBoundingBox(collidingPos.x, jumpOnPos.y + 1.0, collidingPos.z)
+        return canPlayerEnterBlockPos(oneAbove, oneAbove.stateOrEmpty, standingBox, true) &&
+            canPlayerEnterBlockPos(twoAbove, twoAbove.stateOrEmpty, standingBox, false)
     }
 
     /**

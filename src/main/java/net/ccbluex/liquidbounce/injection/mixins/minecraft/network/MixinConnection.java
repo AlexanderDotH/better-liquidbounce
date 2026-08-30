@@ -24,14 +24,13 @@ import net.ccbluex.liquidbounce.event.EventManager;
 import net.ccbluex.liquidbounce.event.events.PacketEvent;
 import net.ccbluex.liquidbounce.event.events.PipelineEvent;
 import net.ccbluex.liquidbounce.event.events.TransferOrigin;
-import net.ccbluex.liquidbounce.features.module.modules.render.playermodel.ServerPlayerModelStateTracker;
+import net.ccbluex.liquidbounce.features.module.modules.render.playermodel.ServerPlayerModelStateHook;
+import net.ccbluex.liquidbounce.injection.hooks.ConnectionReceivingPacketHook;
 import net.minecraft.network.BandwidthDebugMonitor;
 import net.minecraft.network.Connection;
 import net.minecraft.network.PacketListener;
 import net.minecraft.network.protocol.Packet;
 import net.minecraft.network.protocol.PacketFlow;
-import net.minecraft.network.protocol.game.ClientboundBundlePacket;
-import net.minecraft.server.RunningOnDifferentThreadException;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.injection.At;
@@ -66,7 +65,7 @@ public abstract class MixinConnection {
     private void trackActuallySentPlayerState(
         Packet<?> packet, ChannelFutureListener listener, boolean flush, CallbackInfo callbackInfo
     ) {
-        ServerPlayerModelStateTracker.onPacketSent(packet);
+        ServerPlayerModelStateHook.onPacketSent(packet);
     }
 
     /**
@@ -74,29 +73,9 @@ public abstract class MixinConnection {
      */
     @Inject(method = "genericsFtw", at = @At("HEAD"), cancellable = true, require = 1)
     private static void hookReceivingPacket(Packet<?> packet, PacketListener listener, CallbackInfo ci) {
-        if (packet instanceof ClientboundBundlePacket bundleS2CPacket) {
-            // Cancel handling bundle packets since we take this in our own hands
-            ci.cancel();
-
-            // Handle each packet individually
-            for (Packet<?> packetInBundle : bundleS2CPacket.subPackets()) {
-                try {
-                    // This will call this method again, but with a single packet instead of a bundle
-                    genericsFtw(packetInBundle, listener);
-                } catch (RunningOnDifferentThreadException ignored) {
-                }
-                // usually we also handle RejectedExecutionException and
-                // ClassCastException, but both of them will disconnect the player
-                // and therefore are handled by the upper layer
-            }
-            return;
-        }
-
-        final PacketEvent event = new PacketEvent(TransferOrigin.INCOMING, packet, true);
-        EventManager.INSTANCE.callEvent(event);
-        if (event.isCancelled()) {
-            ci.cancel();
-        }
+        ConnectionReceivingPacketHook.handle(
+            packet, listener, ci::cancel, packetInBundle -> genericsFtw(packetInBundle, listener)
+        );
     }
 
     /**

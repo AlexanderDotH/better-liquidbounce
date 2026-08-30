@@ -162,7 +162,7 @@ class CustomFogIntegrationContractTest {
         val renderer = readSource(FOG_VOLUME_RENDERER_PATH)
         val cachedUniform = readSource(CACHED_UNIFORM_PATH)
 
-        assertTrue(renderer.contains("object CustomFogVolumeRenderer : MinecraftShortcuts, EventListener"))
+        assertTrue(renderer.contains("object CustomFogVolumeRenderer : EventListener"))
         assertTrue(
             Regex(
                 """volumeData\s*=\s*CachedUniform(?:<[^>\n]+>)?\(\s*ClientUniformDefine\.FOG_VOLUME"""
@@ -257,7 +257,7 @@ class CustomFogIntegrationContractTest {
         const val CLIENT_SHADERS_PATH =
             "src/main/kotlin/net/ccbluex/liquidbounce/render/ClientShaders.kt"
         const val CLIENT_PIPELINES_PATH =
-            "src/main/kotlin/net/ccbluex/liquidbounce/render/ClientRenderPipelines.kt"
+            "src/main/kotlin/net/ccbluex/liquidbounce/render/FogPipelineDefinitions.kt"
         const val CLIENT_UNIFORMS_PATH =
             "src/main/kotlin/net/ccbluex/liquidbounce/render/ClientUniformDefine.kt"
         const val CACHED_UNIFORM_PATH =

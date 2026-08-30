@@ -26,8 +26,8 @@ import net.ccbluex.liquidbounce.features.module.modules.world.traps.BlockChangeI
 import net.ccbluex.liquidbounce.features.module.modules.world.traps.BlockIntentProvider
 import net.ccbluex.liquidbounce.utils.block.collidingRegion
 import net.ccbluex.liquidbounce.utils.block.state
-import net.ccbluex.liquidbounce.utils.block.targetfinding.BlockPlacementTargetFindingOptions
-import net.ccbluex.liquidbounce.utils.block.targetfinding.BlockPosOffsets
+import net.ccbluex.liquidbounce.features.block.config.BlockPlacementTargetFindingOptions
+import net.ccbluex.liquidbounce.features.block.config.BlockPosOffsets
 import net.ccbluex.liquidbounce.utils.inventory.HotbarItemSlot
 import net.ccbluex.liquidbounce.utils.inventory.Slots
 import net.ccbluex.liquidbounce.utils.inventory.findClosestSlot

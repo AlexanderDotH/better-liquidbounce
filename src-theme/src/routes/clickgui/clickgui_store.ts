@@ -1,5 +1,7 @@
 import {type Writable, writable} from "svelte/store";
 
+export {os} from "../../integration/clientEnvironment";
+
 export {clickGuiThemeSession} from "./theme/themeSession";
 export type {
     ClickGuiThemeSession,
@@ -15,8 +17,6 @@ export interface TDescription {
     y: number;
     variant?: "extended";
 }
-
-export const os: Writable<string | null> = writable<string | null>(null);
 
 export const description: Writable<TDescription | null> = writable(null);
 

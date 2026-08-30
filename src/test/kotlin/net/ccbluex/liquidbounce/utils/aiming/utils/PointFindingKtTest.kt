@@ -57,6 +57,19 @@ class PointFindingKtTest {
     }
 
     @Test
+    fun `projected point consumer preserves collection order`() {
+        val eye = Vec3(-2.0, 0.25, 0.75)
+        val box = AABB(0.0, 0.0, 0.0, 1.0, 1.0, 1.0)
+        val expected = projectPointsOnBox(eye, box, maxPoints = 32)
+        val collected = ArrayList<Vec3>()
+
+        val success = projectPointsOnBox(eye, box, maxPoints = 32) { collected += it }
+
+        assertTrue(success)
+        assertEquals(expected, collected)
+    }
+
+    @Test
     fun `projected points report false when eye is inside box`() {
         val eye = Vec3(0.5, 0.5, 0.5)
         val box = AABB(0.0, 0.0, 0.0, 1.0, 1.0, 1.0)

@@ -23,7 +23,6 @@ import net.ccbluex.liquidbounce.config.types.group.Mode
 import net.ccbluex.liquidbounce.config.types.group.ModeValueGroup
 import net.ccbluex.liquidbounce.event.events.PlayerMoveEvent
 import net.ccbluex.liquidbounce.event.handler
-import net.ccbluex.liquidbounce.features.module.modules.movement.fly.ModuleFly.modes
 import net.ccbluex.liquidbounce.features.module.modules.movement.fly.automation.FlyAutomationCapabilities
 import net.ccbluex.liquidbounce.features.module.modules.movement.fly.automation.FlyAutomationKind
 import net.ccbluex.liquidbounce.features.module.modules.movement.fly.automation.FlyAutomationProfile
@@ -40,9 +39,6 @@ import kotlin.math.sin
  * @note spartan flags less if your motion is stable, that's why we use PlayerMoveEvent
  */
 internal object FlySpartan524 : Mode("Spartan524"), FlyAutomationProfile {
-
-    override val parent: ModeValueGroup<*>
-        get() = modes
 
     override val automationCapabilities = FlyAutomationCapabilities(
         horizontal = true,

@@ -1,0 +1,125 @@
+{
+  "schemaVersion": 1,
+  "internalPackagePrefix": "net.ccbluex.liquidbounce",
+  "analyzedPathPrefixes": [
+    "src/main/java",
+    "src/main/kotlin"
+  ],
+  "components": [
+    {
+      "id": "bootstrap",
+      "exactPackages": [
+        "net.ccbluex.liquidbounce"
+      ],
+      "packagePrefixes": [
+        "net.ccbluex.liquidbounce.bootstrap",
+        "net.ccbluex.liquidbounce.injection"
+      ],
+      "allowedDependencies": [
+        "api-render",
+        "event-config",
+        "features",
+        "foundation",
+        "integration"
+      ]
+    },
+    {
+      "id": "integration",
+      "exactPackages": [],
+      "packagePrefixes": [
+        "net.ccbluex.liquidbounce.integration",
+        "net.ccbluex.liquidbounce.script"
+      ],
+      "allowedDependencies": [
+        "api-render",
+        "event-config",
+        "features",
+        "foundation"
+      ]
+    },
+    {
+      "id": "features",
+      "exactPackages": [],
+      "packagePrefixes": [
+        "net.ccbluex.liquidbounce.deeplearn",
+        "net.ccbluex.liquidbounce.features"
+      ],
+      "allowedDependencies": [
+        "api-render",
+        "event-config",
+        "foundation"
+      ]
+    },
+    {
+      "id": "api-render",
+      "exactPackages": [],
+      "packagePrefixes": [
+        "net.ccbluex.liquidbounce.api",
+        "net.ccbluex.liquidbounce.render"
+      ],
+      "allowedDependencies": [
+        "event-config",
+        "foundation"
+      ]
+    },
+    {
+      "id": "event-config",
+      "exactPackages": [],
+      "packagePrefixes": [
+        "net.ccbluex.liquidbounce.config",
+        "net.ccbluex.liquidbounce.event"
+      ],
+      "allowedDependencies": [
+        "foundation"
+      ]
+    },
+    {
+      "id": "foundation",
+      "exactPackages": [],
+      "packagePrefixes": [
+        "net.ccbluex.liquidbounce.additions",
+        "net.ccbluex.liquidbounce.annotations",
+        "net.ccbluex.liquidbounce.common",
+        "net.ccbluex.liquidbounce.interfaces",
+        "net.ccbluex.liquidbounce.lang",
+        "net.ccbluex.liquidbounce.utils"
+      ],
+      "allowedDependencies": []
+    }
+  ],
+  "ownership": {
+    "featureComponentIds": [
+      "features"
+    ],
+    "roleSegments": [
+      "config",
+      "contract",
+      "integration",
+      "model",
+      "planner",
+      "policy",
+      "render",
+      "research",
+      "runtime",
+      "session"
+    ],
+    "collectionSegments": [
+      "exploits",
+      "modes",
+      "triggers"
+    ]
+  },
+  "restrictedEdges": [
+    {
+      "fromComponent": "bootstrap",
+      "toComponent": "features",
+      "sourcePackagePrefixes": [
+        "net.ccbluex.liquidbounce.injection"
+      ],
+      "allowedImportPatterns": [
+        "net\\.ccbluex\\.liquidbounce\\.features(?:\\.[a-z][A-Za-z0-9_]*)*\\.Module[A-Z][A-Za-z0-9_]*(?:\\.[A-Za-z0-9_]+)?",
+        "net\\.ccbluex\\.liquidbounce\\.features\\..*(?:Bridge|Hook)(?:\\.[A-Za-z0-9_]+)?"
+      ]
+    }
+  ]
+}

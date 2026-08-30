@@ -27,7 +27,7 @@ import net.ccbluex.liquidbounce.features.module.modules.combat.killaura.features
 import net.ccbluex.liquidbounce.utils.client.isBlocksAttacksExisting
 import net.ccbluex.liquidbounce.utils.entity.isInHand
 import net.ccbluex.liquidbounce.utils.entity.usingItemOrNull
-import net.ccbluex.liquidbounce.utils.input.InputTracker.isPressedOnAny
+import net.ccbluex.liquidbounce.features.input.InputTracker.isPressedOnAny
 import net.ccbluex.liquidbounce.utils.item.isSword
 import net.minecraft.network.protocol.game.ServerboundUseItemPacket
 import net.minecraft.world.InteractionHand

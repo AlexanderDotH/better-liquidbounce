@@ -1,7 +1,6 @@
 <script lang="ts">
     import {
         deleteScreen,
-        generateAlteningAccount,
         getAccounts,
         getServers,
         loginToAccount as loginToAccountRest,
@@ -10,17 +9,13 @@
         restoreSession,
         setAccountFavorite
     } from "../../../integration/rest.js";
-    import {removeItem, setItem} from "../../../integration/persistent_storage";
     import BottomButtonWrapper from "../common/buttons/BottomButtonWrapper.svelte";
     import SwitchSetting from "../common/setting/SwitchSetting.svelte";
     import OptionBar from "../common/optionbar/OptionBar.svelte";
-    import MenuListItem from "../common/menulist/MenuListItem.svelte";
     import ButtonContainer from "../common/buttons/ButtonContainer.svelte";
-    import MenuListItemTag from "../common/menulist/MenuListItemTag.svelte";
     import MenuList from "../common/menulist/MenuList.svelte";
     import IconTextButton from "../common/buttons/IconTextButton.svelte";
     import Search from "../common/Search.svelte";
-    import MenuListItemButton from "../common/menulist/MenuListItemButton.svelte";
     import type {Account, Server} from "../../../integration/types";
     import {onMount} from "svelte";
     import MultiSelect from "../common/setting/select/MultiSelect.svelte";
@@ -32,13 +27,10 @@
         AccountManagerLoginEvent,
     } from "../../../integration/events.js";
     import DirectLoginModal from "./directLogin/DirectLoginModal.svelte";
-    import TheAlteningApiKeyModal from "./TheAlteningApiKeyModal.svelte";
-    import {activeBans, availableServers, findServerIcon, formatRemainingBanTime} from "./banBadges.js";
-    import {REST_BASE} from "../../../integration/host";
-    import FavoriteAccountDeleteModal from "./FavoriteAccountDeleteModal.svelte";
-    import {requiresFavoriteDeletionConfirmation} from "./accountDeletion.js";
-
-    const THE_ALTENING_API_KEY_STORAGE_KEY = "altmanager_thealtening_api_key";
+    import {filterAccounts, nonFavoriteAccountIds} from "./accountListModel.ts";
+    import AccountListItem from "./AccountListItem.svelte";
+    import FavoriteAccountDeletionFlow from "./FavoriteAccountDeletionFlow.svelte";
+    import TheAlteningGenerator from "./TheAlteningGenerator.svelte";
 
     let premiumOnly = false;
     let favoritesOnly = false;
@@ -51,32 +43,15 @@
 
     let addAccountModalVisible = false;
     let directLoginModalVisible = false;
-    let alteningApiKeyModalVisible = false;
-    let generatingAltening = false;
     let clearingNonFavorites = false;
-    let favoriteAccountPendingDeletion: Account | null = null;
-    let favoriteAccountDeleteModalVisible = false;
-    let deletingFavoriteAccount = false;
+    let favoriteAccountDeletionFlow: FavoriteAccountDeletionFlow;
 
-    $: {
-        let filteredAccounts = accounts;
-        if (premiumOnly) {
-            filteredAccounts = filteredAccounts.filter(a => a.type !== "Cracked");
-        }
-        if (favoritesOnly) {
-            filteredAccounts = filteredAccounts.filter(a => a.favorite);
-        }
-        if (!accountTypes.includes("Mojang")) {
-            filteredAccounts = filteredAccounts.filter(a => a.type !== "Cracked" && a.type !== "Microsoft")
-        }
-        if (!accountTypes.includes("TheAltening")) {
-            filteredAccounts = filteredAccounts.filter(a => a.type !== "TheAltening")
-        }
-        if (searchQuery) {
-            filteredAccounts = filteredAccounts.filter(a => a.username.toLowerCase().includes(searchQuery.toLowerCase()));
-        }
-        renderedAccounts = filteredAccounts;
-    }
+    $: renderedAccounts = filterAccounts(accounts, {
+        premiumOnly,
+        favoritesOnly,
+        accountTypes,
+        searchQuery,
+    });
 
     async function refreshAccounts() {
         accounts = await getAccounts();
@@ -97,13 +72,6 @@
         return () => window.clearInterval(banTimer);
     });
 
-    function serverIcon(serverName: string): string {
-        const icon = findServerIcon(serverName, servers);
-        return icon
-            ? `data:image/png;base64,${icon}`
-            : `${REST_BASE}/api/v1/client/resource?id=minecraft:textures/misc/unknown_server.png`;
-    }
-
     function handleSearch(e: CustomEvent<{ query: string }>) {
         searchQuery = e.detail.query;
     }
@@ -119,47 +87,12 @@
         await refreshAccounts();
     }
 
-    function requestAccountRemoval(account: Account) {
-        if (!requiresFavoriteDeletionConfirmation(account)) {
-            void removeAccount(account.id);
-            return;
-        }
-
-        favoriteAccountPendingDeletion = account;
-        favoriteAccountDeleteModalVisible = true;
-    }
-
-    async function confirmFavoriteAccountRemoval() {
-        const account = favoriteAccountPendingDeletion;
-        if (!account || deletingFavoriteAccount) {
-            return;
-        }
-
-        deletingFavoriteAccount = true;
-        try {
-            await removeAccount(account.id);
-            favoriteAccountDeleteModalVisible = false;
-            favoriteAccountPendingDeletion = null;
-        } finally {
-            deletingFavoriteAccount = false;
-        }
-    }
-
-    function cancelFavoriteAccountRemoval() {
-        if (!deletingFavoriteAccount) {
-            favoriteAccountPendingDeletion = null;
-        }
-    }
-
     async function clearNonFavoriteAccounts() {
         if (clearingNonFavorites) {
             return;
         }
 
-        const accountIds = accounts
-            .filter(account => !account.favorite)
-            .map(account => account.id)
-            .sort((left, right) => right - left);
+        const accountIds = nonFavoriteAccountIds(accounts);
 
         if (accountIds.length === 0) {
             return;
@@ -197,63 +130,6 @@
         await loginToAccountRest(id);
     }
 
-    async function handleGenerateTheAlteningClick() {
-        if (generatingAltening) {
-            return;
-        }
-
-        const apiKey = localStorage.getItem(THE_ALTENING_API_KEY_STORAGE_KEY)?.trim();
-        if (!apiKey) {
-            alteningApiKeyModalVisible = true;
-            return;
-        }
-
-        await generateTheAlteningAccount(apiKey, false);
-    }
-
-    async function handleGenerateTheAlteningWithApiKey(e: CustomEvent<{ apiKey: string }>) {
-        await generateTheAlteningAccount(e.detail.apiKey, true);
-    }
-
-    async function generateTheAlteningAccount(apiKey: string, persistOnSuccess: boolean) {
-        if (generatingAltening) {
-            return;
-        }
-
-        generatingAltening = true;
-        try {
-            const result = await generateAlteningAccount(apiKey);
-            switch (result.status) {
-                case "SUCCESS":
-                    if (persistOnSuccess) {
-                        await setItem(THE_ALTENING_API_KEY_STORAGE_KEY, apiKey);
-                    }
-                    alteningApiKeyModalVisible = false;
-                    await refreshAccounts();
-                    break;
-                case "CREDENTIALS_REQUIRED":
-                case "ACCESS_DENIED":
-                    await removeItem(THE_ALTENING_API_KEY_STORAGE_KEY);
-                    alteningApiKeyModalVisible = true;
-                    showTheAlteningError(result.message);
-                    break;
-                case "ERROR":
-                    showTheAlteningError(result.message);
-                    break;
-            }
-        } finally {
-            generatingAltening = false;
-        }
-    }
-
-    function showTheAlteningError(message: string) {
-        notification.set({
-            title: "AltManager",
-            message,
-            error: true
-        });
-    }
-
     listen("accountManagerAddition", (e: AccountManagerAdditionEvent) => {
         addAccountModalVisible = false;
         refreshAccounts();
@@ -268,16 +144,7 @@
 <DirectLoginModal bind:visible={directLoginModalVisible}/>
 
 <AddAccountModal bind:visible={addAccountModalVisible}/>
-<TheAlteningApiKeyModal
-        bind:visible={alteningApiKeyModalVisible}
-        loading={generatingAltening}
-        on:generate={handleGenerateTheAlteningWithApiKey}/>
-<FavoriteAccountDeleteModal
-        bind:visible={favoriteAccountDeleteModalVisible}
-        username={favoriteAccountPendingDeletion?.username ?? ""}
-        loading={deletingFavoriteAccount}
-        on:confirm={confirmFavoriteAccountRemoval}
-        on:cancel={cancelFavoriteAccountRemoval}/>
+<FavoriteAccountDeletionFlow bind:this={favoriteAccountDeletionFlow} onRemove={removeAccount}/>
 
 <OptionBar>
     <Search on:search={handleSearch}/>
@@ -290,43 +157,14 @@
           on:sort={handleAccountSort}>
     {#key accounts}
         {#each renderedAccounts as account}
-            <MenuListItem
-                    image={account.avatar}
-                    title={account.username}
-                    favorite={account.favorite}
-                    on:dblclick={() => loginToAccount(account.id)}>
-                <svelte:fragment slot="subtitle">
-                    <pre class="uuid">{account.uuid}</pre>
-                </svelte:fragment>
-
-                <svelte:fragment slot="tag">
-                    <MenuListItemTag text={account.type}/>
-                    {#each availableServers(account.workingServers, account.bans, banTime) as serverName (serverName)}
-                        <MenuListItemTag
-                                text="Works"
-                                icon={serverIcon(serverName)}
-                                tooltip={`Works on ${serverName}`}
-                                success={true}/>
-                    {/each}
-                    {#each activeBans(account.bans, banTime) as ban (ban.serverName)}
-                        <MenuListItemTag
-                                text={formatRemainingBanTime(ban.bannedUntil, banTime)}
-                                icon={serverIcon(ban.serverName)}
-                                tooltip={`${ban.serverName}: ${ban.reason}`}/>
-                    {/each}
-                </svelte:fragment>
-
-                <svelte:fragment slot="active-visible">
-                    <MenuListItemButton title="Delete" icon="trash"
-                                        on:click={() => requestAccountRemoval(account)}/>
-                    <MenuListItemButton title="Favorite" icon={account.favorite ? "favorite-filled" : "favorite" }
-                                        on:click={() => toggleFavorite(account.id, !account.favorite)}/>
-                </svelte:fragment>
-
-                <svelte:fragment slot="always-visible">
-                    <MenuListItemButton title="Login" icon="play" on:click={() => loginToAccount(account.id)}/>
-                </svelte:fragment>
-            </MenuListItem>
+            <AccountListItem
+                    {account}
+                    {servers}
+                    {banTime}
+                    onRequestRemoval={account => favoriteAccountDeletionFlow.request(account)}
+                    onToggleFavorite={toggleFavorite}
+                    onLogin={loginToAccount}
+            />
         {/each}
     {/key}
 </MenuList>
@@ -341,8 +179,7 @@
     </ButtonContainer>
 
     <ButtonContainer>
-        <IconTextButton icon="altmanager/icon-thealtening-white.svg" title="Generate" disabled={generatingAltening}
-                        on:click={handleGenerateTheAlteningClick}/>
+        <TheAlteningGenerator onGenerated={refreshAccounts}/>
     </ButtonContainer>
 
     <ButtonContainer>
@@ -355,9 +192,3 @@
         <IconTextButton icon="icon-back.svg" title="Back" on:click={() => deleteScreen()}/>
     </ButtonContainer>
 </BottomButtonWrapper>
-
-<style lang="scss">
-  .uuid {
-    font-family: monospace;
-  }
-</style>

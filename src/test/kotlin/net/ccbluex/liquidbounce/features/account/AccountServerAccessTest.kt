@@ -19,7 +19,6 @@
 package net.ccbluex.liquidbounce.features.account
 
 import com.google.gson.GsonBuilder
-import net.ccbluex.liquidbounce.config.gson.adapter.MinecraftAccountAdapter
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertTrue
@@ -28,7 +27,7 @@ import org.junit.jupiter.api.Test
 class AccountServerAccessTest {
 
     private val gson = GsonBuilder()
-        .registerTypeHierarchyAdapter(MinecraftAccount::class.java, MinecraftAccountAdapter)
+        .registerTypeHierarchyAdapter(MinecraftAccount::class.java, MinecraftAccountGsonAdapter)
         .create()
 
     @Test

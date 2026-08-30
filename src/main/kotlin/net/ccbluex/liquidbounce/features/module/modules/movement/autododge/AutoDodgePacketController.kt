@@ -18,7 +18,7 @@
  */
 package net.ccbluex.liquidbounce.features.module.modules.movement.autododge
 
-import net.ccbluex.liquidbounce.features.module.modules.combat.RemoteKillMovementOwnership
+import net.ccbluex.liquidbounce.utils.movement.remote.RemoteMovementOwnership
 import net.minecraft.client.multiplayer.ClientLevel
 import net.minecraft.client.player.LocalPlayer
 import net.minecraft.network.Connection
@@ -42,7 +42,7 @@ internal data class AutoDodgePacketUpdateRequest(
 internal class AutoDodgePacketController(
     private val runtime: AutoDodgePacketRuntime = AutoDodgePacketRuntime(),
     private val acquireMovementLease: () -> AutoCloseable? = {
-        RemoteKillMovementOwnership.tryAcquire(AUTO_DODGE_PACKET_MOVEMENT_OWNER)
+        RemoteMovementOwnership.tryAcquire(AUTO_DODGE_PACKET_MOVEMENT_OWNER)
     },
 ) {
     val debug: AutoDodgePacketRuntimeDebug

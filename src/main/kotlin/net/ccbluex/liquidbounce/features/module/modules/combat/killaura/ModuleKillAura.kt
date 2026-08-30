@@ -18,24 +18,51 @@
  */
 package net.ccbluex.liquidbounce.features.module.modules.combat.killaura
 
+import net.ccbluex.liquidbounce.features.module.modules.combat.fightbot.*
 import com.google.gson.JsonObject
-import net.ccbluex.liquidbounce.config.types.list.Tagged
+import net.ccbluex.liquidbounce.config.ValueGroupDeserializationRegistry
+import net.ccbluex.liquidbounce.common.Tagged
 import net.ccbluex.liquidbounce.event.events.RotationUpdateEvent
 import net.ccbluex.liquidbounce.event.events.SprintEvent
-import net.ccbluex.liquidbounce.event.events.WorldRenderEvent
+import net.ccbluex.liquidbounce.render.events.WorldRenderEvent
 import net.ccbluex.liquidbounce.event.handler
 import net.ccbluex.liquidbounce.event.tickHandler
+import net.ccbluex.liquidbounce.features.combat.contract.CombatRuntimeEnvironment
 import net.ccbluex.liquidbounce.features.global.GlobalSettingsCombat
 import net.ccbluex.liquidbounce.features.module.ClientModule
 import net.ccbluex.liquidbounce.features.module.ModuleCategories
-import net.ccbluex.liquidbounce.features.module.modules.combat.FightBotTargetHandoff
+import net.ccbluex.liquidbounce.features.module.modules.combat.fightbot.FightBotTargetHandoff
+import net.ccbluex.liquidbounce.features.module.modules.combat.macekill.*
+import net.ccbluex.liquidbounce.features.module.modules.combat.macekill.config.*
+import net.ccbluex.liquidbounce.features.module.modules.combat.macekill.debug.*
+import net.ccbluex.liquidbounce.features.module.modules.combat.macekill.event.*
+import net.ccbluex.liquidbounce.features.module.modules.combat.macekill.correction.*
+import net.ccbluex.liquidbounce.features.module.modules.combat.macekill.planner.*
+import net.ccbluex.liquidbounce.features.module.modules.combat.macekill.lifecycle.*
+import net.ccbluex.liquidbounce.features.module.modules.combat.macekill.research.*
+import net.ccbluex.liquidbounce.features.module.modules.combat.macekill.target.*
+import net.ccbluex.liquidbounce.features.module.modules.combat.macekill.facade.*
+import net.ccbluex.liquidbounce.features.module.modules.combat.macekill.contract.*
+import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.*
+import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.contract.*
+import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.planner.collision.*
+import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.damage.*
+import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.planner.direct.*
+import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.planner.instant.*
+import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.planner.profiled.*
+import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.planner.schedule.*
+import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.session.attempt.*
+import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.session.movement.*
+import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.session.packet.*
+import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.session.safety.*
+import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.config.*
+import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.debug.*
+import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.target.*
+import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.preview.*
 import net.ccbluex.liquidbounce.features.module.modules.combat.ModuleAutoWeapon
 import net.ccbluex.liquidbounce.features.module.modules.combat.ModuleFightBot
 import net.ccbluex.liquidbounce.features.module.modules.combat.ModuleMaceKill
 import net.ccbluex.liquidbounce.features.module.modules.combat.ModuleSpearKill
-import net.ccbluex.liquidbounce.features.module.modules.combat.lockedTarget
-import net.ccbluex.liquidbounce.features.module.modules.combat.selectKillAuraTargetForFightBot
-import net.ccbluex.liquidbounce.features.module.modules.combat.state
 import net.ccbluex.liquidbounce.features.module.modules.combat.criticals.ModuleCriticals.CriticalsSelectionMode
 import net.ccbluex.liquidbounce.features.module.modules.combat.elytratarget.ModuleElytraTarget
 import net.ccbluex.liquidbounce.features.module.modules.combat.killaura.KillAuraRotationsValueGroup.KillAuraRotationTiming.ON_TICK
@@ -63,23 +90,23 @@ import net.ccbluex.liquidbounce.render.renderEnvironment
 import net.ccbluex.liquidbounce.utils.aiming.RotationManager
 import net.ccbluex.liquidbounce.utils.aiming.data.Rotation
 import net.ccbluex.liquidbounce.utils.aiming.data.RotationWithVector
-import net.ccbluex.liquidbounce.utils.aiming.point.PointTracker
+import net.ccbluex.liquidbounce.features.aiming.point.PointTracker
 import net.ccbluex.liquidbounce.utils.aiming.preference.LeastDifferencePreference
 import net.ccbluex.liquidbounce.utils.aiming.utils.raytraceBox
 import net.ccbluex.liquidbounce.utils.block.SwingMode
-import net.ccbluex.liquidbounce.utils.combat.CombatManager
-import net.ccbluex.liquidbounce.utils.combat.attackEntity
-import net.ccbluex.liquidbounce.utils.combat.shouldBeAttacked
+import net.ccbluex.liquidbounce.features.combat.runtime.CombatManager
+import net.ccbluex.liquidbounce.features.combat.runtime.attackEntity
+import net.ccbluex.liquidbounce.features.combat.runtime.shouldBeAttacked
 import net.ccbluex.liquidbounce.utils.entity.rotation
 import net.ccbluex.liquidbounce.utils.entity.squaredBoxedDistanceTo
-import net.ccbluex.liquidbounce.utils.inventory.InventoryManager.isInventoryOpen
+import net.ccbluex.liquidbounce.features.inventory.InventoryManager.isInventoryOpen
 import net.ccbluex.liquidbounce.utils.inventory.isInContainerScreen
 import net.ccbluex.liquidbounce.utils.item.isSpear
 import net.ccbluex.liquidbounce.utils.kotlin.Priority
 import net.ccbluex.liquidbounce.utils.math.sq
 import net.ccbluex.liquidbounce.utils.raytracing.findEntityInCrosshair
 import net.ccbluex.liquidbounce.utils.raytracing.isLookingAtEntity
-import net.ccbluex.liquidbounce.utils.render.TargetRenderer
+import net.ccbluex.liquidbounce.render.target.TargetRenderer
 import net.minecraft.client.gui.screens.inventory.ContainerScreen
 import net.minecraft.world.entity.Entity
 import net.minecraft.world.entity.LivingEntity
@@ -91,7 +118,7 @@ import net.minecraft.world.item.Items
  *
  * Automatically attacks enemies.
  */
-@Suppress("MagicNumber", "TooManyFunctions", "LargeClass")
+@Suppress("MagicNumber")
 object ModuleKillAura : ClientModule("KillAura", ModuleCategories.COMBAT) {
 
     // Attack speed
@@ -126,6 +153,9 @@ object ModuleKillAura : ClientModule("KillAura", ModuleCategories.COMBAT) {
     private var targetSelectionEvaluated = false
 
     init {
+        ValueGroupDeserializationRegistry.register("kill-aura-range", name, 100) { group, values ->
+            if (group === ModuleKillAura) range.migrateFromValues(values)
+        }
         tree(KillAuraAutoBlock)
         tree(KillAuraVelocityHit)
         tree(TargetRenderer(this) {
@@ -133,6 +163,7 @@ object ModuleKillAura : ClientModule("KillAura", ModuleCategories.COMBAT) {
         })
         tree(KillAuraFailSwing)
         tree(KillAuraRangeIndicator)
+        CombatRuntimeEnvironment.bindKillAuraTarget { running && targetTracker.target != null }
     }
 
     val extendedInteractionRange: Float
@@ -445,7 +476,6 @@ object ModuleKillAura : ClientModule("KillAura", ModuleCategories.COMBAT) {
         }
     }
 
-    @Suppress("CognitiveComplexMethod", "CyclomaticComplexMethod")
     private suspend fun attackTarget(target: Entity, rotation: Rotation) {
         debugParameter("Rotation") { rotation }
         debugParameter("Target") { target.scoreboardName }
@@ -471,47 +501,56 @@ object ModuleKillAura : ClientModule("KillAura", ModuleCategories.COMBAT) {
         debugParameter("Valid Rotation") { rotation }
 
         val mainHandStack = player.mainHandItem
-
-        // Attack enemy, according to the attack scheduler
-        if (clicker.isClickTick && canAttackNow(target, mainHandStack) &&
-            !KillAuraAutoBlock.isPrioritizingBlocking) {
+        val attackScheduled = clicker.isClickTick && canAttackNow(target, mainHandStack) &&
+            !KillAuraAutoBlock.isPrioritizingBlocking
+        if (attackScheduled) {
             clicker.prepareForAttack(rotation) {
-                // On each click, we check if we are still ready to attack
-                if (!canAttackNow(target, mainHandStack)) {
-                    return@prepareForAttack false
-                }
-
-                val attackKeepSprint = keepSprint && !shouldBlockSprinting
-                executeKillAuraAttack(
-                    route = attackRoute,
-                    normalAttack = {
-                        attackEntity(target, SwingMode.DO_NOT_HIDE, attackKeepSprint)
-                        true
-                    },
-                    reachHitAttack = {
-                        val livingTarget = reachHitTarget ?: return@executeKillAuraAttack false
-                        ModuleReach.hit.tryAttack(
-                            livingTarget,
-                            rotation,
-                            attackKeepSprint,
-                            automatedByKillAura = true,
-                        )
-                    },
-                    onSuccess = {
-                        range.update()
-                        KillAuraNotifyWhenFail.failedHitsIncrement = 0
-                        KillAuraAutoBlock.hasBlockedSinceAttack = false
-
-                        GenericDebugRecorder.recordDebugInfo(ModuleKillAura, "attackEntity", JsonObject().apply {
-                            add("player", GenericDebugRecorder.debugObject(player))
-                            add("targetPos", GenericDebugRecorder.debugObject(target))
-                        })
-                    },
-                )
+                executeSelectedAttack(target, reachHitTarget, rotation, attackRoute, mainHandStack)
             }
-        } else if (KillAuraClicker.ticksSinceLastClick >= KillAuraAutoBlock.reblockTicks) {
+            return
+        }
+        if (KillAuraClicker.ticksSinceLastClick >= KillAuraAutoBlock.reblockTicks) {
             KillAuraAutoBlock.startBlocking()
         }
+    }
+
+    private suspend fun executeSelectedAttack(
+        target: Entity,
+        reachHitTarget: LivingEntity?,
+        rotation: Rotation,
+        attackRoute: KillAuraAttackRoute,
+        mainHandStack: ItemStack,
+    ): Boolean {
+        if (!canAttackNow(target, mainHandStack)) return false
+
+        val attackKeepSprint = keepSprint && !shouldBlockSprinting
+        return executeKillAuraAttack(
+            route = attackRoute,
+            normalAttack = {
+                attackEntity(target, SwingMode.DO_NOT_HIDE, attackKeepSprint)
+                true
+            },
+            reachHitAttack = {
+                val livingTarget = reachHitTarget ?: return@executeKillAuraAttack false
+                ModuleReach.hit.tryAttack(
+                    livingTarget,
+                    rotation,
+                    attackKeepSprint,
+                    automatedByKillAura = true,
+                )
+            },
+            onSuccess = { recordSuccessfulAttack(target) },
+        )
+    }
+
+    private fun recordSuccessfulAttack(target: Entity) {
+        range.update()
+        KillAuraNotifyWhenFail.failedHitsIncrement = 0
+        KillAuraAutoBlock.hasBlockedSinceAttack = false
+        GenericDebugRecorder.recordDebugInfo(ModuleKillAura, "attackEntity", JsonObject().apply {
+            add("player", GenericDebugRecorder.debugObject(player))
+            add("targetPos", GenericDebugRecorder.debugObject(target))
+        })
     }
 
     /** Launches MaceKill in this tick and resolves an ordinary, SpearKill, or Reach Hit fallback. */
@@ -596,24 +635,12 @@ object ModuleKillAura : ClientModule("KillAura", ModuleCategories.COMBAT) {
     }
 
     private fun updateTarget() {
-        // Calculate maximum range based on enemy distance
         val normalMaximumRange = if (targetTracker.closestSquaredEnemyDistance > range.interactionRange.sq()) {
             range.scanRange
         } else {
             extendedInteractionRange
         }
-
-        when (val handoff = ModuleFightBot.targetHandoff) {
-            FightBotTargetHandoff.Inactive -> Unit
-            FightBotTargetHandoff.Idle -> {
-                targetTracker.reset()
-                return
-            }
-            is FightBotTargetHandoff.Locked -> {
-                updateFightBotTarget(handoff.target, normalMaximumRange)
-                return
-            }
-        }
+        if (updateFromFightBotHandoff(normalMaximumRange)) return
 
         val maximumRange = calculateKillAuraTargetingRange(
             delegateKillAuraAttacks = GlobalSettingsCombat.delegateKillAuraAttacks,
@@ -630,38 +657,53 @@ object ModuleKillAura : ClientModule("KillAura", ModuleCategories.COMBAT) {
         debugParameter("Range") { range }
         val squaredMaxRange = maximumRange.sq()
         val squaredNormalRange = extendedInteractionRange.sq()
-
-        // Find a suitable target
         val target = targetTracker.targets()
             .filter { entity -> entity.squaredBoxedDistanceTo(player) <= squaredMaxRange }
             .filterNot(ModuleMaceKill::shouldExcludeKillAuraTarget)
             .sortedBy { entity ->
-                killAuraAttackRoutePriority(entity.squaredBoxedDistanceTo(player), squaredNormalRange.toDouble())
+                killAuraAttackRoutePriority(
+                    entity.squaredBoxedDistanceTo(player),
+                    squaredNormalRange.toDouble(),
+                )
             }
-            .firstOrNull { entity ->
-                val remoteKillTarget = isRemoteKillRouteTarget(entity)
-                val delegatedReachHitTarget = !remoteKillTarget && shouldUseReachHitFor(entity)
-                if (!shouldUseKillAuraAimPipeline(remoteKillTarget, delegatedReachHitTarget)) {
-                    return@firstOrNull remoteKillTarget || canDispatchReachHit(
-                        entity,
-                        calculateKillAuraDelegatedAttackRotation(player.eyePosition, entity.boundingBox),
-                    )
-                }
-
-                val targeting = targetingParameters(
-                    entity,
-                    normalRange = normalMaximumRange,
-                    normalWallsRange = range.interactionThroughWallsRange,
-                ) ?: return@firstOrNull false
-
-                processTarget(entity, targeting.range, targeting.wallsRange, targeting.allowAimThroughWalls)
-            }
+            .firstOrNull { entity -> canTarget(entity, normalMaximumRange) }
 
         if (target != null) {
             targetTracker.target = target
         } else {
             targetTracker.reset()
         }
+    }
+
+    private fun updateFromFightBotHandoff(normalMaximumRange: Float): Boolean =
+        when (val handoff = ModuleFightBot.targetHandoff) {
+            FightBotTargetHandoff.Inactive -> false
+            FightBotTargetHandoff.Idle -> {
+                targetTracker.reset()
+                true
+            }
+            is FightBotTargetHandoff.Locked -> {
+                updateFightBotTarget(handoff.target, normalMaximumRange)
+                true
+            }
+        }
+
+    private fun canTarget(entity: LivingEntity, normalMaximumRange: Float): Boolean {
+        val remoteKillTarget = isRemoteKillRouteTarget(entity)
+        val delegatedReachHitTarget = !remoteKillTarget && shouldUseReachHitFor(entity)
+        if (!shouldUseKillAuraAimPipeline(remoteKillTarget, delegatedReachHitTarget)) {
+            return remoteKillTarget || canDispatchReachHit(
+                entity,
+                calculateKillAuraDelegatedAttackRotation(player.eyePosition, entity.boundingBox),
+            )
+        }
+
+        val targeting = targetingParameters(
+            entity,
+            normalRange = normalMaximumRange,
+            normalWallsRange = range.interactionThroughWallsRange,
+        ) ?: return false
+        return processTarget(entity, targeting.range, targeting.wallsRange, targeting.allowAimThroughWalls)
     }
 
     private fun updateFightBotMovementRotation() {
@@ -838,89 +880,4 @@ object ModuleKillAura : ClientModule("KillAura", ModuleCategories.COMBAT) {
         val allowAimThroughWalls: Boolean,
     )
 
-}
-
-internal fun shouldBlockSprintForCriticals(
-    keepSprintEnabled: Boolean,
-    elytraTargetRunning: Boolean,
-    criticalsRequestSprintStop: Boolean,
-): Boolean = !keepSprintEnabled && !elytraTargetRunning && criticalsRequestSprintStop
-
-internal enum class KillAuraAttackRoute {
-    NONE,
-    NORMAL,
-    MACE_KILL,
-    SPEAR_KILL,
-    REACH_HIT,
-}
-
-internal val KillAuraAttackRoute.isRemoteKillRoute: Boolean
-    get() = this == KillAuraAttackRoute.MACE_KILL || this == KillAuraAttackRoute.SPEAR_KILL
-
-internal fun dispatchKillAuraRemoteKillRoute(
-    route: KillAuraAttackRoute,
-    launchMaceKill: () -> Boolean,
-): Boolean = route == KillAuraAttackRoute.MACE_KILL && launchMaceKill()
-
-internal fun selectKillAuraAttackRoute(
-    delegateKillAuraAttacks: Boolean,
-    normalAttackPossible: Boolean,
-    spearKillRunning: Boolean = false,
-    spearKillTargetPossible: Boolean = false,
-    reachHitAvailable: Boolean,
-    reachHitTargetPossible: Boolean,
-    heldRemoteWeapon: KillAuraRemoteWeapon = KillAuraRemoteWeapon.NONE,
-    maceKillAvailable: Boolean = false,
-    maceKillTargetPossible: Boolean = false,
-): KillAuraAttackRoute = selectKillAuraRemoteKillRoute(
-    delegateKillAuraAttacks = delegateKillAuraAttacks,
-    normalAttackPossible = normalAttackPossible,
-    heldRemoteWeapon = heldRemoteWeapon,
-    maceKillAvailable = maceKillAvailable,
-    maceKillTargetPossible = maceKillTargetPossible,
-    spearKillAvailable = spearKillRunning,
-    spearKillTargetPossible = spearKillTargetPossible,
-    reachHitAvailable = reachHitAvailable,
-    reachHitTargetPossible = reachHitTargetPossible,
-)
-
-internal fun calculateKillAuraTargetingRange(
-    delegateKillAuraAttacks: Boolean,
-    normalMaximumRange: Float,
-    reachHitAvailable: Boolean,
-    reachHitMaximumRange: Float,
-    spearKillRunning: Boolean = false,
-    spearKillMaximumRange: Float = 0f,
-    maceKillRunning: Boolean = false,
-    maceKillMaximumRange: Float = 0f,
-): Float = if (!delegateKillAuraAttacks) {
-    normalMaximumRange
-} else {
-    maxOf(
-        normalMaximumRange,
-        reachHitMaximumRange.takeIf { reachHitAvailable } ?: 0f,
-        spearKillMaximumRange.takeIf { spearKillRunning } ?: 0f,
-        maceKillMaximumRange.takeIf { maceKillRunning } ?: 0f,
-    )
-}
-
-internal suspend fun executeKillAuraAttack(
-    route: KillAuraAttackRoute,
-    normalAttack: suspend () -> Boolean,
-    reachHitAttack: suspend () -> Boolean,
-    onSuccess: () -> Unit,
-): Boolean {
-    val success = when (route) {
-        KillAuraAttackRoute.NONE -> false
-        KillAuraAttackRoute.NORMAL -> normalAttack()
-        KillAuraAttackRoute.MACE_KILL,
-        KillAuraAttackRoute.SPEAR_KILL -> false
-        KillAuraAttackRoute.REACH_HIT -> reachHitAttack()
-    }
-
-    if (success) {
-        onSuccess()
-    }
-
-    return success
 }

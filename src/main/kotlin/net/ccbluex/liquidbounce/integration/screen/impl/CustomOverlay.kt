@@ -19,7 +19,6 @@
 
 package net.ccbluex.liquidbounce.integration.screen.impl
 
-import net.ccbluex.liquidbounce.LiquidBounce.logger
 import net.ccbluex.liquidbounce.integration.backend.BrowserBackendManager
 import net.ccbluex.liquidbounce.integration.backend.browser.Browser
 import net.ccbluex.liquidbounce.integration.backend.browser.BrowserSettings
@@ -27,6 +26,7 @@ import net.ccbluex.liquidbounce.integration.backend.isBrowserDisabled
 import net.ccbluex.liquidbounce.integration.screen.CustomScreenType
 import net.ccbluex.liquidbounce.integration.screen.ScreenManager
 import net.ccbluex.liquidbounce.integration.theme.ThemeManager
+import net.ccbluex.liquidbounce.utils.client.logger
 
 class CustomOverlay(
     private val screenType: CustomScreenType,

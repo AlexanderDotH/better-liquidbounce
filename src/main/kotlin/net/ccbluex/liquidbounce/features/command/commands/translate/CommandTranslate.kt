@@ -22,83 +22,71 @@ import net.ccbluex.liquidbounce.api.thirdparty.translator.TranslateLanguage
 import net.ccbluex.liquidbounce.api.thirdparty.translator.TranslationResult
 import net.ccbluex.liquidbounce.features.command.Command
 import net.ccbluex.liquidbounce.features.command.CommandException
-import net.ccbluex.liquidbounce.features.command.CommandExecutor.suspendHandler
+import net.ccbluex.liquidbounce.features.command.CommandRuntime.suspendHandler
 import net.ccbluex.liquidbounce.features.command.builder.CommandBuilder
 import net.ccbluex.liquidbounce.features.command.builder.ParameterBuilder
 import net.ccbluex.liquidbounce.features.global.GlobalSettingsAutoTranslate
-import net.ccbluex.liquidbounce.utils.client.chat
-import net.ccbluex.liquidbounce.utils.client.copyable
-import net.ccbluex.liquidbounce.utils.client.regular
-import net.ccbluex.liquidbounce.utils.client.variable
+import net.ccbluex.liquidbounce.features.chat.chat
+import net.ccbluex.liquidbounce.utils.text.copyable
+import net.ccbluex.liquidbounce.utils.text.regular
+import net.ccbluex.liquidbounce.utils.text.variable
 
 object CommandTranslate : Command.Factory {
 
-    @Suppress("LongMethod")
     override fun createCommand() = CommandBuilder.begin("translate")
         .alias("tr")
-        .parameter(
-            ParameterBuilder.begin<String>("sourceLanguage")
-                .verifiedBy(ParameterBuilder.STRING_VALIDATOR)
-                .autocompletedFrom { listOf("auto") + languageCodes.keys }
-                .required()
-                .build()
-        )
-        .parameter(
-            ParameterBuilder.begin<String>("targetLanguage")
-                .verifiedBy(ParameterBuilder.STRING_VALIDATOR)
-                .autocompletedFrom {
-                    languageCodes.keys
-                }
-                .required()
-                .build()
-        )
-        .parameter(
-            ParameterBuilder.begin<String>("text")
-                .verifiedBy(ParameterBuilder.STRING_VALIDATOR)
-                .required()
-                .vararg()
-                .build()
-        )
+        .parameter(languageParameter("sourceLanguage") { listOf("auto") + languageCodes.keys })
+        .parameter(languageParameter("targetLanguage") { languageCodes.keys })
+        .parameter(textParameter())
         .suspendHandler {
-            val (sourceLanguage, targetLanguage, texts) = args
-            sourceLanguage as String
-            targetLanguage as String
-            texts as Array<*>
-
-            if (sourceLanguage.equals(targetLanguage, ignoreCase = true)) {
-                throw CommandException(command.result("sameLanguage"))
-            }
-
-            val text = texts.joinToString(" ")
-            val result = GlobalSettingsAutoTranslate.translate(
-                TranslateLanguage.of(sourceLanguage),
-                TranslateLanguage.of(targetLanguage),
-                text,
-            )
-
-            if (result is TranslationResult.Success) {
-                if (result.translation == result.origin) {
-                    throw CommandException(command.result("sameText"))
-                } else {
-                    chat(
-                        regular("("),
-                        variable(result.fromLanguage.literal),
-                        regular(") "),
-                        regular(result.origin)
-                            .copyable(copyContent = result.origin),
-                    )
-                    chat(
-                        regular("("),
-                        variable(result.toLanguage.literal),
-                        regular(") "),
-                        regular(result.translation)
-                            .copyable(copyContent = result.translation),
-                    )
-                }
-            } else {
-                chat(result.toResultText())
-            }
+            executeTranslation(command, args)
         }
         .build()
+
+    private fun languageParameter(name: String, suggestions: () -> Iterable<String>) =
+        ParameterBuilder.begin<String>(name)
+            .verifiedBy(ParameterBuilder.STRING_VALIDATOR)
+            .autocompletedFrom(placeholdersProvider = suggestions)
+            .required()
+            .build()
+
+    private fun textParameter() = ParameterBuilder.begin<String>("text")
+        .verifiedBy(ParameterBuilder.STRING_VALIDATOR)
+        .required()
+        .vararg()
+        .build()
+
+    private suspend fun executeTranslation(command: Command, arguments: Array<out Any>) {
+        val sourceLanguage = arguments[0] as String
+        val targetLanguage = arguments[1] as String
+        val texts = arguments[2] as Array<*>
+        if (sourceLanguage.equals(targetLanguage, ignoreCase = true)) {
+            throw CommandException(command.result("sameLanguage"))
+        }
+        val result = GlobalSettingsAutoTranslate.translate(
+            TranslateLanguage.of(sourceLanguage),
+            TranslateLanguage.of(targetLanguage),
+            texts.joinToString(" "),
+        )
+        if (result !is TranslationResult.Success) {
+            chat(result.toResultText())
+            return
+        }
+        if (result.translation == result.origin) {
+            throw CommandException(command.result("sameText"))
+        }
+        printTranslation(result)
+    }
+
+    private fun printTranslation(result: TranslationResult.Success) {
+        chat(
+            regular("("), variable(result.fromLanguage.literal), regular(") "),
+            regular(result.origin).copyable(copyContent = result.origin),
+        )
+        chat(
+            regular("("), variable(result.toLanguage.literal), regular(") "),
+            regular(result.translation).copyable(copyContent = result.translation),
+        )
+    }
 
 }

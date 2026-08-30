@@ -7,7 +7,7 @@
     import {onMount} from "svelte";
     import {convertToSpacedString, spaceSeperatedNames} from "../../theme/theme_config";
     import {isClickGuiScreen} from "../../util/utils";
-    import {cefTextInput} from "./setting/common/cefTextInput";
+    import {cefTextInput} from "../../integration/input/cefTextInput";
 
     export let modules: Module[];
 
@@ -221,92 +221,5 @@
 </div>
 
 <style lang="scss">
-
-  .search {
-    position: fixed;
-    left: 50%;
-    top: 70px;
-    transform: translateX(-50%);
-    background-color: var(--clickgui-search-background-color);
-    width: 600px;
-    border-radius: 30px;
-    overflow: hidden;
-    transition: ease border-radius 0.2s;
-    box-shadow: 0 0 10px var(--clickgui-search-shadow-color);
-
-    &.has-results {
-      border-radius: 10px;
-    }
-
-    &:focus-within,
-    &.has-focus {
-      z-index: 9999999999;
-    }
-  }
-
-  .results {
-    border-top: solid 2px var(--clickgui-search-border-color);
-    padding: 5px 25px;
-    max-height: 250px;
-    overflow: auto;
-
-    .result {
-      font-size: 16px;
-      padding: 10px 0;
-      transition: ease padding-left 0.2s;
-      cursor: pointer;
-      display: grid;
-      grid-template-columns: max-content 1fr max-content;
-
-      .module-name {
-        color: var(--clickgui-text-dimmed-color);
-        transition: ease color 0.2s;
-      }
-
-      &.enabled {
-        .module-name {
-          color: var(--clickgui-search-enabled-color);
-        }
-      }
-
-      .aliases {
-        color: var(--clickgui-search-alias-color);
-        margin-left: 10px;
-      }
-
-      &.selected {
-        padding-left: 10px;
-      }
-
-      &:hover {
-        color: var(--clickgui-text-color);
-
-        &::after {
-          content: "Right-click to locate";
-          color: var(--clickgui-search-hint-color);
-          font-size: 12px;
-        }
-      }
-    }
-
-    .placeholder {
-      color: var(--clickgui-text-dimmed-color);
-      font-size: 16px;
-      padding: 10px 0;
-    }
-
-    &::-webkit-scrollbar {
-      width: 0;
-    }
-  }
-
-  .search-input {
-    padding: 15px 25px;
-    background-color: transparent;
-    border: none;
-    font-family: "Inter", sans-serif;
-    font-size: 16px;
-    color: var(--clickgui-text-color);
-    width: 100%;
-  }
+  @use "./Search.styles";
 </style>

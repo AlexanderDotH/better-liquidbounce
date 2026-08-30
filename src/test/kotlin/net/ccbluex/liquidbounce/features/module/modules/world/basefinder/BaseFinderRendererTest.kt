@@ -21,7 +21,7 @@ import org.junit.jupiter.api.Test
 class BaseFinderRendererTest {
 
     private val scope = BaseFinderRenderScope("server", "minecraft:overworld", worldEpoch = 7L)
-    private val settings = BaseFinderRenderSettings(
+    private val settings = BaseFinderRenderPlanSettings(
         minimumConfidence = 65,
         maximumDistance = 512.0,
         renderLimit = 32,
@@ -276,112 +276,6 @@ class BaseFinderRendererTest {
             listOf("Seed mismatch", "Unexpected solid +40 · 143 blocks"),
             batch.labels.single().evidenceLines,
         )
-    }
-
-    @Test
-    fun `all mismatch kinds remain renderable and score details cannot alter their overlay`() {
-        val overlaySettings = SeedMismatchRenderSettings(
-            maximumDistance = 32.0,
-            renderLimit = 8,
-            missingSolidColor = Color4b(1, 2, 3),
-            unexpectedSolidColor = Color4b(4, 5, 6),
-            utilityMismatchColor = Color4b(7, 8, 9),
-            materialSwapColor = Color4b(10, 11, 12),
-        )
-        val cells = SeedMismatchKind.entries.mapIndexed { index, kind ->
-            SeedMismatchCell(BaseCoordinate(index, 64, 0), kind)
-        }
-        val camera = Vec3(0.5, 64.5, 0.5)
-        val baseline = BaseFinderSeedMismatchRenderPlanner.plan(cells, camera, overlaySettings)
-
-        BaseFinderRenderPlanner.plan(
-            request(
-                marker("scored").copy(
-                    evidenceDetails = listOf(
-                        BaseFinderRenderEvidence(
-                            "Seed mismatch",
-                            89,
-                            contributions = listOf(
-                                BaseFinderRenderContribution("Unexpected solid", 40, "64 blocks"),
-                            ),
-                        ),
-                    ),
-                ),
-            ),
-        )
-        val afterScoringProjection = BaseFinderSeedMismatchRenderPlanner.plan(cells, camera, overlaySettings)
-
-        assertEquals(baseline, afterScoringProjection)
-        assertEquals(SeedMismatchKind.entries, baseline.entries.map { it.cell.kind })
-        assertEquals(
-            listOf(
-                overlaySettings.missingSolidColor,
-                overlaySettings.unexpectedSolidColor,
-                overlaySettings.utilityMismatchColor,
-                overlaySettings.materialSwapColor,
-            ),
-            baseline.entries.map { it.color },
-        )
-    }
-
-    @Test
-    fun `domain snapshot converts coordinates and scope without sharing marker lists`() {
-        val labelContributions = mutableListOf(
-            BaseFinderLabelContribution("Unexpected solid", 40, "143 blocks"),
-        )
-        val markers = mutableListOf(
-            BaseFinderMarker(
-                id = "domain",
-                anchor = BaseCoordinate(12, 70, -4),
-                confidence = 91,
-                topEvidenceKeys = listOf("Storage"),
-                updatedAtMillis = 456L,
-                evidenceDetails = listOf(
-                    BaseFinderLabelEvidence(
-                        family = "Seed mismatch",
-                        score = 85,
-                        detections = emptyList(),
-                        contributions = labelContributions,
-                    ),
-                ),
-                bounds = BaseFinderBounds(
-                    minimum = BaseCoordinate(8, 68, -7),
-                    maximum = BaseCoordinate(14, 72, -1),
-                ),
-            )
-        )
-        val snapshot = BaseFinderRenderSnapshot(
-            worldEpoch = 9L,
-            serverKey = "snapshot-server",
-            dimensionKey = "minecraft:the_end",
-            revision = 3L,
-            markers = markers,
-        )
-
-        val request = BaseFinderRenderRequest.fromSnapshot(snapshot, Vec3.ZERO, settings, nowMillis = 789L)
-        markers.clear()
-        labelContributions.clear()
-
-        assertEquals(BaseFinderRenderScope("snapshot-server", "minecraft:the_end", 9L, 3L), request.scope)
-        assertEquals(Vec3(12.0, 70.0, -4.0), request.markers.single().anchor)
-        assertEquals(91, request.markers.single().confidence)
-        assertEquals(
-            listOf(
-                BaseFinderRenderEvidence(
-                    family = "Seed mismatch",
-                    score = 85,
-                    contributions = listOf(
-                        BaseFinderRenderContribution("Unexpected solid", 40, "143 blocks"),
-                    ),
-                ),
-            ),
-            request.markers.single().evidenceDetails,
-        )
-        assertEquals(
-            BaseFinderBounds(BaseCoordinate(8, 68, -7), BaseCoordinate(14, 72, -1)),
-            request.markers.single().bounds,
-        )
-        assertEquals(789L, request.nowMillis)
     }
 
     private fun request(

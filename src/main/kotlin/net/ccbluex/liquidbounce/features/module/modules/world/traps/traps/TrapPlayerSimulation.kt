@@ -23,7 +23,7 @@ import net.ccbluex.liquidbounce.features.module.modules.render.ModuleDebug
 import net.ccbluex.liquidbounce.features.module.modules.world.traps.ModuleAutoTrap
 import net.ccbluex.liquidbounce.render.engine.type.Color4b
 import net.ccbluex.liquidbounce.utils.client.player
-import net.ccbluex.liquidbounce.utils.entity.PlayerSimulationCache
+import net.ccbluex.liquidbounce.features.simulation.PlayerSimulationCache
 import net.ccbluex.liquidbounce.utils.math.average
 import net.minecraft.world.entity.EntityDimensions
 import net.minecraft.world.entity.LivingEntity

@@ -18,12 +18,12 @@
  */
 package net.ccbluex.liquidbounce.features.module.modules.combat.killaura
 
-import net.ccbluex.liquidbounce.config.types.list.Tagged
+import net.ccbluex.liquidbounce.common.Tagged
 import net.ccbluex.liquidbounce.utils.client.isOlderThanOrEqual1_8
 import net.ccbluex.liquidbounce.utils.client.mc
 import net.ccbluex.liquidbounce.utils.client.player
-import net.ccbluex.liquidbounce.utils.input.InputTracker.isPressedOnAny
-import net.ccbluex.liquidbounce.utils.input.InputTracker.wasPressedRecently
+import net.ccbluex.liquidbounce.features.input.InputTracker.isPressedOnAny
+import net.ccbluex.liquidbounce.features.input.InputTracker.wasPressedRecently
 import net.ccbluex.liquidbounce.utils.item.getEnchantment
 import net.ccbluex.liquidbounce.utils.item.isAxe
 import net.ccbluex.liquidbounce.utils.item.isSword
@@ -57,3 +57,9 @@ enum class KillAuraRequirements(
  */
 private fun ItemStack.isWeapon() = this.isSword || !isOlderThanOrEqual1_8 && this.isAxe
     || this.item is MaceItem || this.getEnchantment(Enchantments.KNOCKBACK) > 0
+
+internal fun shouldBlockSprintForCriticals(
+    keepSprintEnabled: Boolean,
+    elytraTargetRunning: Boolean,
+    criticalsRequestSprintStop: Boolean,
+): Boolean = !keepSprintEnabled && !elytraTargetRunning && criticalsRequestSprintStop

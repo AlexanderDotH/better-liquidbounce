@@ -19,8 +19,8 @@
 package net.ccbluex.liquidbounce.config.types.group
 
 import net.ccbluex.liquidbounce.config.OptionalInclusion
-import net.ccbluex.liquidbounce.config.autoconfig.AutoConfig
 import net.ccbluex.liquidbounce.config.autoconfig.IncludeConfiguration
+import net.ccbluex.liquidbounce.features.autoconfig.AutoConfig
 import net.ccbluex.liquidbounce.config.gson.publicGson
 import net.ccbluex.liquidbounce.test.MinecraftBootstrap
 import org.junit.jupiter.api.BeforeEach

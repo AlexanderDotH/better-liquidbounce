@@ -20,10 +20,9 @@ package net.ccbluex.liquidbounce.features.command.commands.client.client
 
 import net.ccbluex.liquidbounce.features.command.builder.CommandBuilder
 import net.ccbluex.liquidbounce.features.command.builder.ParameterBuilder
-import net.ccbluex.liquidbounce.integration.screen.impl.InternetExplorerScreen
-import net.ccbluex.liquidbounce.utils.client.chat
-import net.ccbluex.liquidbounce.utils.client.mc
-import net.ccbluex.liquidbounce.utils.client.regular
+import net.ccbluex.liquidbounce.features.command.commands.client.client.runtime.ClientCommandRuntimeBridge
+import net.ccbluex.liquidbounce.features.chat.chat
+import net.ccbluex.liquidbounce.utils.text.regular
 
 object CommandClientBrowserSubcommand {
     fun browserCommand() = CommandBuilder.begin("browser")
@@ -38,8 +37,6 @@ object CommandClientBrowserSubcommand {
                 .build()
         ).handler {
             chat(regular("Opening browser..."))
-            mc.schedule {
-                mc.gui.setScreen(InternetExplorerScreen(args[0] as String))
-            }
+            ClientCommandRuntimeBridge.openBrowser(args[0] as String)
         }.build()
 }

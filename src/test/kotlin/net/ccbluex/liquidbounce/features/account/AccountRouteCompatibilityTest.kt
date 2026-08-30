@@ -27,12 +27,7 @@ class AccountRouteCompatibilityTest {
 
     @Test
     fun `account routes retain legacy aliases and every upstream Microsoft login flow`() {
-        val source = Files.readString(
-            Path.of(
-                "src/main/kotlin/net/ccbluex/liquidbounce/integration/interop/protocol/rest/v1/client/" +
-                    "AccountFunctions.kt"
-            )
-        )
+        val source = readSources(ACCOUNT_ROUTE_OPERATIONS, ACCOUNT_ROUTE_REGISTRATION)
 
         assertTrue(source.contains("postLegacyNewMicrosoftAccount()"))
         assertTrue(source.contains("postLegacyClipboardMicrosoftAccount()"))
@@ -45,9 +40,7 @@ class AccountRouteCompatibilityTest {
 
     @Test
     fun `Microsoft worker guards are released from finally blocks`() {
-        val source = Files.readString(
-            Path.of("src/main/kotlin/net/ccbluex/liquidbounce/features/account/AccountManager.kt")
-        )
+        val source = readSources(ACCOUNT_CREATION_OPERATIONS)
         val webViewWorker = source.substringAfter("thread(name = \"microsoft-account-webview\"")
             .substringBefore("fun newMicrosoftAccountViaCredentials")
         val credentialsWorker = source.substringAfter("thread(name = \"microsoft-account-credentials\"")
@@ -57,6 +50,19 @@ class AccountRouteCompatibilityTest {
             val finallyBlock = worker.substringAfter("finally {").substringBefore('}')
             assertTrue(finallyBlock.contains("microsoftLoginInProgress.set(false)"))
         }
+    }
+
+    private fun readSources(vararg paths: String): String = paths.joinToString("\n") { path ->
+        Files.readString(Path.of(path))
+    }
+
+    private companion object {
+        const val ACCOUNT_ROUTE_OPERATIONS =
+            "src/main/kotlin/net/ccbluex/liquidbounce/integration/interop/protocol/rest/v1/client/GetAccounts.kt"
+        const val ACCOUNT_ROUTE_REGISTRATION =
+            "src/main/kotlin/net/ccbluex/liquidbounce/integration/interop/protocol/rest/v1/client/DeleteAccount.kt"
+        const val ACCOUNT_CREATION_OPERATIONS =
+            "src/main/kotlin/net/ccbluex/liquidbounce/features/account/AccountCreationOperations.kt"
     }
 
 }

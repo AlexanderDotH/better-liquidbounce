@@ -19,27 +19,19 @@
 package net.ccbluex.liquidbounce.features.global
 
 import kotlinx.coroutines.Dispatchers
-import net.ccbluex.liquidbounce.LiquidBounce
-import net.ccbluex.liquidbounce.LiquidBounce.clientBranch
-import net.ccbluex.liquidbounce.LiquidBounce.clientCommit
-import net.ccbluex.liquidbounce.LiquidBounce.clientVersion
+import net.ccbluex.liquidbounce.common.ClientLifecycleState
 import net.ccbluex.liquidbounce.config.types.group.ToggleableValueGroup
-import net.ccbluex.liquidbounce.config.types.list.Tagged
 import net.ccbluex.liquidbounce.event.events.ClientShutdownEvent
 import net.ccbluex.liquidbounce.event.events.NotificationEvent
 import net.ccbluex.liquidbounce.event.handler
 import net.ccbluex.liquidbounce.event.tickHandler
 import net.ccbluex.liquidbounce.event.waitTicks
-import net.ccbluex.liquidbounce.features.module.ModuleManager
 import net.ccbluex.liquidbounce.utils.client.logger
-import net.ccbluex.liquidbounce.utils.client.notification
-import net.ccbluex.liquidbounce.utils.client.protocolVersion
-import net.ccbluex.liquidbounce.utils.text.hideSensitiveAddress
+import net.ccbluex.liquidbounce.features.chat.notification
 import net.ccbluex.discordipc.DiscordActivity
 import net.ccbluex.discordipc.DiscordIpcClient
 import net.ccbluex.discordipc.DiscordIpcPlatform
 import net.ccbluex.discordipc.NoDiscordClientException
-import net.minecraft.SharedConstants
 import net.minecraft.util.Util
 import java.time.Instant
 import java.util.concurrent.Executors
@@ -215,73 +207,13 @@ object GlobalSettingsRichPresence : ToggleableValueGroup(
         shutdownIpc()
     }
 
-    private fun buildText(parts: Set<RichPresencePart>): String {
-        val pieces = parts.mapNotNull { it.getText()?.takeIf(String::isNotBlank) }
-
-        if (pieces.isEmpty()) {
-            return ""
-        }
-
-        return pieces.joinToString(separatorText)
-    }
+    private fun buildText(parts: Set<RichPresencePart>): String =
+        RichPresencePresentation.buildText(parts, separatorText)
 
     /**
      * Always running after initialized
      */
-    override val running get() = LiquidBounce.isInitialized
-
-    private enum class RichPresencePart(override val tag: String) : Tagged {
-        CLIENT_NAME("ClientName"),
-        CLIENT_VERSION("ClientVersion"),
-        CLIENT_AUTHOR("ClientAuthor"),
-        CLIENT_BRANCH("ClientBranch"),
-        CLIENT_COMMIT("ClientCommit"),
-        MODULES_SUMMARY("Modules"),
-        MINECRAFT_VERSION("MinecraftVersion"),
-        PROTOCOL_VERSION("ProtocolVersion"),
-        SERVER("Server");
-
-        fun getText(): String? = when (this) {
-            CLIENT_NAME -> LiquidBounce.CLIENT_NAME
-            CLIENT_VERSION -> clientVersion
-            CLIENT_AUTHOR -> LiquidBounce.CLIENT_AUTHOR
-            MODULES_SUMMARY -> "${ModuleManager.count { it.running }}/${ModuleManager.count()} modules"
-            MINECRAFT_VERSION -> SharedConstants.getCurrentVersion().name().let { "Minecraft $it" }
-            PROTOCOL_VERSION -> protocolVersion.let { "Joined with Minecraft ${it.name}" }
-            SERVER -> (mc.currentServer?.ip ?: "none").hideSensitiveAddress()
-            CLIENT_BRANCH -> clientBranch
-            CLIENT_COMMIT -> clientCommit
-        }
-
-    }
-
-    @Suppress("unused")
-    private enum class PresenceActivityType(
-        override val tag: String,
-        val activityType: DiscordActivity.Type,
-    ) : Tagged {
-        PLAYING("Playing", DiscordActivity.Type.PLAYING),
-        LISTENING("Listening", DiscordActivity.Type.LISTENING),
-        WATCHING("Watching", DiscordActivity.Type.WATCHING),
-        COMPETING("Competing", DiscordActivity.Type.COMPETING),
-    }
-
-    @Suppress("unused")
-    private enum class PresenceStatusDisplayType(
-        override val tag: String,
-        val statusDisplayType: DiscordActivity.StatusDisplayType,
-    ) : Tagged {
-        NAME("Name", DiscordActivity.StatusDisplayType.NAME),
-        STATE("State", DiscordActivity.StatusDisplayType.STATE),
-        DETAILS("Details", DiscordActivity.StatusDisplayType.DETAILS),
-    }
-
-    private enum class PresenceAsset(
-        override val tag: String,
-        val assetValue: String?,
-    ) : Tagged {
-        LOGO("Logo", "liquidbounce"),
-    }
+    override val running get() = ClientLifecycleState.isInitialized
 
 }
 

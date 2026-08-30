@@ -6,7 +6,7 @@
     import Pickr from "@simonwep/pickr";
     import {convertToSpacedString, spaceSeperatedNames} from "../../../theme/theme_config";
     import {intToRgba, rgbaToHex, rgbaToInt} from "../../../integration/util";
-    import {cefTextInput} from "./common/cefTextInput";
+    import {cefTextInput} from "../../../integration/input/cefTextInput";
 
     export let setting: ModuleSetting;
 

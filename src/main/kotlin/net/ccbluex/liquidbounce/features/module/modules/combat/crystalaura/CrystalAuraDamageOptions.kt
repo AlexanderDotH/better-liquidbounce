@@ -18,7 +18,6 @@
  */
 package net.ccbluex.liquidbounce.features.module.modules.combat.crystalaura
 
-import it.unimi.dsi.fastutil.floats.FloatFloatImmutablePair
 import it.unimi.dsi.fastutil.floats.FloatFloatPair
 import net.ccbluex.liquidbounce.config.types.group.ValueGroup
 import net.ccbluex.liquidbounce.features.misc.FriendManager
@@ -26,7 +25,7 @@ import net.ccbluex.liquidbounce.features.module.modules.combat.crystalaura.Modul
 import net.ccbluex.liquidbounce.features.module.modules.combat.crystalaura.ModuleCrystalAura.targetTracker
 import net.ccbluex.liquidbounce.features.module.modules.combat.crystalaura.ModuleCrystalAura.world
 import net.ccbluex.liquidbounce.features.module.modules.combat.crystalaura.trigger.CrystalAuraTriggerer
-import net.ccbluex.liquidbounce.utils.combat.getEntitiesBoxInRange
+import net.ccbluex.liquidbounce.features.combat.runtime.getEntitiesBoxInRange
 import net.ccbluex.liquidbounce.utils.entity.getDamageFromExplosion
 import net.ccbluex.liquidbounce.utils.collection.LruCache
 import net.minecraft.core.BlockPos
@@ -65,38 +64,23 @@ object CrystalAuraDamageOptions : ValueGroup("Damage") {
     internal fun approximateExplosionDamage(pos: Vec3, requestingSubmodule: RequestingSubmodule): FloatFloatPair? {
         val target = targetTracker.target ?: return null
         val damageToTarget = target.getDamage(pos, requestingSubmodule, CheckedEntity.TARGET)
-        val notEnoughDamage = damageToTarget.isSmallerThan(minEnemyDamage)
-        if (notEnoughDamage) {
-            return null
+        return acceptCrystalDamage(
+            damageToTarget = damageToTarget,
+            selfDamage = { player.getDamage(pos, requestingSubmodule, CheckedEntity.SELF) },
+            unsafeFriendDamage = { hasUnsafeFriendDamage(pos, requestingSubmodule) },
+            playerHealth = { player.health + player.absorptionAmount },
+            limits = CrystalDamageLimits(minEnemyDamage, maxSelfDamage, antiSuicide, efficient),
+        )
+    }
+
+    private fun hasUnsafeFriendDamage(pos: Vec3, requestingSubmodule: RequestingSubmodule): Boolean {
+        if (maxFriendDamage >= 10f) return false
+        return world.getEntitiesBoxInRange(pos, 6.0) {
+            FriendManager.isFriend(it) && it.boundingBox.maxY > pos.y
+        }.any {
+            it is LivingEntity &&
+                it.getDamage(pos, requestingSubmodule, CheckedEntity.OTHER).isGreaterThan(maxFriendDamage)
         }
-
-        val selfDamage = player.getDamage(pos, requestingSubmodule, CheckedEntity.SELF)
-        val willKill = antiSuicide && selfDamage.isAnyGreaterThanOrEqual(player.health + player.absorptionAmount)
-        val tooMuchDamage = selfDamage.isGreaterThan(maxSelfDamage)
-        if (willKill || tooMuchDamage) {
-            return null
-        }
-
-        var tooMuchDamageForFriend = false
-        if (maxFriendDamage < 10f) { // 10f is the maximum allowed by the setting
-            val friends =
-                world
-                    .getEntitiesBoxInRange(pos, 6.0) { FriendManager.isFriend(it) && it.boundingBox.maxY > pos.y }
-
-            if (friends.any {
-                it is LivingEntity &&
-                    it.getDamage(pos, requestingSubmodule, CheckedEntity.OTHER).isGreaterThan(maxFriendDamage)
-            }) {
-                tooMuchDamageForFriend = true
-            }
-        }
-
-        val isNotEfficient = efficient && damageToTarget.isSmallerThanOrEqual(selfDamage)
-        if (tooMuchDamageForFriend || isNotEfficient) {
-            return null
-        }
-
-        return FloatFloatImmutablePair(selfDamage.getFixed(), damageToTarget.getFixed())
     }
 
     private fun LivingEntity.getDamage(

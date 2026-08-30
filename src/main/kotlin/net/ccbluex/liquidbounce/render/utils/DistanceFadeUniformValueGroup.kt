@@ -23,7 +23,7 @@ import com.mojang.blaze3d.systems.RenderPass
 import net.ccbluex.liquidbounce.config.types.Value
 import net.ccbluex.liquidbounce.config.types.group.ValueGroup
 import net.ccbluex.liquidbounce.render.ClientUniformDefine
-import net.ccbluex.liquidbounce.utils.render.writeStd140
+import net.ccbluex.liquidbounce.render.buffer.writeStd140
 
 class DistanceFadeUniformValueGroup : ValueGroup("DistanceFade") {
 
@@ -40,7 +40,7 @@ class DistanceFadeUniformValueGroup : ValueGroup("DistanceFade") {
         maxOf(farStart, it)
     }.markDirtyOnChanged()
 
-    private val ubo = ClientUniformDefine.DISTANCE_FADE.createSingleBuffer()
+    private val ubo by lazy { ClientUniformDefine.DISTANCE_FADE.createSingleBuffer() }
 
     private var uboDirty = true
     private fun <T : Any> Value<T>.markDirtyOnChanged() = onChanged { uboDirty = true }

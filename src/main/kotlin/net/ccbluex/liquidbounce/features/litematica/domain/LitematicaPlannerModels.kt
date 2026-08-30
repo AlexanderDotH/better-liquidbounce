@@ -19,7 +19,7 @@
 
 package net.ccbluex.liquidbounce.features.litematica.domain
 
-import net.ccbluex.liquidbounce.config.types.list.Tagged
+import net.ccbluex.liquidbounce.common.Tagged
 
 enum class LitematicaActivationMode(override val tag: String) : Tagged {
     LITEMATICA_KEY("LitematicaKey"),

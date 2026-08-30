@@ -3,7 +3,7 @@
     import type {BlockHitResult, ModuleSetting, Setting, Vec, Vec3Setting, VecAxis} from "../../../integration/types";
     import {convertToSpacedString, spaceSeperatedNames} from "../../../theme/theme_config";
     import {getCrosshairData, getPlayerData} from "../../../integration/rest";
-    import {cefTextInput} from "./common/cefTextInput";
+    import {cefTextInput} from "../../../integration/input/cefTextInput";
 
     export let setting: ModuleSetting;
     export let vecAxes: VecAxis[];

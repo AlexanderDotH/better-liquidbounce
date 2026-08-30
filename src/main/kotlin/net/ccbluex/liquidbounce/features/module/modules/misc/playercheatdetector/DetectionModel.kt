@@ -18,7 +18,7 @@
  */
 package net.ccbluex.liquidbounce.features.module.modules.misc.playercheatdetector
 
-import net.ccbluex.liquidbounce.config.types.list.Tagged
+import net.ccbluex.liquidbounce.common.Tagged
 import net.minecraft.core.BlockPos
 import net.minecraft.world.phys.AABB
 import net.minecraft.world.phys.Vec3

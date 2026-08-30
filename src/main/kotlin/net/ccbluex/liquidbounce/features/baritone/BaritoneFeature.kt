@@ -11,7 +11,6 @@
 package net.ccbluex.liquidbounce.features.baritone
 
 import net.ccbluex.liquidbounce.features.baritone.core.BaritoneFacade
-import net.ccbluex.liquidbounce.integration.screen.CustomScreenType
 
 /** Runtime seam shared by Baritone's module, command, REST surface, and bootstrap adapter. */
 object BaritoneFeature {
@@ -20,7 +19,7 @@ object BaritoneFeature {
     private var installedFacade: BaritoneFacade? = null
 
     @Volatile
-    private var dashboardOpener: (CustomScreenType) -> Unit = CustomScreenType::open
+    private var dashboard: BaritoneDashboardPort = UnavailableBaritoneDashboard
 
     @Synchronized
     fun install(facade: BaritoneFacade) {
@@ -36,13 +35,15 @@ object BaritoneFeature {
 
     fun facadeOrNull(): BaritoneFacade? = installedFacade
 
-    fun openDashboard() = dashboardOpener(CustomScreenType.BARITONE)
+    fun openDashboard() = dashboard.open()
 
-    internal fun useDashboardOpener(opener: (CustomScreenType) -> Unit) {
-        dashboardOpener = opener
+    internal fun isDashboardVisible() = dashboard.isVisible()
+
+    internal fun installDashboard(dashboard: BaritoneDashboardPort) {
+        this.dashboard = dashboard
     }
 
-    internal fun restoreDashboardOpener() {
-        dashboardOpener = CustomScreenType::open
+    internal fun restoreDashboard() {
+        dashboard = UnavailableBaritoneDashboard
     }
 }

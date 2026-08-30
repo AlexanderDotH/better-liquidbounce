@@ -20,8 +20,8 @@ package net.ccbluex.liquidbounce.api.services.client
 
 import com.vdurmont.semver4j.Semver
 import kotlinx.coroutines.async
-import net.ccbluex.liquidbounce.LiquidBounce
 import net.ccbluex.liquidbounce.api.core.ioScope
+import net.ccbluex.liquidbounce.common.ClientBuildMetadata
 import net.ccbluex.liquidbounce.utils.client.GitInfo
 import net.ccbluex.liquidbounce.utils.client.logger
 import java.time.OffsetDateTime
@@ -33,8 +33,8 @@ object ClientUpdate {
         runCatching {
             val newestBuild = runCatching {
                 ClientApi.requestNewestBuildEndpoint(
-                    branch = LiquidBounce.clientBranch,
-                    release = !LiquidBounce.IN_DEVELOPMENT
+                    branch = ClientBuildMetadata.branch,
+                    release = !ClientBuildMetadata.IN_DEVELOPMENT
                 )
             }.onFailure { exception ->
                 logger.error("Unable to receive update information", exception)
@@ -42,7 +42,7 @@ object ClientUpdate {
 
             val newestSemVersion = Semver(newestBuild.lbVersion, Semver.SemverType.LOOSE)
 
-            val isNewer = if (LiquidBounce.IN_DEVELOPMENT) { // check if new build is newer than current build
+            val isNewer = if (ClientBuildMetadata.IN_DEVELOPMENT) { // check if new build is newer than current build
                 val newestVersionDate = newestBuild.date
                 val currentVersionDate = OffsetDateTime.parse(
                     GitInfo.get("git.commit.time"),
@@ -52,7 +52,7 @@ object ClientUpdate {
                 newestVersionDate > currentVersionDate
             } else {
                 // check if version number is higher than current version number (on release builds only!)
-                val clientSemVersion = Semver(LiquidBounce.clientVersion, Semver.SemverType.LOOSE)
+                val clientSemVersion = Semver(ClientBuildMetadata.version, Semver.SemverType.LOOSE)
 
                 newestBuild.release && newestSemVersion.isGreaterThan(clientSemVersion)
             }

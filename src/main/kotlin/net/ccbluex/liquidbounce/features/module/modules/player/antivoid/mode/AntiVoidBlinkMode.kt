@@ -23,7 +23,7 @@ import net.ccbluex.liquidbounce.event.events.BlinkPacketEvent
 import net.ccbluex.liquidbounce.event.events.TransferOrigin
 import net.ccbluex.liquidbounce.event.handler
 import net.ccbluex.liquidbounce.features.blink.BlinkManager
-import net.ccbluex.liquidbounce.features.blink.BlinkManager.Action
+import net.ccbluex.liquidbounce.event.events.BlinkPacketAction as Action
 import net.ccbluex.liquidbounce.features.blink.BlinkManager.positions
 import net.ccbluex.liquidbounce.features.module.modules.player.antivoid.ModuleAntiVoid
 import net.ccbluex.liquidbounce.features.module.modules.world.scaffold.ModuleScaffold

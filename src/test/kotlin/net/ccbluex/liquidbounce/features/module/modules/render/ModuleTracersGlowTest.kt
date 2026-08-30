@@ -18,6 +18,10 @@
  */
 package net.ccbluex.liquidbounce.features.module.modules.render
 
+import net.ccbluex.liquidbounce.features.module.modules.render.tracers.TracerRenderBatch
+import net.ccbluex.liquidbounce.features.module.modules.render.tracers.TracerSegment
+import net.ccbluex.liquidbounce.features.module.modules.render.tracers.TracerLineDraw
+import net.ccbluex.liquidbounce.features.module.modules.render.tracers.forEachLine
 import net.ccbluex.liquidbounce.config.types.RangedValue
 import net.ccbluex.liquidbounce.config.types.ValueType
 import net.ccbluex.liquidbounce.config.types.group.Mode

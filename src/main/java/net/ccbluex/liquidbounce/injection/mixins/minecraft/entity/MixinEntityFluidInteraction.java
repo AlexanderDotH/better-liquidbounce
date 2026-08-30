@@ -24,7 +24,6 @@ import com.llamalad7.mixinextras.sugar.Local;
 import net.ccbluex.liquidbounce.event.EventManager;
 import net.ccbluex.liquidbounce.event.events.PlayerFluidCollisionCheckEvent;
 import net.ccbluex.liquidbounce.features.module.modules.movement.ModuleNoPush;
-import net.ccbluex.liquidbounce.features.module.modules.movement.NoPushBy;
 import net.minecraft.client.Minecraft;
 import net.minecraft.tags.TagKey;
 import net.minecraft.world.entity.Entity;
@@ -60,7 +59,7 @@ public abstract class MixinEntityFluidInteraction {
             return original;
         }
 
-        return ModuleNoPush.canPush(NoPushBy.LIQUIDS)
+        return ModuleNoPush.canPushLiquids()
             ? original : Vec3.ZERO;
     }
 

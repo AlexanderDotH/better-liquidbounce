@@ -19,10 +19,10 @@
 package net.ccbluex.liquidbounce.features.global
 
 import net.ccbluex.liquidbounce.config.types.Config
+import net.ccbluex.liquidbounce.config.types.group.ValueGroup
 import net.ccbluex.liquidbounce.features.blink.BlinkManager
 import net.ccbluex.liquidbounce.features.command.CommandManager
-import net.ccbluex.liquidbounce.integration.backend.browser.GlobalBrowserSettings
-import net.ccbluex.liquidbounce.lang.LanguageManager
+import net.ccbluex.liquidbounce.features.language.LanguageManager
 
 /**
  * Global Manager
@@ -38,9 +38,17 @@ object GlobalManager : Config("Settings") {
         tree(GlobalSettingsCombat)
         tree(BlinkManager)
         tree(GlobalSettingsAutoTranslate)
-        tree(GlobalBrowserSettings)
         tree(GlobalSettingsClientChat)
         tree(GlobalSettingsRichPresence)
+    }
+
+    fun installBrowserSettings(settings: ValueGroup) {
+        tree(settings)
+        inner.remove(settings)
+        val trailingSettings = inner.dropWhile { it !== GlobalSettingsClientChat }
+        inner.removeAll(trailingSettings.toSet())
+        inner.add(settings)
+        inner.addAll(trailingSettings)
     }
 
 }

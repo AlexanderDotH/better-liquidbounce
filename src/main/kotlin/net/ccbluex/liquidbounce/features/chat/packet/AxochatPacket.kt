@@ -19,6 +19,7 @@
 package net.ccbluex.liquidbounce.features.chat.packet
 
 import com.google.gson.annotations.SerializedName
+import net.ccbluex.liquidbounce.common.interop.ClientChatUserPayload
 import java.util.UUID
 
 sealed interface AxochatPacket {
@@ -37,7 +38,7 @@ sealed interface AxochatPacket {
 @JvmRecord
 data class AxoUser(
     @SerializedName("name")
-    val name: String,
+    override val name: String,
     @SerializedName("uuid")
-    val uuid: UUID,
-)
+    override val uuid: UUID,
+) : ClientChatUserPayload

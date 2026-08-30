@@ -19,7 +19,6 @@
 
 package net.ccbluex.liquidbounce.injection.mixins.minecraft.render.fog.environment;
 
-import net.ccbluex.liquidbounce.features.module.modules.render.DoRender;
 import net.ccbluex.liquidbounce.features.module.modules.render.ModuleAntiBlind;
 import net.minecraft.client.Camera;
 import net.minecraft.client.DeltaTracker;
@@ -41,7 +40,7 @@ public abstract class MixinLavaFogEnvironment {
 
     @Inject(method = "setupFog", at = @At("RETURN"))
     private void disableLavaFog(FogData fog, Camera camera, ClientLevel level, float renderDistance, DeltaTracker deltaTracker, CallbackInfo ci) {
-        if (!ModuleAntiBlind.canRender(DoRender.LIQUIDS_FOG)) {
+        if (!ModuleAntiBlind.canRenderLiquidsFog()) {
             fog.environmentalStart = Float.MAX_VALUE;
             fog.environmentalEnd = Float.MAX_VALUE;
             fog.skyEnd = Float.MAX_VALUE;

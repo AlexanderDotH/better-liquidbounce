@@ -24,7 +24,7 @@ import com.mojang.blaze3d.systems.RenderSystem
 import com.mojang.blaze3d.textures.FilterMode
 import it.unimi.dsi.fastutil.floats.Float2IntFunction
 import net.ccbluex.liquidbounce.utils.client.logger
-import net.ccbluex.liquidbounce.utils.render.uploadRect
+import net.ccbluex.liquidbounce.render.buffer.uploadRect
 import net.minecraft.client.gui.render.TextureSetup
 import net.minecraft.client.renderer.texture.DynamicTexture
 import net.minecraft.util.Mth

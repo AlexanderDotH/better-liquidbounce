@@ -26,21 +26,12 @@ import com.llamalad7.mixinextras.sugar.Local;
 import net.ccbluex.liquidbounce.common.ChunkUpdateFlag;
 import net.ccbluex.liquidbounce.event.EventManager;
 import net.ccbluex.liquidbounce.event.events.*;
-import net.ccbluex.liquidbounce.features.module.modules.combat.SpearKillSetbackHook;
-import net.ccbluex.liquidbounce.features.module.modules.combat.crystalaura.trigger.triggers.*;
-import net.ccbluex.liquidbounce.features.module.modules.exploit.disabler.disablers.DisablerSpigotSpam;
-import net.ccbluex.liquidbounce.features.module.modules.misc.betterchat.ModuleBetterChat;
-import net.ccbluex.liquidbounce.features.module.modules.player.Limit;
-import net.ccbluex.liquidbounce.features.module.modules.player.ModuleAntiExploit;
-import net.ccbluex.liquidbounce.features.module.modules.player.ModuleNoCapability;
-import net.ccbluex.liquidbounce.features.module.modules.player.ModuleNoRotateSet;
-import net.ccbluex.liquidbounce.features.module.modules.player.reach.interactable.ReachInteractableFeature;
-import net.ccbluex.liquidbounce.features.module.modules.render.playermodel.ServerPlayerModelStateTracker;
-import net.ccbluex.liquidbounce.utils.aiming.RotationManager;
+import net.ccbluex.liquidbounce.integration.gameplay.PacketListenerAntiExploitHook;
+import net.ccbluex.liquidbounce.integration.gameplay.PacketListenerChatHook;
+import net.ccbluex.liquidbounce.integration.gameplay.PacketListenerSessionHook;
+import net.ccbluex.liquidbounce.integration.gameplay.PacketListenerTriggerHook;
 import net.ccbluex.liquidbounce.utils.aiming.data.Rotation;
-import net.ccbluex.liquidbounce.utils.kotlin.Priority;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.screens.LevelLoadingScreen;
 import net.minecraft.client.multiplayer.ClientCommonPacketListenerImpl;
 import net.minecraft.client.multiplayer.ClientPacketListener;
 import net.minecraft.client.multiplayer.CommonListenerCookie;
@@ -49,7 +40,6 @@ import net.minecraft.network.Connection;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.protocol.PacketUtils;
 import net.minecraft.network.protocol.game.*;
-import net.minecraft.util.Mth;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.phys.Vec3;
 import org.jspecify.annotations.Nullable;
@@ -73,12 +63,12 @@ public abstract class MixinClientPacketListener extends ClientCommonPacketListen
 
     @Inject(method = "<init>", at = @At("RETURN"))
     private void resetPlayerModelStateForNewSession(CallbackInfo ci) {
-        ServerPlayerModelStateTracker.reset();
+        PacketListenerSessionHook.resetPlayerModelState();
     }
 
     @Inject(method = "handleRespawn", at = @At("HEAD"))
     private void resetPlayerModelStateOnRespawn(ClientboundRespawnPacket packet, CallbackInfo ci) {
-        ServerPlayerModelStateTracker.reset();
+        PacketListenerSessionHook.resetPlayerModelState();
     }
 
     @Inject(method = "handleLevelChunkWithLight", at = @At("RETURN"))
@@ -101,32 +91,32 @@ public abstract class MixinClientPacketListener extends ClientCommonPacketListen
 
     @Inject(method = "handleTeleportEntity", at = @At("RETURN"))
     private void hookOnEntityPosition(ClientboundTeleportEntityPacket packet, CallbackInfo ci) {
-        EntityMoveTrigger.INSTANCE.notify(packet);
+        PacketListenerTriggerHook.entityMoved(packet);
     }
 
     @Inject(method = "handleBlockUpdate", at = @At("RETURN"))
     private void hookOnBlockUpdate(ClientboundBlockUpdatePacket packet, CallbackInfo ci) {
-        BlockChangeTrigger.INSTANCE.notify(packet);
+        PacketListenerTriggerHook.blockUpdated(packet);
     }
 
     @Inject(method = "handleChunkBlocksUpdate", at = @At("RETURN"))
     private void hookOnChunkDeltaUpdate(ClientboundSectionBlocksUpdatePacket packet, CallbackInfo ci) {
-        BlockChangeTrigger.INSTANCE.postChunkUpdateHandler(packet);
+        PacketListenerTriggerHook.chunkBlocksUpdated(packet);
     }
 
     @Inject(method = "handleAddEntity", at = @At("RETURN"))
     private void hookOnEntitySpawn(ClientboundAddEntityPacket packet, CallbackInfo ci) {
-        CrystalSpawnTrigger.INSTANCE.notify(packet);
+        PacketListenerTriggerHook.entityAdded(packet);
     }
 
     @Inject(method = "handleSoundEntityEvent", at = @At("RETURN"))
     private void hookOnPlaySoundFromEntity(ClientboundSoundEntityPacket packet, CallbackInfo ci) {
-        ExplodeSoundTrigger.INSTANCE.notify(packet);
+        PacketListenerTriggerHook.entitySoundPlayed(packet);
     }
 
     @Inject(method = "handleRemoveEntities", at = @At("RETURN"))
     private void hookOnEntitiesDestroy(ClientboundRemoveEntitiesPacket packet, CallbackInfo ci) {
-        CrystalDestroyTrigger.INSTANCE.notify(packet);
+        PacketListenerTriggerHook.entitiesRemoved(packet);
     }
 
     @ModifyExpressionValue(method = "setTitleText", at = @At(value = "INVOKE", target = "Lnet/minecraft/network/protocol/game/ClientboundSetTitleTextPacket;text()Lnet/minecraft/network/chat/Component;"))
@@ -183,49 +173,22 @@ public abstract class MixinClientPacketListener extends ClientCommonPacketListen
     @SuppressWarnings("OptionalUsedAsFieldOrParameterType")
     @ModifyExpressionValue(method = "handleExplosion", at = @At(value = "INVOKE", target = "Lnet/minecraft/network/protocol/game/ClientboundExplodePacket;playerKnockback()Ljava/util/Optional;"))
     private Optional<Vec3> onExplosionVelocity(Optional<Vec3> original) {
-        var present = original.isPresent();
-        if (present && ModuleAntiExploit.canLimit(Limit.EXPLOSION_STRENGTH)) {
-            var vec = original.get();
-            double fixedX = Mth.clamp(vec.x, -10.0, 10.0);
-            double fixedY = Mth.clamp(vec.y, -10.0, 10.0);
-            double fixedZ = Mth.clamp(vec.z, -10.0, 10.0);
-
-            if (fixedX != vec.x || fixedY != vec.y || fixedZ != vec.z) {
-                ModuleAntiExploit.INSTANCE.notifyAboutExploit("Limited too strong explosion",
-                        true);
-                return Optional.of(new Vec3(fixedX, fixedY, fixedZ));
-            }
-        }
-
-        return original;
+        return PacketListenerAntiExploitHook.limitExplosion(original);
     }
 
     @ModifyExpressionValue(method = "handleParticleEvent", at = @At(value = "INVOKE", target = "Lnet/minecraft/network/protocol/game/ClientboundLevelParticlesPacket;getCount()I", ordinal = 1))
     private int onParticleAmount(int original) {
-        if (ModuleAntiExploit.canLimit(Limit.PARTICLES_AMOUNT) && 500 <= original) {
-            ModuleAntiExploit.INSTANCE.notifyAboutExploit("Limited too many particles", true);
-            return 100;
-        }
-        return original;
+        return PacketListenerAntiExploitHook.limitParticleAmount(original);
     }
 
     @ModifyExpressionValue(method = "handleParticleEvent", at = @At(value = "INVOKE", target = "Lnet/minecraft/network/protocol/game/ClientboundLevelParticlesPacket;getMaxSpeed()F"))
     private float onParticleSpeed(float original) {
-        if (ModuleAntiExploit.canLimit(Limit.PARTICLES_SPEED) && 10.0f <= original) {
-            ModuleAntiExploit.INSTANCE.notifyAboutExploit("Limited too fast particles speed", true);
-            return 10.0f;
-        }
-        return original;
+        return PacketListenerAntiExploitHook.limitParticleSpeed(original);
     }
 
     @ModifyExpressionValue(method = "handleGameEvent", at = @At(value = "INVOKE", target = "Lnet/minecraft/network/protocol/game/ClientboundGameEventPacket;getEvent()Lnet/minecraft/network/protocol/game/ClientboundGameEventPacket$Type;"))
     private ClientboundGameEventPacket.Type onGameStateChange(ClientboundGameEventPacket.Type original) {
-        if (ModuleAntiExploit.INSTANCE.getRunning() && original == ClientboundGameEventPacket.DEMO_EVENT && ModuleAntiExploit.INSTANCE.getCancelDemo()) {
-            ModuleAntiExploit.INSTANCE.notifyAboutExploit("Cancelled demo GUI (just annoying thing)", false);
-            return null;
-        }
-
-        return original;
+        return PacketListenerAntiExploitHook.filterGameEvent(original);
     }
 
     @Inject(method = "handleSetHealth", at = @At("HEAD"))
@@ -248,7 +211,7 @@ public abstract class MixinClientPacketListener extends ClientCommonPacketListen
         LocalPlayer player = this.minecraft.player;
 
         if (player != null) {
-            ModuleNoCapability.onServerAbilitiesApplied(packet, player.getAbilities());
+            PacketListenerSessionHook.serverAbilitiesApplied(packet, player);
         }
     }
 
@@ -258,18 +221,15 @@ public abstract class MixinClientPacketListener extends ClientCommonPacketListen
     @Inject(method = "handleMovePlayer", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/multiplayer/ClientPacketListener;setValuesFromPositionPacket(Lnet/minecraft/world/entity/PositionMoveRotation;Ljava/util/Set;Lnet/minecraft/world/entity/Entity;Z)Z"))
     private void injectPlayerPositionLook(
         ClientboundPlayerPositionPacket packet, CallbackInfo ci, @Local(name = "player") Player player) {
-        SpearKillSetbackHook.beforeCorrection(packet, player);
-        ReachInteractableFeature.beforeCorrection(packet, player);
+        PacketListenerSessionHook.beforeCorrection(packet, player);
         rotationThreadLocal.set(new Rotation(player.getYRot(), player.getXRot(), true));
     }
 
     @Inject(method = "handleMovePlayer", at = @At("RETURN"))
     private void injectNoRotateSet(ClientboundPlayerPositionPacket packet, CallbackInfo ci, @Local(name = "player") Player player) {
-        SpearKillSetbackHook.afterCorrection(packet, player);
-        ReachInteractableFeature.afterCorrection(packet, player);
-        ServerPlayerModelStateTracker.correct(player.position(), player.getYRot(), player.getXRot());
+        PacketListenerSessionHook.afterCorrection(packet, player);
 
-        if (!ModuleNoRotateSet.INSTANCE.getRunning() || Minecraft.getInstance().gui.screen() instanceof LevelLoadingScreen) {
+        if (!PacketListenerSessionHook.shouldRestoreRotation()) {
             return;
         }
 
@@ -278,33 +238,12 @@ public abstract class MixinClientPacketListener extends ClientCommonPacketListen
             return;
         }
         this.rotationThreadLocal.remove();
-
-        if (ModuleNoRotateSet.INSTANCE.getMode().getActiveMode() == ModuleNoRotateSet.ResetRotation.INSTANCE) {
-            // Changes your server side rotation and then resets it with provided settings
-            var rotationTarget = ModuleNoRotateSet.ResetRotation.INSTANCE.getRotations().toRotationTarget(
-                    new Rotation(player.getYRot(), player.getXRot(), true),
-                    null,
-                    true,
-                    null
-            );
-            RotationManager.INSTANCE.setRotationTarget(rotationTarget, Priority.NOT_IMPORTANT, ModuleNoRotateSet.INSTANCE);
-        }
-
-        // Increase yaw and pitch by a value so small that the difference cannot be seen,
-        // just to update the rotation server-side.
-        player.setYRot(prevRotation.yRot() + 0.000001f);
-        player.setXRot(prevRotation.xRot() + 0.000001f);
+        PacketListenerSessionHook.restoreRotation(player, prevRotation);
     }
 
     @ModifyVariable(method = "sendChat", at = @At("HEAD"), argsOnly = true, name = "content")
     private String handleSendMessage(String content) {
-        var result = ModuleBetterChat.INSTANCE.modifyMessage(content);
-
-        if (DisablerSpigotSpam.INSTANCE.getRunning()) {
-            return DisablerSpigotSpam.INSTANCE.getMessage() + " " + result;
-        }
-
-        return result;
+        return PacketListenerChatHook.modifyOutgoingMessage(content);
     }
 
 }

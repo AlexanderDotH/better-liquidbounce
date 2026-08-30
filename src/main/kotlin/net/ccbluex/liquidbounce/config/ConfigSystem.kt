@@ -21,35 +21,22 @@ package net.ccbluex.liquidbounce.config
 import com.google.gson.Gson
 import com.google.gson.JsonElement
 import com.google.gson.JsonObject
-import net.ccbluex.liquidbounce.LiquidBounce
 import net.ccbluex.liquidbounce.config.gson.fileGson
-import net.ccbluex.liquidbounce.config.gson.util.parseTree
 import net.ccbluex.liquidbounce.config.types.Config
 import net.ccbluex.liquidbounce.config.types.Value
-import net.ccbluex.liquidbounce.config.types.group.ModeValueGroup
 import net.ccbluex.liquidbounce.config.types.group.ValueGroup
-import net.ccbluex.liquidbounce.features.module.ModuleManager
-import net.ccbluex.liquidbounce.features.module.modules.combat.migrateLegacyFightBotConfig
-import net.ccbluex.liquidbounce.features.module.modules.combat.migrateLegacyMaceKillConfig
-import net.ccbluex.liquidbounce.features.module.modules.combat.killaura.ModuleKillAura
-import net.ccbluex.liquidbounce.features.module.modules.player.reach.migrateLegacyReachConfig
-import net.ccbluex.liquidbounce.utils.client.clientLogger
 import net.ccbluex.liquidbounce.utils.client.mc
-import net.ccbluex.liquidbounce.utils.io.createZipArchive
-import net.ccbluex.liquidbounce.utils.io.extractZip
 import java.io.File
 import java.io.Reader
-import java.io.Writer
 
 /**
- * A hierarchy config system
+ * Public facade for the hierarchical config system.
  */
-@Suppress("TooManyFunctions")
 object ConfigSystem {
 
     const val KEY_PREFIX = "liquidbounce"
 
-    private val logger = clientLogger("ConfigSystem")
+    private const val CLIENT_DIRECTORY_NAME = "LiquidBounce"
 
     private var firstLaunch = false
 
@@ -59,11 +46,8 @@ object ConfigSystem {
             return firstLaunch
         }
 
-    // Config directory folder
     val rootFolder by lazy {
-        File(mc.gameDirectory, LiquidBounce.CLIENT_NAME).apply {
-            // Check if there is already a config folder and if not create new folder
-            // (mkdirs not needed - .minecraft should always exist)
+        File(mc.gameDirectory, CLIENT_DIRECTORY_NAME).apply {
             if (!exists()) {
                 firstLaunch = true
                 mkdir()
@@ -71,11 +55,8 @@ object ConfigSystem {
         }
     }
 
-    // User config directory folder
     val userConfigsFolder by lazy {
         File(rootFolder, "configs").apply {
-            // Check if there is already a config folder and if not create new folder
-            // (mkdirs not needed - .minecraft should always exist)
             if (!exists()) {
                 mkdir()
             }
@@ -84,8 +65,6 @@ object ConfigSystem {
 
     internal val backupFolder by lazy {
         File(rootFolder, "backups").apply {
-            // Check if there is already a config folder and if not create new folder
-            // (mkdirs not needed - .minecraft should always exist)
             if (!exists()) {
                 mkdir()
             }
@@ -128,232 +107,54 @@ object ConfigSystem {
         }
     }
 
-    /**
-     * Create an config based on an existing tree
-     */
     fun root(name: String, tree: MutableCollection<out ValueGroup> = mutableListOf()): Config {
         @Suppress("UNCHECKED_CAST")
         return root(Config(name, value = tree as MutableCollection<Value<*>>))
     }
 
-    /**
-     * Add an existing config instance
-     */
     fun root(config: Config): Config {
         config.walkInit()
         configs.add(config)
         return config
     }
 
-    /**
-     * Create a ZIP file backup of configs
-     */
-    fun backup(fileName: String, groups: Iterable<Config> = this.configs) {
-        var zipFile = File(backupFolder, "$fileName.zip")
-        var suffix = 1
-        while (zipFile.exists()) {
-            zipFile = File(backupFolder, "${fileName}_${suffix++}.zip")
-        }
-
-        groups.map { valueGroup -> valueGroup.jsonFile }.createZipArchive(zipFile)
+    fun backup(fileName: String, groups: Iterable<Config> = configs) {
+        ConfigFileStorage.backup(backupFolder, fileName, groups)
     }
 
-    /**
-     * Restore a backup from a ZIP file to the configs
-     */
     fun restore(fileName: String) {
-        val zipFile = File(backupFolder, "$fileName.zip")
-        check(zipFile.exists()) { "Backup file does not exist" }
-
-        // Store all configs to make sure they are up to date,
-        // before we overwrite some of them through [extractZip]
-        storeAll()
-        extractZip(zipFile, rootFolder)
-        loadAll()
+        ConfigFileStorage.restore(backupFolder, rootFolder, fileName, configs)
     }
 
-    /**
-     * Loads all registered configs.
-     */
     fun loadAll() {
-        for (valueGroup in configs) { // Make a new .json file to save our root config
-            load(valueGroup)
-        }
+        configs.forEach(ConfigFileStorage::load)
     }
 
     fun load(config: Config) {
-        config.jsonFile.runCatching {
-            if (!exists()) {
-                // Do not try to load a non-existing file
-                return@runCatching
-            }
-
-            logger.debug("Reading config ${config.loweredName}...")
-            deserializeValueGroup(config, bufferedReader())
-        }.onSuccess {
-            logger.info("Successfully loaded config '${config.loweredName}'.")
-        }.onFailure {
-            logger.error("Unable to load config ${config.loweredName}", it)
-        }
-
-        // After loading the config, we need to store it again to make sure all values are up to date
-        store(config)
+        ConfigFileStorage.load(config)
     }
 
-    /**
-     * All configs known to the config system should be stored now.
-     * This will overwrite all existing files with the new values.
-     *
-     * These configs are root configs, which always create a new file with their name.
-     */
     fun storeAll() {
-        configs.forEach(::store)
+        configs.forEach(ConfigFileStorage::store)
     }
 
-    /**
-     * Store config to a file (will be created if not exists).
-     *
-     * The config should be known to the config system.
-     */
     fun store(config: Config) {
-        config.jsonTmpFile.runCatching {
-            // Write to temp file
-            logger.debug("Writing config ${config.loweredName}...")
-            if (!exists()) {
-                createNewFile().let { logger.debug("Created new file (status: $it)") }
-            }
-            serializeValueGroup(config, bufferedWriter())
-            logger.debug("Writing config ${config.loweredName}... done")
-
-            // Move temp file to final file
-            if (config.jsonFile.exists() && !config.jsonFile.delete()) {
-                error("Unable to delete old file for config ${config.loweredName}")
-            }
-
-            if (!renameTo(config.jsonFile)) {
-                error("Unable to rename temp file to final file for config ${config.loweredName}")
-            }
-            logger.info("Successfully stored config '${config.loweredName}'.")
-        }.onFailure {
-            logger.error("Unable to store config ${config.loweredName}", it)
-        }
+        ConfigFileStorage.store(config)
     }
 
-    /**
-     * Serialize a config to a writer and close it
-     */
-    private fun serializeValueGroup(valueGroup: ValueGroup, writer: Writer, gson: Gson = fileGson) {
-        gson.newJsonWriter(writer).use {
-            gson.toJson(valueGroup, ValueGroup::class.javaObjectType, it)
-        }
-    }
-
-    /**
-     * Serialize a config to a [JsonObject].
-     */
     fun serializeValueGroup(valueGroup: ValueGroup, gson: Gson = fileGson): JsonObject =
-        gson.toJsonTree(valueGroup, ValueGroup::class.javaObjectType) as JsonObject
+        ConfigValueGroupCodec.serialize(valueGroup, gson)
 
-    /**
-     * Deserialize a config from a reader, and close it
-     */
     fun deserializeValueGroup(valueGroup: ValueGroup, reader: Reader, gson: Gson = fileGson) {
-        gson.newJsonReader(reader).use { reader ->
-            deserializeValueGroup(valueGroup, reader.parseTree())
-        }
+        ConfigValueGroupCodec.deserialize(valueGroup, reader, gson)
     }
 
-    /**
-     * Deserialize a config from a [JsonElement]. It should be [JsonObject].
-     */
     fun deserializeValueGroup(valueGroup: ValueGroup, jsonElement: JsonElement) {
-        val jsonObject = jsonElement.asJsonObject
-
-        if (valueGroup === ModuleManager.modulesConfig) {
-            migrateLegacyReachConfig(jsonObject)
-            migrateLegacyFightBotConfig(jsonObject)
-            migrateLegacyMaceKillConfig(jsonObject)
-        }
-
-        // Check if the name is the same as the config name
-        val name = jsonObject.getAsJsonPrimitive("name").asString
-        check(name == valueGroup.name || valueGroup.aliases.contains(name)) {
-            "config name does not match the name in the json object"
-        }
-
-        valueGroup.prepareDeserialize(jsonObject)
-
-        val storedValues = jsonObject.getAsJsonArray("value")
-        val valuesByName = buildMap {
-            for (valueElem in storedValues) {
-                val valueObj = valueElem.asJsonObject
-                val valueName = valueObj["name"].asString
-                this.getOrPut(valueName) { ArrayDeque(1) }.addLast(valueObj)
-            }
-        }
-
-        // Migration Code for KillAura's Range Values
-        if (valueGroup is ModuleKillAura) {
-            valueGroup.range.migrateFromValues(valuesByName)
-        }
-
-        for (value in valueGroup.inner) {
-            val queue = valuesByName[value.name]
-                ?: value.aliases.firstNotNullOfOrNull { valuesByName[it] }
-                ?: continue
-            if (queue.isEmpty()) continue
-
-            deserializeValue(value, queue.removeFirst())
-        }
+        ConfigValueGroupCodec.deserialize(valueGroup, jsonElement)
     }
 
-    /**
-     * Deserialize a value from a json object
-     */
     fun deserializeValue(value: Value<*>, jsonObject: JsonObject) {
-        // In the case of a config, we need to go deeper and deserialize the config itself
-        if (value is ValueGroup) {
-            runCatching {
-                if (value is ModeValueGroup<*>) {
-                    // Set current active choice
-                    runCatching {
-                        value.setByString(jsonObject["active"].asString)
-                    }.onFailure {
-                        logger.error("Unable to deserialize active choice for ${value.name}", it)
-                    }
-
-                    // Deserialize each choice
-                    val choices = jsonObject["choices"].asJsonObject
-
-                    for (choice in value.modes) {
-                        runCatching {
-                            val choiceElement = choices[choice.name]
-                                // Alias support
-                                ?: choice.aliases.firstNotNullOfOrNull { alias -> choices[alias] }
-                                ?: error("Choice ${choice.name} not found")
-
-                            deserializeValueGroup(choice, choiceElement)
-                        }.onFailure {
-                            logger.error("Unable to deserialize choice ${choice.name}", it)
-                        }
-                    }
-                }
-
-                // Deserialize the rest of the config
-                deserializeValueGroup(value, jsonObject)
-            }.onFailure {
-                logger.error("Unable to deserialize config ${value.name}", it)
-            }
-
-            return
-        }
-
-        // Otherwise, we simply deserialize the value
-        runCatching {
-            value.deserializeFrom(fileGson, jsonObject["value"])
-        }.onFailure {
-            logger.error("Unable to deserialize value ${value.name}", it)
-        }
+        ConfigValueGroupCodec.deserializeValue(value, jsonObject)
     }
 
     private fun ensureRootKeys() {
@@ -369,12 +170,8 @@ object ConfigSystem {
         if (trimmed.isBlank()) {
             return trimmed
         }
-        val prefix = "$KEY_PREFIX."
-        return if (trimmed.startsWith(prefix, ignoreCase = true)) {
-            trimmed
-        } else {
-            prefix + trimmed
-        }
-    }
 
+        val prefix = "$KEY_PREFIX."
+        return if (trimmed.startsWith(prefix, ignoreCase = true)) trimmed else prefix + trimmed
+    }
 }

@@ -19,7 +19,6 @@
 
 package net.ccbluex.liquidbounce.injection.mixins.minecraft.render;
 
-import net.ccbluex.liquidbounce.features.module.modules.render.DoRender;
 import net.ccbluex.liquidbounce.features.module.modules.render.ModuleAntiBlind;
 import net.minecraft.network.chat.Component;
 import net.minecraft.util.FormattedCharSequence;
@@ -45,7 +44,7 @@ public abstract class MixinSignText {
 
     @Inject(method = "getRenderMessages", at = @At("HEAD"), cancellable = true)
     private void injectNoSignRender(boolean filtered, Function<Component, FormattedCharSequence> messageOrderer, CallbackInfoReturnable<FormattedCharSequence[]> cir) {
-        if (!ModuleAntiBlind.canRender(DoRender.SIGN_TEXT)) {
+        if (!ModuleAntiBlind.canRenderSignText()) {
             cir.setReturnValue(LIQUIDBOUNCE$EMPTY);
         }
     }

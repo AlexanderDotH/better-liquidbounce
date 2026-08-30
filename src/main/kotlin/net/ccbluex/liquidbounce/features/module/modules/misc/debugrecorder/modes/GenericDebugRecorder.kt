@@ -24,12 +24,12 @@ import com.google.gson.JsonObject
 import net.ccbluex.fastutil.objectHashSetOf
 import net.ccbluex.liquidbounce.event.tickHandler
 import net.ccbluex.liquidbounce.features.module.ClientModule
-import net.ccbluex.liquidbounce.features.module.modules.misc.debugrecorder.ModuleDebugRecorder
+import net.ccbluex.liquidbounce.features.module.modules.misc.debugrecorder.runtime.DebugRecorderMode
 import net.ccbluex.liquidbounce.utils.io.toJsonArray
 import net.minecraft.world.entity.Entity
 import java.util.concurrent.CopyOnWriteArraySet
 
-object GenericDebugRecorder : ModuleDebugRecorder.DebugRecorderMode<JsonObject>("Generic") {
+object GenericDebugRecorder : DebugRecorderMode<JsonObject>("Generic") {
 
     private data class ScheduledEntityDebug(var ticksLeft: Int, val entityId: Int)
 
@@ -49,7 +49,7 @@ object GenericDebugRecorder : ModuleDebugRecorder.DebugRecorderMode<JsonObject>(
             val entity = world.getEntity(entityId)
 
             if (entity != null) {
-                recordDebugInfo(ModuleDebugRecorder, "entity", debugObject(entity))
+                recordDebugInfo(owner, "entity", debugObject(entity))
             }
         }
 

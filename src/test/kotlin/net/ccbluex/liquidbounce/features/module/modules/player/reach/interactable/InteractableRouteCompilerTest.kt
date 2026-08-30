@@ -10,6 +10,8 @@
  */
 package net.ccbluex.liquidbounce.features.module.modules.player.reach.interactable
 
+import net.ccbluex.liquidbounce.features.module.modules.player.reach.contract.InteractablePacketInstruction
+import net.ccbluex.liquidbounce.features.module.modules.player.reach.contract.InteractableVClipSettings
 import net.ccbluex.liquidbounce.features.module.modules.movement.vclip.VClipFallSafetyContext
 import net.ccbluex.liquidbounce.features.module.modules.player.reach.interactable.route.InteractableRouteKind
 import net.ccbluex.liquidbounce.features.module.modules.player.reach.interactable.route.InteractableRoutePathKind

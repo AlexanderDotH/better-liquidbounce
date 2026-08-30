@@ -20,7 +20,6 @@
 package net.ccbluex.liquidbounce.injection.mixins.minecraft.entity;
 
 import com.mojang.blaze3d.vertex.PoseStack;
-import net.ccbluex.liquidbounce.features.module.modules.render.DoRender;
 import net.ccbluex.liquidbounce.features.module.modules.render.ModuleAntiBlind;
 import net.minecraft.client.renderer.SubmitNodeCollector;
 import net.minecraft.client.renderer.entity.layers.CustomHeadLayer;
@@ -38,7 +37,7 @@ public abstract class MixinCustomHeadLayer<S extends LivingEntityRenderState> {
             at = @At("HEAD"),
             cancellable = true
     ) private void onRender(PoseStack matrixStack, SubmitNodeCollector orderedRenderCommandQueue, int i, S livingEntityRenderState, float f, float g, CallbackInfo ci) {
-        if (livingEntityRenderState instanceof AvatarRenderState && !ModuleAntiBlind.canRender(DoRender.ARMOR)) {
+        if (livingEntityRenderState instanceof AvatarRenderState && !ModuleAntiBlind.canRenderArmor()) {
             ci.cancel();
         }
     }

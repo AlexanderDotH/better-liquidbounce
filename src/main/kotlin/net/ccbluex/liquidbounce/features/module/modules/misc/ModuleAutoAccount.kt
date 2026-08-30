@@ -18,18 +18,19 @@
  */
 package net.ccbluex.liquidbounce.features.module.modules.misc
 
-import net.ccbluex.liquidbounce.config.types.list.Tagged
+import net.ccbluex.liquidbounce.common.Tagged
 import net.ccbluex.liquidbounce.event.Event
 import net.ccbluex.liquidbounce.event.events.ChatReceiveEvent
 import net.ccbluex.liquidbounce.event.events.TitleEvent
 import net.ccbluex.liquidbounce.event.sequenceHandler
 import net.ccbluex.liquidbounce.event.tickUntil
 import net.ccbluex.liquidbounce.event.waitTicks
-import net.ccbluex.liquidbounce.features.command.commands.module.CommandAutoAccount
 import net.ccbluex.liquidbounce.features.misc.HideAppearance
 import net.ccbluex.liquidbounce.features.module.ClientModule
 import net.ccbluex.liquidbounce.features.module.ModuleCategories
-import net.ccbluex.liquidbounce.utils.client.chat
+import net.ccbluex.liquidbounce.features.module.modules.misc.autoaccount.contract.AutoAccountCommandActions
+import net.ccbluex.liquidbounce.features.module.modules.misc.autoaccount.contract.AutoAccountCommandBridge
+import net.ccbluex.liquidbounce.features.chat.chat
 
 
 /**
@@ -37,7 +38,7 @@ import net.ccbluex.liquidbounce.utils.client.chat
  *
  * Automatically handles logins or registrations on servers when requested.
  *
- * Command: [CommandAutoAccount]
+ * Command: autoaccount
  */
 object ModuleAutoAccount : ClientModule(
     "AutoAccount",
@@ -120,6 +121,12 @@ object ModuleAutoAccount : ClientModule(
     }
 
     init {
+        AutoAccountCommandBridge.install(
+            AutoAccountCommandActions(
+                register = ::register,
+                login = ::login,
+            ),
+        )
         createMessageHandler<ChatReceiveEvent>(MessageSource.CHAT) { it.message }
         createMessageHandler<TitleEvent.Title>(MessageSource.TITLE) { it.text?.tryCollapseToString() }
         createMessageHandler<TitleEvent.Subtitle>(MessageSource.SUBTITLE) { it.text?.tryCollapseToString() }

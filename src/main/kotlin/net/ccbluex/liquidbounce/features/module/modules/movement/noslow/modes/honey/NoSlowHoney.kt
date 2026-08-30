@@ -21,10 +21,9 @@ package net.ccbluex.liquidbounce.features.module.modules.movement.noslow.modes.h
 import net.ccbluex.liquidbounce.config.types.group.ToggleableValueGroup
 import net.ccbluex.liquidbounce.event.events.BlockVelocityMultiplierEvent
 import net.ccbluex.liquidbounce.event.handler
-import net.ccbluex.liquidbounce.features.module.modules.movement.noslow.ModuleNoSlow
 import net.minecraft.world.level.block.HoneyBlock
 
-internal object NoSlowHoney : ToggleableValueGroup(ModuleNoSlow, "HoneyBlock", true) {
+internal object NoSlowHoney : ToggleableValueGroup(name = "HoneyBlock", enabled = true) {
 
     val multiplier by float("Multiplier", 1f, 0.4f..2f)
 

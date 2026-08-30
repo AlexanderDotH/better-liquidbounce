@@ -21,6 +21,7 @@ package net.ccbluex.liquidbounce.features.misc.proxy
 import io.netty.handler.proxy.HttpProxyHandler
 import io.netty.handler.proxy.Socks5ProxyHandler
 import net.ccbluex.liquidbounce.api.thirdparty.IpInfoApi
+import net.ccbluex.liquidbounce.common.interop.ProxyCheckPayload
 import java.net.InetSocketAddress
 
 /**
@@ -34,7 +35,7 @@ data class Proxy(
     var forwardAuthentication: Boolean = false,
     var ipInfo: IpInfoApi.IpData? = null,
     var favorite: Boolean = false
-) {
+) : ProxyCheckPayload {
 
     enum class Type {
         HTTP,

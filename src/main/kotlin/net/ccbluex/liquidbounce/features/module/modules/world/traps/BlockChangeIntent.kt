@@ -18,7 +18,7 @@
  */
 package net.ccbluex.liquidbounce.features.module.modules.world.traps
 
-import net.ccbluex.liquidbounce.utils.block.targetfinding.BlockPlacementTarget
+import net.ccbluex.liquidbounce.features.block.contract.BlockPlacementTarget
 import net.ccbluex.liquidbounce.utils.inventory.HotbarItemSlot
 import net.minecraft.core.Direction
 import net.minecraft.core.Vec3i

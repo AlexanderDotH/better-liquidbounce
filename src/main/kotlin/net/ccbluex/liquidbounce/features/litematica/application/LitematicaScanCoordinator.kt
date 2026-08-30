@@ -51,15 +51,7 @@ class LitematicaScanCoordinator(
         pendingPositions: Set<LitematicaPosition>,
     ): LitematicaScanUpdate? {
         val metadataChanged = refreshMetadata()
-        val batch = port.scanPlacements(
-            LitematicaScanRequest(
-                center = center,
-                range = settings.range,
-                maxCells = SCAN_MAX_CELLS,
-                timeBudgetNanos = SCAN_TIME_BUDGET_NANOS,
-                cursor = cursor,
-            ),
-        )
+        val batch = port.scanPlacements(scanRequest(center, settings))
         if (batch.restartGeneration) restartGeneration()
         batch.placements.forEach(::mergePlacement)
         batch.interactions.forEach { interaction ->
@@ -69,7 +61,24 @@ class LitematicaScanCoordinator(
         if (!batch.complete) {
             return if (batch.restartGeneration) LitematicaScanUpdate(plan, placementChanged = true) else null
         }
+        return completeScan(center, settings, pendingPositions, metadataChanged, batch.restartGeneration)
+    }
 
+    private fun scanRequest(center: LitematicaPoint, settings: LitematicaPlannerSettings) = LitematicaScanRequest(
+        center = center,
+        range = settings.range,
+        maxCells = SCAN_MAX_CELLS,
+        timeBudgetNanos = SCAN_TIME_BUDGET_NANOS,
+        cursor = cursor,
+    )
+
+    private fun completeScan(
+        center: LitematicaPoint,
+        settings: LitematicaPlannerSettings,
+        pendingPositions: Set<LitematicaPosition>,
+        metadataChanged: Boolean,
+        restarted: Boolean,
+    ): LitematicaScanUpdate {
         val nextPlan = planner.plan(
             LitematicaPlanRequest(
                 origin = center,
@@ -88,7 +97,7 @@ class LitematicaScanCoordinator(
         clearGeneration()
         return LitematicaScanUpdate(
             nextPlan,
-            batch.restartGeneration || metadataChanged || selectionChanged,
+            restarted || metadataChanged || selectionChanged,
         )
     }
 

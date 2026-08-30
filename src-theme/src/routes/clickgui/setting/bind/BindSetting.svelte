@@ -4,7 +4,7 @@
     import {waitMatches} from "../../../../integration/ws";
     import type {KeyboardKeyEvent, MouseButtonEvent} from "../../../../integration/events";
     import {convertToSpacedString, spaceSeperatedNames} from "../../../../theme/theme_config";
-    import BindDisplay from "./BindDisplay.svelte";
+    import BindDisplay from "../../../../components/bind/BindDisplay.svelte";
     import SwitchBindAction from "./SwitchBindAction.svelte";
     import {isClickGuiScreen, UNKNOWN_KEY} from "../../../../util/utils";
 

@@ -11,10 +11,10 @@
 
 package net.ccbluex.liquidbounce.integration.theme.component
 
+import net.ccbluex.liquidbounce.common.interop.ModernContextualBarSnapshot
 import net.ccbluex.liquidbounce.features.misc.HideAppearance
 import net.ccbluex.liquidbounce.features.module.modules.render.HudTheme
 import net.ccbluex.liquidbounce.features.module.modules.render.ModuleHud
-import net.ccbluex.liquidbounce.injection.mixins.minecraft.gui.MixinHudAccessor
 import net.ccbluex.liquidbounce.utils.client.mc
 import net.minecraft.client.gui.Hud
 
@@ -40,39 +40,6 @@ internal fun resolveContextualInfoForPresentation(
 
 internal fun normalizeContextualProgress(progress: Float): Float =
     if (progress.isFinite()) progress.coerceIn(0f, 1f) else 0f
-
-@JvmRecord
-data class ModernContextualBarSnapshot(
-    val mode: String,
-    val progress: Float,
-    val level: Int,
-    val cooldown: Boolean,
-    val markers: List<ModernLocatorMarker>,
-) {
-    companion object {
-        @JvmField
-        val EMPTY = ModernContextualBarSnapshot(
-            mode = MODE_EMPTY,
-            progress = 0f,
-            level = 0,
-            cooldown = false,
-            markers = emptyList(),
-        )
-    }
-}
-
-@JvmRecord
-data class ModernLocatorMarker(
-    val id: String,
-    val label: String,
-    val offset: Double,
-    val elevation: String,
-    val distance: Int,
-    val color: Int,
-    val kind: String,
-    val playerUuid: String?,
-    val style: String,
-)
 
 /**
  * Bridges Minecraft's already-selected contextual state to the bundled browser HUD.
@@ -105,7 +72,7 @@ object ModernContextualBar {
     fun snapshot(): ModernContextualBarSnapshot {
         val player = mc.player ?: return ModernContextualBarSnapshot.EMPTY
         val contextualInfo = runCatching {
-            (mc.gui.hud as MixinHudAccessor).contextualInfoBar.first
+            (mc.gui.hud as HudContextualInfoAccess).contextualInfoBar.first
         }.getOrDefault(Hud.ContextualInfo.EMPTY)
 
         return when (contextualInfo) {
@@ -141,7 +108,6 @@ object ModernContextualBar {
     }
 }
 
-private const val MODE_EMPTY = "empty"
 private const val MODE_EXPERIENCE = "experience"
 private const val MODE_LOCATOR = "locator"
 private const val MODE_JUMPABLE_VEHICLE = "jumpableVehicle"

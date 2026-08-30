@@ -21,37 +21,34 @@ package net.ccbluex.liquidbounce.features.module.modules.combat
 
 import net.ccbluex.liquidbounce.config.types.group.Mode
 import net.ccbluex.liquidbounce.config.types.group.ModeValueGroup
-import net.ccbluex.liquidbounce.config.types.list.Tagged
 import net.ccbluex.liquidbounce.event.events.RotationUpdateEvent
 import net.ccbluex.liquidbounce.event.handler
 import net.ccbluex.liquidbounce.event.tickHandler
 import net.ccbluex.liquidbounce.features.module.ClientModule
 import net.ccbluex.liquidbounce.features.module.ModuleCategories
+import net.ccbluex.liquidbounce.features.module.modules.combat.autoshoot.AutoShootGravityType
 import net.ccbluex.liquidbounce.features.module.modules.combat.killaura.ModuleKillAura
 import net.ccbluex.liquidbounce.utils.aiming.RotationManager
-import net.ccbluex.liquidbounce.utils.aiming.RotationsValueGroup
+import net.ccbluex.liquidbounce.features.rotation.RotationsValueGroup
 import net.ccbluex.liquidbounce.utils.aiming.data.Rotation
-import net.ccbluex.liquidbounce.utils.aiming.point.PointTracker
-import net.ccbluex.liquidbounce.utils.aiming.projectiles.SituationalProjectileAngleCalculator
+import net.ccbluex.liquidbounce.features.aiming.point.PointTracker
 import net.ccbluex.liquidbounce.utils.block.SwingMode
-import net.ccbluex.liquidbounce.utils.clicking.Clicker
+import net.ccbluex.liquidbounce.features.clicking.Clicker
 import net.ccbluex.liquidbounce.utils.client.SilentHotbar
 import net.ccbluex.liquidbounce.utils.collection.Filter
 import net.ccbluex.liquidbounce.utils.collection.itemSortedSetOf
-import net.ccbluex.liquidbounce.utils.combat.CombatManager
-import net.ccbluex.liquidbounce.utils.combat.TargetPriority
-import net.ccbluex.liquidbounce.utils.combat.TargetTracker
+import net.ccbluex.liquidbounce.features.combat.runtime.CombatManager
+import net.ccbluex.liquidbounce.features.combat.runtime.TargetPriority
+import net.ccbluex.liquidbounce.features.combat.runtime.TargetTracker
 import net.ccbluex.liquidbounce.utils.inventory.HotbarItemSlot
-import net.ccbluex.liquidbounce.utils.inventory.InventoryManager
+import net.ccbluex.liquidbounce.features.inventory.InventoryManager
 import net.ccbluex.liquidbounce.utils.inventory.Slots
 import net.ccbluex.liquidbounce.utils.inventory.findClosestSlot
 import net.ccbluex.liquidbounce.utils.entity.useItem
 import net.ccbluex.liquidbounce.utils.kotlin.Priority
-import net.ccbluex.liquidbounce.utils.render.TargetRenderer
-import net.ccbluex.liquidbounce.utils.render.trajectory.TrajectoryInfo
+import net.ccbluex.liquidbounce.render.target.TargetRenderer
 import net.minecraft.world.entity.LivingEntity
 import net.minecraft.world.item.EggItem
-import net.minecraft.world.item.Item
 import net.minecraft.world.item.Items
 import net.minecraft.world.item.SnowballItem
 
@@ -72,7 +69,7 @@ object ModuleAutoShoot : ClientModule("AutoShoot", ModuleCategories.COMBAT) {
         EggAndSnowball,
         arrayOf(EggAndSnowball, Custom),
     )
-    private val gravityType by enumChoice("GravityType", GravityType.AUTO).apply { tagBy(this) }
+    private val gravityType by enumChoice("GravityType", AutoShootGravityType.AUTO).apply { tagBy(this) }
 
     private val clicker = tree(Clicker(this, mc.options.keyUse, itemCooldown = null))
 
@@ -99,7 +96,7 @@ object ModuleAutoShoot : ClientModule("AutoShoot", ModuleCategories.COMBAT) {
      * The target renderer to render the target, which we are currently aiming at.
      */
     init {
-        tree(TargetRenderer(this, targetTracker))
+        tree(TargetRenderer(this, targetTracker::target))
     }
 
     private val selectSlotAutomatically by boolean("SelectSlotAutomatically", true)
@@ -142,7 +139,7 @@ object ModuleAutoShoot : ClientModule("AutoShoot", ModuleCategories.COMBAT) {
     }
 
     private fun getRotation(target: LivingEntity, slot: HotbarItemSlot): Rotation? {
-        return GravityType.from(slot).rotationFor(target)
+        return gravityType.rotationFor(target, slot.itemStack.item, player.eyePosition, pointTracker)
     }
 
     /**
@@ -237,51 +234,6 @@ object ModuleAutoShoot : ClientModule("AutoShoot", ModuleCategories.COMBAT) {
 
         override fun findSlot(): HotbarItemSlot? = Slots.OffhandWithHotbar.findClosestSlot {
             !it.isEmpty && filter(it.item, items)
-        }
-    }
-
-    private enum class GravityType(override val tag: String) : Tagged {
-        AUTO("Auto") {
-            override fun rotationFor(target: LivingEntity): Rotation? = null
-        },
-        LINEAR("Linear") {
-            override fun rotationFor(target: LivingEntity): Rotation {
-                // On linear we likely don't need to care about gravity,
-                // but instead aim exactly at the hitbox of the target.
-                val eyes = player.eyePosition
-                val point = pointTracker.findPoint(eyes, target, 1)
-                return Rotation.lookingAt(point.pos, eyes)
-            }
-        },
-        PROJECTILE("Projectile") {
-            override fun rotationFor(target: LivingEntity): Rotation? {
-                return SituationalProjectileAngleCalculator.calculateAngleForEntity(
-                    TrajectoryInfo.GENERIC,
-                    target
-                )
-            }
-        };
-
-        abstract fun rotationFor(target: LivingEntity): Rotation?
-
-        companion object {
-            @JvmStatic
-            fun from(slot: HotbarItemSlot): GravityType =
-                from(slot.itemStack.item)
-
-            @JvmStatic
-            fun from(item: Item): GravityType {
-                return when (gravityType) {
-                    AUTO -> {
-                        when (item) {
-                            is EggItem, is SnowballItem -> PROJECTILE
-                            else -> LINEAR
-                        }
-                    }
-
-                    else -> gravityType
-                }
-            }
         }
     }
 

@@ -20,20 +20,21 @@ class LitematicaDependencyContractTest {
 
     @Test
     fun `verified Litematica APIs stay compile only`() {
-        val build = read(BUILD_FILE)
+        val dependencies = read(DEPENDENCY_FILE)
+        val testing = read(TESTING_FILE)
         val catalog = read(VERSION_CATALOG)
 
-        assertTrue(build.contains("compileOnly(libs.litematica)"))
-        assertTrue(build.contains("compileOnly(libs.malilib)"))
-        assertTrue(build.contains("litematicaIntegrationTestRuntime"))
-        assertTrue(build.contains("includeTags(\"litematica-integration\")"))
-        assertTrue(build.contains("excludeTags(\"litematica-integration\")"))
-        assertFalse(build.contains("include(libs.litematica)"))
-        assertFalse(build.contains("include(libs.malilib)"))
-        assertFalse(build.contains("runtimeOnly(libs.litematica)"))
-        assertFalse(build.contains("runtimeOnly(libs.malilib)"))
-        assertFalse(build.contains("jij(libs.litematica)"))
-        assertFalse(build.contains("jij(libs.malilib)"))
+        assertTrue(dependencies.contains("add(\"compileOnly\", library(\"litematica\"))"))
+        assertTrue(dependencies.contains("add(\"compileOnly\", library(\"malilib\"))"))
+        assertTrue(dependencies.contains("litematicaIntegrationTestRuntime"))
+        assertTrue(testing.contains("includeTags(\"litematica-integration\")"))
+        assertTrue(testing.contains("excludeTags(\"litematica-integration\")"))
+        assertFalse(dependencies.contains("add(\"include\", library(\"litematica\"))"))
+        assertFalse(dependencies.contains("add(\"include\", library(\"malilib\"))"))
+        assertFalse(dependencies.contains("add(\"runtimeOnly\", library(\"litematica\"))"))
+        assertFalse(dependencies.contains("add(\"runtimeOnly\", library(\"malilib\"))"))
+        assertFalse(dependencies.contains("add(\"jij\", library(\"litematica\"))"))
+        assertFalse(dependencies.contains("add(\"jij\", library(\"malilib\"))"))
         assertTrue(catalog.contains("litematica = \"jzraAo7b\""))
         assertTrue(catalog.contains("malilib = \"xKxhjDJ2\""))
     }
@@ -53,7 +54,8 @@ class LitematicaDependencyContractTest {
     private fun read(path: String): String = Files.readString(Path.of(path))
 
     private companion object {
-        const val BUILD_FILE = "build.gradle.kts"
+        const val DEPENDENCY_FILE = "gradle/game-dependencies.gradle.kts"
+        const val TESTING_FILE = "gradle/testing.gradle.kts"
         const val VERSION_CATALOG = "gradle/libs.versions.toml"
         const val FABRIC_METADATA = "src/main/resources/fabric.mod.json"
     }

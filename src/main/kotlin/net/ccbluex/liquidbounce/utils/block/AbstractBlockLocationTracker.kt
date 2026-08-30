@@ -39,7 +39,7 @@ import kotlin.concurrent.write
  *
  * @param T state type
  */
-sealed class AbstractBlockLocationTracker<T> : ChunkScanner.BlockChangeSubscriber {
+sealed class AbstractBlockLocationTracker<T> : BlockChangeSubscriber {
 
     /**
      * Gets the [state] of specified [BlockPos] and its [BlockState].

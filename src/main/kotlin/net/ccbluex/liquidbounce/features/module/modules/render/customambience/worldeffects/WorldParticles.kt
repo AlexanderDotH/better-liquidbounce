@@ -20,22 +20,21 @@
 package net.ccbluex.liquidbounce.features.module.modules.render.customambience.worldeffects
 
 import net.ccbluex.liquidbounce.config.types.group.ToggleableValueGroup
-import net.ccbluex.liquidbounce.features.module.modules.render.customambience.ModuleCustomAmbience
+import net.ccbluex.liquidbounce.event.EventListener
+import net.ccbluex.liquidbounce.features.module.modules.render.customambience.worldeffects.model.WorldParticleStore
 import net.ccbluex.liquidbounce.features.module.modules.render.customambience.worldeffects.modes.WorldParticlesSimple
-import net.ccbluex.liquidbounce.utils.collection.ExpiringList.Companion.ExpiringList
-import net.minecraft.world.phys.Vec3
 
-object WorldParticles : ToggleableValueGroup(ModuleCustomAmbience, "WorldParticles", false) {
-
-    val coords = ExpiringList<Vec3>()
+internal class WorldParticles(parent: EventListener) : ToggleableValueGroup(parent, "WorldParticles", false) {
+    private val store = WorldParticleStore(this)
+    private val simpleMode = WorldParticlesSimple(store)
 
     val modes = choices("Mode", 0) {
         arrayOf(
-            WorldParticlesSimple,
+            simpleMode,
             // TODO: Create WireFrame mode
         )
-    }.apply { onChanged { coords.clear() } }
+    }.apply { onChanged { store.clear() } }
 
-    override fun onDisabled() = coords.clear()
+    override fun onDisabled() = store.clear()
 
 }

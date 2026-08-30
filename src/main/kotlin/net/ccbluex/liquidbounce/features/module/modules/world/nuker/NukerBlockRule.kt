@@ -18,7 +18,7 @@
  */
 package net.ccbluex.liquidbounce.features.module.modules.world.nuker
 
-import net.ccbluex.liquidbounce.config.types.list.Tagged
+import net.ccbluex.liquidbounce.common.Tagged
 import net.minecraft.world.level.block.Block
 
 internal enum class NukerBlockRule(override val tag: String) : Tagged {

@@ -20,10 +20,10 @@
 package net.ccbluex.liquidbounce.features.module.modules.render.trajectories
 
 import net.ccbluex.liquidbounce.config.types.group.ToggleableValueGroup
-import net.ccbluex.liquidbounce.config.types.list.Tagged
+import net.ccbluex.liquidbounce.common.Tagged
 import net.ccbluex.liquidbounce.event.events.OverlayRenderEvent
 import net.ccbluex.liquidbounce.event.handler
-import net.ccbluex.liquidbounce.features.module.modules.render.TimeUnit
+import net.ccbluex.liquidbounce.features.module.modules.render.timing.TimeUnit
 import net.ccbluex.liquidbounce.render.FontManager
 import net.ccbluex.liquidbounce.render.engine.font.HorizontalAnchor
 import net.ccbluex.liquidbounce.render.engine.type.Color4b
@@ -31,8 +31,8 @@ import net.ccbluex.liquidbounce.render.engine.type.Vec3f
 import net.ccbluex.liquidbounce.utils.text.asPlainText
 import net.ccbluex.liquidbounce.utils.text.textOf
 import net.ccbluex.liquidbounce.utils.math.toFixed
-import net.ccbluex.liquidbounce.utils.render.WorldToScreen
-import net.ccbluex.liquidbounce.utils.render.trajectory.TrajectoryInfoRenderer
+import net.ccbluex.liquidbounce.render.WorldToScreen
+import net.ccbluex.liquidbounce.render.trajectory.TrajectoryInfoRenderer
 import net.minecraft.world.phys.Vec3
 
 object TrajectoryDetailedInfoRenderer : ToggleableValueGroup(ModuleTrajectories, "ShowDetailedInfo", false) {

@@ -19,7 +19,6 @@
 
 package net.ccbluex.liquidbounce.injection.mixins.minecraft.render.blockentity;
 
-import net.ccbluex.liquidbounce.features.module.modules.render.DoRender;
 import net.ccbluex.liquidbounce.features.module.modules.render.ModuleAntiBlind;
 import net.minecraft.client.renderer.blockentity.SpawnerRenderer;
 import org.spongepowered.asm.mixin.Mixin;
@@ -34,7 +33,7 @@ public abstract class MixinSpawnerRenderer {
             at = @At("HEAD"),
             cancellable = true
     ) private void onRender(CallbackInfo ci) {
-        if (!ModuleAntiBlind.canRender(DoRender.MOB_IN_SPAWNER)) {
+        if (!ModuleAntiBlind.canRenderMobInSpawner()) {
             ci.cancel();
         }
     }

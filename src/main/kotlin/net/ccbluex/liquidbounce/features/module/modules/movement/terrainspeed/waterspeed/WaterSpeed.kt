@@ -24,12 +24,11 @@ import net.ccbluex.liquidbounce.config.types.group.ValueGroup
 import net.ccbluex.liquidbounce.event.events.MovementInputEvent
 import net.ccbluex.liquidbounce.event.events.PlayerTickEvent
 import net.ccbluex.liquidbounce.event.handler
-import net.ccbluex.liquidbounce.features.module.modules.movement.terrainspeed.ModuleTerrainSpeed
 import net.ccbluex.liquidbounce.utils.entity.moving
 import net.ccbluex.liquidbounce.utils.entity.withStrafe
 import net.ccbluex.liquidbounce.utils.math.copy
 
-internal object WaterSpeed : ToggleableValueGroup(ModuleTerrainSpeed, "WaterSpeed", true) {
+internal object WaterSpeed : ToggleableValueGroup(name = "WaterSpeed", enabled = true) {
 
     val autoSwim by boolean("AutoSwim", true)
 

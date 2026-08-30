@@ -15,8 +15,8 @@ import net.ccbluex.liquidbounce.config.gson.interopGson
 import net.ccbluex.liquidbounce.features.command.Parameter
 import net.ccbluex.liquidbounce.features.command.commands.client.CommandTargets
 import net.ccbluex.liquidbounce.test.MinecraftBootstrap
-import net.ccbluex.liquidbounce.utils.combat.Targets
-import net.ccbluex.liquidbounce.utils.combat.trialMembershipDecision
+import net.ccbluex.liquidbounce.features.combat.model.Targets
+import net.ccbluex.liquidbounce.features.combat.runtime.trialMembershipDecision
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertNull

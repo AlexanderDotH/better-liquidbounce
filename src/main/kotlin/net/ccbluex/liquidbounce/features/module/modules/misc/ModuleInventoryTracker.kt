@@ -24,11 +24,12 @@ import net.ccbluex.liquidbounce.event.events.EntityEquipmentChangeEvent
 import net.ccbluex.liquidbounce.event.events.ItemLoreQueryEvent
 import net.ccbluex.liquidbounce.event.events.WorldChangeEvent
 import net.ccbluex.liquidbounce.event.handler
-import net.ccbluex.liquidbounce.features.command.commands.module.CommandInvsee
 import net.ccbluex.liquidbounce.features.module.ClientModule
 import net.ccbluex.liquidbounce.features.module.ModuleCategories
 import net.ccbluex.liquidbounce.features.module.modules.misc.antibot.ModuleAntiBot
-import net.ccbluex.liquidbounce.utils.inventory.ViewedInventoryScreen
+import net.ccbluex.liquidbounce.features.module.modules.misc.inventorytracker.contract.InventoryTrackerCommandActions
+import net.ccbluex.liquidbounce.features.module.modules.misc.inventorytracker.contract.InventoryTrackerCommandBridge
+import net.ccbluex.liquidbounce.render.inventory.ViewedInventoryScreen
 import net.ccbluex.liquidbounce.utils.text.asPlainText
 import net.minecraft.ChatFormatting
 import net.minecraft.client.player.RemotePlayer
@@ -47,8 +48,6 @@ import java.util.UUID
  * Module InventoryTracker
  *
  * Tracks the inventories of other players.
- *
- * Command: [CommandInvsee]
  */
 object ModuleInventoryTracker : ClientModule("InventoryTracker", ModuleCategories.WORLD) {
 
@@ -59,6 +58,25 @@ object ModuleInventoryTracker : ClientModule("InventoryTracker", ModuleCategorie
 
     private val inventoryMap = Object2ObjectOpenHashMap<UUID, TrackedInventory>()
     val playerMap = Object2ObjectOpenHashMap<UUID, Player>()
+
+    init {
+        InventoryTrackerCommandBridge.install(InventoryTrackerCommandActions(::openInventory))
+    }
+
+    private fun openInventory(inputName: String): Boolean {
+        val playerId = network.onlinePlayers.find { it.profile.name.equals(inputName, true) }?.profile?.id
+        val player = { playerId?.let(world::getPlayerByUUID) ?: playerMap[playerId] }
+
+        if (playerId == null || player() == null) {
+            return false
+        }
+
+        mc.schedule {
+            mc.gui.setScreen(ViewedInventoryScreen(player))
+        }
+        InventoryTrackerCommandBridge.viewedPlayer = playerId
+        return true
+    }
 
     @Suppress("unused")
     val playerEquipmentChangeHandler = handler<EntityEquipmentChangeEvent> { event ->
@@ -119,7 +137,7 @@ object ModuleInventoryTracker : ClientModule("InventoryTracker", ModuleCategorie
     @Suppress("unused")
     private val itemLoreQueryHandler = handler<ItemLoreQueryEvent> { event ->
         if (mc.gui.screen() !is ViewedInventoryScreen) return@handler
-        val player = CommandInvsee.viewedPlayer
+        val player = InventoryTrackerCommandBridge.viewedPlayer
         val timeStamp = inventoryMap[player]?.timeMap?.getLong(event.itemStack)?.takeIf { it != 0L } ?: return@handler
         val lastSeen = System.currentTimeMillis() - timeStamp
         event.lore.add(

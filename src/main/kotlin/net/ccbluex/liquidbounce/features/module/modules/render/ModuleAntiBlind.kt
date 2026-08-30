@@ -18,7 +18,7 @@
  */
 package net.ccbluex.liquidbounce.features.module.modules.render
 
-import net.ccbluex.liquidbounce.config.types.list.Tagged
+import net.ccbluex.liquidbounce.common.Tagged
 import net.ccbluex.liquidbounce.features.module.ClientModule
 import net.ccbluex.liquidbounce.features.module.ModuleCategories
 import net.minecraft.client.gui.Gui
@@ -66,6 +66,38 @@ object ModuleAntiBlind : ClientModule("AntiBlind", ModuleCategories.RENDER, alia
 
     @JvmStatic
     fun canRender(choice: DoRender) = !running || choice in render
+
+    @JvmStatic
+    fun canRenderFallingBlocks() = canRender(DoRender.FALLING_BLOCKS)
+
+    @JvmStatic
+    fun canRenderInvisibleEntities() = canRender(DoRender.INVISIBLE_ENTITIES)
+
+    @JvmStatic fun canRenderArmor() = canRender(DoRender.ARMOR)
+    @JvmStatic fun canRenderBeaconBeams() = canRender(DoRender.BEACON_BEAMS)
+    @JvmStatic fun canRenderBlinding() = canRender(DoRender.BLINDING)
+    @JvmStatic fun canRenderBlockBreakOverlay() = canRender(DoRender.BLOCK_BREAK_OVERLAY)
+    @JvmStatic fun canRenderBossBars() = canRender(DoRender.BOSS_BARS)
+    @JvmStatic fun canRenderDarkness() = canRender(DoRender.DARKNESS)
+    @JvmStatic fun canRenderEatParticles() = canRender(DoRender.EAT_PARTICLES)
+    @JvmStatic fun canRenderEnchantTableBook() = canRender(DoRender.ENCHANT_TABLE_BOOK)
+    @JvmStatic fun canRenderFallingLeaves() = canRender(DoRender.FALLING_LEAVES)
+    @JvmStatic fun canRenderFloatingItems() = canRender(DoRender.FLOATING_ITEMS)
+    @JvmStatic fun canRenderGuiBackground() = canRender(DoRender.GUI_BACKGROUND)
+    @JvmStatic fun canRenderLiquidsFog() = canRender(DoRender.LIQUIDS_FOG)
+    @JvmStatic fun canRenderMapContents() = canRender(DoRender.MAP_CONTENTS)
+    @JvmStatic fun canRenderMapMarkers() = canRender(DoRender.MAP_MARKERS)
+    @JvmStatic fun canRenderMobInSpawner() = canRender(DoRender.MOB_IN_SPAWNER)
+    @JvmStatic fun canRenderNausea() = canRender(DoRender.NAUSEA)
+    @JvmStatic fun canRenderPortalOverlay() = canRender(DoRender.PORTAL_OVERLAY)
+    @JvmStatic fun canRenderPowderSnowFog() = canRender(DoRender.POWDER_SNOW_FOG)
+    @JvmStatic fun canRenderPumpkinBlur() = canRender(DoRender.PUMPKIN_BLUR)
+    @JvmStatic fun canRenderSignText() = canRender(DoRender.SIGN_TEXT)
+    @JvmStatic fun canRenderSkylightUpdates() = canRender(DoRender.SKYLIGHT_UPDATES)
+    @JvmStatic fun canRenderSpyglassOverlay() = canRender(DoRender.SPYGLASS_OVERLAY)
+    @JvmStatic fun canRenderTitle() = canRender(DoRender.TITLE)
+    @JvmStatic fun canRenderWallOverlay() = canRender(DoRender.WALL_OVERLAY)
+    @JvmStatic fun canRenderWorldBorder() = canRender(DoRender.WORLD_BORDER)
 
     val fireOpacityPercentage get() =
         if (running) {

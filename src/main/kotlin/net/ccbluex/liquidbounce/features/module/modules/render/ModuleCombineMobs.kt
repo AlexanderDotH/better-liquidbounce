@@ -25,7 +25,7 @@ import net.ccbluex.liquidbounce.event.events.GameRenderEvent
 import net.ccbluex.liquidbounce.event.handler
 import net.ccbluex.liquidbounce.features.module.ClientModule
 import net.ccbluex.liquidbounce.features.module.ModuleCategories
-import net.ccbluex.liquidbounce.utils.entity.RenderedEntities
+import net.ccbluex.liquidbounce.features.render.RenderedEntities
 import net.minecraft.world.entity.Entity
 import net.minecraft.world.entity.EntityType
 import net.minecraft.world.entity.LivingEntity
@@ -44,6 +44,10 @@ import net.minecraft.world.entity.vehicle.minecart.AbstractMinecart
  * "2b2t's WAR Against Chicken Lag" https://www.youtube.com/watch?v=Qqmz76Z5az0
  */
 object ModuleCombineMobs : ClientModule("CombineMobs", ModuleCategories.RENDER) {
+
+    init {
+        RenderedEntities.installEntityFilter { entity -> !running || !trackEntity(entity, true) }
+    }
 
     @JvmRecord
     private data class CombineKey(val type: EntityType<*>, val babyGroup: Boolean)

@@ -1,5 +1,5 @@
 <script lang="ts">
-    import {cefTextInput} from "../../../clickgui/setting/common/cefTextInput";
+    import {cefTextInput} from "../../../../integration/input/cefTextInput";
 
     const MENU_TEXT_INPUT_SCREEN_NAMES = ["altmanager", "proxymanager", "multiplayer"];
 

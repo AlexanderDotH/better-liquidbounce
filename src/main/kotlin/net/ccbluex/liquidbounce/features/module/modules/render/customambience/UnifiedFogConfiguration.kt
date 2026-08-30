@@ -18,7 +18,7 @@
  */
 package net.ccbluex.liquidbounce.features.module.modules.render.customambience
 
-import net.ccbluex.liquidbounce.config.types.list.Tagged
+import net.ccbluex.liquidbounce.common.Tagged
 
 enum class FogEngine(override val tag: String) : Tagged {
     LEGACY("Legacy"),

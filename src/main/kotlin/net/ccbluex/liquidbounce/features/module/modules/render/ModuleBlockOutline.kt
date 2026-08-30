@@ -20,11 +20,11 @@ package net.ccbluex.liquidbounce.features.module.modules.render
 
 import net.ccbluex.liquidbounce.config.types.group.ToggleableValueGroup
 import net.ccbluex.liquidbounce.event.events.WorldChangeEvent
-import net.ccbluex.liquidbounce.event.events.WorldRenderEvent
+import net.ccbluex.liquidbounce.render.events.WorldRenderEvent
 import net.ccbluex.liquidbounce.event.handler
 import net.ccbluex.liquidbounce.features.module.ClientModule
 import net.ccbluex.liquidbounce.features.module.ModuleCategories
-import net.ccbluex.liquidbounce.injection.mixins.minecraft.render.MixinLevelRenderer
+import net.ccbluex.liquidbounce.features.module.modules.render.blockoutline.flattenBlockOutlineBox
 import net.ccbluex.liquidbounce.render.WorldRenderEnvironment
 import net.ccbluex.liquidbounce.render.drawBox
 import net.ccbluex.liquidbounce.render.drawBoxSide
@@ -55,7 +55,7 @@ import net.minecraft.world.phys.shapes.VoxelShape
  *
  * TODO: Implement GUI Information Panel
  *
- * @see MixinLevelRenderer.cancelBlockOutline
+ * The level-renderer injection delegates its block-outline cancellation decision to this facade.
  */
 object ModuleBlockOutline : ClientModule("BlockOutline", ModuleCategories.RENDER, aliases = listOf("BlockOverlay")) {
 
@@ -125,7 +125,7 @@ object ModuleBlockOutline : ClientModule("BlockOutline", ModuleCategories.RENDER
             return@handler
         }
 
-        val finalPosition = (if (sideOnly) flatBox(singleBox, side) else singleBox).move(blockPos)
+        val finalPosition = (if (sideOnly) flattenBlockOutlineBox(singleBox, side) else singleBox).move(blockPos)
         if (currentPosition != finalPosition) {
             previousPosition = currentPosition
             currentPosition = finalPosition
@@ -200,42 +200,6 @@ object ModuleBlockOutline : ClientModule("BlockOutline", ModuleCategories.RENDER
             draw(maskColor)
         }
     }
-
-    private fun flatBox(box: AABB, side: Direction) = when (side) {
-        Direction.UP -> boxWithBoundsY(box, box.maxY)
-        Direction.DOWN -> boxWithBoundsY(box, box.minY)
-        Direction.NORTH -> boxWithBoundsZ(box, box.minZ)
-        Direction.SOUTH -> boxWithBoundsZ(box, box.maxZ)
-        Direction.WEST -> boxWithBoundsX(box, box.minX)
-        Direction.EAST -> boxWithBoundsX(box, box.maxX)
-    }
-
-    private fun boxWithBoundsX(box: AABB, x: Double) = AABB(
-        x,
-        box.minY,
-        box.minZ,
-        x,
-        box.maxY,
-        box.maxZ
-    )
-
-    private fun boxWithBoundsY(box: AABB, y: Double) = AABB(
-        box.minX,
-        y,
-        box.minZ,
-        box.maxX,
-        y,
-        box.maxZ
-    )
-
-    private fun boxWithBoundsZ(box: AABB, z: Double) = AABB(
-        box.minX,
-        box.minY,
-        z,
-        box.maxX,
-        box.maxY,
-        z
-    )
 
     @Suppress("unused")
     private val worldChangeHandler = handler<WorldChangeEvent> {

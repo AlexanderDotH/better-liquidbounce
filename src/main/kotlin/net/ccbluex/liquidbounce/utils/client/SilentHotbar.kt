@@ -19,13 +19,7 @@
 package net.ccbluex.liquidbounce.utils.client
 
 import net.ccbluex.liquidbounce.additions.realSelectedSlot
-import net.ccbluex.liquidbounce.event.EventListener
-import net.ccbluex.liquidbounce.event.EventManager
-import net.ccbluex.liquidbounce.event.events.GameTickEvent
-import net.ccbluex.liquidbounce.event.events.SelectHotbarSlotSilentlyEvent
-import net.ccbluex.liquidbounce.event.events.WorldChangeEvent
-import net.ccbluex.liquidbounce.event.handler
-import net.ccbluex.liquidbounce.features.module.modules.world.scaffold.ModuleScaffold
+import net.ccbluex.liquidbounce.common.runtime.SilentHotbarRuntimeHooks
 import net.ccbluex.liquidbounce.utils.inventory.HotbarItemSlot
 import net.minecraft.world.entity.player.Inventory
 import org.jetbrains.annotations.Range
@@ -45,10 +39,10 @@ enum class SilentHotbarSelectionPolicy(
 }
 
 /**
- * Manages things like [ModuleScaffold]'s silent mode.
+ * Manages silent hotbar selections for modules such as Scaffold.
  * Not thread safe, please only use this on the main-thread of minecraft
  */
-object SilentHotbar : EventListener {
+object SilentHotbar {
 
     private val state = SilentHotbarStateMachine {
         mc.gameMode?.ensureHasSentCarriedItem()
@@ -104,8 +98,7 @@ object SilentHotbar : EventListener {
     ): Boolean {
         require(Inventory.isHotbarSlot(slot)) { "Invalid hotbar slot: $slot" }
 
-        val event = EventManager.callEvent(SelectHotbarSlotSilentlyEvent(requester, slot))
-        if (event.isCancelled) {
+        if (!SilentHotbarRuntimeHooks.allowsSelection(requester, slot)) {
             return false
         }
 
@@ -124,15 +117,9 @@ object SilentHotbar : EventListener {
      */
     fun isSlotModifiedBy(requester: Any?) = state.isModifiedBy(requester)
 
-    @Suppress("unused")
-    private val worldChangeHandler = handler<WorldChangeEvent> {
-        state.clearForWorldChange()
-    }
+    internal fun clearForWorldChange() = state.clearForWorldChange()
 
-    @Suppress("unused")
-    private val tickHandler = handler<GameTickEvent>(priority = 1001) {
-        state.advanceTick()
-    }
+    internal fun advanceTick() = state.advanceTick()
 }
 
 internal class SilentHotbarStateMachine(

@@ -19,6 +19,7 @@
 
 package net.ccbluex.liquidbounce.utils.aiming.utils
 
+import net.ccbluex.liquidbounce.test.assertVec3Equals
 import net.ccbluex.liquidbounce.utils.aiming.data.Rotation
 import net.ccbluex.liquidbounce.utils.aiming.preference.RotationPreference
 import net.ccbluex.liquidbounce.utils.math.isHitByLine
@@ -68,6 +69,37 @@ class RotationFindingKtTest {
 
         assertNotNull(result)
         assertTrue(abs(result!!.rotation.yaw) < 30f, "Expected later box to win, got yaw=${result.rotation.yaw}")
+    }
+
+    @Test
+    fun `raytraceBoxes visits preferred then nearest spot before projected points`() {
+        val eyes = Vec3.ZERO
+        val box = AABB(2.0, 0.0, 0.0, 3.0, 1.0, 1.0)
+        val preferredSpot = Vec3(3.0, 0.75, 0.75)
+        val preference = object : RotationPreference {
+            override fun getPreferredSpot(eyesPos: Vec3, range: Double): Vec3 = preferredSpot
+
+            override fun getPreferredSpotOnBox(box: AABB, eyesPos: Vec3, range: Double): Vec3 = preferredSpot
+
+            override fun compare(first: Rotation, second: Rotation): Int = 0
+        }
+        val visitedSpots = ArrayList<Vec3>()
+
+        raytraceBoxes(
+            eyes = eyes,
+            boxes = listOf(box),
+            range = 8.0,
+            wallsRange = 8.0,
+            visibilityPredicate = VisibilityPredicate { _, spot ->
+                visitedSpots += spot
+                true
+            },
+            rotationPreference = preference,
+        )
+
+        assertTrue(visitedSpots.size >= 2)
+        assertVec3Equals(Vec3(2.0, 0.5, 0.5), visitedSpots[0], TOLERANCE)
+        assertVec3Equals(Vec3(2.0, 0.0, 0.0), visitedSpots[1], TOLERANCE)
     }
 
     @Test

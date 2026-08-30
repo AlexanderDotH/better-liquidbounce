@@ -21,9 +21,9 @@ package net.ccbluex.liquidbounce.config.types
 import com.google.gson.Gson
 import com.google.gson.JsonElement
 import net.ccbluex.liquidbounce.config.ConfigSystem
-import net.ccbluex.liquidbounce.config.autoconfig.AutoConfig
+import net.ccbluex.liquidbounce.config.autoconfig.AutoConfigContext
 import net.ccbluex.liquidbounce.config.gson.stategies.Exclude
-import net.ccbluex.liquidbounce.lang.LanguageManager
+import net.ccbluex.liquidbounce.lang.LanguageCatalog
 import org.lwjgl.PointerBuffer
 import org.lwjgl.system.MemoryStack
 import org.lwjgl.util.tinyfd.TinyFileDialogs
@@ -55,7 +55,7 @@ class FileValue(
 
     override fun deserializeFrom(gson: Gson, element: JsonElement) {
         // File value is not allowed to be deserialized from AutoConfig.
-        if (!AutoConfig.loadingNow) {
+        if (!AutoConfigContext.loadingNow) {
             super.deserializeFrom(gson, element)
         }
     }
@@ -121,7 +121,7 @@ enum class FileDialogMode(
     };
 
     val title: String
-        get() = LanguageManager.getLanguage()?.getOrDefault(translationKey, fallbackTitle) ?: fallbackTitle
+        get() = LanguageCatalog.translate(translationKey, fallbackTitle)
 
     protected abstract fun selectFilesRaw(extensions: Iterable<String>?): String?
 

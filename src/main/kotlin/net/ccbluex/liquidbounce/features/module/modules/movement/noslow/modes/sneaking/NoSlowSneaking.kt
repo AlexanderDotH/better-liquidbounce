@@ -22,11 +22,10 @@ import net.ccbluex.liquidbounce.config.types.group.NoneMode
 import net.ccbluex.liquidbounce.config.types.group.ToggleableValueGroup
 import net.ccbluex.liquidbounce.event.events.PlayerSneakMultiplier
 import net.ccbluex.liquidbounce.event.handler
-import net.ccbluex.liquidbounce.features.module.modules.movement.noslow.ModuleNoSlow
 import net.ccbluex.liquidbounce.utils.client.inGame
 import kotlin.math.max
 
-internal object NoSlowSneaking : ToggleableValueGroup(ModuleNoSlow, "Sneaking", true) {
+internal object NoSlowSneaking : ToggleableValueGroup(name = "Sneaking", enabled = true) {
 
     private val minMultiplier by float("MinMultiplier", 1f, 0.3f..1f)
 

@@ -15,7 +15,6 @@ import com.mojang.blaze3d.buffers.GpuBufferSlice
 import com.mojang.blaze3d.pipeline.RenderTarget
 import com.mojang.blaze3d.systems.RenderSystem
 import com.mojang.blaze3d.textures.FilterMode
-import com.mojang.blaze3d.vertex.VertexConsumer
 import net.ccbluex.liquidbounce.event.EventListener
 import net.ccbluex.liquidbounce.event.events.ClientShutdownEvent
 import net.ccbluex.liquidbounce.event.handler
@@ -23,17 +22,12 @@ import net.ccbluex.liquidbounce.render.ClientRenderPipelines
 import net.ccbluex.liquidbounce.render.ClientUniformDefine
 import net.ccbluex.liquidbounce.render.createRenderPass
 import net.ccbluex.liquidbounce.render.engine.GaussianKernel
-import net.ccbluex.liquidbounce.render.engine.RenderDrawKey
 import net.ccbluex.liquidbounce.render.engine.esp.EspGlowStyle
 import net.ccbluex.liquidbounce.render.engine.esp.EspRenderTargetHolder
 import net.ccbluex.liquidbounce.render.engine.esp.EspTargetSize
 import net.ccbluex.liquidbounce.render.engine.type.Color4b
-import net.ccbluex.liquidbounce.render.getDynamicTransformsUniform
-import net.ccbluex.liquidbounce.render.mesh.BatchCollector
-import net.ccbluex.liquidbounce.utils.render.writeStd140
+import net.ccbluex.liquidbounce.render.buffer.writeStd140
 import org.joml.Matrix3x2fc
-import org.joml.Matrix4f
-import kotlin.math.roundToInt
 
 /** Rounded backdrop-blur and Gaussian-halo compositor for deferred GUI elements. */
 object GuiGlowRenderer : EventListener {
@@ -93,7 +87,7 @@ object GuiGlowRenderer : EventListener {
         }
         val batch = frameState.consume() ?: return
 
-        drawMask(maskTarget, batch.requests)
+        GuiGlowMaskDrawer.draw(maskTarget, batch.requests)
         if (batch.backgroundBlurRadius > 0f) {
             compositeBackdropBlur(mainTarget, maskTarget, batch.backgroundBlurRadius)
         }
@@ -148,39 +142,6 @@ object GuiGlowRenderer : EventListener {
             pass.bindTexture("BlurSampler", ping.colorTextureView, linearSampler)
             pass.bindTexture("MaskSampler", maskTarget.colorTextureView, linearSampler)
             pass.draw(3, 1, 0, 0)
-        }
-    }
-
-    private fun drawMask(target: RenderTarget, requests: List<GuiGlowFrameRequest>) {
-        val collector = BatchCollector()
-        val key = RenderDrawKey.of(ClientRenderPipelines.GUI.roundedRect())
-        collector.start(key).use { scope ->
-            for (request in requests) {
-                writeRoundedRect(scope.consumer, request)
-            }
-        }
-
-        collector.flush(
-            target,
-            getDynamicTransformsUniform(Matrix4f().setTranslation(0f, 0f, -11000f)),
-        )
-    }
-
-    private fun writeRoundedRect(
-        vertices: VertexConsumer,
-        request: GuiGlowFrameRequest,
-    ) {
-        val width = request.width.roundToInt().coerceIn(1, MAX_ENCODED_VALUE)
-        val height = request.height.roundToInt().coerceIn(1, MAX_ENCODED_VALUE)
-        val radius = request.radius.roundToInt().coerceIn(0, minOf(width, height) / 2)
-        for (index in CORNER_ORDER) {
-            val offset = index * 2
-            vertices.addVertex(request.corners[offset], request.corners[offset + 1], 0f)
-                .setUv(U_COORDINATES[index], V_COORDINATES[index])
-                .setColor(request.color.argb)
-                .setUv1(width, height)
-                .setUv2(radius, 0)
-                .setLineWidth(0f)
         }
     }
 
@@ -266,8 +227,4 @@ object GuiGlowRenderer : EventListener {
         styleData.buffer().close()
     }
 
-    private const val MAX_ENCODED_VALUE = 32767
-    private val CORNER_ORDER = intArrayOf(0, 1, 2, 3)
-    private val U_COORDINATES = floatArrayOf(0f, 0f, 1f, 1f)
-    private val V_COORDINATES = floatArrayOf(0f, 1f, 1f, 0f)
 }

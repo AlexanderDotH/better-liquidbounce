@@ -22,7 +22,7 @@ package net.ccbluex.liquidbounce.render.buffers
 import com.mojang.blaze3d.buffers.GpuBufferSlice
 import com.mojang.blaze3d.buffers.Std140Builder
 import net.ccbluex.liquidbounce.render.ClientUniformDefine
-import net.ccbluex.liquidbounce.utils.render.writeStd140
+import net.ccbluex.liquidbounce.render.buffer.writeStd140
 
 /**
  * Retains the last uniform slice across frames and uploads a new one only when [T] changes.

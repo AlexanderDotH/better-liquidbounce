@@ -27,10 +27,10 @@ import net.ccbluex.liquidbounce.features.command.builder.valueGroupKeyPath
 import net.ccbluex.liquidbounce.features.command.builder.valueKeyPath
 import net.ccbluex.liquidbounce.features.command.builder.valueType
 import net.ccbluex.liquidbounce.features.module.modules.render.ModuleClickGui
-import net.ccbluex.liquidbounce.utils.client.MessageMetadata
-import net.ccbluex.liquidbounce.utils.client.chat
-import net.ccbluex.liquidbounce.utils.client.regular
-import net.ccbluex.liquidbounce.utils.client.variable
+import net.ccbluex.liquidbounce.features.chat.MessageMetadata
+import net.ccbluex.liquidbounce.features.chat.chat
+import net.ccbluex.liquidbounce.utils.text.regular
+import net.ccbluex.liquidbounce.utils.text.variable
 
 /**
  * Value Command

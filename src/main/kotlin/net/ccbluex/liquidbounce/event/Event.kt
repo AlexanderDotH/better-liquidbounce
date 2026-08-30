@@ -18,10 +18,10 @@
  */
 package net.ccbluex.liquidbounce.event
 
-import it.unimi.dsi.fastutil.objects.Object2ReferenceRBTreeMap
-import it.unimi.dsi.fastutil.objects.Reference2ObjectOpenHashMap
 import net.ccbluex.liquidbounce.annotations.Tag
 import net.ccbluex.liquidbounce.config.gson.stategies.ProtocolExclude
+import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.ConcurrentSkipListMap
 
 /**
  * A callable event
@@ -66,18 +66,35 @@ enum class EventState(val stateName: String) {
  * Retrieves the name that the event is supposed to be associated with in JavaScript.
  */
 val Class<out Event>.eventName: String
-    get() = EVENT_CLASS_TO_NAME[this]!!
+    get() = checkNotNull(EVENT_CLASS_TO_NAME[this]) {
+        "The event '$name' is not registered."
+    }
 
-private val EVENT_CLASS_TO_NAME: Map<Class<out Event>, String> = ALL_EVENT_CLASSES.associateWithTo(
-    Reference2ObjectOpenHashMap(ALL_EVENT_CLASSES.size)
+private val EVENT_CLASS_TO_NAME = ALL_EVENT_CLASSES.associateWithTo(
+    ConcurrentHashMap<Class<out Event>, String>(ALL_EVENT_CLASSES.size)
 ) {
-    it.getAnnotation(Tag::class.java)!!.name
+    it.declaredEventName()
 }
 
 @JvmField
-internal val EVENT_NAME_TO_CLASS: Map<String, Class<out Event>> = ALL_EVENT_CLASSES.associateByTo(
-    Object2ReferenceRBTreeMap(String.CASE_INSENSITIVE_ORDER)
-) {
-    it.getAnnotation(Tag::class.java)!!.name
+internal val EVENT_NAME_TO_CLASS = ConcurrentSkipListMap<String, Class<out Event>>(
+    String.CASE_INSENSITIVE_ORDER
+).apply {
+    ALL_EVENT_CLASSES.forEach { eventClass ->
+        this[eventClass.declaredEventName()] = eventClass
+    }
 }
 
+internal fun registerEventMetadata(eventClass: Class<out Event>) {
+    val name = eventClass.declaredEventName()
+    val existingClass = EVENT_NAME_TO_CLASS.putIfAbsent(name, eventClass)
+    check(existingClass == null || existingClass == eventClass) {
+        "The event name '$name' is already registered for '${existingClass?.name}'."
+    }
+    EVENT_CLASS_TO_NAME.putIfAbsent(eventClass, name)
+}
+
+private fun Class<out Event>.declaredEventName(): String =
+    checkNotNull(getAnnotation(Tag::class.java)) {
+        "The event '$name' does not declare @Tag."
+    }.name

@@ -23,8 +23,7 @@ import net.ccbluex.liquidbounce.config.types.group.Mode
 import net.ccbluex.liquidbounce.config.types.group.ModeValueGroup
 import net.ccbluex.liquidbounce.event.tickHandler
 import net.ccbluex.liquidbounce.event.waitTicks
-import net.ccbluex.liquidbounce.features.module.modules.movement.fly.ModuleFly
-import net.ccbluex.liquidbounce.features.module.modules.movement.fly.ModuleFly.modes
+import net.ccbluex.liquidbounce.features.module.modules.movement.fly.runtime.FlyModuleControl
 import net.ccbluex.liquidbounce.features.module.modules.movement.fly.automation.FlyAutomationCapabilities
 import net.ccbluex.liquidbounce.features.module.modules.movement.fly.automation.FlyAutomationEnd
 import net.ccbluex.liquidbounce.features.module.modules.movement.fly.automation.FlyAutomationKind
@@ -33,7 +32,7 @@ import net.ccbluex.liquidbounce.features.module.modules.movement.fly.automation.
 import net.ccbluex.liquidbounce.features.module.modules.movement.fly.modes.FlyAutomaticEndSignal
 import net.ccbluex.liquidbounce.features.module.modules.movement.fly.modes.withFlyAutomationStrafe
 import net.ccbluex.liquidbounce.utils.client.Timer
-import net.ccbluex.liquidbounce.utils.client.chat
+import net.ccbluex.liquidbounce.features.chat.chat
 import net.ccbluex.liquidbounce.utils.kotlin.Priority
 import net.ccbluex.liquidbounce.utils.movement.stopXZVelocity
 import net.minecraft.network.protocol.game.ServerboundMovePlayerPacket
@@ -45,9 +44,6 @@ import net.minecraft.network.protocol.game.ServerboundMovePlayerPacket
  * @note it gives you ~2 flags for damage
  */
 internal object FlyVerusB3896Damage : Mode("VerusB3896Damage"), FlyAutomationProfile {
-
-    override val parent: ModeValueGroup<*>
-        get() = modes
 
     private var flyTicks = 0
     private var shouldStop = false
@@ -112,13 +108,13 @@ internal object FlyVerusB3896Damage : Mode("VerusB3896Damage"), FlyAutomationPro
             automaticEnd.mark(
                 if (shouldStop) "Verus self-damage failed" else "Verus damage boost completed",
             )
-            ModuleFly.enabled = false
+            FlyModuleControl.disable()
             return@tickHandler
         }
 
         player.deltaMovement = player.deltaMovement.withFlyAutomationStrafe(player, 9.95)
         player.deltaMovement.y = 0.0
-        Timer.requestTimerSpeed(0.1f, Priority.IMPORTANT_FOR_USAGE_2, ModuleFly)
+        Timer.requestTimerSpeed(0.1f, Priority.IMPORTANT_FOR_USAGE_2, FlyModuleControl.module)
     }
 
     override fun disable() {

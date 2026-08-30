@@ -35,7 +35,7 @@ import net.ccbluex.liquidbounce.features.module.modules.misc.safeactions.SafeDro
 import net.ccbluex.liquidbounce.features.module.modules.misc.safeactions.SafeDropContext
 import net.ccbluex.liquidbounce.features.module.modules.misc.safeactions.SafeDropPressTracker
 import net.ccbluex.liquidbounce.lang.translation
-import net.ccbluex.liquidbounce.utils.client.notification
+import net.ccbluex.liquidbounce.features.chat.notification
 import net.minecraft.client.player.LocalPlayer
 import net.minecraft.world.inventory.AbstractContainerMenu
 import net.minecraft.world.inventory.Slot

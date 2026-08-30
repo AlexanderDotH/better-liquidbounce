@@ -26,14 +26,16 @@ import net.ccbluex.liquidbounce.event.waitTicks
 import net.ccbluex.liquidbounce.features.module.ClientModule
 import net.ccbluex.liquidbounce.features.module.ModuleCategories
 import net.ccbluex.liquidbounce.features.module.modules.world.scaffold.ModuleScaffold
+import net.ccbluex.liquidbounce.features.module.modules.world.timer.SmoothPulseDurations
+import net.ccbluex.liquidbounce.features.module.modules.world.timer.SmoothPulsePhase
+import net.ccbluex.liquidbounce.features.module.modules.world.timer.SmoothPulsePolicy
 import net.ccbluex.liquidbounce.utils.client.Timer
-import net.ccbluex.liquidbounce.utils.client.notification
-import net.ccbluex.liquidbounce.utils.combat.CombatManager
+import net.ccbluex.liquidbounce.features.chat.notification
+import net.ccbluex.liquidbounce.features.combat.runtime.CombatManager
 import net.ccbluex.liquidbounce.utils.entity.moving
 import net.ccbluex.liquidbounce.utils.kotlin.Priority
 import net.minecraft.client.gui.screens.inventory.ContainerScreen
 import net.minecraft.client.gui.screens.inventory.InventoryScreen
-import net.minecraft.util.Mth
 import kotlin.math.abs
 import kotlin.math.ceil
 
@@ -118,78 +120,42 @@ object ModuleTimer : ClientModule("Timer", ModuleCategories.WORLD, disableOnQuit
         private val rampDownTicks by int("RampDownTicks", 8, 1..100, "ticks")
         private val onMove by boolean("OnMove", true)
 
-        private enum class Phase {
-            Delay, RampUp, Hold, RampDown
-        }
-
-        private var phase = Phase.Delay
+        private val durations: SmoothPulseDurations
+            get() = SmoothPulseDurations(delayTicks, rampUpTicks, holdTicks, rampDownTicks)
+        private var phase = SmoothPulsePhase.DELAY
         private var phaseTick = 0
 
         override fun enable() {
-            phase = initialPhase()
+            phase = SmoothPulsePolicy.initialPhase(durations)
             phaseTick = 0
         }
 
         override fun disable() {
-            phase = Phase.Delay
+            phase = SmoothPulsePhase.DELAY
             phaseTick = 0
-        }
-
-        private fun initialPhase(): Phase =
-            if (delayTicks == 0) Phase.RampUp else Phase.Delay
-
-        private fun phaseDuration(phase: Phase): Int = when (phase) {
-            Phase.Delay -> delayTicks
-            Phase.RampUp -> rampUpTicks
-            Phase.Hold -> holdTicks
-            Phase.RampDown -> rampDownTicks
-        }
-
-        private fun nextPhase(current: Phase): Phase = when (current) {
-            Phase.Delay -> Phase.RampUp
-            Phase.RampUp -> if (holdTicks == 0) Phase.RampDown else Phase.Hold
-            Phase.Hold -> Phase.RampDown
-            Phase.RampDown -> if (delayTicks == 0) Phase.RampUp else Phase.Delay
         }
 
         private fun advancePhase() {
             phaseTick = 0
-            do {
-                phase = nextPhase(phase)
-            } while (phaseDuration(phase) == 0)
-        }
-
-        private fun smoothStep(t: Float): Float = t * t * (3f - 2f * t)
-
-        private fun speedForPhase(phase: Phase, phaseTick: Int): Float = when (phase) {
-            Phase.Delay -> baseSpeed
-            Phase.Hold -> targetSpeed
-            Phase.RampUp -> {
-                val t = smoothStep(((phaseTick + 1).toFloat() / rampUpTicks).coerceIn(0f, 1f))
-                Mth.lerp(t, baseSpeed, targetSpeed)
-            }
-            Phase.RampDown -> {
-                val t = smoothStep(((phaseTick + 1).toFloat() / rampDownTicks).coerceIn(0f, 1f))
-                Mth.lerp(t, targetSpeed, baseSpeed)
-            }
+            phase = SmoothPulsePolicy.nextActivePhase(phase, durations)
         }
 
         val repeatable = tickHandler {
             if (onMove && !ModuleTimer.player.moving) {
-                phase = initialPhase()
+                phase = SmoothPulsePolicy.initialPhase(durations)
                 phaseTick = 0
                 Timer.requestTimerSpeed(baseSpeed, Priority.IMPORTANT_FOR_USAGE_1, ModuleTimer)
                 return@tickHandler
             }
 
             Timer.requestTimerSpeed(
-                speedForPhase(phase, phaseTick),
+                SmoothPulsePolicy.speed(phase, phaseTick, baseSpeed, targetSpeed, durations),
                 Priority.IMPORTANT_FOR_USAGE_1,
                 ModuleTimer
             )
 
             phaseTick++
-            if (phaseTick >= phaseDuration(phase)) {
+            if (phaseTick >= durations.duration(phase)) {
                 advancePhase()
             }
         }

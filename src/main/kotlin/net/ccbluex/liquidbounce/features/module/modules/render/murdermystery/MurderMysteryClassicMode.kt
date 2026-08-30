@@ -19,7 +19,7 @@
 
 package net.ccbluex.liquidbounce.features.module.modules.render.murdermystery
 
-import net.ccbluex.liquidbounce.utils.client.chat
+import net.ccbluex.liquidbounce.features.chat.chat
 import net.minecraft.client.player.AbstractClientPlayer
 
 object MurderMysteryClassicMode : UuidBasedMurderMysteryMode("Classic") {

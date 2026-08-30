@@ -1,35 +1,29 @@
 <script lang="ts">
     import {onDestroy, onMount} from "svelte";
-    import type {ConfigurableSetting} from "../../../../integration/types";
-    import type {ClickGuiValueChangeEvent} from "../../../../integration/events";
-    import {listen} from "../../../../integration/ws";
     import {setItem} from "../../../../integration/persistent_storage";
-    import {
-        convertToSpacedString,
-        spaceSeperatedNames,
-    } from "../../../../theme/theme_config";
+    import {spaceSeperatedNames} from "../../../../theme/theme_config";
     import {
         description as descriptionStore,
         highlightModuleName,
         scaleFactor,
     } from "../../clickgui_store";
-    import GenericSetting from "../../setting/common/GenericSetting.svelte";
+    import ModernModuleSettings from "./ModernModuleSettings.svelte";
     import type {ClickGuiDataSource} from "./model/clickGuiDataSource";
     import {productionClickGuiDataSource} from "./model/clickGuiDataSource";
-    import {
-        modernModuleExpansionKey,
-        shouldLoadModernModuleSettings,
-    } from "./model/modernInteractionState";
+    import {modernModuleExpansionKey} from "./model/modernInteractionState";
     import {
         MODERN_MODULE_STAGGER_LIMIT,
-        MODERN_SETTING_STAGGER_LIMIT,
         motionStaggerIndex,
     } from "./model/modernMotion";
-    import {createLatestValueSaveQueue} from "../../theme/latestValueSaveQueue";
+    import {motionAwareScrollBehavior} from "./modernShellState";
     import {
-        logicalViewportDimension,
-        motionAwareScrollBehavior,
-    } from "./modernShellState";
+        describeModernModuleError,
+        modernModuleDescription,
+        modernModuleDisplayName,
+        prefersReducedMotion,
+        shouldToggleModernModuleExpansion,
+    } from "./model/modernModulePresentation.ts";
+    import "./ModernModule.styles.scss";
 
     interface Props {
         name: string;
@@ -54,32 +48,15 @@
     }: Props = $props();
 
     let moduleButton = $state<HTMLButtonElement>();
-    let configurable = $state<ConfigurableSetting | null>(null);
     let liveEnabled = $state(false);
     let expanded = $state(false);
-    let loadingSettings = $state(false);
     let togglePending = $state(false);
     let toggleMotionVersion = $state(0);
     let toggleFeedbackActive = $state(false);
     let toggleFeedbackTimeout: number | null = null;
-    let savePending = $state(false);
     let interactionError = $state<string | null>(null);
-    let settingsSaveError = $state<string | null>(null);
 
     let settingsPath = $derived(modernModuleExpansionKey(name));
-    const settingsSaveQueue = createLatestValueSaveQueue<ConfigurableSetting>({
-        save: settings => dataSource.setModuleSettings(name, settings),
-        reload: () => dataSource.getModuleSettings(name),
-        onConfirmed: settings => {
-            configurable = settings;
-        },
-        onStateChange: state => {
-            savePending = state.saving;
-            settingsSaveError = state.error
-                ? describeError(state.error, "Settings could not be saved.")
-                : null;
-        },
-    });
 
     $effect(() => {
         liveEnabled = enabled;
@@ -101,22 +78,8 @@
         return () => window.clearTimeout(timeout);
     });
 
-    listen("clickGuiValueChange", (event: ClickGuiValueChangeEvent) => {
-        if (event.configurable.name !== name) {
-            return;
-        }
-
-        if (settingsSaveQueue.isSaving() || settingsSaveQueue.hasPending()) {
-            return;
-        }
-
-        configurable = structuredClone(event.configurable);
-        loadingSettings = false;
-    });
-
     onMount(() => {
         expanded = hasSettings && localStorage.getItem(settingsPath) === "true";
-        loadSettingsIfNeeded();
     });
 
     onDestroy(() => {
@@ -124,35 +87,6 @@
             clearTimeout(toggleFeedbackTimeout);
         }
     });
-
-    async function refreshSettings(): Promise<void> {
-        loadingSettings = true;
-
-        try {
-            configurable = await dataSource.getModuleSettings(name);
-            if (!hasConfigurableSettings(configurable)) {
-                expanded = false;
-            }
-            interactionError = null;
-        } catch (error) {
-            interactionError = describeError(error, "Settings could not be loaded.");
-        } finally {
-            loadingSettings = false;
-        }
-    }
-
-    function loadSettingsIfNeeded(): void {
-        if (!shouldLoadModernModuleSettings({
-            expanded,
-            hasSettings,
-            loaded: configurable !== null,
-            loading: loadingSettings,
-        })) {
-            return;
-        }
-
-        void refreshSettings();
-    }
 
     async function toggleModule(): Promise<void> {
         if (togglePending) {
@@ -170,7 +104,7 @@
             await dataSource.setModuleEnabled(name, liveEnabled);
         } catch (error) {
             liveEnabled = previousEnabled;
-            interactionError = describeError(error, "Module state could not be changed.");
+            interactionError = describeModernModuleError(error, "Module state could not be changed.");
         } finally {
             togglePending = false;
         }
@@ -194,7 +128,6 @@
         }
 
         expanded = !expanded;
-        loadSettingsIfNeeded();
         void persistExpansion();
     }
 
@@ -202,41 +135,14 @@
         try {
             await setItem(settingsPath, expanded.toString());
         } catch (error) {
-            interactionError = describeError(error, "Expansion state could not be saved.");
+            interactionError = describeModernModuleError(error, "Expansion state could not be saved.");
         }
-    }
-
-    function scheduleSettingsSave(): void {
-        if (!configurable) {
-            return;
-        }
-
-        interactionError = null;
-        settingsSaveError = null;
-        settingsSaveQueue.enqueue(
-            structuredClone($state.snapshot(configurable)),
-        );
     }
 
     function handleModuleKeydown(event: KeyboardEvent): void {
-        if (!hasSettings) {
-            return;
-        }
-
-        if (event.key === "ArrowRight" && !expanded) {
-            event.preventDefault();
-            toggleExpanded();
-        }
-
-        if (event.key === "ArrowLeft" && expanded) {
-            event.preventDefault();
-            toggleExpanded();
-        }
-
-        if (event.key === "ContextMenu") {
-            event.preventDefault();
-            toggleExpanded();
-        }
+        if (!shouldToggleModernModuleExpansion(event.key, expanded, hasSettings)) return;
+        event.preventDefault();
+        toggleExpanded();
     }
 
     function showDescription(): void {
@@ -244,54 +150,18 @@
             return;
         }
 
-        const bounds = moduleButton.getBoundingClientRect();
-        const aliasText = aliases.length > 0
-            ? ` (aka ${aliases.map(displayName).join(", ")})`
-            : "";
-        const moduleDescription = `${description}${aliasText}`;
-
-        if (window.innerWidth - bounds.right > 300) {
-            descriptionStore.set({
-                x: logicalViewportDimension(bounds.right, $scaleFactor),
-                y: logicalViewportDimension(
-                    bounds.top + bounds.height / 2,
-                    $scaleFactor,
-                ),
-                anchor: "right",
-                description: moduleDescription,
-            });
-            return;
-        }
-
-        descriptionStore.set({
-            x: logicalViewportDimension(bounds.left, $scaleFactor),
-            y: logicalViewportDimension(
-                bounds.top + bounds.height / 2,
-                $scaleFactor,
-            ),
-            anchor: "left",
-            description: moduleDescription,
-        });
+        descriptionStore.set(modernModuleDescription(
+            moduleButton.getBoundingClientRect(),
+            window.innerWidth,
+            $scaleFactor,
+            description,
+            aliases,
+            $spaceSeperatedNames,
+        ));
     }
 
     function displayName(value: string): string {
-        return $spaceSeperatedNames ? convertToSpacedString(value) : value;
-    }
-
-    function hasConfigurableSettings(settings: ConfigurableSetting): boolean {
-        return settings.value.some(setting => setting.name !== "Bind");
-    }
-
-    function describeError(error: unknown, fallback: string): string {
-        if (!(error instanceof Error) || !error.message.trim()) {
-            return fallback;
-        }
-
-        return `${fallback} ${error.message}`;
-    }
-
-    function prefersReducedMotion(): boolean {
-        return window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false;
+        return modernModuleDisplayName(value, $spaceSeperatedNames);
     }
 </script>
 
@@ -341,363 +211,15 @@
         {/if}
     </button>
 
-    {#if expanded}
-        <div
-                id="modern-module-settings-{name}"
-                class="module-settings"
-                role="region"
-                aria-label="{displayName(name)} settings"
-                aria-busy={loadingSettings || savePending}
-        >
-            {#if loadingSettings && !configurable}
-                <div class="settings-status" role="status">
-                    <span class="spinner" aria-hidden="true"></span>
-                    Loading settings
-                </div>
-            {:else if configurable}
-                {#each configurable.value as _, index (configurable.value[index].name)}
-                    <div
-                            class="modern-setting-shell"
-                            style:--modern-setting-enter-index={motionStaggerIndex(index, MODERN_SETTING_STAGGER_LIMIT)}
-                    >
-                        <GenericSetting
-                                path={settingsPath}
-                                bind:setting={configurable.value[index]}
-                                on:change={scheduleSettingsSave}
-                        />
-                    </div>
-                {/each}
-            {/if}
-
-            {#if interactionError || settingsSaveError}
-                <div class="settings-error" role="alert">
-                    <span>{settingsSaveError ?? interactionError}</span>
-                    {#if !configurable}
-                        <button type="button" onclick={refreshSettings}>Retry</button>
-                    {:else if settingsSaveError}
-                        <button type="button" onclick={() => settingsSaveQueue.retry()}>
-                            Retry save
-                        </button>
-                    {/if}
-                </div>
-            {/if}
-        </div>
-    {/if}
+    <ModernModuleSettings
+            {name}
+            {hasSettings}
+            {expanded}
+            {settingsPath}
+            {dataSource}
+            externalError={interactionError}
+            onError={message => interactionError = message}
+            onClearError={() => interactionError = null}
+            onCollapse={() => expanded = false}
+    />
 </article>
-
-<style lang="scss">
-  .module {
-    position: relative;
-    color: var(--clickgui-text-dimmed-color);
-    border-bottom: 1px solid rgba(255, 255, 255, 0.055);
-    pointer-events: var(--modern-module-pointer-events, auto);
-    content-visibility: auto;
-    contain-intrinsic-block-size: auto 42px;
-  }
-
-  .module.revealed {
-    animation:
-      modern-module-enter
-      var(--modern-motion-entrance-duration, 260ms)
-      var(--modern-motion-entrance-easing, cubic-bezier(0.16, 1, 0.3, 1))
-      backwards;
-    animation-delay:
-      calc(
-        var(--modern-module-enter-index, 0)
-        * var(--modern-motion-stagger, 24ms)
-      );
-  }
-
-  .module:last-child {
-    border-bottom: 0;
-  }
-
-  .module-row {
-    position: relative;
-    width: 100%;
-    min-height: 42px;
-    display: grid;
-    grid-template-columns: 7px minmax(0, 1fr) auto;
-    align-items: center;
-    gap: 9px;
-    padding: 0 12px;
-    color: inherit;
-    background: transparent;
-    border: 0;
-    overflow: hidden;
-    cursor: pointer;
-    font-family: inherit;
-    text-align: left;
-    transition:
-      color var(--modern-motion-duration, 140ms) var(--modern-motion-easing, ease),
-      background-color var(--modern-motion-duration, 140ms) var(--modern-motion-easing, ease);
-  }
-
-  .toggle-sweep {
-    position: absolute;
-    z-index: 0;
-    inset: 0;
-    background: linear-gradient(
-      90deg,
-      transparent,
-      color-mix(in srgb, var(--accent-color) 15%, white 2%),
-      transparent
-    );
-    opacity: 0;
-    pointer-events: none;
-    transform: translateX(110%);
-    animation:
-      modern-module-toggle-sweep
-      440ms
-      var(--modern-motion-entrance-easing, cubic-bezier(0.16, 1, 0.3, 1));
-  }
-
-  .module-row > :not(.toggle-sweep) {
-    position: relative;
-    z-index: 1;
-  }
-
-  .module-row:hover {
-    color: var(--clickgui-text-color);
-    background: rgba(255, 255, 255, 0.045);
-  }
-
-  .module-row:focus-visible {
-    position: relative;
-    z-index: 1;
-    outline: 2px solid var(--modern-focus-ring, color-mix(in srgb, var(--accent-color) 78%, white));
-    outline-offset: -2px;
-  }
-
-  .state-dot {
-    width: 6px;
-    height: 6px;
-    background: #58606b;
-    border-radius: 50%;
-    transition:
-      background-color
-      var(--modern-motion-duration, 140ms)
-      var(--modern-motion-easing, cubic-bezier(0.2, 0.8, 0.2, 1)),
-      transform
-      var(--modern-motion-duration, 140ms)
-      var(--modern-motion-easing, cubic-bezier(0.2, 0.8, 0.2, 1));
-  }
-
-  .module-name {
-    min-width: 0;
-    overflow: hidden;
-    color: #bdc3cc;
-    font-size: 12px;
-    font-weight: 560;
-    letter-spacing: -0.005em;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    transition: color var(--modern-motion-duration, 140ms) var(--modern-motion-easing, ease);
-  }
-
-  .expand-mark {
-    width: 12px;
-    height: 12px;
-    fill: currentColor;
-    opacity: 0.52;
-    transition:
-      opacity var(--modern-motion-duration, 140ms) var(--modern-motion-easing, ease),
-      color var(--modern-motion-duration, 140ms) var(--modern-motion-easing, ease);
-  }
-
-  .expand-mark.expanded {
-    opacity: 0.9;
-    transform: rotate(90deg);
-  }
-
-  .module.enabled .state-dot {
-    background: color-mix(in srgb, var(--accent-color) 82%, white);
-  }
-
-  .module.enabled.state-feedback .state-dot {
-    animation:
-      modern-state-confirm
-      calc(var(--modern-motion-duration, 140ms) * 2)
-      var(--modern-motion-entrance-easing, cubic-bezier(0.16, 1, 0.3, 1));
-  }
-
-  .module.enabled .module-name {
-    color: color-mix(in srgb, var(--accent-color) 78%, white);
-  }
-
-  .module.highlighted::after {
-    position: absolute;
-    inset: 2px;
-    content: "";
-    border: 1px solid color-mix(in srgb, var(--accent-color) 68%, white);
-    border-radius: 7px;
-    pointer-events: none;
-    animation:
-      modern-locate-confirm
-      calc(var(--modern-motion-entrance-duration, 260ms) * 2)
-      var(--modern-motion-entrance-easing, cubic-bezier(0.16, 1, 0.3, 1))
-      backwards;
-  }
-
-  .module.pending .module-row {
-    cursor: progress;
-    opacity: 0.72;
-  }
-
-  .module-settings {
-    padding: 4px 12px 9px;
-    color: var(--clickgui-text-color);
-    background: rgba(255, 255, 255, 0.022);
-    border-left: 2px solid color-mix(in srgb, var(--accent-color) 46%, transparent);
-    animation:
-      settings-open
-      var(--modern-motion-entrance-duration, 260ms)
-      var(--modern-motion-entrance-easing, cubic-bezier(0.16, 1, 0.3, 1))
-      backwards;
-  }
-
-  // GenericSetting's shared entrance transition can measure zero while its
-  // nested control mounts inside this newly expanded region. Keep the fix
-  // scoped to Modern so the measured zero frame cannot remain authoritative.
-  .modern-setting-shell > :global(div) {
-    height: auto !important;
-    overflow: visible !important;
-    opacity: 1 !important;
-  }
-
-  .modern-setting-shell {
-    animation:
-      modern-setting-enter
-      var(--modern-motion-entrance-duration, 260ms)
-      var(--modern-motion-entrance-easing, cubic-bezier(0.16, 1, 0.3, 1))
-      backwards;
-    animation-delay:
-      calc(
-        var(--modern-setting-enter-index, 0)
-        * var(--modern-motion-stagger, 24ms)
-      );
-  }
-
-  .settings-status,
-  .settings-error {
-    min-height: 34px;
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    color: #8f98a4;
-    font-size: 10px;
-  }
-
-  .settings-error {
-    justify-content: space-between;
-    color: #e5a5a5;
-  }
-
-  .settings-error button {
-    padding: 4px 7px;
-    color: #eceff3;
-    background: rgba(255, 255, 255, 0.06);
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    border-radius: 6px;
-    cursor: pointer;
-    font: inherit;
-  }
-
-  .settings-error button:focus-visible {
-    outline: 2px solid var(--modern-focus-ring, color-mix(in srgb, var(--accent-color) 78%, white));
-    outline-offset: 2px;
-  }
-
-  .spinner {
-    width: 10px;
-    height: 10px;
-    border: 1px solid rgba(255, 255, 255, 0.18);
-    border-top-color: color-mix(in srgb, var(--accent-color) 78%, white);
-    border-radius: 50%;
-    animation: spin 700ms linear infinite;
-  }
-
-  @keyframes settings-open {
-    from {
-      transform: translateY(-6px);
-    }
-  }
-
-  @keyframes modern-module-enter {
-    from {
-      transform: translateX(-6px);
-    }
-  }
-
-  @keyframes modern-setting-enter {
-    from {
-      transform: translateX(-4px);
-    }
-  }
-
-  @keyframes modern-state-confirm {
-    0% {
-      transform: scale(0.82);
-    }
-
-    58% {
-      transform: scale(1.35);
-    }
-
-    100% {
-      transform: scale(1);
-    }
-  }
-
-  @keyframes modern-locate-confirm {
-    from {
-      transform: scale(0.975);
-    }
-  }
-
-  @keyframes modern-module-toggle-sweep {
-    from {
-      opacity: 0;
-      transform: translateX(-110%);
-    }
-
-    48% {
-      opacity: 0.72;
-    }
-
-    to {
-      opacity: 0;
-      transform: translateX(110%);
-    }
-  }
-
-  @keyframes spin {
-    to {
-      transform: rotate(360deg);
-    }
-  }
-
-  @media (prefers-reduced-motion: reduce) {
-    .module-row,
-    .state-dot,
-    .module-name,
-    .expand-mark {
-      transition-duration: 0.01ms;
-    }
-
-    .module.revealed,
-    .module.enabled .state-dot,
-    .module.highlighted::after,
-    .module-settings,
-    .modern-setting-shell,
-    .toggle-sweep,
-    .expand-mark.expanded {
-      animation: none;
-    }
-
-    .spinner {
-      animation: none;
-      border-color: color-mix(in srgb, var(--accent-color) 65%, white);
-    }
-  }
-</style>

@@ -19,7 +19,7 @@
 package net.ccbluex.liquidbounce.features.module.modules.world.scaffold
 
 import net.ccbluex.liquidbounce.config.types.group.ToggleableValueGroup
-import net.ccbluex.liquidbounce.config.types.list.Tagged
+import net.ccbluex.liquidbounce.common.Tagged
 import net.ccbluex.liquidbounce.event.EventManager
 import net.ccbluex.liquidbounce.event.events.BlockCountChangeEvent
 import net.ccbluex.liquidbounce.event.events.GameTickEvent
@@ -64,26 +64,22 @@ import net.ccbluex.liquidbounce.features.module.modules.world.scaffold.tower.Sca
 import net.ccbluex.liquidbounce.features.module.modules.world.scaffold.tower.ScaffoldTowerMotion
 import net.ccbluex.liquidbounce.features.module.modules.world.scaffold.tower.ScaffoldTowerNone
 import net.ccbluex.liquidbounce.features.module.modules.world.scaffold.tower.ScaffoldTowerPulldown
+import net.ccbluex.liquidbounce.features.module.modules.world.scaffold.tower.ScaffoldTowerRuntime
+import net.ccbluex.liquidbounce.features.module.modules.world.scaffold.tower.ScaffoldTowerRuntimeBridge
 import net.ccbluex.liquidbounce.features.module.modules.world.scaffold.tower.ScaffoldTowerVulcan
 import net.ccbluex.liquidbounce.render.engine.type.Color4b
 import net.ccbluex.liquidbounce.utils.aiming.RotationManager
-import net.ccbluex.liquidbounce.utils.aiming.RotationsValueGroup
+import net.ccbluex.liquidbounce.features.rotation.RotationsValueGroup
 import net.ccbluex.liquidbounce.utils.aiming.utils.withFixedYaw
 import net.ccbluex.liquidbounce.utils.block.SwingMode
-import net.ccbluex.liquidbounce.utils.block.doPlacement
+import net.ccbluex.liquidbounce.features.block.runtime.doPlacement
 import net.ccbluex.liquidbounce.utils.block.targetBlockPos
-import net.ccbluex.liquidbounce.utils.block.targetfinding.BlockPlacementTarget
-import net.ccbluex.liquidbounce.utils.clicking.Clicker
+import net.ccbluex.liquidbounce.features.block.contract.BlockPlacementTarget
+import net.ccbluex.liquidbounce.features.clicking.Clicker
 import net.ccbluex.liquidbounce.utils.client.SilentHotbar
 import net.ccbluex.liquidbounce.utils.client.Timer
 import net.ccbluex.liquidbounce.utils.entity.moving
 import net.ccbluex.liquidbounce.utils.entity.rotation
-import net.ccbluex.liquidbounce.utils.item.PreferAverageHardBlocks
-import net.ccbluex.liquidbounce.utils.item.PreferFavourableBlocks
-import net.ccbluex.liquidbounce.utils.item.PreferFullCubeBlocks
-import net.ccbluex.liquidbounce.utils.item.PreferSolidBlocks
-import net.ccbluex.liquidbounce.utils.item.PreferStackSize
-import net.ccbluex.liquidbounce.utils.item.PreferWalkableBlocks
 import net.ccbluex.liquidbounce.utils.item.getBlock
 import net.ccbluex.liquidbounce.utils.kotlin.EventPriorityConvention
 import net.ccbluex.liquidbounce.utils.kotlin.Priority
@@ -93,8 +89,7 @@ import net.ccbluex.liquidbounce.utils.math.minus
 import net.ccbluex.liquidbounce.utils.math.allEmpty
 import net.ccbluex.liquidbounce.utils.math.topCenter
 import net.ccbluex.liquidbounce.utils.movement.DirectionalInput
-import net.ccbluex.liquidbounce.utils.render.placement.PlacementRenderer
-import net.ccbluex.liquidbounce.utils.sorting.ComparatorChain
+import net.ccbluex.liquidbounce.render.placement.PlacementRenderer
 import net.minecraft.core.BlockPos
 import net.minecraft.core.Direction
 import net.minecraft.network.protocol.game.ServerboundMovePlayerPacket.PosRot
@@ -115,14 +110,22 @@ import kotlin.math.abs
  *
  * Places blocks under you.
  */
-@Suppress("TooManyFunctions")
 object ModuleScaffold : ClientModule("Scaffold", ModuleCategories.WORLD) {
+
+    @JvmStatic
+    fun isTowerModeActive() = running && towerMode.activeMode != ScaffoldTowerNone && towerMode.activeMode.running
 
     private val delay by intRange("Delay", 0..0, 0..40, "ticks")
     private val minDist by float("MinDist", 0.0f, 0.0f..0.25f)
     private val timer by float("Timer", 1f, 0.01f..10f)
 
     init {
+        ScaffoldTowerRuntimeBridge.install(object : ScaffoldTowerRuntime {
+            override val towerMode get() = ModuleScaffold.towerMode
+            override val blockCount get() = ModuleScaffold.blockCount
+            override val isBlockBelow get() = ModuleScaffold.isBlockBelow
+            override val timerOwner get() = ModuleScaffold
+        })
         tree(ScaffoldBlockItemSelection)
         tree(ScaffoldAutoBlockFeature)
         tree(ScaffoldMovementPrediction)
@@ -281,15 +284,7 @@ object ModuleScaffold : ClientModule("Scaffold", ModuleCategories.WORLD) {
     private var nextBlock: Block? = null
 
     val blockCount: Int
-        get() {
-            fun ItemStack.blockCount() = if (isValidBlock(this)) this.count else 0
-
-            return player.offhandItem.blockCount() + if (ScaffoldAutoBlockFeature.enabled) {
-                findPlaceableSlots().sumOf { it.value.blockCount() }
-            } else {
-                player.inventory.getItem(player.inventory.selectedSlot).blockCount()
-            }
-        }
+        get() = ScaffoldBlockItemSelection.blockCount
 
     val isBlockBelow: Boolean
         get() {
@@ -303,33 +298,8 @@ object ModuleScaffold : ClientModule("Scaffold", ModuleCategories.WORLD) {
             ).allEmpty()
         }
 
-    /**
-     * This comparator will estimate the value of a block. If this comparator says that Block A > Block B, Scaffold will
-     * prefer Block A over Block B.
-     * The chain will prefer the block that is solid. If both are solid, it goes to the next criteria
-     * (in this case full cube) and so on
-     */
-    private val BLOCK_COMPARATOR_FOR_HOTBAR =
-        ComparatorChain(
-            PreferFavourableBlocks,
-            PreferSolidBlocks,
-            PreferFullCubeBlocks,
-            PreferWalkableBlocks,
-            PreferAverageHardBlocks(neutralRange = true),
-            PreferStackSize.PREFER_MORE,
-            PreferAverageHardBlocks(neutralRange = false),
-        )
     @JvmField
-    val BLOCK_COMPARATOR_FOR_INVENTORY =
-        ComparatorChain(
-            PreferFavourableBlocks,
-            PreferSolidBlocks,
-            PreferFullCubeBlocks,
-            PreferWalkableBlocks,
-            PreferAverageHardBlocks(neutralRange = true),
-            PreferStackSize.PREFER_FEWER,
-            PreferAverageHardBlocks(neutralRange = false),
-        )
+    val BLOCK_COMPARATOR_FOR_INVENTORY = ScaffoldBlockItemSelection.inventoryComparator
 
     override fun onEnabled() {
         // Placement Y is the Y coordinate of the block below the player
@@ -371,7 +341,7 @@ object ModuleScaffold : ClientModule("Scaffold", ModuleCategories.WORLD) {
     private val rotationUpdateHandler = handler<RotationUpdateEvent> {
         NoFallBlink.waitUntilGround = true
 
-        val blockInHotbar = findBestValidHotbarSlotForTarget()
+        val blockInHotbar = ScaffoldBlockItemSelection.findBestValidHotbarSlotForTarget()
 
         val bestStack = if (blockInHotbar == null) {
             nextBlock = null
@@ -533,7 +503,11 @@ object ModuleScaffold : ClientModule("Scaffold", ModuleCategories.WORLD) {
         val hasBlockInOffHand = isValidBlock(player.offhandItem)
 
         if (ScaffoldAutoBlockFeature.alwaysHoldBlock) {
-            hasBlockInMainHand = handleSilentBlockSelection(hasBlockInMainHand, hasBlockInOffHand)
+            hasBlockInMainHand = ScaffoldBlockItemSelection.ensureBlockInMainHand(
+                this@ModuleScaffold,
+                hasBlockInMainHand,
+                hasBlockInOffHand,
+            )
         }
 
         // Prioritize by all means the main hand if it has a block
@@ -573,7 +547,11 @@ object ModuleScaffold : ClientModule("Scaffold", ModuleCategories.WORLD) {
         }
 
         if (!ScaffoldAutoBlockFeature.alwaysHoldBlock) {
-            hasBlockInMainHand = handleSilentBlockSelection(hasBlockInMainHand, hasBlockInOffHand)
+            hasBlockInMainHand = ScaffoldBlockItemSelection.ensureBlockInMainHand(
+                this@ModuleScaffold,
+                hasBlockInMainHand,
+                hasBlockInOffHand,
+            )
         }
 
         if (!hasBlockInMainHand && !hasBlockInOffHand) {
@@ -632,29 +610,6 @@ object ModuleScaffold : ClientModule("Scaffold", ModuleCategories.WORLD) {
 
             waitTicks(currentDelay)
         }
-    }
-
-    private fun findPlaceableSlots() = buildList(9) {
-        for (i in 0..8) {
-            val stack = player.inventory.getItem(i)
-
-            if (isValidBlock(stack)) {
-                add(IndexedValue(i, stack))
-            }
-        }
-    }
-
-    private fun findBestValidHotbarSlotForTarget(): Int? {
-        val placeableSlots = findPlaceableSlots()
-        val doNotUseBelowCount = ScaffoldAutoBlockFeature.doNotUseBelowCount
-
-        val (slot, _) = placeableSlots
-            .filter { (_, stack) -> stack.count > doNotUseBelowCount }
-            .maxWithOrNull { o1, o2 -> BLOCK_COMPARATOR_FOR_HOTBAR.compare(o1.value, o2.value) }
-            ?: placeableSlots.maxWithOrNull { o1, o2 -> BLOCK_COMPARATOR_FOR_HOTBAR.compare(o1.value, o2.value) }
-            ?: return null
-
-        return slot
     }
 
     internal fun isValidCrosshairTarget(rayTraceResult: BlockHitResult): Boolean {
@@ -724,28 +679,6 @@ object ModuleScaffold : ClientModule("Scaffold", ModuleCategories.WORLD) {
                 isTargetUnderPlayer && !isTowering
             }
         }
-    }
-
-    private fun handleSilentBlockSelection(hasBlockInMainHand: Boolean, hasBlockInOffHand: Boolean): Boolean {
-        // Handle silent block selection
-        if (ScaffoldAutoBlockFeature.enabled && !hasBlockInMainHand && !hasBlockInOffHand) {
-            val bestMainHandSlot = findBestValidHotbarSlotForTarget()
-
-            if (bestMainHandSlot != null) {
-                SilentHotbar.selectSlotSilently(
-                    this, bestMainHandSlot,
-                    ScaffoldAutoBlockFeature.slotResetDelay
-                )
-
-                return true
-            } else {
-                SilentHotbar.resetSlot(this)
-            }
-        } else {
-            SilentHotbar.resetSlot(this)
-        }
-
-        return hasBlockInMainHand
     }
 
 }

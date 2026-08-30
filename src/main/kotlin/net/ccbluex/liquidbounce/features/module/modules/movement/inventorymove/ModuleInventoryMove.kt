@@ -21,7 +21,7 @@ package net.ccbluex.liquidbounce.features.module.modules.movement.inventorymove
 import com.mojang.blaze3d.platform.InputConstants
 import net.ccbluex.fastutil.fastIterable
 import net.ccbluex.fastutil.referenceBooleanArrayMapOf
-import net.ccbluex.liquidbounce.config.types.list.Tagged
+import net.ccbluex.liquidbounce.common.Tagged
 import net.ccbluex.liquidbounce.event.events.KeyboardKeyEvent
 import net.ccbluex.liquidbounce.event.events.MovementInputEvent
 import net.ccbluex.liquidbounce.event.events.PacketEvent
@@ -33,14 +33,14 @@ import net.ccbluex.liquidbounce.features.module.modules.movement.inventorymove.f
 import net.ccbluex.liquidbounce.features.module.modules.movement.inventorymove.features.InventoryMoveSprintControlFeature
 import net.ccbluex.liquidbounce.features.module.modules.movement.inventorymove.features.InventoryMoveTimerFeature
 import net.ccbluex.liquidbounce.features.module.modules.render.ModuleClickGui
-import net.ccbluex.liquidbounce.utils.inventory.InventoryManager
+import net.ccbluex.liquidbounce.features.inventory.InventoryManager
 import net.ccbluex.liquidbounce.utils.inventory.isInInventoryScreen
 import net.ccbluex.liquidbounce.utils.kotlin.EventPriorityConvention.FINAL_DECISION
 import net.ccbluex.liquidbounce.utils.kotlin.EventPriorityConvention.FIRST_PRIORITY
 import net.ccbluex.liquidbounce.utils.movement.DirectionalInput
 import net.ccbluex.liquidbounce.utils.network.isC2SContainerPacket
 import net.ccbluex.liquidbounce.utils.network.sendCloseInventory
-import net.ccbluex.liquidbounce.utils.network.sendPacketSilently
+import net.ccbluex.liquidbounce.features.network.sendPacketSilently
 import net.minecraft.client.KeyMapping
 import net.minecraft.client.gui.components.EditBox
 import net.minecraft.client.gui.components.MultiLineEditBox

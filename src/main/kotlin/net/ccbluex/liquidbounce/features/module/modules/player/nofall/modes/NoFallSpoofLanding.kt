@@ -26,9 +26,9 @@ import net.ccbluex.liquidbounce.event.handler
 import net.ccbluex.liquidbounce.features.module.modules.player.nofall.ModuleNoFall
 import net.ccbluex.liquidbounce.features.module.modules.render.ModuleDebug.debugParameter
 import net.ccbluex.liquidbounce.lang.translation
-import net.ccbluex.liquidbounce.utils.client.chat
+import net.ccbluex.liquidbounce.features.chat.chat
 import net.ccbluex.liquidbounce.utils.client.isOlderThanOrEqual1_8
-import net.ccbluex.liquidbounce.utils.client.markAsError
+import net.ccbluex.liquidbounce.utils.text.markAsError
 import net.ccbluex.liquidbounce.utils.kotlin.EventPriorityConvention.MODEL_STATE
 import net.ccbluex.liquidbounce.utils.math.component1
 import net.ccbluex.liquidbounce.utils.math.component2

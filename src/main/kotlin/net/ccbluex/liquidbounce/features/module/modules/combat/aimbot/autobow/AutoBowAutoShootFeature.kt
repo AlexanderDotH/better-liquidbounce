@@ -23,10 +23,9 @@ import net.ccbluex.liquidbounce.config.types.group.ToggleableValueGroup
 import net.ccbluex.liquidbounce.event.events.GameTickEvent
 import net.ccbluex.liquidbounce.event.events.KeybindIsPressedEvent
 import net.ccbluex.liquidbounce.event.handler
-import net.ccbluex.liquidbounce.features.module.modules.combat.aimbot.ModuleAutoBow
 import net.ccbluex.liquidbounce.utils.aiming.RotationManager
-import net.ccbluex.liquidbounce.utils.combat.shouldBeAttacked
-import net.ccbluex.liquidbounce.utils.entity.PlayerSimulationCache
+import net.ccbluex.liquidbounce.features.combat.runtime.shouldBeAttacked
+import net.ccbluex.liquidbounce.features.simulation.PlayerSimulationCache
 import net.ccbluex.liquidbounce.utils.entity.SimulatedArrow
 import net.ccbluex.liquidbounce.utils.entity.SimulatedPlayerCache
 import net.ccbluex.liquidbounce.utils.entity.rotation
@@ -42,7 +41,10 @@ import net.minecraft.world.item.CrossbowItem
 import net.minecraft.world.item.ItemStack
 import net.minecraft.world.item.TridentItem
 
-object AutoBowAutoShootFeature : ToggleableValueGroup(ModuleAutoBow, "AutoShoot", true) {
+class AutoBowAutoShootFeature(
+    private val owner: AutoBowFeatureOwner,
+    private val aimbotFeature: AutoBowAimbotFeature,
+) : ToggleableValueGroup(owner, "AutoShoot", true) {
 
     private val charged by int("Charged", 15, 3..20, suffix = "ticks")
 
@@ -64,7 +66,7 @@ object AutoBowAutoShootFeature : ToggleableValueGroup(ModuleAutoBow, "AutoShoot"
         val mid = chargedRandom.start + lenHalf
 
         currentChargeRandom =
-            (mid + ModuleAutoBow.random.nextGaussian() * lenHalf).toInt()
+            (mid + owner.nextChargeRandomGaussian() * lenHalf).toInt()
                 .coerceIn(chargedRandom.start.toInt(), chargedRandom.endInclusive.toInt())
     }
 
@@ -115,7 +117,7 @@ object AutoBowAutoShootFeature : ToggleableValueGroup(ModuleAutoBow, "AutoShoot"
             else -> return@handler
         }
 
-        if (!ModuleAutoBow.lastShotTimer.hasElapsed((delayBetweenShots * 1000.0F).toLong())) {
+        if (!owner.hasShotDelayElapsed((delayBetweenShots * 1000.0F).toLong())) {
             return@handler
         }
 
@@ -125,8 +127,8 @@ object AutoBowAutoShootFeature : ToggleableValueGroup(ModuleAutoBow, "AutoShoot"
             if (hypotheticalHit == null || !hypotheticalHit.shouldBeAttacked()) {
                 return@handler
             }
-        } else if (AutoBowAimbotFeature.enabled) {
-            if (AutoBowAimbotFeature.targetTracker.target == null) {
+        } else if (aimbotFeature.enabled) {
+            if (aimbotFeature.targetTracker.target == null) {
                 return@handler
             }
 
@@ -143,7 +145,7 @@ object AutoBowAutoShootFeature : ToggleableValueGroup(ModuleAutoBow, "AutoShoot"
             val isChargedNow = usingItemStack.isChargedCrossbow
             if (isChargedNow) {
                 useItem(usingItemHand)
-                ModuleAutoBow.lastShotTimer.reset()
+                owner.recordShot()
             } else {
                 forceUncharged = true
             }

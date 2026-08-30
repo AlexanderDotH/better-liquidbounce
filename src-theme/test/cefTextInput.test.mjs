@@ -6,7 +6,7 @@ import {
     copyTextSelection,
     cutTextSelection,
     pasteTextSelection,
-} from "../src/routes/clickgui/setting/common/textEditing.ts";
+} from "../src/integration/input/textEditing.ts";
 import {
     createModernClickGuiPreviewState,
     routeModernClickGuiPreviewRequest,
@@ -81,7 +81,7 @@ test("every editable ClickGUI field uses the CEF text-input action", () => {
         "src/routes/clickgui/setting/list/SearchableList.svelte",
         "src/routes/clickgui/setting/merchant/MerchantItemDrawer.svelte",
         "src/routes/clickgui/tabs/hud_editor/drawer/ComponentDrawer.svelte",
-        "src/routes/clickgui/themes/modern/ModernSearch.svelte",
+        "src/routes/clickgui/themes/modern/ModernSearchInput.svelte",
     ];
 
     for (const relativePath of editableComponents) {
@@ -91,6 +91,12 @@ test("every editable ClickGUI field uses the CEF text-input action", () => {
             `${relativePath} must route keyboard and clipboard input through cefTextInput`,
         );
     }
+
+    assert.match(
+        source("src/routes/clickgui/themes/modern/ModernSearch.svelte"),
+        /<ModernSearchInput/,
+        "ModernSearch must delegate its editable field to the CEF-backed input view",
+    );
 });
 
 test("text fields keep newer local edits while an older save is being acknowledged", () => {
@@ -109,22 +115,25 @@ test("text fields keep newer local edits while an older save is being acknowledg
 });
 
 test("the CEF action routes copy, cut, and paste through the Minecraft clipboard", () => {
-    const action = source("src/routes/clickgui/setting/common/cefTextInput.ts");
+    const action = source("src/integration/input/cefTextInput.ts");
+    const keyboard = source("src/integration/input/cefTextInputKeyboard.ts");
+    const implementation = `${action}\n${keyboard}`;
 
-    assert.match(action, /event\.keyCode === KEY_C[\s\S]*?copyTextSelection[\s\S]*?setClipboardText/);
-    assert.match(action, /event\.keyCode === KEY_X[\s\S]*?cutTextSelection[\s\S]*?setClipboardText/);
-    assert.match(action, /event\.keyCode === KEY_V[\s\S]*?getClipboardText[\s\S]*?pasteTextSelection/);
+    assert.match(implementation, /case KEY_C[\s\S]*?copyTextSelection[\s\S]*?setClipboardText/);
+    assert.match(implementation, /case KEY_X[\s\S]*?cutTextSelection[\s\S]*?setClipboardText/);
+    assert.match(implementation, /case KEY_V[\s\S]*?getClipboardText[\s\S]*?pasteTextSelection/);
 });
 
 test("the CEF action releases focus on outside clicks and window blur", () => {
-    const action = source("src/routes/clickgui/setting/common/cefTextInput.ts");
+    const action = source("src/integration/input/cefTextInput.ts");
+    const keyboard = source("src/integration/input/cefTextInputKeyboard.ts");
 
-    assert.match(action, /document\.addEventListener\("pointerdown", handlePointerDown, true\)/);
-    assert.match(action, /window\.addEventListener\("blur", releaseFocus\)/);
-    assert.match(action, /screenActive = isActiveKeyboardScreen\(event\.screen, options\)/);
-    assert.doesNotMatch(action, /if \(event\.screen !== undefined\)/);
+    assert.match(action, /document\.addEventListener\("pointerdown", this\.handlePointerDown, true\)/);
+    assert.match(action, /window\.addEventListener\("blur", this\.releaseFocus\)/);
+    assert.match(keyboard, /screenActive = isActiveKeyboardScreen\(event\.screen, runtime\.options\)/);
+    assert.doesNotMatch(keyboard, /if \(event\.screen !== undefined\)/);
     assert.match(
         action,
-        /function handlePointerDown[\s\S]*?event\.composedPath\(\)\.includes\(node\)[\s\S]*?releaseFocus\(\)/,
+        /handlePointerDown[\s\S]*?event\.composedPath\(\)\.includes\(this\.node\)[\s\S]*?this\.releaseFocus\(\)/,
     );
 });

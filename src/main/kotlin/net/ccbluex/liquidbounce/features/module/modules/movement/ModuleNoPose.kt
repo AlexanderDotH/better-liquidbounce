@@ -18,11 +18,9 @@
  */
 package net.ccbluex.liquidbounce.features.module.modules.movement
 
-import net.ccbluex.liquidbounce.config.types.list.Tagged
+import net.ccbluex.liquidbounce.common.Tagged
 import net.ccbluex.liquidbounce.features.module.ClientModule
 import net.ccbluex.liquidbounce.features.module.ModuleCategories
-import net.ccbluex.liquidbounce.injection.mixins.minecraft.entity.MixinEntity
-import net.ccbluex.liquidbounce.injection.mixins.minecraft.entity.MixinPlayer
 import net.minecraft.world.entity.EntityAttachment
 import net.minecraft.world.entity.EntityAttachments
 import net.minecraft.world.entity.EntityDimensions
@@ -32,8 +30,7 @@ import net.minecraft.world.entity.player.Player
 /**
  * Prevents pose changes for low version of server protocol
  *
- * @see MixinEntity
- * @see MixinPlayer
+ * Entity and player mixin hooks call the stable module facade below.
  */
 object ModuleNoPose : ClientModule("NoPose", ModuleCategories.MOVEMENT, aliases = listOf("NoSwim", "NoCrawl")) {
 

@@ -21,7 +21,7 @@ package net.ccbluex.liquidbounce.features.module.modules.render
 import net.ccbluex.liquidbounce.config.ConfigSystem
 import net.ccbluex.liquidbounce.config.types.group.ToggleableValueGroup
 import net.ccbluex.liquidbounce.config.types.group.ValueGroup
-import net.ccbluex.liquidbounce.config.types.list.Tagged
+import net.ccbluex.liquidbounce.common.Tagged
 import net.ccbluex.liquidbounce.event.EventManager
 import net.ccbluex.liquidbounce.event.events.BrowserReadyEvent
 import net.ccbluex.liquidbounce.event.events.DisconnectEvent
@@ -29,22 +29,17 @@ import net.ccbluex.liquidbounce.event.events.HudValueChangeEvent
 import net.ccbluex.liquidbounce.event.events.ScreenEvent
 import net.ccbluex.liquidbounce.event.events.SpaceSeperatedNamesChangeEvent
 import net.ccbluex.liquidbounce.event.handler
+import net.ccbluex.liquidbounce.features.autoconfig.contract.AutoConfigUiBridge
 import net.ccbluex.liquidbounce.features.misc.HideAppearance.isDestructed
 import net.ccbluex.liquidbounce.features.misc.HideAppearance.isHidingNow
 import net.ccbluex.liquidbounce.features.module.ClientModule
 import net.ccbluex.liquidbounce.features.module.ModuleCategories
 import net.ccbluex.liquidbounce.features.module.modules.render.ModuleHud.themes
-import net.ccbluex.liquidbounce.integration.backend.browser.BrowserSettings
-import net.ccbluex.liquidbounce.integration.screen.CustomScreenType
-import net.ccbluex.liquidbounce.integration.screen.impl.CustomSharedMinecraftScreen
-import net.ccbluex.liquidbounce.integration.screen.impl.CustomStandaloneMinecraftScreen
-import net.ccbluex.liquidbounce.integration.screen.impl.CustomOverlay
-import net.ccbluex.liquidbounce.integration.theme.ThemeManager
-import net.ccbluex.liquidbounce.integration.theme.component.components.minimap.MinimapHudComponent
-import net.ccbluex.liquidbounce.integration.theme.component.components.seedcracker.SeedCrackerHudComponent
-import net.ccbluex.liquidbounce.utils.client.chat
+import net.ccbluex.liquidbounce.features.module.modules.render.hud.HudBlurEffectSettings
+import net.ccbluex.liquidbounce.features.module.modules.render.hud.HudRuntimeBridge
+import net.ccbluex.liquidbounce.features.chat.chat
 import net.ccbluex.liquidbounce.utils.client.inGame
-import net.ccbluex.liquidbounce.utils.client.markAsError
+import net.ccbluex.liquidbounce.utils.text.markAsError
 import net.minecraft.client.gui.screens.DisconnectedScreen
 import net.minecraft.client.gui.screens.LevelLoadingScreen
 import net.minecraft.client.gui.screens.Screen
@@ -67,7 +62,7 @@ internal fun ValueGroup.hudThemeChoice() = enumChoice("Theme", HudTheme.MODERN).
     }
 }
 
-object ModuleHud : ClientModule("HUD", ModuleCategories.RENDER, state = true, hide = true) {
+object ModuleHud : ClientModule("HUD", ModuleCategories.RENDER, state = true, hide = true), HudBlurEffectSettings {
 
     override val running
         get() = this.enabled && !isDestructed
@@ -93,8 +88,7 @@ object ModuleHud : ClientModule("HUD", ModuleCategories.RENDER, state = true, hi
             !(hudEditorSelected && isClickGuiScreen(screen))
 
     private fun isClickGuiScreen(screen: Screen?): Boolean =
-        screen is CustomSharedMinecraftScreen && screen.screenType == CustomScreenType.CLICK_GUI ||
-            screen is CustomStandaloneMinecraftScreen && screen.screenType == CustomScreenType.CLICK_GUI
+        HudRuntimeBridge.isClickGuiScreen(screen)
 
     private fun updateOverlayVisibility(screen: Screen?) {
         if (!enabled || !isVisible) {
@@ -105,13 +99,11 @@ object ModuleHud : ClientModule("HUD", ModuleCategories.RENDER, state = true, hi
         overlay.visible = shouldShowOverlay(screen)
     }
 
-    private var overlay = CustomOverlay(
-        screenType = CustomScreenType.HUD,
-        browserSettings = BrowserSettings(60, ::reopen)
-    )
+    private var overlay = HudRuntimeBridge.createOverlay(::reopen)
 
     init {
         tree(Blur)
+        AutoConfigUiBridge.installHudReopen(::reopen)
     }
 
     object Blur : ToggleableValueGroup(ModuleHud, "Blur", enabled = true) {
@@ -135,11 +127,15 @@ object ModuleHud : ClientModule("HUD", ModuleCategories.RENDER, state = true, hi
     val isBlurEffectActive
         get() = Blur.enabled && !(mc.gui.hud.isHidden && mc.gui.screen() == null)
 
+    override fun enabled(): Boolean = running && isBlurEffectActive
+    override fun sigma(): Float = Blur.sigma
+    override fun alphaBlendStart(): Float = Blur.alphaBlendRange.start
+    override fun alphaBlendEnd(): Float = Blur.alphaBlendRange.endInclusive
+
     val themes = tree(ValueGroup("Themes"))
 
     val components = tree(ValueGroup("AdditionalComponents")).apply {
-        tree(MinimapHudComponent)
-        tree(SeedCrackerHudComponent)
+        HudRuntimeBridge.additionalComponents().forEach(::tree)
     }
 
     /**
@@ -150,9 +146,7 @@ object ModuleHud : ClientModule("HUD", ModuleCategories.RENDER, state = true, hi
         themes.inner.filterIsInstance<ValueGroup>().forEach {
             themes.drop(it)
         }
-        for (theme in ThemeManager.themes) {
-            themes.tree(theme.settings)
-        }
+        HudRuntimeBridge.themeSettings().forEach(themes::tree)
         themes.walkInit()
         themes.walkKeyPath()
     }

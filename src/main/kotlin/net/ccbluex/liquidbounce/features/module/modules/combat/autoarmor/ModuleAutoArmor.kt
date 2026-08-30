@@ -28,8 +28,8 @@ import net.ccbluex.liquidbounce.features.module.modules.combat.autoarmor.ModuleA
 import net.ccbluex.liquidbounce.utils.inventory.ArmorItemSlot
 import net.ccbluex.liquidbounce.utils.inventory.HotbarItemSlot
 import net.ccbluex.liquidbounce.utils.inventory.InventoryAction
-import net.ccbluex.liquidbounce.utils.inventory.InventoryManager
-import net.ccbluex.liquidbounce.utils.inventory.PlayerInventoryConstraints
+import net.ccbluex.liquidbounce.features.inventory.InventoryManager
+import net.ccbluex.liquidbounce.features.inventory.PlayerInventoryConstraints
 import net.ccbluex.liquidbounce.utils.inventory.hasInventorySpace
 import net.ccbluex.liquidbounce.utils.item.armor.ArmorEvaluation
 import net.ccbluex.liquidbounce.utils.item.armor.ArmorPiece

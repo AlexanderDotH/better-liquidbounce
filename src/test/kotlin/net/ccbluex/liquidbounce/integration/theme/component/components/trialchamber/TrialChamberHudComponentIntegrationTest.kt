@@ -10,7 +10,7 @@
  */
 package net.ccbluex.liquidbounce.integration.theme.component.components.trialchamber
 
-import net.ccbluex.liquidbounce.utils.render.Alignment
+import net.ccbluex.liquidbounce.config.types.group.Alignment
 import java.nio.file.Files
 import java.nio.file.Path
 import org.junit.jupiter.api.Assertions.assertEquals

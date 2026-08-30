@@ -20,10 +20,12 @@ package net.ccbluex.liquidbounce.features.module.modules.misc
 
 import net.ccbluex.liquidbounce.features.module.ClientModule
 import net.ccbluex.liquidbounce.features.module.ModuleCategories
-import net.ccbluex.liquidbounce.utils.client.ServerObserver
-import net.ccbluex.liquidbounce.utils.client.chat
-import net.ccbluex.liquidbounce.utils.client.regular
-import net.ccbluex.liquidbounce.utils.client.variable
+import net.ccbluex.liquidbounce.event.events.ServerTransactionCaptureCompletedEvent
+import net.ccbluex.liquidbounce.event.handler
+import net.ccbluex.liquidbounce.features.server.ServerObserver
+import net.ccbluex.liquidbounce.features.chat.chat
+import net.ccbluex.liquidbounce.utils.text.regular
+import net.ccbluex.liquidbounce.utils.text.variable
 
 /**
  * Module Anti Cheat Detect
@@ -34,6 +36,11 @@ object ModuleAntiCheatDetect : ClientModule("AntiCheatDetect", ModuleCategories.
 
     init {
         doNotIncludeAlways()
+    }
+
+    @Suppress("unused")
+    private val captureCompletedHandler = handler<ServerTransactionCaptureCompletedEvent> {
+        completed()
     }
 
     override fun onEnabled() {

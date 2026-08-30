@@ -21,13 +21,14 @@ package net.ccbluex.liquidbounce.injection.mixins.minecraft.render;
 
 import net.minecraft.client.renderer.rendertype.RenderSetup;
 import net.minecraft.client.renderer.rendertype.RenderType;
+import net.ccbluex.liquidbounce.render.RenderTypeAccess;
 import org.jspecify.annotations.NullMarked;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.gen.Accessor;
 
 @NullMarked
 @Mixin(RenderType.class)
-public interface MixinRenderTypeAccessor {
+public interface MixinRenderTypeAccessor extends RenderTypeAccess {
 
     @Accessor
     String getName();

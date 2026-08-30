@@ -19,7 +19,7 @@
 package net.ccbluex.liquidbounce.features.module.modules.world.scaffold.features
 
 import net.ccbluex.liquidbounce.config.types.group.ToggleableValueGroup
-import net.ccbluex.liquidbounce.config.types.list.Tagged
+import net.ccbluex.liquidbounce.common.Tagged
 import net.ccbluex.liquidbounce.event.events.BlinkPacketEvent
 import net.ccbluex.liquidbounce.event.events.TransferOrigin
 import net.ccbluex.liquidbounce.event.handler
@@ -55,7 +55,7 @@ object ScaffoldBlinkFeature : ToggleableValueGroup(ModuleScaffold, "Blink", fals
         }
 
         if (!player.onGround() || !pulseTimer.hasElapsed(pulseTime)) {
-            event.action = BlinkManager.Action.QUEUE
+            event.action = net.ccbluex.liquidbounce.event.events.BlinkPacketAction.QUEUE
         }
     }
 

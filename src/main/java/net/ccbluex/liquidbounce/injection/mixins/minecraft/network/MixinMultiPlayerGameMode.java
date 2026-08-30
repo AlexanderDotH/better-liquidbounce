@@ -19,12 +19,12 @@
 package net.ccbluex.liquidbounce.injection.mixins.minecraft.network;
 
 import com.llamalad7.mixinextras.injector.ModifyExpressionValue;
+import net.ccbluex.liquidbounce.common.attack.AcceptedAttackHook;
+import net.ccbluex.liquidbounce.common.attack.AcceptedAttackResult;
 import net.ccbluex.liquidbounce.event.EventManager;
 import net.ccbluex.liquidbounce.event.events.*;
-import net.ccbluex.liquidbounce.features.module.modules.combat.MaceKillAttackHook;
-import net.ccbluex.liquidbounce.features.module.modules.combat.MaceKillAttackResult;
 import net.ccbluex.liquidbounce.features.module.modules.combat.aimbot.ModuleAutoBow;
-import net.ccbluex.liquidbounce.features.module.modules.combat.crystalaura.trigger.triggers.ClientBlockBreakTrigger;
+import net.ccbluex.liquidbounce.features.module.modules.combat.crystalaura.trigger.ClientBlockBreakHook;
 import net.ccbluex.liquidbounce.utils.client.SilentHotbar;
 import net.minecraft.client.multiplayer.MultiPlayerGameMode;
 import net.minecraft.core.BlockPos;
@@ -67,7 +67,7 @@ public abstract class MixinMultiPlayerGameMode {
         cancellable = true
     )
     private void hookAcceptedAttack(Player player, Entity target, CallbackInfo callbackInfo) {
-        if (MaceKillAttackHook.commit(player, target) == MaceKillAttackResult.REJECTED) {
+        if (AcceptedAttackHook.commit(player, target) == AcceptedAttackResult.REJECTED) {
             callbackInfo.cancel();
         }
     }
@@ -143,7 +143,7 @@ public abstract class MixinMultiPlayerGameMode {
 
     @Inject(method = "destroyBlock", at = @At(value = "INVOKE", target = "Lnet/minecraft/world/level/block/Block;destroy(Lnet/minecraft/world/level/LevelAccessor;Lnet/minecraft/core/BlockPos;Lnet/minecraft/world/level/block/state/BlockState;)V", shift = At.Shift.AFTER))
     private void hookBreakBlock(BlockPos pos, CallbackInfoReturnable<Boolean> cir) {
-        ClientBlockBreakTrigger.INSTANCE.clientBreakHandler();
+        ClientBlockBreakHook.onClientBlockBreak();
     }
 
 }

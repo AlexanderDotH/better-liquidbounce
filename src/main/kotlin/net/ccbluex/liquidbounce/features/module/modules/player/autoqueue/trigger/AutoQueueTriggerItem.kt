@@ -20,7 +20,7 @@
 package net.ccbluex.liquidbounce.features.module.modules.player.autoqueue.trigger
 
 import net.ccbluex.liquidbounce.features.module.modules.player.autoqueue.trigger.AutoQueueTriggerItem.mode
-import net.ccbluex.liquidbounce.utils.inventory.SingleItemStackPickMode
+import net.ccbluex.liquidbounce.features.inventory.SingleItemStackPickMode
 import net.ccbluex.liquidbounce.utils.inventory.Slots
 
 /**

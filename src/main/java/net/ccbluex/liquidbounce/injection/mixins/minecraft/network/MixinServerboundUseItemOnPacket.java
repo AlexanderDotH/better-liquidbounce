@@ -21,7 +21,7 @@ package net.ccbluex.liquidbounce.injection.mixins.minecraft.network;
 
 import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
-import net.ccbluex.liquidbounce.features.module.modules.exploit.disabler.disablers.DisablerVerusScaffoldG;
+import net.ccbluex.liquidbounce.features.module.modules.exploit.disabler.DisablerPacketHook;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.network.protocol.game.ServerboundUseItemOnPacket;
 import net.minecraft.world.phys.BlockHitResult;
@@ -32,7 +32,7 @@ import org.spongepowered.asm.mixin.injection.At;
 public abstract class MixinServerboundUseItemOnPacket {
     @WrapOperation(method = "write", at = @At(value = "INVOKE", target = "Lnet/minecraft/network/FriendlyByteBuf;writeBlockHitResult(Lnet/minecraft/world/phys/BlockHitResult;)V"))
     private void writeBlockHitResult(FriendlyByteBuf buf, BlockHitResult blockHit, Operation<Void> original) {
-        if (DisablerVerusScaffoldG.INSTANCE.getRunning()) {
+        if (DisablerPacketHook.usesVerusScaffoldSerialization()) {
             buf.writeBlockPos(blockHit.getBlockPos());
             buf.writeVarInt(6 + blockHit.getDirection().ordinal() * 7);
             buf.writeFloat((float) blockHit.getLocation().x - blockHit.getBlockPos().getX());

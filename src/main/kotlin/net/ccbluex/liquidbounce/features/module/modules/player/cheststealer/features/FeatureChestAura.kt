@@ -20,7 +20,7 @@ package net.ccbluex.liquidbounce.features.module.modules.player.cheststealer.fea
 
 import net.ccbluex.fastutil.enumSetOf
 import net.ccbluex.liquidbounce.config.types.group.ToggleableValueGroup
-import net.ccbluex.liquidbounce.config.types.list.Tagged
+import net.ccbluex.liquidbounce.common.Tagged
 import net.ccbluex.liquidbounce.event.events.PacketEvent
 import net.ccbluex.liquidbounce.event.events.RotationUpdateEvent
 import net.ccbluex.liquidbounce.event.handler
@@ -29,13 +29,13 @@ import net.ccbluex.liquidbounce.event.tickHandler
 import net.ccbluex.liquidbounce.event.waitTicks
 import net.ccbluex.liquidbounce.features.module.modules.player.cheststealer.ModuleChestStealer
 import net.ccbluex.liquidbounce.utils.aiming.RotationManager
-import net.ccbluex.liquidbounce.utils.aiming.RotationsValueGroup
+import net.ccbluex.liquidbounce.features.rotation.RotationsValueGroup
 import net.ccbluex.liquidbounce.utils.aiming.utils.raytraceBlockRotation
 import net.ccbluex.liquidbounce.utils.block.SwingMode
 import net.ccbluex.liquidbounce.utils.block.anotherChestPartDirection
 import net.ccbluex.liquidbounce.utils.block.searchBlocksInRangeSorted
 import net.ccbluex.liquidbounce.utils.block.state
-import net.ccbluex.liquidbounce.utils.combat.CombatManager
+import net.ccbluex.liquidbounce.features.combat.runtime.CombatManager
 import net.ccbluex.liquidbounce.utils.inventory.findBlocksEndingWith
 import net.ccbluex.liquidbounce.utils.kotlin.EventPriorityConvention.READ_FINAL_STATE
 import net.ccbluex.liquidbounce.utils.kotlin.Priority
@@ -52,15 +52,11 @@ import net.minecraft.world.phys.HitResult
 import java.util.function.BooleanSupplier
 
 /**
- * ChestAura feature
- */
-/**
  * ChestAura feature is responsible for automatically interacting with storage blocks (such as chests)
  * within a specified range and line of sight of the player.
  */
 object FeatureChestAura : ToggleableValueGroup(ModuleChestStealer, "Aura", true) {
 
-    // Configuration fields with appropriate names
     private val interactionRange by float("Range", 3F, 1F..6F)
     private val wallInteractionRange by float("WallRange", 0f, 0F..6F).onChange {
         // Ensure that wallInteractionRange does not exceed interactionRange
@@ -85,7 +81,6 @@ object FeatureChestAura : ToggleableValueGroup(ModuleChestStealer, "Aura", true)
         };
     }
 
-    // Sub-configurable for managing the await container settings
     private object AwaitContainerSettings : ToggleableValueGroup(this, "AwaitContainer", true) {
         val retryTimeout by int("Timeout", 10, 1..80, "ticks")
         val maxInteractionRetries by int("MaxRetries", 4, 1..10)

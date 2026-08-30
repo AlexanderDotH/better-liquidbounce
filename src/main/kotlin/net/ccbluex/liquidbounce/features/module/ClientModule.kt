@@ -21,8 +21,8 @@ package net.ccbluex.liquidbounce.features.module
 import com.mojang.blaze3d.platform.InputConstants
 import kotlinx.coroutines.launch
 import net.ccbluex.liquidbounce.config.ConfigSystem
-import net.ccbluex.liquidbounce.config.autoconfig.AutoConfig
-import net.ccbluex.liquidbounce.config.autoconfig.AutoConfig.loadingNow
+import net.ccbluex.liquidbounce.features.autoconfig.AutoConfig
+import net.ccbluex.liquidbounce.features.autoconfig.AutoConfig.loadingNow
 import net.ccbluex.liquidbounce.config.gson.stategies.Exclude
 import net.ccbluex.liquidbounce.config.types.Value
 import net.ccbluex.liquidbounce.config.types.group.ToggleableValueGroup
@@ -35,13 +35,13 @@ import net.ccbluex.liquidbounce.event.events.ModuleToggleEvent
 import net.ccbluex.liquidbounce.event.events.NotificationEvent
 import net.ccbluex.liquidbounce.event.events.RefreshArrayListEvent
 import net.ccbluex.liquidbounce.features.module.modules.misc.antibot.ModuleAntiBot
-import net.ccbluex.liquidbounce.lang.LanguageManager
+import net.ccbluex.liquidbounce.features.language.LanguageManager
 import net.ccbluex.liquidbounce.lang.translation
-import net.ccbluex.liquidbounce.script.ScriptApiRequired
+import net.ccbluex.liquidbounce.annotations.ScriptApiRequired
 import net.ccbluex.liquidbounce.utils.client.clientLogger
 import net.ccbluex.liquidbounce.utils.text.asPlainText
 import net.ccbluex.liquidbounce.utils.client.inGame
-import net.ccbluex.liquidbounce.utils.client.notification
+import net.ccbluex.liquidbounce.features.chat.notification
 import net.ccbluex.liquidbounce.utils.text.plus
 import net.ccbluex.liquidbounce.utils.text.toLowerCamelCase
 import net.ccbluex.liquidbounce.utils.input.InputBind
@@ -52,7 +52,7 @@ import net.minecraft.network.chat.Style
 /**
  * A module also called 'hack' can be enabled and handle events
  */
-@Suppress("LongParameterList", "detekt:TooManyFunctions")
+@Suppress("LongParameterList")
 open class ClientModule(
     name: String, // name parameter in configurable
     @Exclude val category: ModuleCategory, // module category

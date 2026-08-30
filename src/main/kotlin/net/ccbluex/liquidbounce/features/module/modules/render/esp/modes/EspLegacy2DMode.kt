@@ -18,14 +18,13 @@
  */
 package net.ccbluex.liquidbounce.features.module.modules.render.esp.modes
 
-import net.ccbluex.liquidbounce.event.events.WorldRenderEvent
+import net.ccbluex.liquidbounce.render.events.WorldRenderEvent
 import net.ccbluex.liquidbounce.event.handler
-import net.ccbluex.liquidbounce.features.module.modules.render.esp.ModuleESP.getColor
+import net.ccbluex.liquidbounce.features.module.modules.render.esp.runtime.EspModeRuntime
 import net.ccbluex.liquidbounce.render.engine.type.Color4b
 import net.ccbluex.liquidbounce.render.renderEnvironment
-import net.ccbluex.liquidbounce.utils.entity.RenderedEntities
 import net.ccbluex.liquidbounce.utils.entity.interpolateCurrentPosition
-import net.ccbluex.liquidbounce.utils.render.drawLegacy2DMarker
+import net.ccbluex.liquidbounce.render.marker.drawLegacy2DMarker
 
 object EspLegacy2DMode : EspMode("Legacy2D") {
 
@@ -36,15 +35,15 @@ object EspLegacy2DMode : EspMode("Legacy2D") {
     @Suppress("unused")
     private val renderHandler = handler<WorldRenderEvent> { event ->
         event.renderEnvironment {
-            for (entity in RenderedEntities) {
+            for (entity in EspModeRuntime.renderedEntities()) {
                 if (!shouldRender(entity)) continue
 
                 val pos = entity.interpolateCurrentPosition(event.partialTicks).add(0.0, yOffset.toDouble(), 0.0)
-                val color = getColor(entity).argb
+                val color = EspModeRuntime.color(entity).argb
                 val backgroundColor = Color4b.BLACK.with(a = backgroundAlpha).argb
 
                 drawLegacy2DMarker(
-                    pos = pos,
+                    position = pos,
                     entityHeight = entity.boundingBox.ysize,
                     scale = scale,
                     foregroundArgb = color,

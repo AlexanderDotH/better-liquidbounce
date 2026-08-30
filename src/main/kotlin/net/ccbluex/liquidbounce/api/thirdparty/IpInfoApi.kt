@@ -20,7 +20,6 @@ package net.ccbluex.liquidbounce.api.thirdparty
 
 import net.ccbluex.liquidbounce.api.core.AsyncLazy
 import net.ccbluex.liquidbounce.api.core.BaseApi
-import net.ccbluex.liquidbounce.features.misc.proxy.ProxyManager
 import net.ccbluex.liquidbounce.utils.client.logger
 
 /**
@@ -28,13 +27,18 @@ import net.ccbluex.liquidbounce.utils.client.logger
  * keeping track of the current IP address.
  */
 object IpInfoApi : BaseApi("https://ipinfo.io") {
+    private var currentOverride: () -> IpData? = { null }
+
+    fun installCurrentOverride(provider: () -> IpData?) {
+        currentOverride = provider
+    }
 
     /**
      * Information about the current IP address of the user. This can change depending on if the
      * user is using a proxy through the Proxy Manager.
      */
     val current: IpData?
-        get() = ProxyManager.currentProxy?.ipInfo ?: original
+        get() = currentOverride() ?: original
 
     /**
      * Information about the current IP address of the user. This does not change during use.

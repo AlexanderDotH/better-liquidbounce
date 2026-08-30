@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import {readFileSync} from "node:fs";
 import test from "node:test";
+import {readComponentSourceWithStyles, readSourceWithStyles} from "./themeSource.mjs";
 
 import {
     MODERN_ANIMATION_STALL_GUARD_MS,
@@ -17,7 +18,10 @@ const modernRoot = new URL(
 );
 
 function read(relativePath) {
-    return readFileSync(new URL(relativePath, modernRoot), "utf8");
+    const url = new URL(relativePath, modernRoot);
+    return ["ModernPanel.svelte", "ModernSearch.svelte"].includes(relativePath)
+        ? readComponentSourceWithStyles(url)
+        : readSourceWithStyles(url);
 }
 
 function cssBlock(source, selector) {

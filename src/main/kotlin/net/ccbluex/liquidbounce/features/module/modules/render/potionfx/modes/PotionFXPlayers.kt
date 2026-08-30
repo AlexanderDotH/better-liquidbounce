@@ -24,11 +24,10 @@ import net.ccbluex.fastutil.enumSetAllOf
 import net.ccbluex.liquidbounce.config.types.group.ToggleableValueGroup
 import net.ccbluex.liquidbounce.config.types.group.ValueGroup
 import net.ccbluex.liquidbounce.config.utils.TextureMode
-import net.ccbluex.liquidbounce.event.events.WorldRenderEvent
+import net.ccbluex.liquidbounce.render.events.WorldRenderEvent
 import net.ccbluex.liquidbounce.event.handler
-import net.ccbluex.liquidbounce.features.module.modules.render.potionfx.ModulePotionFX
-import net.ccbluex.liquidbounce.features.module.modules.render.potionfx.ModulePotionFX.PresetTexture
-import net.ccbluex.liquidbounce.features.module.modules.render.potionfx.ModulePotionFX.SecondaryPresetTexture
+import net.ccbluex.liquidbounce.features.module.modules.render.potionfx.assets.PresetTexture
+import net.ccbluex.liquidbounce.features.module.modules.render.potionfx.assets.SecondaryPresetTexture
 import net.ccbluex.liquidbounce.features.module.modules.render.potionfx.modes.PotionFXPlayers.MainEffect.radius
 import net.ccbluex.liquidbounce.features.module.modules.render.potionfx.modes.PotionFXPlayers.MainEffect.rotationSpeed
 import net.ccbluex.liquidbounce.features.module.modules.render.potionfx.modes.PotionFXPlayers.MainEffect.textureMode
@@ -39,12 +38,12 @@ import net.ccbluex.liquidbounce.render.drawSquareTexture
 import net.ccbluex.liquidbounce.render.renderEnvironment
 import net.ccbluex.liquidbounce.render.withPositionRelativeToCamera
 import net.ccbluex.liquidbounce.render.withPush
-import net.ccbluex.liquidbounce.utils.world.EntityLookup.Companion.EntityLookup
+import net.ccbluex.liquidbounce.features.entity.EntityLookup.Companion.EntityLookup
 import net.ccbluex.liquidbounce.utils.world.filterTo
 import net.minecraft.world.entity.EntityTypes
 import net.minecraft.world.item.alchemy.PotionContents.getColorOptional
 
-object PotionFXPlayers : ToggleableValueGroup(ModulePotionFX, "Players", true) {
+object PotionFXPlayers : ToggleableValueGroup(null, "Players", true) {
 
     private object MainEffect : ValueGroup("MainEffect") {
         val radius by float("Radius", 1f, 0.1f..10f)

@@ -26,11 +26,11 @@ import net.ccbluex.liquidbounce.deeplearn.data.CombatSample
 import net.ccbluex.liquidbounce.event.events.AttackEntityEvent
 import net.ccbluex.liquidbounce.event.events.GameTickEvent
 import net.ccbluex.liquidbounce.event.events.PacketEvent
-import net.ccbluex.liquidbounce.event.events.WorldRenderEvent
+import net.ccbluex.liquidbounce.render.events.WorldRenderEvent
 import net.ccbluex.liquidbounce.event.handler
 import net.ccbluex.liquidbounce.event.sequenceHandler
 import net.ccbluex.liquidbounce.event.tickUntil
-import net.ccbluex.liquidbounce.features.module.modules.misc.debugrecorder.ModuleDebugRecorder
+import net.ccbluex.liquidbounce.features.module.modules.misc.debugrecorder.runtime.DebugRecorderMode
 import net.ccbluex.liquidbounce.features.module.modules.render.ModuleDebug.debugParameter
 import net.ccbluex.liquidbounce.render.drawBox
 import net.ccbluex.liquidbounce.render.engine.type.Color4b
@@ -38,10 +38,10 @@ import net.ccbluex.liquidbounce.render.renderEnvironment
 import net.ccbluex.liquidbounce.render.withPositionRelativeToCamera
 import net.ccbluex.liquidbounce.utils.aiming.RotationManager
 import net.ccbluex.liquidbounce.utils.aiming.data.Rotation
-import net.ccbluex.liquidbounce.utils.client.FloatValueProvider
-import net.ccbluex.liquidbounce.utils.client.chat
-import net.ccbluex.liquidbounce.utils.combat.TargetPriority
-import net.ccbluex.liquidbounce.utils.combat.TargetTracker
+import net.ccbluex.liquidbounce.config.types.FloatValueProvider
+import net.ccbluex.liquidbounce.features.chat.chat
+import net.ccbluex.liquidbounce.features.combat.runtime.TargetPriority
+import net.ccbluex.liquidbounce.features.combat.runtime.TargetTracker
 import net.ccbluex.liquidbounce.utils.entity.interpolateCurrentPosition
 import net.ccbluex.liquidbounce.utils.entity.isBlockAction
 import net.ccbluex.liquidbounce.utils.entity.lastPos
@@ -57,7 +57,7 @@ import net.minecraft.world.phys.AABB
 /**
  * Records combat behavior
  */
-object DebugCombatRecorder : ModuleDebugRecorder.DebugRecorderMode<CombatSample>("Combat") {
+object DebugCombatRecorder : DebugRecorderMode<CombatSample>("Combat") {
 
     private var targetTracker = tree(TargetTracker(
         // Start tracking target that we look at the closest

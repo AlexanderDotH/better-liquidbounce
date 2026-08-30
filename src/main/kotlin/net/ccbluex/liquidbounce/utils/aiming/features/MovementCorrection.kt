@@ -18,7 +18,7 @@
  */
 package net.ccbluex.liquidbounce.utils.aiming.features
 
-import net.ccbluex.liquidbounce.config.types.list.Tagged
+import net.ccbluex.liquidbounce.common.Tagged
 
 /**
  * Corrects movement when aiming away from client-side view direction.

@@ -11,8 +11,6 @@
 package net.ccbluex.liquidbounce.features.module.modules.movement.vclip
 
 import net.ccbluex.liquidbounce.config.types.group.Mode
-import net.ccbluex.liquidbounce.config.types.group.ModeValueGroup
-import net.ccbluex.liquidbounce.features.module.modules.movement.ModuleVClip
 import net.minecraft.world.entity.Entity
 
 internal enum class VClipClipResult {
@@ -21,8 +19,6 @@ internal enum class VClipClipResult {
 }
 
 internal abstract class VClipMovementMode(name: String) : Mode(name) {
-    final override val parent: ModeValueGroup<*>
-        get() = ModuleVClip.modes
 
     abstract fun clip(
         entity: Entity,

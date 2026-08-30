@@ -20,7 +20,8 @@ package net.ccbluex.liquidbounce.features.module.modules.movement.elytrafly.mode
 
 import net.ccbluex.liquidbounce.event.events.PlayerMoveEvent
 import net.ccbluex.liquidbounce.event.handler
-import net.ccbluex.liquidbounce.features.module.modules.movement.elytrafly.ModuleElytraFly
+import net.ccbluex.liquidbounce.features.module.modules.movement.elytrafly.runtime.ElytraFlyRuntime
+import net.ccbluex.liquidbounce.features.module.modules.movement.elytrafly.runtime.shouldNotOperateElytraFly
 import net.ccbluex.liquidbounce.utils.entity.moving
 import net.ccbluex.liquidbounce.utils.entity.withStrafe
 import net.ccbluex.liquidbounce.utils.kotlin.EventPriorityConvention
@@ -176,7 +177,7 @@ internal object ElytraFlyModeBoost : ElytraFlyMode("Boost") {
     }
 
     private fun calculateEffectiveSpeed(isNearGround: Boolean): Double {
-        val baseSpeed = ModuleElytraFly.Speed.horizontal.toDouble()
+        val baseSpeed = ElytraFlyRuntime.horizontalSpeed.toDouble()
 
         val pitchReduction = if (player.xRot < 0) {
             abs(player.xRot / MAX_PITCH_ANGLE) * PITCH_REDUCTION_FACTOR
@@ -200,7 +201,7 @@ internal object ElytraFlyModeBoost : ElytraFlyMode("Boost") {
 
     @Suppress("unused")
     private val moveHandler = handler<PlayerMoveEvent>(priority = EventPriorityConvention.MODEL_STATE) { event ->
-        if (ModuleElytraFly.shouldNotOperate() || !player.isFallFlying) return@handler
+        if (shouldNotOperateElytraFly(player) || !player.isFallFlying) return@handler
 
         val nearGround = isNearGround()
         val divePullUpBoost = if (player.xRot < 0 && currentDiveSpeed > 0) {
@@ -241,7 +242,7 @@ internal object ElytraFlyModeBoost : ElytraFlyMode("Boost") {
     private fun calculateVerticalMovement(currentY: Double, divePullUpBoost: Double, event: PlayerMoveEvent): Double {
         val horizontalSpeed = event.movement.horizontalDistance()
         val naturalLift = horizontalSpeed * NATURAL_LIFT_FACTOR
-        val verticalSpeed = ModuleElytraFly.Speed.vertical.toDouble() * verticalControl
+        val verticalSpeed = ElytraFlyRuntime.verticalSpeed.toDouble() * verticalControl
 
         val baseY = currentY - GRAVITY_COMPENSATION + naturalLift + divePullUpBoost
 

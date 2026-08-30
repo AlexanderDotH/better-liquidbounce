@@ -20,15 +20,13 @@ package net.ccbluex.liquidbounce.features.module.modules.render
 
 import net.ccbluex.liquidbounce.features.module.ClientModule
 import net.ccbluex.liquidbounce.features.module.ModuleCategories
-import net.ccbluex.liquidbounce.injection.mixins.minecraft.render.MixinEndCrystalModel
-import net.ccbluex.liquidbounce.injection.mixins.minecraft.render.entity.MixinEndCrystalRenderer
 
 /**
  * Module CrystalView
  *
  * Tweaks how crystal models behave.
  *
- * Mixins: [MixinEndCrystalModel], [MixinEndCrystalRenderer]
+ * The end-crystal model and renderer injections delegate their values to this facade.
  *
  * @author ccetl
  */

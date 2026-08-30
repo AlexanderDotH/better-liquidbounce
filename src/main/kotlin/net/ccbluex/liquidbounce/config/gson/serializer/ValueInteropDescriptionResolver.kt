@@ -16,8 +16,8 @@ import net.ccbluex.liquidbounce.config.types.ValueType
 import net.ccbluex.liquidbounce.config.types.group.Mode
 import net.ccbluex.liquidbounce.config.types.list.ChoiceListValue
 import net.ccbluex.liquidbounce.config.types.list.MultiChoiceListValue
-import net.ccbluex.liquidbounce.config.types.list.Tagged
-import net.ccbluex.liquidbounce.lang.LanguageManager
+import net.ccbluex.liquidbounce.common.Tagged
+import net.ccbluex.liquidbounce.lang.LanguageCatalog
 import net.minecraft.network.chat.Component
 import java.util.Locale
 
@@ -131,13 +131,10 @@ internal object ValueInteropDescriptionResolver {
     }
 
     private fun localizedTranslation(key: String): String? {
-        if (!LanguageManager.hasFallbackTranslation(key)) {
+        if (!LanguageCatalog.hasFallbackTranslation(key)) {
             return null
         }
-        val language = runCatching(LanguageManager::getLanguage).getOrNull()
-            ?: LanguageManager.getCommonLanguage()
-            ?: return null
-        return language.getOrDefault(key, key).trim().takeIf(String::isNotEmpty)
+        return LanguageCatalog.translate(key, key).trim().takeIf(String::isNotEmpty)
     }
 
     private fun localize(template: String, fallback: String, vararg arguments: String): String {

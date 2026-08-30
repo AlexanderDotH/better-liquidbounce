@@ -19,14 +19,10 @@
 package net.ccbluex.liquidbounce.features.module.modules.player.reach.interactable
 
 import net.ccbluex.liquidbounce.features.module.modules.movement.vclip.VClipFallSafetyContext
-import net.ccbluex.liquidbounce.features.module.modules.movement.vclip.VClipFoliaProfile
 import net.ccbluex.liquidbounce.features.module.modules.movement.vclip.VClipPacketPlanResult
-import net.ccbluex.liquidbounce.features.module.modules.movement.vclip.VClipPlayerPacketShape
-import net.ccbluex.liquidbounce.features.module.modules.movement.vclip.VClipPlayerPacketStep
-import net.ccbluex.liquidbounce.features.module.modules.movement.vclip.VClipPosition
 import net.ccbluex.liquidbounce.features.module.modules.movement.vclip.VClipTransportProfile
 import net.ccbluex.liquidbounce.features.module.modules.movement.vclip.VClipTransportRequest
-import net.ccbluex.liquidbounce.features.module.modules.movement.vclip.VClipVanillaProfile
+import net.ccbluex.liquidbounce.features.module.modules.player.reach.contract.*
 import net.ccbluex.liquidbounce.features.module.modules.player.reach.interactable.route.InteractableRoutePlan
 import net.ccbluex.liquidbounce.features.module.modules.player.reach.interactable.route.InteractableRouteSegment
 import net.ccbluex.liquidbounce.features.module.modules.player.reach.interactable.session.InteractableMovement
@@ -34,36 +30,6 @@ import net.ccbluex.liquidbounce.features.module.modules.player.reach.interactabl
 import net.ccbluex.liquidbounce.features.module.modules.player.reach.interactable.session.InteractableSessionRoute
 import net.minecraft.world.phys.Vec3
 import kotlin.math.ceil
-
-/** Packet shape captured by a session route before live yaw and collision flags are available. */
-internal sealed interface InteractablePacketInstruction {
-    val onGround: Boolean
-    val transportBurstId: Int?
-        get() = null
-
-    data class Status(
-        override val onGround: Boolean,
-        override val transportBurstId: Int? = null,
-    ) : InteractablePacketInstruction
-
-    data class Position(
-        val position: Vec3,
-        val fullPacket: Boolean,
-        override val onGround: Boolean,
-        val collisionChecked: Boolean = true,
-        val requiresStandableEndpoint: Boolean = false,
-        override val transportBurstId: Int? = null,
-    ) : InteractablePacketInstruction
-}
-
-internal sealed interface InteractableRouteCompileResult {
-    data class Ready(
-        val route: InteractableSessionRoute<InteractablePacketInstruction>,
-    ) : InteractableRouteCompileResult
-
-    data object VClipUnavailable : InteractableRouteCompileResult
-    data object VClipDistanceExceeded : InteractableRouteCompileResult
-}
 
 /** Converts a transport-neutral A* plan into delivery-confirmed packets and per-step exact inverses. */
 internal object InteractableRouteCompiler {
@@ -75,10 +41,7 @@ internal object InteractableRouteCompiler {
         vClip: InteractableVClipSettings,
         fallSafety: VClipFallSafetyContext,
     ): InteractableRouteCompileResult {
-        require(stepDistance.isFinite() && stepDistance > 0.0) { "Step distance must be finite and positive" }
-        require(maximumVClipDistance.isFinite() && maximumVClipDistance > 0.0) {
-            "Maximum VClip distance must be finite and positive"
-        }
+        validateDistances(stepDistance, maximumVClipDistance)
         val profile = vClip.toProfile()
         val steps = ArrayList<InteractableRouteStep<InteractablePacketInstruction>>()
         var confirmedPosition = plan.origin
@@ -108,21 +71,30 @@ internal object InteractableRouteCompiler {
             }
         }
 
-        if (steps.isEmpty()) {
-            steps += InteractableRouteStep(
-                outbound = InteractableMovement(
-                    InteractablePacketInstruction.Position(
-                        position = plan.origin,
-                        fullPacket = false,
-                        onGround = true,
-                    ),
-                    plan.origin,
-                ),
-                inverse = emptyList(),
-            )
-        }
+        addOriginStepWhenEmpty(steps, plan.origin)
 
         return InteractableRouteCompileResult.Ready(InteractableSessionRoute(plan.origin, steps))
+    }
+
+    private fun validateDistances(stepDistance: Double, maximumVClipDistance: Double) {
+        require(stepDistance.isFinite() && stepDistance > 0.0) { "Step distance must be finite and positive" }
+        require(maximumVClipDistance.isFinite() && maximumVClipDistance > 0.0) {
+            "Maximum VClip distance must be finite and positive"
+        }
+    }
+
+    private fun addOriginStepWhenEmpty(
+        steps: MutableList<InteractableRouteStep<InteractablePacketInstruction>>,
+        origin: Vec3,
+    ) {
+        if (steps.isNotEmpty()) return
+        steps += InteractableRouteStep(
+            outbound = InteractableMovement(
+                InteractablePacketInstruction.Position(position = origin, fullPacket = false, onGround = true),
+                origin,
+            ),
+            inverse = emptyList(),
+        )
     }
 
     private fun compilePath(
@@ -230,45 +202,3 @@ internal object InteractableRouteCompiler {
         }
     }
 }
-
-private fun InteractableVClipSettings.toProfile(): VClipTransportProfile = when (this) {
-    is InteractableVClipSettings.Vanilla -> VClipVanillaProfile(paperBypass, fullPacket)
-    is InteractableVClipSettings.Folia -> VClipFoliaProfile(movementPackets, fullPacket)
-}
-
-private fun InteractableRouteSegment.VerticalClip.request(fallSafety: VClipFallSafetyContext) =
-    VClipTransportRequest(from.toVClipPosition(), to.toVClipPosition(), fallSafety)
-
-private fun VClipPlayerPacketStep.toInstruction(
-    requiresStandableEndpoint: Boolean,
-    transportBurstId: Int,
-): InteractablePacketInstruction = when (shape) {
-    VClipPlayerPacketShape.STATUS_ONLY -> InteractablePacketInstruction.Status(onGround, transportBurstId)
-    VClipPlayerPacketShape.POSITION -> InteractablePacketInstruction.Position(
-        requireNotNull(position).toVec3(),
-        fullPacket = false,
-        onGround = onGround,
-        collisionChecked = false,
-        requiresStandableEndpoint = requiresStandableEndpoint,
-        transportBurstId = transportBurstId,
-    )
-    VClipPlayerPacketShape.FULL -> InteractablePacketInstruction.Position(
-        requireNotNull(position).toVec3(),
-        fullPacket = true,
-        onGround = onGround,
-        collisionChecked = false,
-        requiresStandableEndpoint = requiresStandableEndpoint,
-        transportBurstId = transportBurstId,
-    )
-}
-
-private fun Vec3.toVClipPosition() = VClipPosition(x, y, z)
-
-private fun VClipPosition.toVec3() = Vec3(x, y, z)
-
-private fun Vec3.normalizeEndpoint(endpoint: Vec3): Vec3 = if (samePosition(endpoint)) endpoint else this
-
-private fun Vec3.samePosition(other: Vec3): Boolean = distanceToSqr(other) <= POSITION_EPSILON_SQUARED
-
-private const val POSITION_EPSILON = 1.0E-6
-private const val POSITION_EPSILON_SQUARED = POSITION_EPSILON * POSITION_EPSILON

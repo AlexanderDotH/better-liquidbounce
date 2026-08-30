@@ -19,15 +19,11 @@
 package net.ccbluex.liquidbounce.injection.mixins.minecraft.render;
 
 import com.llamalad7.mixinextras.injector.ModifyReturnValue;
-import com.llamalad7.mixinextras.sugar.Local;
 import com.mojang.blaze3d.vertex.PoseStack;
 import net.ccbluex.liquidbounce.common.EspMaskCaptureContext;
 import net.ccbluex.liquidbounce.common.EspMaskLayer;
-import net.ccbluex.liquidbounce.features.module.modules.render.ModuleChams;
 import net.ccbluex.liquidbounce.interfaces.SubmitNodeCollectionAddition;
 import net.ccbluex.liquidbounce.render.engine.esp.EspMaskVertexConsumer;
-import net.ccbluex.liquidbounce.utils.render.NametagSubmitContext;
-import net.ccbluex.liquidbounce.utils.render.PlayerModelNametagHook;
 import net.minecraft.client.model.Model;
 import net.minecraft.client.renderer.SubmitNodeCollector;
 import net.minecraft.client.renderer.SubmitNodeCollection;
@@ -41,19 +37,15 @@ import net.minecraft.client.renderer.feature.phase.FeatureRenderPhase;
 import net.minecraft.client.renderer.feature.phase.SimpleFeatureRenderPhase;
 import net.minecraft.client.renderer.item.ItemStackRenderState;
 import net.minecraft.client.renderer.rendertype.RenderType;
-import net.minecraft.client.renderer.state.level.CameraRenderState;
 import net.minecraft.client.renderer.texture.OverlayTexture;
 import net.minecraft.client.renderer.texture.TextureAtlasSprite;
 import net.minecraft.client.resources.model.geometry.BakedQuad;
-import net.minecraft.network.chat.Component;
 import net.minecraft.world.item.ItemDisplayContext;
-import net.minecraft.world.phys.Vec3;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
-import org.spongepowered.asm.mixin.injection.ModifyVariable;
 
 import java.util.ArrayList;
 import java.util.EnumMap;
@@ -194,51 +186,6 @@ public abstract class MixinSubmitNodeCollection implements SubmitNodeCollectionA
         }
 
         return renderType.outline().orElse(null);
-    }
-
-    @Inject(
-        method = "submitNameTag(Lcom/mojang/blaze3d/vertex/PoseStack;Lnet/minecraft/world/phys/Vec3;ILnet/minecraft/network/chat/Component;ZILnet/minecraft/client/renderer/state/level/CameraRenderState;)V",
-        at = @At("HEAD"),
-        cancellable = true
-    )
-    private void cancelAmnesiaVanillaNameTag(
-        PoseStack poseStack,
-        Vec3 attachment,
-        int yOffset,
-        Component text,
-        boolean seeThrough,
-        int lightCoords,
-        CameraRenderState cameraRenderState,
-        CallbackInfo ci
-    ) {
-        var state = NametagSubmitContext.get();
-        if (state != null && PlayerModelNametagHook.shouldSuppressVanillaNameDisplay(state)) {
-            ci.cancel();
-        }
-    }
-
-    @ModifyVariable(
-        method = "submitModel(Lnet/minecraft/client/model/Model;Ljava/lang/Object;Lcom/mojang/blaze3d/vertex/PoseStack;Lnet/minecraft/client/renderer/rendertype/RenderType;IIILnet/minecraft/client/renderer/texture/TextureAtlasSprite;ILnet/minecraft/client/renderer/feature/ModelFeatureRenderer$CrumblingOverlay;)V",
-        at = @At("HEAD"),
-        argsOnly = true,
-        name = "renderType"
-    )
-    private RenderType remapHeldItemModelRenderType(RenderType renderType) {
-        return ModuleChams.INSTANCE.remapCurrentHeldItemRenderTypeIfNeeded(renderType);
-    }
-
-    @Inject(
-        method = "submitItem",
-        at = @At(
-            value = "INVOKE",
-            target = "Lnet/minecraft/client/renderer/feature/ItemFeatureRenderer$Submit;hasTranslucency()Z"
-        )
-    )
-    private void markHeldItemSubmit(
-        CallbackInfo callbackInfo,
-        @Local(name = "submit") ItemFeatureRenderer.Submit submit
-    ) {
-        ModuleChams.INSTANCE.markHeldItemSubmitIfActive(submit);
     }
 
 }

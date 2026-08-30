@@ -20,19 +20,24 @@ package net.ccbluex.liquidbounce.features.module.modules.movement.inventorymove.
 
 import net.ccbluex.liquidbounce.config.types.group.ToggleableValueGroup
 import net.ccbluex.liquidbounce.event.tickHandler
-import net.ccbluex.liquidbounce.features.module.modules.movement.inventorymove.ModuleInventoryMove
+import net.ccbluex.liquidbounce.features.module.ClientModule
 import net.ccbluex.liquidbounce.utils.client.Timer
 import net.ccbluex.liquidbounce.utils.kotlin.Priority
 import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen
 
-object InventoryMoveTimerFeature : ToggleableValueGroup(ModuleInventoryMove, "Timer", false) {
+object InventoryMoveTimerFeature : ToggleableValueGroup(name = "Timer", enabled = false) {
 
     private val speed by float("Speed", 1.0f, 0.1f..2.0f)
 
     @Suppress("unused")
     private val tickHandler = tickHandler {
         if (mc.gui.screen() is AbstractContainerScreen<*>) {
-            Timer.requestTimerSpeed(speed, Priority.IMPORTANT_FOR_USAGE_2, ModuleInventoryMove)
+            Timer.requestTimerSpeed(
+                speed,
+                Priority.IMPORTANT_FOR_USAGE_2,
+                parent as? ClientModule
+                    ?: error("InventoryMoveTimerFeature must be attached before handling events"),
+            )
         }
     }
 

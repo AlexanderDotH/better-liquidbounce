@@ -22,7 +22,7 @@ import net.ccbluex.liquidbounce.config.types.group.ModeValueGroup
 import net.ccbluex.liquidbounce.event.events.PlayerJumpEvent
 import net.ccbluex.liquidbounce.event.handler
 import net.ccbluex.liquidbounce.event.tickHandler
-import net.ccbluex.liquidbounce.features.module.modules.movement.speed.ModuleSpeed
+import net.ccbluex.liquidbounce.features.module.modules.movement.speed.runtime.SpeedModuleControl
 import net.ccbluex.liquidbounce.features.module.modules.movement.speed.modes.SpeedBHopBase
 import net.ccbluex.liquidbounce.utils.client.Timer
 import net.ccbluex.liquidbounce.utils.entity.moving
@@ -59,13 +59,13 @@ class SpeedGWENHighHop(parent: ModeValueGroup<*>) : SpeedBHopBase("GWENHighHop",
     private fun handleFallPhase() {
         if (player.fallDistance > 0f) {
             player.deltaMovement = player.deltaMovement.copy(y = player.deltaMovement.y - 0.005)
-            Timer.requestTimerSpeed(1.2f, Priority.IMPORTANT_FOR_USAGE_1, ModuleSpeed)
+            Timer.requestTimerSpeed(1.2f, Priority.IMPORTANT_FOR_USAGE_1, SpeedModuleControl.module)
         } else if (motionTicks < 1.1f) {
             motionTicks += 0.25f
         }
 
         if (player.fallDistance > 0.2f) {
-            Timer.requestTimerSpeed(1f, Priority.IMPORTANT_FOR_USAGE_1, ModuleSpeed)
+            Timer.requestTimerSpeed(1f, Priority.IMPORTANT_FOR_USAGE_1, SpeedModuleControl.module)
         }
     }
 

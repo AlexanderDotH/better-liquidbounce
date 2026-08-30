@@ -23,7 +23,7 @@ import com.google.gson.JsonObject
 import net.ccbluex.liquidbounce.config.types.group.json
 import net.ccbluex.liquidbounce.integration.theme.component.HudComponent
 import net.ccbluex.liquidbounce.integration.theme.component.HudComponentTweak
-import net.ccbluex.liquidbounce.utils.render.Alignment
+import net.ccbluex.liquidbounce.config.types.group.Alignment
 
 class WebHudComponent(
     name: String,

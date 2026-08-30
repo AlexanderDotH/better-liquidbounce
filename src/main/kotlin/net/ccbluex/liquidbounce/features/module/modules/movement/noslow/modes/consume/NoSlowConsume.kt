@@ -19,12 +19,12 @@
 package net.ccbluex.liquidbounce.features.module.modules.movement.noslow.modes.consume
 
 import net.ccbluex.liquidbounce.config.types.group.NoneMode
-import net.ccbluex.liquidbounce.features.module.modules.movement.noslow.NoSlowUseActionHandler
 import net.ccbluex.liquidbounce.features.module.modules.movement.noslow.modes.shared.NoSlowNoBlockInteract
 import net.ccbluex.liquidbounce.features.module.modules.movement.noslow.modes.shared.NoSlowSharedGrim2360
 import net.ccbluex.liquidbounce.features.module.modules.movement.noslow.modes.shared.NoSlowSharedGrim2364MC18
 import net.ccbluex.liquidbounce.features.module.modules.movement.noslow.modes.shared.NoSlowSharedGrim2371
 import net.ccbluex.liquidbounce.features.module.modules.movement.noslow.modes.shared.NoSlowSharedInvalidHand
+import net.ccbluex.liquidbounce.features.module.modules.movement.noslow.modes.shared.NoSlowUseActionHandler
 import net.ccbluex.liquidbounce.utils.client.inGame
 import net.ccbluex.liquidbounce.utils.item.isConsumable
 import net.minecraft.world.item.ItemUseAnimation

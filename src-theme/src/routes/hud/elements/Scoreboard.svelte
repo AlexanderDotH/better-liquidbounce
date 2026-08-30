@@ -1,7 +1,7 @@
 <script lang="ts">
     import {listen} from "../../../integration/ws";
     import type {PlayerData, Scoreboard, TextComponent as TTextComponent} from "../../../integration/types";
-    import TextComponent from "../../menu/common/TextComponent.svelte";
+    import TextComponent from "../../../components/text/TextComponent.svelte";
     import type {ClientPlayerDataEvent} from "../../../integration/events";
     import {createGlobalRegex, replaceTextComponent} from "../../../util/regex_replace";
 

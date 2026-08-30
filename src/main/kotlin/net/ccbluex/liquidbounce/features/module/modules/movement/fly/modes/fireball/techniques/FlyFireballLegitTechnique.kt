@@ -20,7 +20,6 @@
 package net.ccbluex.liquidbounce.features.module.modules.movement.fly.modes.fireball.techniques
 
 import net.ccbluex.liquidbounce.config.types.group.Mode
-import net.ccbluex.liquidbounce.config.types.group.ModeValueGroup
 import net.ccbluex.liquidbounce.config.types.group.ToggleableValueGroup
 import net.ccbluex.liquidbounce.event.events.MovementInputEvent
 import net.ccbluex.liquidbounce.event.events.RotationUpdateEvent
@@ -28,20 +27,17 @@ import net.ccbluex.liquidbounce.event.handler
 import net.ccbluex.liquidbounce.event.tickHandler
 import net.ccbluex.liquidbounce.event.tickUntil
 import net.ccbluex.liquidbounce.event.waitTicks
-import net.ccbluex.liquidbounce.features.module.modules.movement.fly.ModuleFly
-import net.ccbluex.liquidbounce.features.module.modules.movement.fly.modes.fireball.FlyFireball
+import net.ccbluex.liquidbounce.features.module.modules.movement.fly.runtime.FlyModuleControl
+import net.ccbluex.liquidbounce.features.module.modules.movement.fly.modes.fireball.runtime.FlyFireballRuntime
 import net.ccbluex.liquidbounce.features.module.modules.movement.fly.modes.flyAutomationYaw
 import net.ccbluex.liquidbounce.utils.aiming.RotationManager
-import net.ccbluex.liquidbounce.utils.aiming.RotationsValueGroup
+import net.ccbluex.liquidbounce.features.rotation.RotationsValueGroup
 import net.ccbluex.liquidbounce.utils.aiming.data.Rotation
 import net.ccbluex.liquidbounce.utils.kotlin.Priority
 import net.ccbluex.liquidbounce.utils.movement.DirectionalInput
 import net.minecraft.util.Mth
 
 object FlyFireballLegitTechnique : Mode("Legit") {
-
-    override val parent: ModeValueGroup<Mode>
-        get() = FlyFireball.technique
 
     private object Jump : ToggleableValueGroup(this, "Jump", true) {
         val delay by int("Delay", 3, 0..20, "ticks")
@@ -77,7 +73,7 @@ object FlyFireballLegitTechnique : Mode("Legit") {
             ),
             valueGroup = Rotations,
             priority = Priority.IMPORTANT_FOR_PLAYER_LIFE,
-            provider = ModuleFly
+            provider = FlyModuleControl.module
         )
     }
 
@@ -97,7 +93,7 @@ object FlyFireballLegitTechnique : Mode("Legit") {
 
     @Suppress("unused")
     private val repeatable = tickHandler {
-        if (FlyFireball.wasTriggered) {
+        if (FlyFireballRuntime.wasTriggered) {
             canMove = !stopMove
 
             if (Jump.enabled) {
@@ -108,16 +104,16 @@ object FlyFireballLegitTechnique : Mode("Legit") {
                 waitTicks(Jump.delay)
             }
 
-            FlyFireball.throwFireball()
+            FlyFireballRuntime.throwFireball()
 
             if (sprint) {
                 player.isSprinting = true
             }
 
-            FlyFireball.markAutomaticEnd()
-            ModuleFly.enabled = false // Disable after the fireball was thrown
+            FlyFireballRuntime.markAutomaticEnd()
+            FlyModuleControl.disable() // Disable after the fireball was thrown
             canMove = true
-            FlyFireball.wasTriggered = false
+            FlyFireballRuntime.wasTriggered = false
         }
     }
 

@@ -20,11 +20,10 @@
 package net.ccbluex.liquidbounce.features.module.modules.movement.longjump.modes
 
 import net.ccbluex.liquidbounce.config.types.group.Mode
-import net.ccbluex.liquidbounce.config.types.group.ModeValueGroup
 import net.ccbluex.liquidbounce.event.events.PacketEvent
 import net.ccbluex.liquidbounce.event.handler
 import net.ccbluex.liquidbounce.event.tickHandler
-import net.ccbluex.liquidbounce.features.module.modules.movement.longjump.ModuleLongJump
+import net.ccbluex.liquidbounce.features.module.modules.movement.longjump.runtime.LongJumpRuntime
 import net.ccbluex.liquidbounce.utils.entity.withStrafe
 import net.minecraft.network.protocol.game.ClientboundPlayerPositionPacket
 import net.minecraft.network.protocol.game.ServerboundMovePlayerPacket
@@ -37,8 +36,6 @@ import net.minecraft.world.phys.Vec3
  */
 internal object VulcanLongJump : Mode("Vulcan289") {
 
-    override val parent: ModeValueGroup<*>
-        get() = ModuleLongJump.mode
 
     private var receivedSetback = false
     private var started = false
@@ -61,8 +58,8 @@ internal object VulcanLongJump : Mode("Vulcan289") {
     override fun enable() {
         receivedSetback = false
         started = false
-        ModuleLongJump.jumped = false
-        ModuleLongJump.boosted = false
+        LongJumpRuntime.jumped = false
+        LongJumpRuntime.boosted = false
     }
 
     @Suppress("unused")
@@ -83,8 +80,8 @@ internal object VulcanLongJump : Mode("Vulcan289") {
                     player.setPos(player.position().x, player.position().y + 8, player.position().z)
                     player.deltaMovement = player.deltaMovement.withStrafe(strength = 1.0, speed = 0.3)
                     started = false
-                    ModuleLongJump.jumped = true
-                    ModuleLongJump.boosted = true
+                    LongJumpRuntime.jumped = true
+                    LongJumpRuntime.boosted = true
                 }
             }
         }
@@ -95,7 +92,7 @@ internal object VulcanLongJump : Mode("Vulcan289") {
             player.deltaMovement.z
         )
 
-        val didLongJump = ModuleLongJump.autoDisable && ModuleLongJump.jumped
+        val didLongJump = LongJumpRuntime.autoDisable && LongJumpRuntime.jumped
 
         if (player.onGround() && !receivedSetback && player.hurtTime == 0 && !didLongJump) {
             repeat(3) {

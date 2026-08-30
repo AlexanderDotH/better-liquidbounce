@@ -19,8 +19,8 @@
 
 package net.ccbluex.liquidbounce.render.utils
 
-import net.ccbluex.liquidbounce.features.misc.DebuggedOwner
-import net.ccbluex.liquidbounce.features.module.modules.render.ModuleDebug.debugParameter
+import net.ccbluex.liquidbounce.common.debug.DebugParameterSink
+import net.ccbluex.liquidbounce.common.debug.DebuggedOwner
 
 object RenderingDebug : DebuggedOwner {
 
@@ -34,7 +34,7 @@ object RenderingDebug : DebuggedOwner {
 
     @JvmStatic
     fun flipFrame() {
-        debugParameter("RenderPassCount") { renderPassCount }
+        DebugParameterSink.publish(this, "RenderPassCount") { renderPassCount }
         renderPassCount = 0
     }
 

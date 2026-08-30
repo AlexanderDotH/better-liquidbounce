@@ -41,9 +41,9 @@ internal object NoSlowBlockingBlink : Mode("Blink") {
         }
 
         event.action = if (event.packet is ServerboundMovePlayerPacket) {
-             BlinkManager.Action.QUEUE
-        } else if (event.action == BlinkManager.Action.FLUSH) {
-            BlinkManager.Action.PASS
+             net.ccbluex.liquidbounce.event.events.BlinkPacketAction.QUEUE
+        } else if (event.action == net.ccbluex.liquidbounce.event.events.BlinkPacketAction.FLUSH) {
+            net.ccbluex.liquidbounce.event.events.BlinkPacketAction.PASS
         } else {
             return@handler
         }

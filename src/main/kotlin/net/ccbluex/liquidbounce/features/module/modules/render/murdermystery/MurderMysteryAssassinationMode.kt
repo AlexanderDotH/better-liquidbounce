@@ -22,7 +22,7 @@ package net.ccbluex.liquidbounce.features.module.modules.render.murdermystery
 import net.ccbluex.liquidbounce.event.events.PacketEvent
 import net.ccbluex.liquidbounce.event.handler
 import net.ccbluex.liquidbounce.event.tickHandler
-import net.ccbluex.liquidbounce.utils.client.chat
+import net.ccbluex.liquidbounce.features.chat.chat
 import net.ccbluex.liquidbounce.utils.math.levenshtein
 import net.minecraft.client.multiplayer.ClientLevel
 import net.minecraft.client.multiplayer.PlayerInfo

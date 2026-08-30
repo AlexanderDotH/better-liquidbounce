@@ -20,7 +20,6 @@
 package net.ccbluex.liquidbounce.features.module.modules.movement.fly.modes.specific
 
 import net.ccbluex.liquidbounce.config.types.group.Mode
-import net.ccbluex.liquidbounce.config.types.group.ModeValueGroup
 import net.ccbluex.liquidbounce.event.events.BlinkPacketEvent
 import net.ccbluex.liquidbounce.event.events.NotificationEvent
 import net.ccbluex.liquidbounce.event.events.PacketEvent
@@ -29,7 +28,7 @@ import net.ccbluex.liquidbounce.event.handler
 import net.ccbluex.liquidbounce.event.tickHandler
 import net.ccbluex.liquidbounce.event.tickUntil
 import net.ccbluex.liquidbounce.features.blink.BlinkManager
-import net.ccbluex.liquidbounce.features.module.modules.movement.fly.ModuleFly
+import net.ccbluex.liquidbounce.features.module.modules.movement.fly.runtime.FlyModuleControl
 import net.ccbluex.liquidbounce.features.module.modules.movement.fly.automation.FlyAutomationCapabilities
 import net.ccbluex.liquidbounce.features.module.modules.movement.fly.automation.FlyAutomationEnd
 import net.ccbluex.liquidbounce.features.module.modules.movement.fly.automation.FlyAutomationKind
@@ -38,7 +37,7 @@ import net.ccbluex.liquidbounce.features.module.modules.movement.fly.automation.
 import net.ccbluex.liquidbounce.features.module.modules.movement.fly.modes.FlyAutomaticEndSignal
 import net.ccbluex.liquidbounce.features.module.modules.movement.fly.modes.withFlyAutomationStrafe
 import net.ccbluex.liquidbounce.utils.client.Timer
-import net.ccbluex.liquidbounce.utils.client.notification
+import net.ccbluex.liquidbounce.features.chat.notification
 import net.ccbluex.liquidbounce.utils.kotlin.Priority
 import net.ccbluex.liquidbounce.utils.math.anyNotEmpty
 import net.minecraft.network.protocol.game.ClientboundDamageEventPacket
@@ -70,8 +69,6 @@ internal object FlyNcpClip : Mode("NcpClip"), FlyAutomationProfile {
 
     private val maximumDistance by float("MaximumDistance", 200f, 0.1f..500f)
 
-    override val parent: ModeValueGroup<*>
-        get() = ModuleFly.modes
 
     private var startPosition: Vec3? = null
     private var damage = false
@@ -157,7 +154,7 @@ internal object FlyNcpClip : Mode("NcpClip"), FlyAutomationProfile {
 
             // Disable the module when the player touches ground
             automaticEnd.mark("NCP clip flight landed")
-            ModuleFly.enabled = false
+            FlyModuleControl.disable()
             return@tickHandler
         } else if (startPos.distanceTo(player.position()) > maximumDistance) {
             if (shouldLag) {
@@ -168,7 +165,7 @@ internal object FlyNcpClip : Mode("NcpClip"), FlyAutomationProfile {
 
             // Disable the module
             automaticEnd.mark("NCP clip maximum distance reached")
-            ModuleFly.enabled = false
+            FlyModuleControl.disable()
 
             notification("Fly", "You have exceeded the maximum distance.",
                 NotificationEvent.Severity.ERROR)
@@ -181,7 +178,7 @@ internal object FlyNcpClip : Mode("NcpClip"), FlyAutomationProfile {
         }
 
         // Set timer speed
-        Timer.requestTimerSpeed(timer, Priority.IMPORTANT_FOR_USAGE_1, ModuleFly)
+        Timer.requestTimerSpeed(timer, Priority.IMPORTANT_FOR_USAGE_1, FlyModuleControl.module)
     }
 
     @Suppress("unused")
@@ -218,7 +215,7 @@ internal object FlyNcpClip : Mode("NcpClip"), FlyAutomationProfile {
     @Suppress("unused")
     private val fakeLagHandler = handler<BlinkPacketEvent> { event ->
         if (blink && shouldLag && event.origin == TransferOrigin.OUTGOING) {
-            event.action = BlinkManager.Action.QUEUE
+            event.action = net.ccbluex.liquidbounce.event.events.BlinkPacketAction.QUEUE
         }
     }
 

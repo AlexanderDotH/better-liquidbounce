@@ -15,7 +15,7 @@ jobs:
     
     steps:
     - name: Checkout main repository
-      uses: actions/checkout@v6
+      uses: actions/checkout@v7
       with:
         fetch-depth: 0
         token: ${{ secrets.LIQUIDBOUNCE_PAT }}
@@ -109,7 +109,9 @@ jobs:
 
     - name: Create summary
       run: |
-        echo "Theme repository sync completed!" >> $GITHUB_STEP_SUMMARY
-        echo "- Source commit: ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
-        echo "- Files synced from: src-theme/" >> $GITHUB_STEP_SUMMARY
-        echo "- Target repository: ${{ github.repository_owner }}/liquidbounce-theme" >> $GITHUB_STEP_SUMMARY
+        {
+          echo "Theme repository sync completed!"
+          echo "- Source commit: ${{ github.sha }}"
+          echo "- Files synced from: src-theme/"
+          echo "- Target repository: ${{ github.repository_owner }}/liquidbounce-theme"
+        } >> "$GITHUB_STEP_SUMMARY"

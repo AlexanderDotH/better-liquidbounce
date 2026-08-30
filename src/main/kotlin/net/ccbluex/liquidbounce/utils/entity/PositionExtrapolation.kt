@@ -34,10 +34,16 @@ fun interface PositionExtrapolation {
     fun getPositionInTicks(ticks: Double): Vec3
 
     companion object {
+        private var playerFactory: (Player) -> PositionExtrapolation = ::LinearPositionExtrapolation
+
+        fun installPlayerFactory(factory: (Player) -> PositionExtrapolation) {
+            playerFactory = factory
+        }
+
         @JvmStatic
         fun getBestForEntity(target: Entity): PositionExtrapolation {
             return when (target) {
-                is Player -> PlayerSimulationExtrapolation(target)
+                is Player -> playerFactory(target)
                 else -> LinearPositionExtrapolation(target)
             }
         }
@@ -63,8 +69,6 @@ class LinearPositionExtrapolation(
 }
 
 class PlayerSimulationExtrapolation(private val simulation: SimulatedPlayerCache) : PositionExtrapolation {
-    constructor(player: Player) : this(PlayerSimulationCache.getSimulationForOtherPlayers(player))
-
     override fun getPositionInTicks(ticks: Double): Vec3 {
         val ticks = max(0, round(ticks.coerceAtMost(30.0)).toInt())
         return this.simulation.getSnapshotAt(ticks).pos

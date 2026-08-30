@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import {readFileSync} from "node:fs";
 import test from "node:test";
+import {readComponentSourceWithStyles} from "./themeSource.mjs";
 
 const clickGuiRoot = new URL("../src/routes/clickgui/", import.meta.url);
 
@@ -8,9 +9,13 @@ function read(relativePath) {
     return readFileSync(new URL(relativePath, clickGuiRoot), "utf8");
 }
 
+function readGraph(relativePath) {
+    return readComponentSourceWithStyles(new URL(relativePath, clickGuiRoot));
+}
+
 test("layout reset updates mounted panels instead of remounting transition descendants", () => {
     const clickGui = read("themes/modern/ModernClickGui.svelte");
-    const panel = read("themes/modern/ModernPanel.svelte");
+    const panel = readGraph("themes/modern/ModernPanel.svelte");
 
     assert.doesNotMatch(clickGui, /#key\s+layoutGeneration/);
     assert.match(clickGui, /resetVersion=/);
@@ -19,7 +24,7 @@ test("layout reset updates mounted panels instead of remounting transition desce
 
 test("setting transitions stay local when an ancestor theme or panel is removed", () => {
     for (const relativePath of [
-        "setting/common/GenericSetting.svelte",
+        "../../shared/settings/GenericSetting.svelte",
         "setting/MultiChooseSetting.svelte",
         "setting/list/GenericListSetting.svelte",
         "setting/list/RegistryMutableListSetting.svelte",
@@ -57,7 +62,7 @@ test("the production build keeps the dev fixture out of its entry graph", () => 
 });
 
 test("CEF search uses only the websocket keyboard bridge while the dev preview opts into native input", () => {
-    const search = read("themes/modern/ModernSearch.svelte");
+    const search = readGraph("themes/modern/ModernSearch.svelte");
     const tabbed = read("themes/modern/ModernTabbedClickGui.svelte");
     const previewMain = readFileSync(
         new URL("../src/dev/modern-clickgui-preview/main.ts", import.meta.url),
@@ -71,8 +76,8 @@ test("CEF search uses only the websocket keyboard bridge while the dev preview o
 });
 
 test("Modern modules defer settings requests until an expandable module is open", () => {
-    const panel = read("themes/modern/ModernPanel.svelte");
-    const module = read("themes/modern/ModernModule.svelte");
+    const panel = readGraph("themes/modern/ModernPanel.svelte");
+    const module = readGraph("themes/modern/ModernModule.svelte");
     const moduleFunctions = readFileSync(
         new URL(
             "../../src/main/kotlin/net/ccbluex/liquidbounce/integration/interop/protocol/rest/v1/client/ModuleFunctions.kt",
@@ -93,7 +98,7 @@ test("Modern modules defer settings requests until an expandable module is open"
 });
 
 test("panel-level module events are not duplicated by every Modern module row", () => {
-    const panel = read("themes/modern/ModernPanel.svelte");
+    const panel = readGraph("themes/modern/ModernPanel.svelte");
     const module = read("themes/modern/ModernModule.svelte");
 
     assert.match(panel, /listen\("moduleToggle"/);
@@ -101,13 +106,13 @@ test("panel-level module events are not duplicated by every Modern module row", 
 });
 
 test("panel scrolling keeps transient position outside reactive panel state", () => {
-    const panel = read("themes/modern/ModernPanel.svelte");
+    const panel = readGraph("themes/modern/ModernPanel.svelte");
     const handler = panel.match(
-        /function handleModulesScroll\(\): void \{[\s\S]*?\n    \}/,
+        /function handleScroll\(\): void \{[\s\S]*?\n    \}/,
     )?.[0];
 
     assert.ok(handler);
-    assert.match(handler, /currentScrollTop\s*=\s*modulesElement\.scrollTop/);
+    assert.match(handler, /onScrollTop\(element\.scrollTop\)/);
     assert.doesNotMatch(handler, /panelState\.scrollTop\s*=/);
     assert.match(panel, /scrollTop:\s*currentScrollTop/);
     assert.match(panel, /class:scrolling/);

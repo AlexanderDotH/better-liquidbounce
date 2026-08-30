@@ -10,6 +10,7 @@
  */
 package net.ccbluex.liquidbounce.features.module.modules.world.basefinder
 
+import net.ccbluex.liquidbounce.features.module.modules.world.basefinder.model.BaseFinderBlockRegistry
 import net.ccbluex.liquidbounce.test.MinecraftBootstrap
 import net.minecraft.core.BlockPos
 import net.minecraft.core.registries.BuiltInRegistries

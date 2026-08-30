@@ -1,10 +1,10 @@
 import assert from "node:assert/strict";
 import {readFileSync} from "node:fs";
 import test from "node:test";
+import {readSourceWithStyles} from "./themeSource.mjs";
 
-const selector = readFileSync(
-    new URL("../src/routes/hud/theme/HudThemeSelector.svelte", import.meta.url),
-    "utf8",
+const selector = readSourceWithStyles(
+    new URL("../src/shared/hud-theme/HudThemeSelector.svelte", import.meta.url),
 );
 
 test("offers self-contained card and compact HUD theme selector variants", () => {

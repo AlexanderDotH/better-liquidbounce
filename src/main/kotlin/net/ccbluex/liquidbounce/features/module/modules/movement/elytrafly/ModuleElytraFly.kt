@@ -19,7 +19,7 @@
 package net.ccbluex.liquidbounce.features.module.modules.movement.elytrafly
 
 import net.ccbluex.liquidbounce.config.types.group.ToggleableValueGroup
-import net.ccbluex.liquidbounce.config.types.list.Tagged
+import net.ccbluex.liquidbounce.common.Tagged
 import net.ccbluex.liquidbounce.event.tickHandler
 import net.ccbluex.liquidbounce.features.module.ClientModule
 import net.ccbluex.liquidbounce.features.module.ModuleCategories
@@ -28,12 +28,11 @@ import net.ccbluex.liquidbounce.features.module.modules.movement.elytrafly.modes
 import net.ccbluex.liquidbounce.features.module.modules.movement.elytrafly.modes.ElytraFlyModePitch40Infinite
 import net.ccbluex.liquidbounce.features.module.modules.movement.elytrafly.modes.ElytraFlyModeStatic
 import net.ccbluex.liquidbounce.features.module.modules.movement.elytrafly.modes.ElytraFlyModeVanilla
+import net.ccbluex.liquidbounce.features.module.modules.movement.elytrafly.runtime.ElytraFlyRuntime
+import net.ccbluex.liquidbounce.features.module.modules.movement.elytrafly.runtime.shouldNotOperateElytraFly
 import net.ccbluex.liquidbounce.utils.entity.moving
 import net.ccbluex.liquidbounce.utils.entity.set
 import net.minecraft.network.protocol.game.ServerboundPlayerCommandPacket
-import net.minecraft.world.effect.MobEffects
-import net.minecraft.world.entity.EquipmentSlot
-import net.minecraft.world.item.Items
 
 /**
  * ElytraFly module
@@ -61,6 +60,12 @@ object ModuleElytraFly : ClientModule("ElytraFly", ModuleCategories.MOVEMENT) {
 
     init {
         tree(Speed)
+        ElytraFlyRuntime.bind(
+            speedEnabledProvider = { Speed.enabled },
+            horizontalSpeedProvider = { Speed.horizontal },
+            verticalSpeedProvider = { Speed.vertical },
+            messageProvider = { key, arguments -> message(key, *arguments) },
+        )
     }
 
     internal val modes = choices("Mode", ElytraFlyModeStatic, arrayOf(
@@ -136,21 +141,7 @@ object ModuleElytraFly : ClientModule("ElytraFly", ModuleCategories.MOVEMENT) {
         }
     }
 
-    fun shouldNotOperate(): Boolean {
-        if (player.vehicle != null) {
-            return true
-        }
-
-        if (player.abilities.instabuild || player.hasEffect(MobEffects.LEVITATION)) {
-            return true
-        }
-
-        // Find the chest slot
-        val chestSlot = player.getItemBySlot(EquipmentSlot.CHEST)
-
-        // If the player doesn't have an elytra in the chest slot or is in fluids
-        return chestSlot.item != Items.ELYTRA || chestSlot.nextDamageWillBreak()
-    }
+    fun shouldNotOperate(): Boolean = shouldNotOperateElytraFly(player)
 
     private enum class Instant(
         override val tag: String

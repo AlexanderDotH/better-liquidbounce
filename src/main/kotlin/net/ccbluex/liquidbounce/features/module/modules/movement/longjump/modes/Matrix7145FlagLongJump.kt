@@ -20,13 +20,12 @@
 package net.ccbluex.liquidbounce.features.module.modules.movement.longjump.modes
 
 import net.ccbluex.liquidbounce.config.types.group.Mode
-import net.ccbluex.liquidbounce.config.types.group.ModeValueGroup
 import net.ccbluex.liquidbounce.event.events.PacketEvent
 import net.ccbluex.liquidbounce.event.handler
 import net.ccbluex.liquidbounce.event.tickHandler
 import net.ccbluex.liquidbounce.event.tickUntil
 import net.ccbluex.liquidbounce.event.waitTicks
-import net.ccbluex.liquidbounce.features.module.modules.movement.longjump.ModuleLongJump
+import net.ccbluex.liquidbounce.features.module.modules.movement.longjump.runtime.LongJumpRuntime
 import net.ccbluex.liquidbounce.utils.entity.airTicks
 import net.ccbluex.liquidbounce.utils.entity.withStrafe
 import net.ccbluex.liquidbounce.utils.math.copy
@@ -39,8 +38,6 @@ import net.minecraft.network.protocol.game.ClientboundPlayerPositionPacket
  */
 internal object Matrix7145FlagLongJump : Mode("Matrix-7.14.5-Flag") {
 
-    override val parent: ModeValueGroup<*>
-        get() = ModuleLongJump.mode
 
     private val boostSpeed by float("BoostSpeed", 1.97f, 0.1f..5f)
     private val motionY by float("MotionY", 0.42f, 0.0f..5.0f)
@@ -75,8 +72,8 @@ internal object Matrix7145FlagLongJump : Mode("Matrix-7.14.5-Flag") {
         // Reset
         tickUntil { player.onGround() }
         flagTicks = 0
-        if (ModuleLongJump.autoDisable) {
-            ModuleLongJump.enabled = false
+        if (LongJumpRuntime.autoDisable) {
+            LongJumpRuntime.disableModule()
         }
     }
 

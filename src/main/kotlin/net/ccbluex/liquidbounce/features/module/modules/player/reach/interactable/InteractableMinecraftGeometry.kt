@@ -10,26 +10,15 @@
  */
 package net.ccbluex.liquidbounce.features.module.modules.player.reach.interactable
 
+import net.ccbluex.liquidbounce.features.module.modules.player.reach.contract.interactableSweepWaypoints as contractSweepWaypoints
 import net.ccbluex.liquidbounce.features.module.modules.player.reach.interactable.target.InteractableEntityKind
 import net.minecraft.core.BlockPos
 import net.minecraft.world.phys.AABB
 import net.minecraft.world.phys.Vec3
-import kotlin.math.abs
 
 /** Collision sweep used for a normal one-block step instead of intersecting its support block diagonally. */
 internal fun interactableSweepWaypoints(from: Vec3, to: Vec3): List<Vec3> {
-    val hasHorizontalTravel = abs(from.x - to.x) > POSITION_EPSILON || abs(from.z - to.z) > POSITION_EPSILON
-    val verticalDistance = abs(from.y - to.y)
-    if (!hasHorizontalTravel || verticalDistance < STEP_HEIGHT_THRESHOLD ||
-        verticalDistance > MAXIMUM_STEP_HEIGHT
-    ) {
-        return listOf(to)
-    }
-    return if (to.y > from.y) {
-        listOf(Vec3(from.x, to.y, from.z), to)
-    } else {
-        listOf(Vec3(to.x, from.y, to.z), to)
-    }
+    return contractSweepWaypoints(from, to)
 }
 
 internal fun interactionOutlinePoints(position: BlockPos, boxes: List<AABB>): List<Vec3> = boxes.flatMap { box ->
@@ -53,7 +42,3 @@ internal fun isInteractableMenuAvailable(
 
 internal fun requiresSecondaryUse(kind: InteractableEntityKind): Boolean =
     kind == InteractableEntityKind.CHEST_BOAT || kind == InteractableEntityKind.CHEST_RAFT
-
-private const val POSITION_EPSILON = 1.0E-6
-private const val STEP_HEIGHT_THRESHOLD = 0.5
-private const val MAXIMUM_STEP_HEIGHT = 1.0 + POSITION_EPSILON

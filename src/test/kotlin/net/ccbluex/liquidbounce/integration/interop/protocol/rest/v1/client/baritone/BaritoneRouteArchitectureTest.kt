@@ -25,13 +25,16 @@ import kotlin.test.assertContains
 
 class BaritoneRouteArchitectureTest {
 
-    private val sourcePath = Path.of(
-        "src/main/kotlin/net/ccbluex/liquidbounce/integration/interop/protocol/rest/v1/client/BaritoneFunctions.kt"
+    private val routesSourcePath = Path.of(
+        "src/main/kotlin/net/ccbluex/liquidbounce/integration/interop/protocol/rest/v1/client/BaritoneRoutes.kt"
+    )
+    private val requestParsingSourcePath = Path.of(
+        "src/main/kotlin/net/ccbluex/liquidbounce/integration/interop/protocol/rest/v1/client/BaritoneRequestParsing.kt"
     )
 
     @Test
     fun `baritone route exposes the complete public HTTP contract`() {
-        val source = Files.readString(sourcePath)
+        val source = Files.readString(routesSourcePath)
 
         listOf(
             "route(\"/baritone\")",
@@ -56,15 +59,16 @@ class BaritoneRouteArchitectureTest {
 
     @Test
     fun `every mutating handler crosses the injected Minecraft dispatcher boundary`() {
-        val source = Files.readString(sourcePath)
+        val routesSource = Files.readString(routesSourcePath)
+        val requestParsingSource = Files.readString(requestParsingSourcePath)
 
-        assertContains(source, "writeDispatcher: CoroutineDispatcher = Dispatchers.Minecraft")
-        assertContains(source, "withContext(writeDispatcher)")
+        assertContains(routesSource, "writeDispatcher: CoroutineDispatcher = Dispatchers.Minecraft")
+        assertContains(requestParsingSource, "withContext(writeDispatcher)")
     }
 
     @Test
     fun `baritone failures use the structured error contract`() {
-        val source = Files.readString(sourcePath)
+        val source = Files.readString(requestParsingSourcePath)
 
         assertContains(source, "\"code\" to")
         assertContains(source, "\"message\" to")

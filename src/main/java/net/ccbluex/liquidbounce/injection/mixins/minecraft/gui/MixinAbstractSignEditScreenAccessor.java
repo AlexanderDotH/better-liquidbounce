@@ -19,17 +19,20 @@
 
 package net.ccbluex.liquidbounce.injection.mixins.minecraft.gui;
 
+import net.ccbluex.liquidbounce.interfaces.SignEditScreenAccess;
 import net.minecraft.client.gui.screens.inventory.AbstractSignEditScreen;
 import net.minecraft.world.level.block.entity.SignBlockEntity;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.gen.Accessor;
 
 @Mixin(AbstractSignEditScreen.class)
-public interface MixinAbstractSignEditScreenAccessor {
+public interface MixinAbstractSignEditScreenAccessor extends SignEditScreenAccess {
 
+    @Override
     @Accessor("messages")
     String[] getMessages();
 
+    @Override
     @Accessor("sign")
     SignBlockEntity getSign();
 }

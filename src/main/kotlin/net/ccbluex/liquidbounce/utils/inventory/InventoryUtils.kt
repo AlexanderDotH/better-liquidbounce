@@ -16,11 +16,12 @@
  * You should have received a copy of the GNU General Public License
  * along with LiquidBounce. If not, see <https://www.gnu.org/licenses/>.
  */
-@file:Suppress("TooManyFunctions", "WildcardImport")
+@file:JvmName("InventoryUtilsKt")
+@file:JvmMultifileClass
+@file:Suppress("WildcardImport")
 
 package net.ccbluex.liquidbounce.utils.inventory
 
-import net.ccbluex.liquidbounce.event.EventListener
 import net.ccbluex.liquidbounce.utils.aiming.RotationManager
 import net.ccbluex.liquidbounce.utils.block.SwingMode
 import net.ccbluex.liquidbounce.utils.client.SilentHotbar
@@ -29,7 +30,6 @@ import net.ccbluex.liquidbounce.utils.client.player
 import net.ccbluex.liquidbounce.utils.collection.blockSortedSetOf
 import net.ccbluex.liquidbounce.utils.item.durability
 import net.ccbluex.liquidbounce.utils.item.getDestroySpeedWithEnchantment
-import net.ccbluex.liquidbounce.utils.item.isMergeable
 import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen
 import net.minecraft.core.registries.BuiltInRegistries
 import net.minecraft.world.InteractionResult
@@ -42,31 +42,6 @@ import java.util.SortedSet
 import java.util.function.BiPredicate
 import java.util.function.ToDoubleFunction
 
-fun hasInventorySpace() = player.inventory.nonEquipmentItems.any { it.isEmpty }
-
-fun findEmptyStorageSlotsInInventory(): List<ItemSlot> {
-    return (Slots.Inventory + Slots.Hotbar).filter { it.itemStack.isEmpty }
-}
-
-fun findNonEmptyStorageSlotsInInventory(): List<ItemSlot> {
-    return (Slots.Inventory + Slots.Hotbar).filter { !it.itemStack.isEmpty }
-}
-
-fun findNonEmptySlotsInInventory(): List<ItemSlot> {
-    return Slots.All.filter { !it.itemStack.isEmpty }
-}
-
-fun Iterable<ItemSlot>.mergeableCapacityFor(itemStack: ItemStack, blacklist: Collection<ItemSlot>? = null): Int =
-    sumOf {
-        val targetStack = it.itemStack
-        when {
-            blacklist != null && it in blacklist -> 0
-            targetStack.isEmpty -> itemStack.maxStackSize
-            targetStack.isMergeable(itemStack) -> targetStack.maxStackSize - targetStack.count
-            else -> 0
-        }
-    }
-
 fun AbstractContainerScreen<*>.getSlotsInContainer(): List<ContainerItemSlot> =
     this.menu.slots
         .filter { it.container !== player.inventory }
@@ -78,7 +53,7 @@ fun AbstractContainerScreen<*>.findItemsInContainer(): List<ContainerItemSlot> =
         .map { ContainerItemSlot(it.index) }
 
 @JvmOverloads
-context(requester: EventListener)
+context(requester: Any)
 fun useHotbarSlotOrOffhand(
     slot: HotbarItemSlot,
     ticksUntilReset: Int = 1,

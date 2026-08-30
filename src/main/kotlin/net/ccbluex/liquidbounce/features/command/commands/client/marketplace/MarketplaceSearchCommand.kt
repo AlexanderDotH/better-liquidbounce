@@ -20,22 +20,16 @@ package net.ccbluex.liquidbounce.features.command.commands.client.marketplace
 
 import net.ccbluex.liquidbounce.api.services.marketplace.MarketplaceApi
 import net.ccbluex.liquidbounce.features.command.Command
-import net.ccbluex.liquidbounce.features.command.CommandExecutor.suspendHandler
+import net.ccbluex.liquidbounce.features.command.CommandRuntime.suspendHandler
+import net.ccbluex.liquidbounce.features.command.commands.client.marketplace.presentation.renderMarketplaceItemPage
 import net.ccbluex.liquidbounce.features.command.builder.CommandBuilder
 import net.ccbluex.liquidbounce.features.command.builder.ParameterBuilder
-import net.ccbluex.liquidbounce.features.marketplace.MarketplaceManager
-import net.ccbluex.liquidbounce.utils.client.chat
-import net.ccbluex.liquidbounce.utils.client.onClick
-import net.ccbluex.liquidbounce.utils.client.onHover
-import net.ccbluex.liquidbounce.utils.client.regular
-import net.ccbluex.liquidbounce.utils.client.variable
-import net.minecraft.network.chat.ClickEvent
-import net.minecraft.network.chat.HoverEvent
+import net.ccbluex.liquidbounce.features.chat.chat
+import net.ccbluex.liquidbounce.utils.text.regular
 
 /**
  * Search marketplace items
  */
-@Suppress("LongMethod", "CognitiveComplexMethod")
 object MarketplaceSearchCommand : Command.Factory {
 
     override fun createCommand() = CommandBuilder.begin("search")
@@ -66,39 +60,7 @@ object MarketplaceSearchCommand : Command.Factory {
                 query = query
             )
 
-            if (response.items.isEmpty()) {
-                chat(regular(command.result("noResults")))
-                return@suspendHandler
-            }
-
-            chat(regular(command.result("header",
-                variable(page.toString()),
-                variable(response.pagination.pages.toString())
-            )))
-
-            for (item in response.items) {
-                val isSubscribed = MarketplaceManager.isSubscribed(item.id)
-                val action = if (isSubscribed) "unsubscribe" else "subscribe"
-                chat(
-                    regular(
-                        command.result(
-                            "item",
-                            variable(item.id.toString()),
-                            variable("${item.name}${if (isSubscribed) "*" else ""}"),
-                            variable(item.type.toString().lowercase()),
-                            variable(if (item.featured) "★" else "")
-                        ).onClick(
-                            ClickEvent.SuggestCommand(
-                                ".marketplace $action ${item.id}"
-                            )
-                        ).onHover(
-                            HoverEvent.ShowText(
-                                variable(command.result("hover", variable(action), item.id))
-                            )
-                        )
-                    )
-                )
-            }
+            command.renderMarketplaceItemPage("noResults", page, response.pagination.pages, response.items)
         }
         .build()
 }

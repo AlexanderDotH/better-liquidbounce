@@ -18,9 +18,10 @@
  */
 package net.ccbluex.liquidbounce.integration.interop.protocol.event
 
+import net.ccbluex.liquidbounce.event.WebSocketEvent
+
 import com.google.gson.stream.JsonWriter
 import it.unimi.dsi.fastutil.objects.Reference2ObjectOpenHashMap
-import net.ccbluex.liquidbounce.event.ALL_EVENT_CLASSES
 import net.ccbluex.liquidbounce.event.Event
 import net.ccbluex.liquidbounce.event.EventHook
 import net.ccbluex.liquidbounce.event.EventListener
@@ -33,9 +34,10 @@ import org.apache.commons.io.output.StringBuilderWriter
 
 internal object SocketEventListener : EventListener {
 
-    private val events = ALL_EVENT_CLASSES
-        .filter { WebSocketEvent::class.java.isAssignableFrom(it) }
-        .associateBy { it.eventName }
+    private val events: Map<String, Class<out Event>>
+        get() = EventManager.registeredEventClasses()
+            .filter { WebSocketEvent::class.java.isAssignableFrom(it) }
+            .associateBy { it.eventName }
 
     /**
      * Contains all events that are registered in the current context

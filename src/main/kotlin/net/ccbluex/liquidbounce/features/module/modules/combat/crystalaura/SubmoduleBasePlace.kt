@@ -18,27 +18,26 @@
  */
 package net.ccbluex.liquidbounce.features.module.modules.combat.crystalaura
 
-import it.unimi.dsi.fastutil.doubles.DoubleDoubleImmutablePair
-import net.ccbluex.fastutil.mapToArray
 import net.ccbluex.liquidbounce.config.types.group.ToggleableValueGroup
 import net.ccbluex.liquidbounce.event.events.GameTickEvent
 import net.ccbluex.liquidbounce.event.handler
+import net.ccbluex.liquidbounce.features.module.modules.combat.crystalaura.place.BasePlaceLayerPlanner
+import net.ccbluex.liquidbounce.features.module.modules.combat.crystalaura.place.BasePlaceTrapSafety
 import net.ccbluex.liquidbounce.features.module.modules.combat.crystalaura.place.PlacementPositionCandidate
 import net.ccbluex.liquidbounce.features.module.modules.combat.crystalaura.place.SubmoduleCrystalPlacer
 import net.ccbluex.liquidbounce.render.FULL_BOX
 import net.ccbluex.liquidbounce.utils.block.getCenterDistanceSquared
 import net.ccbluex.liquidbounce.utils.block.isBlockedByEntities
-import net.ccbluex.liquidbounce.utils.block.placer.BlockPlacer
+import net.ccbluex.liquidbounce.features.block.placer.BlockPlacer
 import net.ccbluex.liquidbounce.utils.block.stateOrEmpty
 import net.ccbluex.liquidbounce.utils.client.Chronometer
-import net.ccbluex.liquidbounce.utils.entity.PlayerSimulationCache
+import net.ccbluex.liquidbounce.features.simulation.PlayerSimulationCache
 import net.ccbluex.liquidbounce.utils.inventory.Slots
 import net.ccbluex.liquidbounce.utils.kotlin.Priority
 import net.ccbluex.liquidbounce.utils.math.sq
 import net.minecraft.core.BlockPos
 import net.minecraft.world.item.Items
 import net.minecraft.world.level.block.state.BlockState
-import kotlin.math.ceil
 import kotlin.math.floor
 import kotlin.math.max
 
@@ -177,20 +176,7 @@ object SubmoduleBasePlace : ToggleableValueGroup(ModuleCrystalAura, "BasePlace",
      * Returns a set of y levels the  base place can be placed in.
      */
     fun getBasePlaceLayers(targetY: Double): IntRange {
-        var down = 3
-        var maxY = if (targetY % 1 > 0.2) {
-            down++
-            ceil(targetY).toInt()
-        } else {
-            floor(targetY).toInt()
-        }
-
-        if (platformOnly) {
-            maxY--
-            down--
-        }
-
-        return maxY - down + 1..maxY
+        return BasePlaceLayerPlanner.layers(targetY, platformOnly)
     }
 
     /**
@@ -253,101 +239,9 @@ object SubmoduleBasePlace : ToggleableValueGroup(ModuleCrystalAura, "BasePlace",
      * Checks if the position traps the player.
      */
     private fun willNotTrap(pos: BlockPos): Boolean {
-        val bb = player.boundingBox
-        val yA = ceil(bb.minY)
-        val yB = floor(bb.maxY)
-
-        val positions = arrayOf(
-            DoubleDoubleImmutablePair(bb.minX, bb.minZ),
-            DoubleDoubleImmutablePair(bb.minX, bb.maxZ),
-            DoubleDoubleImmutablePair(bb.maxX, bb.minZ),
-            DoubleDoubleImmutablePair(bb.maxX, bb.maxZ)
-        )
-
-        // the block layer below the player, if the player is clipped in the ground block a bit, it doesn't matter
-        val floor = positions.mapToArray {
-            BlockPos.containing(
-                it.keyDouble(),
-                yA - 1.0,
-                it.valueDouble()
-            )
+        return BasePlaceTrapSafety.willNotTrap(pos, player.boundingBox) { blockPos ->
+            blockPos.stateOrEmpty.isSolid
         }
-
-        // the first wall layer
-        val layerA = positions.mapToArray {
-            BlockPos.containing(
-                it.keyDouble(),
-                yA,
-                it.valueDouble()
-            )
-        }
-
-        // the second wall layer
-        val layerB = positions.mapToArray {
-            BlockPos.containing(
-                it.keyDouble(),
-                yB,
-                it.valueDouble()
-            )
-        }
-
-        // the blocks above the player
-        val ceiling = positions.mapToArray {
-            BlockPos.containing(
-                it.keyDouble(),
-                yB + 1.0,
-                it.valueDouble()
-            )
-        }
-
-        val isInFloorOrCeiling = pos in floor || pos in ceiling
-        if (isInFloorOrCeiling) {
-            return canEscapeThroughSides(layerA, layerB)
-        }
-
-        val isInWall = pos in layerA || pos in layerB
-        if (isInWall) {
-            return canEscapeThroughFloorOrCeiling(ceiling, floor)
-        }
-
-        return true
-    }
-
-    private fun canEscapeThroughFloorOrCeiling(
-        ceiling: Array<BlockPos>,
-        floor: Array<BlockPos>
-    ): Boolean {
-        // Can we escape through the ceiling?
-        ceiling.forEach { pos1 ->
-            if (!pos1.stateOrEmpty.isSolid && !pos1.above().stateOrEmpty.isSolid) {
-                return true
-            }
-        }
-
-        // Can we escape through the floor?
-        // For example, with this floor:
-        // o = air, x = a solid block
-        // o x
-        // x x
-        // we could escape
-        floor.forEach { pos1 ->
-            if (!pos1.stateOrEmpty.isSolid && !pos1.below().stateOrEmpty.isSolid) {
-                return true
-            }
-        }
-
-        return false
-    }
-
-    private fun canEscapeThroughSides(layerA: Array<BlockPos>, layerB: Array<BlockPos>): Boolean {
-        // Do we find and escape side?
-        layerA.forEachIndexed { index, pos1 ->
-            if (!pos1.stateOrEmpty.isSolid && !layerB[index].stateOrEmpty.isSolid) {
-                return true
-            }
-        }
-
-        return false
     }
 
 }

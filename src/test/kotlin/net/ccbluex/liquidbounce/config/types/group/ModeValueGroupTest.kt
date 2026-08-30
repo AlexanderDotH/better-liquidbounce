@@ -24,9 +24,22 @@ import net.ccbluex.liquidbounce.config.gson.fileGson
 import net.ccbluex.liquidbounce.event.EventListener
 import net.ccbluex.liquidbounce.test.MinecraftBootstrap
 import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertSame
 import org.junit.jupiter.api.Test
 
 class ModeValueGroupTest {
+
+    @Test
+    fun `mode infers its parent from the group-assigned base`() {
+        val listener = object : EventListener {}
+        lateinit var mode: InferredParentMode
+        val group = ModeValueGroup<Mode>(listener, "Mode", { 0 }) {
+            arrayOf(InferredParentMode().also { mode = it })
+        }
+
+        assertSame(group, mode.parent)
+        assertSame(listener, mode.parent())
+    }
 
     @Test
     fun `categorized modes preserve category and mode order in interop metadata`() {
@@ -97,5 +110,7 @@ class ModeValueGroupTest {
     ) : Mode(name) {
         val amountValue = int("Amount", 0, 0..100)
     }
+
+    private class InferredParentMode : Mode("Inferred")
 
 }

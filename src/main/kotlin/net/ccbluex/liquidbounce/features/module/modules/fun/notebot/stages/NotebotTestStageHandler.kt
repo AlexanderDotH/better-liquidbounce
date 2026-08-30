@@ -18,28 +18,31 @@
  */
 package net.ccbluex.liquidbounce.features.module.modules.`fun`.notebot.stages
 
-import net.ccbluex.liquidbounce.features.module.modules.`fun`.notebot.ModuleNotebot
-import net.ccbluex.liquidbounce.features.module.modules.`fun`.notebot.NoteBlockTracker
-import net.ccbluex.liquidbounce.features.module.modules.`fun`.notebot.NotebotEngine
-import net.ccbluex.liquidbounce.utils.client.chat
+import net.ccbluex.liquidbounce.features.module.modules.`fun`.notebot.contract.NotebotRuntimeBridge
+import net.ccbluex.liquidbounce.features.module.modules.`fun`.notebot.contract.NotebotStage
+import net.ccbluex.liquidbounce.features.module.modules.`fun`.notebot.runtime.NoteBlockTracker
+import net.ccbluex.liquidbounce.features.module.modules.`fun`.notebot.runtime.NotebotEngine
+import net.ccbluex.liquidbounce.features.module.modules.`fun`.notebot.runtime.NotebotStageHandler
 import net.minecraft.ChatFormatting
 
 // we could also read the note property from blocks, but I've found this unreliable
 // this design also seems more future-proof if minecraft should stop sending this data to the client in future versions
-class NotebotTestStageHandler(engine: NotebotEngine): ModuleNotebot.NotebotStageHandler {
+internal class NotebotTestStageHandler(engine: NotebotEngine) : NotebotStageHandler {
 
-    private val progressName = ModuleNotebot.message("progressTest")
+    private val progressName = NotebotRuntimeBridge.message("progressTest")
     private val allBlocks = engine.blocksAndRequirements.availableBlocks.flatMap { it.value }
     private val remainingNoteBlocks = ArrayDeque(allBlocks)
 
-    override val handledStage: ModuleNotebot.NotebotStage
-        get() = ModuleNotebot.NotebotStage.TEST
+    override val handledStage: NotebotStage
+        get() = NotebotStage.TEST
 
     override fun onTick(engine: NotebotEngine) {
         val untestedBlock = getNextBlockToTest()
 
         if (untestedBlock == null) {
-            chat(ModuleNotebot.message("startTuning").withStyle(ChatFormatting.GREEN), ModuleNotebot)
+            NotebotRuntimeBridge.chat(
+                NotebotRuntimeBridge.message("startTuning").withStyle(ChatFormatting.GREEN)
+            )
             engine.changeStage(NotebotTuneStageHandler(engine))
 
             return
@@ -59,7 +62,7 @@ class NotebotTestStageHandler(engine: NotebotEngine): ModuleNotebot.NotebotStage
 
         val total = this.allBlocks.size
 
-        ModuleNotebot.sendNewProgressMessage(progressName, total - notTestedBlocks, total)
+        NotebotRuntimeBridge.sendProgress(progressName, total - notTestedBlocks, total)
     }
 
     private fun getNextBlockToTest(): NoteBlockTracker? {

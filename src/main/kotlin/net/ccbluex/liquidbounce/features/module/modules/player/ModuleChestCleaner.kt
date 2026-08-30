@@ -25,10 +25,10 @@ import net.ccbluex.liquidbounce.features.module.ClientModule
 import net.ccbluex.liquidbounce.features.module.ModuleCategories
 import net.ccbluex.liquidbounce.utils.collection.Filter
 import net.ccbluex.liquidbounce.utils.collection.itemSortedSetOf
-import net.ccbluex.liquidbounce.utils.inventory.CheckScreenHandlerTypeValueGroup
-import net.ccbluex.liquidbounce.utils.inventory.CheckScreenTitleValueGroup
+import net.ccbluex.liquidbounce.features.inventory.CheckScreenHandlerTypeValueGroup
+import net.ccbluex.liquidbounce.features.inventory.CheckScreenTitleValueGroup
 import net.ccbluex.liquidbounce.utils.inventory.InventoryAction
-import net.ccbluex.liquidbounce.utils.inventory.PlayerInventoryConstraints
+import net.ccbluex.liquidbounce.features.inventory.PlayerInventoryConstraints
 import net.ccbluex.liquidbounce.utils.inventory.findItemsInContainer
 import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen
 import net.minecraft.client.gui.screens.inventory.InventoryScreen

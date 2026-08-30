@@ -20,14 +20,13 @@
 package net.ccbluex.liquidbounce.features.module.modules.movement.fly.modes.sentinel
 
 import net.ccbluex.liquidbounce.config.types.group.Mode
-import net.ccbluex.liquidbounce.config.types.group.ModeValueGroup
 import net.ccbluex.liquidbounce.event.events.NotificationEvent
 import net.ccbluex.liquidbounce.event.events.PlayerMoveEvent
 import net.ccbluex.liquidbounce.event.handler
 import net.ccbluex.liquidbounce.event.tickHandler
 import net.ccbluex.liquidbounce.event.waitTicks
 import net.ccbluex.liquidbounce.features.module.modules.exploit.ModulePingSpoof
-import net.ccbluex.liquidbounce.features.module.modules.movement.fly.ModuleFly
+import net.ccbluex.liquidbounce.features.module.modules.movement.fly.runtime.FlyModuleControl
 import net.ccbluex.liquidbounce.features.module.modules.movement.fly.automation.FlyAutomationCapabilities
 import net.ccbluex.liquidbounce.features.module.modules.movement.fly.automation.FlyAutomationEnd
 import net.ccbluex.liquidbounce.features.module.modules.movement.fly.automation.FlyAutomationKind
@@ -37,11 +36,11 @@ import net.ccbluex.liquidbounce.features.module.modules.movement.fly.modes.FlyAu
 import net.ccbluex.liquidbounce.features.module.modules.movement.fly.modes.flyAutomationJump
 import net.ccbluex.liquidbounce.features.module.modules.movement.fly.modes.flyAutomationSneak
 import net.ccbluex.liquidbounce.features.module.modules.movement.fly.modes.withFlyAutomationStrafe
-import net.ccbluex.liquidbounce.features.module.modules.movement.speed.ModuleSpeed
+import net.ccbluex.liquidbounce.features.module.modules.movement.speed.contract.SpeedState
 import net.ccbluex.liquidbounce.lang.translation
-import net.ccbluex.liquidbounce.utils.client.chat
-import net.ccbluex.liquidbounce.utils.client.notification
-import net.ccbluex.liquidbounce.utils.client.regular
+import net.ccbluex.liquidbounce.features.chat.chat
+import net.ccbluex.liquidbounce.features.chat.notification
+import net.ccbluex.liquidbounce.utils.text.regular
 import net.ccbluex.liquidbounce.utils.movement.stopXZVelocity
 import net.minecraft.network.protocol.game.ServerboundMovePlayerPacket
 
@@ -63,8 +62,6 @@ internal object FlySentinel20thApr : Mode("Sentinel20thApr"), FlyAutomationProfi
     private val boostOnce by boolean("BoostOnce", false)
     private val nostalgia by boolean("Nostalgia", false)
 
-    override val parent: ModeValueGroup<*>
-        get() = ModuleFly.modes
 
     private var hasBeenHurt = false
     private var hasBeenTeleported = false
@@ -91,8 +88,8 @@ internal object FlySentinel20thApr : Mode("Sentinel20thApr"), FlyAutomationProfi
             ModulePingSpoof.enabled = true
         }
 
-        if (ModuleSpeed.enabled) {
-            ModuleSpeed.enabled = false
+        if (SpeedState.enabled) {
+            SpeedState.disable()
         }
 
         hasBeenHurt = false
@@ -113,7 +110,7 @@ internal object FlySentinel20thApr : Mode("Sentinel20thApr"), FlyAutomationProfi
 
         if (boostOnce) {
             automaticEnd.mark("Configured single Sentinel boost completed")
-            ModuleFly.enabled = false
+            FlyModuleControl.disable()
             player.stopXZVelocity()
         }
     }

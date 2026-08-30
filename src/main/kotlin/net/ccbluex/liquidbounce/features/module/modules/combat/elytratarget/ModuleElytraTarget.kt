@@ -23,8 +23,8 @@ import net.ccbluex.liquidbounce.event.tickHandler
 import net.ccbluex.liquidbounce.features.module.ClientModule
 import net.ccbluex.liquidbounce.features.module.ModuleCategories
 import net.ccbluex.liquidbounce.features.module.modules.combat.killaura.ModuleKillAura
-import net.ccbluex.liquidbounce.utils.combat.TargetTracker
-import net.ccbluex.liquidbounce.utils.render.TargetRenderer
+import net.ccbluex.liquidbounce.features.combat.runtime.TargetTracker
+import net.ccbluex.liquidbounce.render.target.TargetRenderer
 import net.minecraft.world.entity.LivingEntity
 
 /**
@@ -44,7 +44,7 @@ object ModuleElytraTarget : ClientModule("ElytraTarget", ModuleCategories.COMBAT
         tree(AutoFirework)
     }
 
-    private val targetRenderer = tree(TargetRenderer(this, targetTracker))
+    private val targetRenderer = tree(TargetRenderer(this, targetTracker::target))
     private val safe by boolean("Safe", true)
     private val alwaysGlide by boolean("AlwaysGlide", false)
 

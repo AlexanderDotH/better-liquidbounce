@@ -24,10 +24,10 @@ import net.ccbluex.liquidbounce.event.events.PacketEvent
 import net.ccbluex.liquidbounce.event.handler
 import net.ccbluex.liquidbounce.event.tickHandler
 import net.ccbluex.liquidbounce.event.tickUntil
-import net.ccbluex.liquidbounce.features.module.modules.misc.debugrecorder.ModuleDebugRecorder
+import net.ccbluex.liquidbounce.features.module.modules.misc.debugrecorder.runtime.DebugRecorderMode
 import net.ccbluex.liquidbounce.utils.aiming.RotationManager
 import net.ccbluex.liquidbounce.utils.aiming.data.Rotation
-import net.ccbluex.liquidbounce.utils.client.chat
+import net.ccbluex.liquidbounce.features.chat.chat
 import net.ccbluex.liquidbounce.utils.entity.lastPos
 import net.ccbluex.liquidbounce.utils.entity.lastRotation
 import net.ccbluex.liquidbounce.utils.entity.rotation
@@ -47,7 +47,7 @@ import kotlin.random.Random
 /**
  * Simulates scenarios where the player is training to hit a target.
  */
-object DebugCombatTrainerRecorder : ModuleDebugRecorder.DebugRecorderMode<CombatSample>("CombatTrainer") {
+object DebugCombatTrainerRecorder : DebugRecorderMode<CombatSample>("CombatTrainer") {
 
     private var isFirstRun = true
 

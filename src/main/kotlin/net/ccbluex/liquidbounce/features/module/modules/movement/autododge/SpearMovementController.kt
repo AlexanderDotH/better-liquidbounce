@@ -18,35 +18,20 @@
  */
 package net.ccbluex.liquidbounce.features.module.modules.movement.autododge
 
-import net.ccbluex.liquidbounce.features.module.modules.misc.antibot.ModuleAntiBot
-import net.ccbluex.liquidbounce.utils.entity.SimulatedPlayer
+import net.ccbluex.liquidbounce.features.module.modules.movement.autododge.spearteleport.SpearTeleportDirection
+import net.ccbluex.liquidbounce.features.module.modules.movement.autododge.spearteleport.CombatTeleportThreat
+import net.ccbluex.liquidbounce.features.module.modules.movement.autododge.spearteleport.SpearTeleportPlan
+import net.ccbluex.liquidbounce.features.module.modules.movement.autododge.spearteleport.SpearTeleportRuntime
+import net.ccbluex.liquidbounce.features.module.modules.movement.autododge.spearteleport.SpearTeleportSettings
+import net.ccbluex.liquidbounce.features.module.modules.movement.autododge.spearteleport.SpearTeleportState
+import net.ccbluex.liquidbounce.features.module.modules.movement.autododge.spearteleport.isSafeSpearTeleportCandidate
+
 import net.ccbluex.liquidbounce.utils.entity.wouldFallIntoVoid
-import net.ccbluex.liquidbounce.utils.item.isSpear
-import net.ccbluex.liquidbounce.utils.math.anyNotEmpty
-import net.ccbluex.liquidbounce.utils.movement.DirectionalInput
 import net.minecraft.client.multiplayer.ClientLevel
 import net.minecraft.client.player.LocalPlayer
 import net.minecraft.client.player.RemotePlayer
-import net.minecraft.core.component.DataComponents
 import net.minecraft.network.protocol.game.ServerboundMovePlayerPacket
-import net.minecraft.world.phys.AABB
 import net.minecraft.world.phys.Vec3
-
-internal data class SpearMovementSettings(
-    val enabled: Boolean,
-    val aimMargin: Double,
-    val visibilityGraceTicks: Int,
-    val jukeTicks: IntRange,
-    val threatMemoryTicks: Int,
-    val teleportEnabled: Boolean,
-    val teleport: SpearTeleportSettings,
-)
-
-internal data class SpearMovementResult(
-    val threat: SpearThreat?,
-    val jukePlan: SpearDodgePlan?,
-    val teleportPlan: SpearTeleportPlan?,
-)
 
 /** Coordinates predictive spear threat selection and movement responses, leaving shields independent. */
 internal class SpearMovementController(
@@ -85,7 +70,9 @@ internal class SpearMovementController(
             projectilePlanActive = projectilePlanActive,
             tick = player.tickCount.toLong(),
             playerPosition = player.position(),
-            threat = threat.takeIf { it.requiresTeleport },
+            threat = threat.takeIf { it.requiresTeleport }?.let {
+                CombatTeleportThreat(it.candidate.position, it.candidate.lookDirection, it.trustsAttackerLook)
+            },
             settings = settings.teleport,
             isSafe = { candidate ->
                 isSafeSpearTeleportCandidate(world, player, settings.teleport, candidate)
@@ -175,21 +162,34 @@ internal class SpearMovementController(
         }
         checkNotNull(threat)
 
-        if (committedThreatId != threat.candidate.entityId || committedResponse != threat.response) {
-            jukeCommitment.reset()
-            jukeDecision = null
-            committedThreatId = threat.candidate.entityId
-            committedResponse = threat.response
-        }
-
+        prepareJukeCommitment(threat)
         val playerPosition = player.position().horizontalPosition()
-        val startedSafelyGrounded = player.onGround() && isSupported(world, player, player.boundingBox) &&
+        val startedSafelyGrounded = player.onGround() && isSpearMovementSupported(world, player, player.boundingBox) &&
             !player.wouldFallIntoVoid(player.position(), world.minY.toDouble())
-        jukeDecision = jukeCommitment.update(
+        jukeDecision = buildJukeDecision(threat, player, world, settings, playerPosition, startedSafelyGrounded)
+        return jukeDecision?.plan
+    }
+
+    private fun prepareJukeCommitment(threat: SpearThreat) {
+        if (committedThreatId == threat.candidate.entityId && committedResponse == threat.response) return
+        jukeCommitment.reset()
+        jukeDecision = null
+        committedThreatId = threat.candidate.entityId
+        committedResponse = threat.response
+    }
+
+    private fun buildJukeDecision(
+        threat: SpearThreat,
+        player: LocalPlayer,
+        world: ClientLevel,
+        settings: SpearMovementSettings,
+        playerPosition: HorizontalPosition,
+        startedSafelyGrounded: Boolean,
+    ) = jukeCommitment.update(
             durationTicks = if (threat.response == SpearThreatResponse.FEINT) 1..1 else settings.jukeTicks,
             isCurrentInputSafe = { input ->
                 dodgePlanner.isSafeSimulation(
-                    simulation = simulateMovement(input, player, world),
+                    simulation = simulateSpearMovement(input, player, world),
                     playerPosition = playerPosition,
                     startedSafelyGrounded = startedSafelyGrounded,
                 )
@@ -208,62 +208,10 @@ internal class SpearMovementController(
                     },
                     startedSafelyGrounded = startedSafelyGrounded,
                     safeDistance = DodgePlanner.SAFE_DISTANCE_WITH_PADDING,
-                    simulate = { simulateMovement(it, player, world) },
+                    simulate = { simulateSpearMovement(it, player, world) },
                 )
             },
         )
-        return jukeDecision?.plan
-    }
-
-    private fun simulateMovement(
-        input: DirectionalInput,
-        player: LocalPlayer,
-        world: ClientLevel,
-    ): SpearMovementSimulation {
-        val simulatedInput = SimulatedPlayer.SimulatedPlayerInput.fromClientPlayer(
-            directionalInput = input,
-            jump = false,
-            sprinting = player.isSprinting,
-            sneaking = player.isShiftKeyDown,
-        )
-        val simulatedPlayer = SimulatedPlayer.fromClientPlayer(simulatedInput)
-        return collectSpearMovementSimulation(
-            tick = simulatedPlayer::tick,
-            sample = {
-                SpearMovementSample(
-                    position = simulatedPlayer.pos.horizontalPosition(),
-                    colliding = simulatedPlayer.horizontalCollision,
-                    supported = simulatedPlayer.onGround || isSupported(world, player, simulatedPlayer.boundingBox),
-                    overVoid = player.wouldFallIntoVoid(simulatedPlayer.pos, world.minY.toDouble()),
-                )
-            },
-        )
-    }
-
-    private fun RemotePlayer.toSpearThreatCandidate(): SpearThreatCandidate {
-        val currentPosition = position()
-        val previousPosition = Vec3(xOld, yOld, zOld)
-        val usingSpear = isUsingItem && useItem.isSpear
-        val kineticWeapon = useItem.get(DataComponents.KINETIC_WEAPON).takeIf { usingSpear }
-        return SpearThreatCandidate(
-            entityId = id,
-            name = scoreboardName,
-            position = currentPosition,
-            eyePosition = eyePosition,
-            lookDirection = lookAngle,
-            isHoldingSpear = mainHandItem.isSpear || offhandItem.isSpear,
-            isUsingSpear = usingSpear,
-            spearUseTicks = ticksUsingItem.takeIf { usingSpear } ?: 0,
-            spearDelayTicks = kineticWeapon?.delayTicks,
-            spearDamageUseDurationTicks = kineticWeapon?.computeDamageUseDuration(),
-            isAlive = isAlive,
-            isRemoved = isRemoved,
-            isBot = ModuleAntiBot.isBot(this),
-            hasSignificantPositionJump = currentPosition.distanceToSqr(previousPosition) >=
-                SIGNIFICANT_POSITION_JUMP_SQ,
-            visibilityAgeTicks = tickCount.coerceAtLeast(0),
-        )
-    }
 
     private fun resetCommitment() {
         jukeCommitment.reset()
@@ -272,17 +220,6 @@ internal class SpearMovementController(
         jukeDecision = null
     }
 
-    private companion object {
-        const val SIGNIFICANT_POSITION_JUMP_SQ = 4.0
-        const val SUPPORT_CHECK_DEPTH = 0.05
-        val PACKET_ESCAPE_AXIS = SpearTeleportDirection(1.0, 0.0)
-
-        fun Vec3.horizontalPosition() = HorizontalPosition(x, z)
-
-        fun isSupported(world: ClientLevel, player: LocalPlayer, boundingBox: AABB): Boolean =
-            world.getBlockCollisions(
-                player,
-                boundingBox.move(0.0, -SUPPORT_CHECK_DEPTH, 0.0),
-            ).anyNotEmpty()
-    }
 }
+
+private val PACKET_ESCAPE_AXIS = SpearTeleportDirection(1.0, 0.0)

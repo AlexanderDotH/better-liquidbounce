@@ -97,8 +97,8 @@ class PlayerModelRenderStateApplierTest {
 
     @Test
     fun `replace modifies normal state while ghost does not`() {
-        assertTrue(shouldApplyToNormalState(true, ModulePlayerModel.Display.REPLACE))
-        assertFalse(shouldApplyToNormalState(true, ModulePlayerModel.Display.GHOST))
-        assertFalse(shouldApplyToNormalState(false, ModulePlayerModel.Display.REPLACE))
+        assertTrue(shouldApplyToNormalState(running = true, replacementDisplay = true))
+        assertFalse(shouldApplyToNormalState(running = true, replacementDisplay = false))
+        assertFalse(shouldApplyToNormalState(running = false, replacementDisplay = true))
     }
 }

@@ -19,10 +19,9 @@
 
 package net.ccbluex.liquidbounce.render
 
-import net.ccbluex.liquidbounce.LiquidBounce
 import net.ccbluex.liquidbounce.config.types.group.Mode
 import net.ccbluex.liquidbounce.config.types.group.ModeValueGroup
-import net.ccbluex.liquidbounce.config.types.list.Tagged
+import net.ccbluex.liquidbounce.common.Tagged
 import net.ccbluex.liquidbounce.render.engine.type.Color4b
 import net.ccbluex.liquidbounce.render.utils.rainbow
 import net.ccbluex.liquidbounce.utils.entity.cameraDistance
@@ -162,6 +161,6 @@ enum class BuiltinParticle(
     SPARK("Spark", "spark");
 
     val texture by lazy {
-        LiquidBounce.resource("particles/$fileName.png").readNativeImage().asTexture { "Builtin Particle $tag" }
+        renderResource("particles/$fileName.png").readNativeImage().asTexture { "Builtin Particle $tag" }
     }
 }

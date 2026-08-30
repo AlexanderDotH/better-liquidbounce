@@ -26,15 +26,14 @@ import net.ccbluex.liquidbounce.event.events.TransferOrigin
 import net.ccbluex.liquidbounce.event.handler
 import net.ccbluex.liquidbounce.event.tickHandler
 import net.ccbluex.liquidbounce.features.blink.BlinkManager
-import net.ccbluex.liquidbounce.features.module.modules.movement.inventorymove.ModuleInventoryMove
 import net.ccbluex.liquidbounce.features.module.modules.player.ModuleBlink
 import net.ccbluex.liquidbounce.utils.client.Chronometer
 import net.ccbluex.liquidbounce.utils.text.formatAsTime
-import net.ccbluex.liquidbounce.utils.client.notification
+import net.ccbluex.liquidbounce.features.chat.notification
 import net.ccbluex.liquidbounce.utils.network.isC2SContainerPacket
 import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen
 
-object InventoryMoveBlinkFeature : ToggleableValueGroup(ModuleInventoryMove, "Blink", false) {
+object InventoryMoveBlinkFeature : ToggleableValueGroup(name = "Blink", enabled = false) {
 
     /**
      * After reaching this time, we will close the inventory and blink.
@@ -49,8 +48,8 @@ object InventoryMoveBlinkFeature : ToggleableValueGroup(ModuleInventoryMove, "Bl
 
         if (mc.gui.screen() is AbstractContainerScreen<*> && event.origin == TransferOrigin.OUTGOING) {
             event.action = when {
-                packet.isC2SContainerPacket() -> BlinkManager.Action.PASS
-                else -> BlinkManager.Action.QUEUE
+                packet.isC2SContainerPacket() -> net.ccbluex.liquidbounce.event.events.BlinkPacketAction.PASS
+                else -> net.ccbluex.liquidbounce.event.events.BlinkPacketAction.QUEUE
             }
         }
     }

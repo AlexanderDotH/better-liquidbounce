@@ -24,7 +24,6 @@ import net.ccbluex.liquidbounce.config.types.group.ModeValueGroup
 import net.ccbluex.liquidbounce.config.types.group.ToggleableValueGroup
 import net.ccbluex.liquidbounce.event.events.PlayerMoveEvent
 import net.ccbluex.liquidbounce.event.handler
-import net.ccbluex.liquidbounce.features.module.modules.movement.terrainspeed.ModuleTerrainSpeed
 import net.ccbluex.liquidbounce.utils.block.getBlock
 import net.minecraft.core.Direction
 import net.minecraft.world.level.block.LadderBlock
@@ -33,7 +32,7 @@ import net.minecraft.world.level.block.VineBlock
 /**
  * Fast Climb allows you to climb up ladder-related blocks faster
  */
-internal object FastClimb : ToggleableValueGroup(ModuleTerrainSpeed, "FastClimb", true) {
+internal object FastClimb : ToggleableValueGroup(name = "FastClimb", enabled = true) {
 
     private val modes = modes(this, "Mode", Motion, arrayOf(Motion, Clip))
 

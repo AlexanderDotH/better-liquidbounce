@@ -19,16 +19,18 @@
 
 package net.ccbluex.liquidbounce.features.module.modules.`fun`.amnesia
 
-import net.ccbluex.liquidbounce.config.types.list.Tagged
+import net.ccbluex.liquidbounce.features.module.modules.`fun`.amnesia.playermodel.PlayerModelFakeVelocityState
+
 import net.ccbluex.liquidbounce.config.types.group.ToggleableValueGroup
 import net.ccbluex.liquidbounce.event.events.EntityHealthUpdateEvent
 import net.ccbluex.liquidbounce.event.events.GameRenderEvent
 import net.ccbluex.liquidbounce.event.handler
-import net.ccbluex.liquidbounce.features.module.modules.`fun`.ModuleAmnesia
+import net.ccbluex.liquidbounce.features.module.modules.`fun`.amnesia.contract.AmnesiaRuntimeBridge
+import net.ccbluex.liquidbounce.features.module.modules.`fun`.amnesia.model.VelocityMode
 import net.ccbluex.liquidbounce.utils.client.mc
 
 object FakeVelocity : ToggleableValueGroup(
-    ModuleAmnesia,
+    null,
     "FakeVelocity",
     false,
     aliases = listOf("Fake Velocity"),
@@ -43,11 +45,6 @@ object FakeVelocity : ToggleableValueGroup(
     internal val maxDesync by float("MaxDesync", 3f, 0.5f..8f, "blocks")
     internal val tinyRecoil by float("TinyRecoil", 0.05f, 0f..0.5f, "blocks")
 
-    enum class VelocityMode(override val tag: String) : Tagged {
-        FREEZE("Freeze"),
-        NO_VELOCITY("NoVelocity"),
-    }
-
     @Suppress("unused")
     private val renderHandler = handler<GameRenderEvent>(priority = 1) {
         if (!running) {
@@ -55,7 +52,7 @@ object FakeVelocity : ToggleableValueGroup(
             return@handler
         }
 
-        val target = ModuleAmnesia.findTarget() ?: run {
+        val target = AmnesiaRuntimeBridge.findTarget() ?: run {
             PlayerModelFakeVelocityState.reset()
             return@handler
         }
@@ -85,7 +82,7 @@ object FakeVelocity : ToggleableValueGroup(
             return@handler
         }
 
-        val target = ModuleAmnesia.findTarget() ?: return@handler
+        val target = AmnesiaRuntimeBridge.findTarget() ?: return@handler
         if (event.entity.id != target.id) {
             return@handler
         }

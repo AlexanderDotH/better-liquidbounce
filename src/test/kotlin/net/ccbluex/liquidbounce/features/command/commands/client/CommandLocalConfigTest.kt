@@ -19,7 +19,7 @@
 
 package net.ccbluex.liquidbounce.features.command.commands.client
 
-import net.ccbluex.liquidbounce.config.autoconfig.LocalConfigLoadSelection
+import net.ccbluex.liquidbounce.features.autoconfig.LocalConfigLoadSelection
 import net.ccbluex.liquidbounce.features.command.Parameter
 import net.ccbluex.liquidbounce.features.module.ClientModule
 import net.ccbluex.liquidbounce.features.module.ModuleCategories

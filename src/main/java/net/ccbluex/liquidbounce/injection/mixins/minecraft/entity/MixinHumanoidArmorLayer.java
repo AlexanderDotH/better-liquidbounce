@@ -20,7 +20,6 @@
 package net.ccbluex.liquidbounce.injection.mixins.minecraft.entity;
 
 import com.mojang.blaze3d.vertex.PoseStack;
-import net.ccbluex.liquidbounce.features.module.modules.render.DoRender;
 import net.ccbluex.liquidbounce.features.module.modules.render.ModuleAntiBlind;
 import net.minecraft.client.renderer.SubmitNodeCollector;
 import net.minecraft.client.renderer.entity.layers.HumanoidArmorLayer;
@@ -40,7 +39,7 @@ public abstract class MixinHumanoidArmorLayer<S extends HumanoidRenderState> {
             at = @At("HEAD"),
             cancellable = true
     ) private void onRender(PoseStack matrices, SubmitNodeCollector orderedRenderCommandQueue, ItemStack stack, EquipmentSlot slot, int light, S bipedEntityRenderState, CallbackInfo ci) {
-        if (bipedEntityRenderState instanceof AvatarRenderState && !ModuleAntiBlind.canRender(DoRender.ARMOR)) {
+        if (bipedEntityRenderState instanceof AvatarRenderState && !ModuleAntiBlind.canRenderArmor()) {
             ci.cancel();
         }
     }

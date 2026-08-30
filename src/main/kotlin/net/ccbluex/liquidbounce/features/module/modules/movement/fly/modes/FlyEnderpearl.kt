@@ -20,20 +20,18 @@
 package net.ccbluex.liquidbounce.features.module.modules.movement.fly.modes
 
 import net.ccbluex.liquidbounce.config.types.group.Mode
-import net.ccbluex.liquidbounce.config.types.group.ModeValueGroup
 import net.ccbluex.liquidbounce.event.events.PacketEvent
 import net.ccbluex.liquidbounce.event.events.TransferOrigin
 import net.ccbluex.liquidbounce.event.handler
 import net.ccbluex.liquidbounce.event.tickHandler
 import net.ccbluex.liquidbounce.event.waitTicks
-import net.ccbluex.liquidbounce.features.module.modules.movement.fly.ModuleFly
 import net.ccbluex.liquidbounce.features.module.modules.movement.fly.automation.FlyAutomationCapabilities
 import net.ccbluex.liquidbounce.features.module.modules.movement.fly.automation.FlyAutomationKind
 import net.ccbluex.liquidbounce.features.module.modules.movement.fly.automation.FlyAutomationProfile
 import net.ccbluex.liquidbounce.features.module.modules.movement.fly.automation.FlyAutomationReadiness
 import net.ccbluex.liquidbounce.features.module.modules.player.ModuleFastUse
 import net.ccbluex.liquidbounce.utils.aiming.RotationManager
-import net.ccbluex.liquidbounce.utils.aiming.RotationsValueGroup
+import net.ccbluex.liquidbounce.features.rotation.RotationsValueGroup
 import net.ccbluex.liquidbounce.utils.aiming.data.Rotation
 import net.ccbluex.liquidbounce.utils.block.isBlockAtPosition
 import net.ccbluex.liquidbounce.utils.client.SilentHotbar
@@ -48,8 +46,6 @@ import net.minecraft.world.level.block.Block
 
 internal object FlyEnderpearl : Mode("Enderpearl"), FlyAutomationProfile {
 
-    override val parent: ModeValueGroup<*>
-        get() = ModuleFly.modes
 
     private val speed by float("Speed", 1f, 0.5f..2f)
 

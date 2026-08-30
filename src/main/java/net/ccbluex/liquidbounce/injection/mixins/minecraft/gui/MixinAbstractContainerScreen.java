@@ -22,7 +22,7 @@ package net.ccbluex.liquidbounce.injection.mixins.minecraft.gui;
 import com.mojang.blaze3d.platform.InputConstants;
 import net.ccbluex.liquidbounce.features.module.modules.misc.ModuleItemScroller;
 import net.ccbluex.liquidbounce.features.module.modules.movement.inventorymove.ModuleInventoryMove;
-import net.ccbluex.liquidbounce.features.module.modules.player.cheststealer.features.FeatureSilentScreen;
+import net.ccbluex.liquidbounce.features.module.modules.player.cheststealer.features.SilentScreenHook;
 import net.ccbluex.liquidbounce.features.module.modules.render.ModuleBetterInventory;
 import net.ccbluex.liquidbounce.injection.mixins.minecraft.client.MixinMouseHandlerAccessor;
 import net.minecraft.client.MouseHandler;
@@ -76,7 +76,7 @@ public abstract class MixinAbstractContainerScreen<T extends AbstractContainerMe
             ci.cancel();
         }
 
-        if (FeatureSilentScreen.INSTANCE.getShouldHide()) {
+        if (SilentScreenHook.shouldHide()) {
             ci.cancel();
         }
     }

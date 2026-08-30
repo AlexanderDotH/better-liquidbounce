@@ -24,8 +24,7 @@ import net.ccbluex.liquidbounce.config.types.Value
 import net.ccbluex.liquidbounce.config.types.ValueType
 import net.ccbluex.liquidbounce.config.types.list.ChoiceListValue
 import net.ccbluex.liquidbounce.config.types.list.MultiChoiceListValue
-import net.ccbluex.liquidbounce.config.types.list.Tagged
-import net.ccbluex.liquidbounce.config.types.list.Tagged.Companion.asTagged
+import net.ccbluex.liquidbounce.common.Tagged
 import net.ccbluex.liquidbounce.deeplearn.ModelManager.list
 import net.ccbluex.liquidbounce.script.asArray
 import net.ccbluex.liquidbounce.script.asDoubleArray
@@ -36,7 +35,7 @@ import org.graalvm.polyglot.Value as PolyglotValue
 /**
  * Object used by the script API to provide an idiomatic way of creating module values.
  */
-@Suppress("unused", "TooManyFunctions", "StringLiteralDuplication")
+@Suppress("unused", "StringLiteralDuplication")
 object ScriptSetting {
 
     @JvmName("boolean")
@@ -44,7 +43,7 @@ object ScriptSetting {
         val name = value.getMember("name").asString()
         val default = value.getMember("default").asBoolean()
 
-        return value(name, default, ValueType.BOOLEAN)
+        return scriptValue(name, default, ValueType.BOOLEAN)
     }
 
     @JvmName("float")
@@ -55,7 +54,7 @@ object ScriptSetting {
         val suffix = value.getMember("suffix")?.asString() ?: ""
 
         require(range.size == 2)
-        return rangedValue(
+        return scriptRangedValue(
             name,
             default.toFloat(),
             range.first().toFloat()..range.last().toFloat(),
@@ -73,7 +72,7 @@ object ScriptSetting {
 
         require(default.size == 2)
         require(range.size == 2)
-        return rangedValue(
+        return scriptRangedValue(
             name,
             default.first().toFloat()..default.last().toFloat(),
             range.first().toFloat()..range.last().toFloat(),
@@ -90,7 +89,7 @@ object ScriptSetting {
         val suffix = value.getMember("suffix")?.asString() ?: ""
 
         require(range.size == 2)
-        return rangedValue(name, default, range.first()..range.last(), suffix, ValueType.INT)
+        return scriptRangedValue(name, default, range.first()..range.last(), suffix, ValueType.INT)
     }
 
     @JvmName("intRange")
@@ -102,7 +101,7 @@ object ScriptSetting {
 
         require(default.size == 2)
         require(range.size == 2)
-        return rangedValue(
+        return scriptRangedValue(
             name,
             default.first()..default.last(),
             range.first()..range.last(),
@@ -116,7 +115,7 @@ object ScriptSetting {
         val name = value.getMember("name").asString()
         val default = inputByName(value.getMember("default").asString())
 
-        return value(name, default, ValueType.KEY)
+        return scriptValue(name, default, ValueType.KEY)
     }
 
     @JvmName("text")
@@ -124,7 +123,7 @@ object ScriptSetting {
         val name = value.getMember("name").asString()
         val default = value.getMember("default").asString()
 
-        return value(name, default, ValueType.TEXT)
+        return scriptValue(name, default, ValueType.TEXT)
     }
 
     @JvmName("textArray")
@@ -138,7 +137,7 @@ object ScriptSetting {
     @JvmName("choose")
     fun choose(value: PolyglotValue): ChoiceListValue<Tagged> {
         val name = value.getMember("name").asString()
-        val choices = value.getMember("choices").asArray<String>().toNamedChoices(::LinkedHashSet)
+        val choices = value.getMember("choices").asArray<String>().toScriptNamedChoices(::LinkedHashSet)
         val defaultStr = value.getMember("default").asString()
 
         val default = choices.find { it.tag == defaultStr }
@@ -154,8 +153,8 @@ object ScriptSetting {
     @JvmName("multiChoose")
     fun multiChoose(value: PolyglotValue): MultiChoiceListValue<Tagged> {
         val name = value.getMember("name").asString()
-        val choices = value.getMember("choices").asArray<String>().toNamedChoices(::LinkedHashSet)
-        val default = value.getMember("default")?.asArray<String>().toNamedChoices(::HashSet)
+        val choices = value.getMember("choices").asArray<String>().toScriptNamedChoices(::LinkedHashSet)
+        val default = value.getMember("default")?.asArray<String>().toScriptNamedChoices(::HashSet)
 
         val canBeNone = value.getMember("canBeNone")?.asBoolean() ?: true
 
@@ -167,18 +166,4 @@ object ScriptSetting {
         )
     }
 
-    private fun <T : Any> value(
-        name: String,
-        default: T,
-        valueType: ValueType = ValueType.INVALID,
-    ) = Value(name, defaultValue = default, valueType = valueType)
-
-    private fun <T : Any> rangedValue(
-        name: String, default: T, range: ClosedRange<*>, suffix: String,
-        valueType: ValueType
-    ) =
-        RangedValue(name, defaultValue = default, range = range, suffix = suffix, valueType = valueType)
-
-    private inline fun Array<String>?.toNamedChoices(toSet: (Int) -> MutableSet<Tagged>) =
-        this?.mapTo(toSet(size)) { it.asTagged() } ?: toSet(0)
 }

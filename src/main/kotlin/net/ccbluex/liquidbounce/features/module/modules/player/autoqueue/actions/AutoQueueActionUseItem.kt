@@ -22,7 +22,7 @@ package net.ccbluex.liquidbounce.features.module.modules.player.autoqueue.action
 import net.ccbluex.liquidbounce.event.waitTicks
 import net.ccbluex.liquidbounce.features.module.modules.player.autoqueue.ModuleAutoQueue
 import net.ccbluex.liquidbounce.utils.client.SilentHotbar
-import net.ccbluex.liquidbounce.utils.inventory.SingleItemStackPickMode
+import net.ccbluex.liquidbounce.features.inventory.SingleItemStackPickMode
 import net.ccbluex.liquidbounce.utils.inventory.Slots
 
 object AutoQueueActionUseItem : AutoQueueAction("UseItem") {

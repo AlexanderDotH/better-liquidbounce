@@ -21,29 +21,26 @@ package net.ccbluex.liquidbounce.features.module.modules.world
 import it.unimi.dsi.fastutil.objects.ReferenceOpenHashSet
 import net.ccbluex.fastutil.objectRBTreeSetOf
 import net.ccbluex.liquidbounce.config.types.ValueType
-import net.ccbluex.liquidbounce.config.types.list.Tagged
+import net.ccbluex.liquidbounce.common.Tagged
 import net.ccbluex.liquidbounce.event.events.DeathEvent
 import net.ccbluex.liquidbounce.event.events.DisconnectEvent
 import net.ccbluex.liquidbounce.event.events.NotificationEvent
 import net.ccbluex.liquidbounce.event.events.PacketEvent
 import net.ccbluex.liquidbounce.event.events.WorldChangeEvent
 import net.ccbluex.liquidbounce.event.handler
-import net.ccbluex.liquidbounce.features.command.commands.module.CommandAutoDisable
 import net.ccbluex.liquidbounce.features.module.ClientModule
 import net.ccbluex.liquidbounce.features.module.ModuleCategories
 import net.ccbluex.liquidbounce.features.module.modules.combat.killaura.ModuleKillAura
 import net.ccbluex.liquidbounce.features.module.modules.movement.ModuleNoClip
 import net.ccbluex.liquidbounce.features.module.modules.movement.fly.ModuleFly
 import net.ccbluex.liquidbounce.features.module.modules.movement.speed.ModuleSpeed
-import net.ccbluex.liquidbounce.utils.client.notification
+import net.ccbluex.liquidbounce.features.chat.notification
 import net.minecraft.network.protocol.game.ClientboundPlayerPositionPacket
 
 /**
  * AutoDisable module
  *
  * Automatically disables modules, when special event happens.
- *
- * Command: [CommandAutoDisable]
  */
 object ModuleAutoDisable : ClientModule("AutoDisable", ModuleCategories.WORLD) {
     val modules: Set<ClientModule>

@@ -61,4 +61,12 @@ class ModuleAnimationsTest {
         assertEquals("1.7", ModuleAnimations.blockAnimationChoice.activeMode.name)
         assertFalse(SwingAnimations.enabled)
     }
+
+    @Test
+    fun `swing animation mode names retain their persisted order`() {
+        assertEquals(
+            listOf("Swipe", "Spin", "Hook", "Dash", "Tap", "Inject", "Slap", "Akrien", "Smooth", "Power", "Feast"),
+            SwingAnimations.Mode.entries.map { it.tag },
+        )
+    }
 }

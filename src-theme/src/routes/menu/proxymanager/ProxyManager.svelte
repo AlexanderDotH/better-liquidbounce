@@ -26,24 +26,9 @@
     import SwitchSetting from "../common/setting/SwitchSetting.svelte";
     import MultiSelect from "../common/setting/select/MultiSelect.svelte";
     import {notification} from "../common/header/notification_store";
-    import lookup from "country-code-lookup";
     import {listen} from "../../../integration/ws";
     import type {ProxyCheckResultEvent} from "../../../integration/events.js";
-
-    $: {
-        let filteredProxies = proxies;
-
-        filteredProxies = filteredProxies.filter(p => countries.includes(convertCountryCode(p.ipInfo?.country)));
-        filteredProxies = filteredProxies.filter(p => proxyTypes.includes(p.type));
-        if (favoritesOnly) {
-            filteredProxies = filteredProxies.filter(a => a.favorite);
-        }
-        if (searchQuery) {
-            filteredProxies = filteredProxies.filter(p => p.host.toLowerCase().includes(searchQuery.toLowerCase()));
-        }
-
-        renderedProxies = filteredProxies;
-    }
+    import {convertProxyCountryCode, filterProxies} from "./proxyListModel";
 
     let addProxyModalVisible = false;
     let editProxyModalVisible = false;
@@ -58,6 +43,13 @@
     let renderedProxies = proxies;
     let isConnectedToProxy = false;
 
+    $: renderedProxies = filterProxies(proxies, {
+        countries,
+        proxyTypes,
+        favoritesOnly,
+        searchQuery,
+    });
+
     let currentEditProxy: Proxy | null = null;
 
     onMount(async () => {
@@ -70,19 +62,12 @@
         isConnectedToProxy = await getCurrentProxy() !== null;
     }
 
-    function convertCountryCode(code: string | undefined): string {
-        if (code === undefined) {
-            return "Unknown";
-        }
-        return lookup.byIso(code)?.country ?? "Unknown";
-    }
-
     async function refreshProxies() {
         proxies = await getProxies();
 
         const c = new Set<string>();
         for (const p of proxies) {
-            c.add(convertCountryCode(p.ipInfo?.country));
+            c.add(convertProxyCountryCode(p.ipInfo?.country));
         }
         allCountries = Array.from(c);
         countries = allCountries;
@@ -204,7 +189,7 @@
             </svelte:fragment>
 
             <svelte:fragment slot="tag">
-                <MenuListItemTag text={convertCountryCode(proxy.ipInfo?.country)}/>
+                <MenuListItemTag text={convertProxyCountryCode(proxy.ipInfo?.country)}/>
                 <MenuListItemTag text={proxy.type}/>
             </svelte:fragment>
 

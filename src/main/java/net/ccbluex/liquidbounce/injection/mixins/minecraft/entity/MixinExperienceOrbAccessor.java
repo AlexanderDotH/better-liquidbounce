@@ -19,13 +19,14 @@
 
 package net.ccbluex.liquidbounce.injection.mixins.minecraft.entity;
 
+import net.ccbluex.liquidbounce.features.module.modules.player.fastexp.ExperienceOrbFollowTargetBridge;
 import net.minecraft.world.entity.ExperienceOrb;
 import net.minecraft.world.entity.player.Player;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.gen.Accessor;
 
 @Mixin(ExperienceOrb.class)
-public interface MixinExperienceOrbAccessor {
+public interface MixinExperienceOrbAccessor extends ExperienceOrbFollowTargetBridge {
     @Accessor("followingPlayer")
     Player getFollowingPlayer();
 }

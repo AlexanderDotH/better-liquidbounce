@@ -24,10 +24,10 @@ import net.ccbluex.liquidbounce.config.OptionalInclusion
 import net.ccbluex.liquidbounce.config.gson.stategies.Exclude
 import net.ccbluex.liquidbounce.config.gson.stategies.ProtocolExclude
 import net.ccbluex.liquidbounce.config.types.ValueType
-import net.ccbluex.liquidbounce.config.types.list.Tagged
+import net.ccbluex.liquidbounce.common.Tagged
+import net.ccbluex.liquidbounce.annotations.ScriptApiRequired
 import net.ccbluex.liquidbounce.event.EventListener
-import net.ccbluex.liquidbounce.features.module.MinecraftShortcuts
-import net.ccbluex.liquidbounce.script.ScriptApiRequired
+import net.ccbluex.liquidbounce.utils.client.MinecraftShortcuts
 import java.util.function.ToIntFunction
 
 /**
@@ -137,7 +137,9 @@ abstract class Mode(
     final override val tagAliases: List<String>
         get() = this.aliases
 
-    abstract val parent: ModeValueGroup<*>
+    open val parent: ModeValueGroup<*>
+        get() = base as? ModeValueGroup<*>
+            ?: error("Mode '$name' is not attached to a ModeValueGroup")
 
     open fun enable() { }
 

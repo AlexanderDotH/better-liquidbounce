@@ -22,7 +22,7 @@ import net.ccbluex.liquidbounce.config.types.group.ModeValueGroup
 import net.ccbluex.liquidbounce.event.events.PlayerJumpEvent
 import net.ccbluex.liquidbounce.event.handler
 import net.ccbluex.liquidbounce.event.tickHandler
-import net.ccbluex.liquidbounce.features.module.modules.movement.speed.ModuleSpeed
+import net.ccbluex.liquidbounce.features.module.modules.movement.speed.runtime.SpeedModuleControl
 import net.ccbluex.liquidbounce.features.module.modules.movement.speed.modes.SpeedBHopBase
 import net.ccbluex.liquidbounce.utils.client.Timer
 import net.ccbluex.liquidbounce.utils.entity.moving
@@ -49,7 +49,7 @@ class SpeedAAC332(parent: ModeValueGroup<*>) : SpeedBHopBase("AAC332", parent) {
             speed = player.getCalculatedBaseMovementSpeed() - 0.008
         )
         if (player.fallDistance > 0.41f) {
-            Timer.requestTimerSpeed(1.2f, Priority.IMPORTANT_FOR_USAGE_1, ModuleSpeed)
+            Timer.requestTimerSpeed(1.2f, Priority.IMPORTANT_FOR_USAGE_1, SpeedModuleControl.module)
         }
     }
 

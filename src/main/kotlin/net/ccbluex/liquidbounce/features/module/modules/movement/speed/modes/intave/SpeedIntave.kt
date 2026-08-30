@@ -20,7 +20,7 @@ package net.ccbluex.liquidbounce.features.module.modules.movement.speed.modes.in
 
 import net.ccbluex.liquidbounce.config.types.group.ModeValueGroup
 import net.ccbluex.liquidbounce.event.tickHandler
-import net.ccbluex.liquidbounce.features.module.modules.movement.speed.ModuleSpeed
+import net.ccbluex.liquidbounce.features.module.modules.movement.speed.runtime.SpeedModuleControl
 import net.ccbluex.liquidbounce.features.module.modules.movement.speed.modes.SpeedBHopBase
 import net.ccbluex.liquidbounce.utils.client.Timer
 import net.ccbluex.liquidbounce.utils.entity.moving
@@ -41,7 +41,7 @@ class SpeedIntave(parent: ModeValueGroup<*>) : SpeedBHopBase("Intave", parent) {
                 else -> 1f
             },
             Priority.IMPORTANT_FOR_USAGE_1,
-            ModuleSpeed
+            SpeedModuleControl.module
         )
     }
 

@@ -18,6 +18,7 @@
  */
 package net.ccbluex.liquidbounce.injection.mixins.minecraft.client.option;
 
+import net.ccbluex.liquidbounce.integration.interop.protocol.rest.v1.game.ServerListAccess;
 import net.minecraft.client.multiplayer.ServerData;
 import net.minecraft.client.multiplayer.ServerList;
 import org.spongepowered.asm.mixin.Mixin;
@@ -26,7 +27,8 @@ import org.spongepowered.asm.mixin.gen.Accessor;
 import java.util.List;
 
 @Mixin(ServerList.class)
-public interface MixinServerListAccessor {
+public interface MixinServerListAccessor extends ServerListAccess {
+    @Override
     @Accessor("serverList")
     List<ServerData> liquid_bounce$getServerList();
 }

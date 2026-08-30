@@ -28,7 +28,7 @@ import net.ccbluex.liquidbounce.event.events.*;
 import net.ccbluex.liquidbounce.features.module.modules.exploit.ModuleNoPitchLimit;
 import net.ccbluex.liquidbounce.features.module.modules.movement.ModuleAntiBounce;
 import net.ccbluex.liquidbounce.features.module.modules.movement.ModuleNoPose;
-import net.ccbluex.liquidbounce.features.module.modules.movement.noslow.modes.slime.NoSlowSlime;
+import net.ccbluex.liquidbounce.features.module.modules.movement.noslow.NoSlowInjectionHook;
 import net.ccbluex.liquidbounce.features.module.modules.render.ModuleFreeCam;
 import net.minecraft.client.Minecraft;
 import net.minecraft.tags.TagKey;
@@ -87,7 +87,7 @@ public abstract class MixinEntity {
     @ModifyExpressionValue(method = "restituteMovementAfterCollisions", at = @At(value = "INVOKE", target = "Ljava/lang/Math;max(DD)D", remap = false))
     private double hookSlimeBounce(double original, @Local(argsOnly = true, name = "effectState") BlockState effectState) {
         // TODO(26.2): Re-check the old exact Y-velocity conditions after vanilla moved slime bounce into Entity restitution.
-        if (NoSlowSlime.INSTANCE.getRunning() && effectState.getBlock() instanceof SlimeBlock) {
+        if (NoSlowInjectionHook.isSlimeEnabled() && effectState.getBlock() instanceof SlimeBlock) {
             return 0.0;
         }
 

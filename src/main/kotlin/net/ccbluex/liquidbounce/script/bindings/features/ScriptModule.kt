@@ -27,14 +27,14 @@ import net.ccbluex.liquidbounce.event.newEventHook
 import net.ccbluex.liquidbounce.features.module.ClientModule
 import net.ccbluex.liquidbounce.features.module.ModuleCategories
 import net.ccbluex.liquidbounce.script.PolyglotScript
-import net.ccbluex.liquidbounce.utils.client.MessageMetadata
-import net.ccbluex.liquidbounce.utils.client.chat
-import net.ccbluex.liquidbounce.utils.client.highlight
+import net.ccbluex.liquidbounce.features.chat.MessageMetadata
+import net.ccbluex.liquidbounce.features.chat.chat
+import net.ccbluex.liquidbounce.utils.text.highlight
 import net.ccbluex.liquidbounce.utils.client.inGame
-import net.ccbluex.liquidbounce.utils.client.markAsError
-import net.ccbluex.liquidbounce.utils.client.regular
-import net.ccbluex.liquidbounce.utils.client.variable
-import net.ccbluex.liquidbounce.utils.client.warning
+import net.ccbluex.liquidbounce.utils.text.markAsError
+import net.ccbluex.liquidbounce.utils.text.regular
+import net.ccbluex.liquidbounce.utils.text.variable
+import net.ccbluex.liquidbounce.utils.text.warning
 import java.util.function.Supplier
 
 class ScriptModule(val script: PolyglotScript, moduleObject: Map<String, Any>) : ClientModule(

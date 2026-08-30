@@ -19,9 +19,8 @@
 package net.ccbluex.liquidbounce.features.module.modules.movement.liquidwalk.modes
 
 import net.ccbluex.liquidbounce.config.types.group.Mode
-import net.ccbluex.liquidbounce.config.types.group.ModeValueGroup
 import net.ccbluex.liquidbounce.event.tickHandler
-import net.ccbluex.liquidbounce.features.module.modules.movement.liquidwalk.ModuleLiquidWalk
+import net.ccbluex.liquidbounce.features.module.modules.movement.liquidwalk.runtime.LiquidWalkModuleProvider
 import net.ccbluex.liquidbounce.utils.client.Timer
 import net.ccbluex.liquidbounce.utils.entity.isInsideWaterOrBubbleColumn
 import net.ccbluex.liquidbounce.utils.kotlin.Priority
@@ -36,22 +35,19 @@ internal object LiquidWalkVulcan291 : Mode("Vulcan291") {
 
     private val motion by float("Motion", 0.8f, 0.2f..1.4f)
 
-    override val parent: ModeValueGroup<Mode>
-        get() = ModuleLiquidWalk.modes
 
     @Suppress("unused")
     private val tickHandler = tickHandler {
         // It DOES NOT bypass with Lava - do not use [player.isInFluid].
         if (player.isInsideWaterOrBubbleColumn) {
             // One tick speed-up for extra speed
-            Timer.requestTimerSpeed(1.125f, Priority.IMPORTANT_FOR_USAGE_1, ModuleLiquidWalk)
+            Timer.requestTimerSpeed(1.125f, Priority.IMPORTANT_FOR_USAGE_1, LiquidWalkModuleProvider.module)
 
             // Acts as a high-jump
             player.deltaMovement.y = motion.toDouble()
         } else {
-            Timer.requestTimerSpeed(1.0f, Priority.IMPORTANT_FOR_USAGE_1, ModuleLiquidWalk)
+            Timer.requestTimerSpeed(1.0f, Priority.IMPORTANT_FOR_USAGE_1, LiquidWalkModuleProvider.module)
         }
     }
 
 }
-

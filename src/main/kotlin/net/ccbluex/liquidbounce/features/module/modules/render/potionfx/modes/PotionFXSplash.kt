@@ -25,12 +25,11 @@ import net.ccbluex.liquidbounce.config.types.group.ToggleableValueGroup
 import net.ccbluex.liquidbounce.config.types.group.ValueGroup
 import net.ccbluex.liquidbounce.config.utils.TextureMode
 import net.ccbluex.liquidbounce.event.events.PacketEvent
-import net.ccbluex.liquidbounce.event.events.WorldRenderEvent
+import net.ccbluex.liquidbounce.render.events.WorldRenderEvent
 import net.ccbluex.liquidbounce.event.handler
-import net.ccbluex.liquidbounce.features.module.modules.render.potionfx.ModulePotionFX
-import net.ccbluex.liquidbounce.features.module.modules.render.potionfx.ModulePotionFX.PresetTexture
-import net.ccbluex.liquidbounce.features.module.modules.render.potionfx.ModulePotionFX.SecondaryPresetTexture
-import net.ccbluex.liquidbounce.features.module.modules.render.potionfx.ModulePotionFX.glow
+import net.ccbluex.liquidbounce.features.module.modules.render.potionfx.assets.PresetTexture
+import net.ccbluex.liquidbounce.features.module.modules.render.potionfx.assets.SecondaryPresetTexture
+import net.ccbluex.liquidbounce.features.module.modules.render.potionfx.assets.potionFxGlow
 import net.ccbluex.liquidbounce.features.module.modules.render.potionfx.modes.PotionFXSplash.MainEffect.fadeStart
 import net.ccbluex.liquidbounce.features.module.modules.render.potionfx.modes.PotionFXSplash.MainEffect.lifetime
 import net.ccbluex.liquidbounce.features.module.modules.render.potionfx.modes.PotionFXSplash.MainEffect.radius
@@ -42,7 +41,7 @@ import net.ccbluex.liquidbounce.render.drawSquareTexture
 import net.ccbluex.liquidbounce.render.renderEnvironment
 import net.ccbluex.liquidbounce.render.withPositionRelativeToCamera
 import net.ccbluex.liquidbounce.render.withPush
-import net.ccbluex.liquidbounce.utils.collection.ExpiringList.Companion.ExpiringList
+import net.ccbluex.liquidbounce.features.collection.ExpiringList.Companion.ExpiringList
 import net.ccbluex.liquidbounce.utils.math.Easing
 import net.minecraft.network.protocol.game.ClientboundLevelEventPacket
 import net.minecraft.util.ARGB
@@ -54,7 +53,7 @@ import net.minecraft.world.phys.HitResult
 import net.minecraft.world.phys.Vec3
 import net.minecraft.world.phys.shapes.CollisionContext
 
-object PotionFXSplash : ToggleableValueGroup(ModulePotionFX, "SplashPotion", true) {
+object PotionFXSplash : ToggleableValueGroup(null, "SplashPotion", true) {
 
     private object MainEffect : ValueGroup("MainEffect") {
         val lifetime by intRange("Lifetime", 20..40, 1..1000)
@@ -187,7 +186,7 @@ object PotionFXSplash : ToggleableValueGroup(ModulePotionFX, "SplashPotion", tru
                             withPush {
                                 mulPose(mc.gameRenderer.mainCamera().rotation())
                                 drawSquareTexture(
-                                    glow,
+                                    potionFxGlow,
                                     SecondEffects.Flash.radius * 2 * glowProgress,
                                     splash.value.color,
                                     AnchorPoint.CENTER,

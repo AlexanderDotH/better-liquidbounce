@@ -21,11 +21,11 @@ package net.ccbluex.liquidbounce.integration.theme.component.components.minimap
 import it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap
 import it.unimi.dsi.fastutil.objects.ObjectArrayList
 import it.unimi.dsi.fastutil.objects.ObjectOpenHashSet
-import net.ccbluex.liquidbounce.LiquidBounce.CLIENT_NAME
+import net.ccbluex.liquidbounce.common.ClientBuildMetadata
 import net.ccbluex.liquidbounce.render.engine.type.BoundingBox2f
 import net.ccbluex.liquidbounce.render.engine.type.Color4b
 import net.ccbluex.liquidbounce.utils.render.textureSetup
-import net.ccbluex.liquidbounce.utils.render.uploadRect
+import net.ccbluex.liquidbounce.render.buffer.uploadRect
 import net.minecraft.client.gui.render.TextureSetup
 import net.minecraft.client.renderer.texture.DynamicTexture
 import org.joml.Vector2i
@@ -50,7 +50,7 @@ private val NOT_LOADED_ATLAS_POSITION = MinimapTextureAtlasManager.AtlasPosition
 
 class MinimapTextureAtlasManager {
     private val texture = DynamicTexture(
-        { "$CLIENT_NAME MinimapTexture" },
+        { "${ClientBuildMetadata.NAME} MinimapTexture" },
         ATLAS_SIZE * 16, ATLAS_SIZE * 16, false
     )
 

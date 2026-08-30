@@ -21,12 +21,11 @@ package net.ccbluex.liquidbounce.features.module.modules.render.esp.modes
 import it.unimi.dsi.fastutil.objects.ObjectArrayList
 import net.ccbluex.fastutil.Pool
 import net.ccbluex.liquidbounce.config.types.group.Mode
+import net.ccbluex.liquidbounce.config.types.group.ModeValueGroup
 import net.ccbluex.liquidbounce.event.events.GameTickEvent
 import net.ccbluex.liquidbounce.event.handler
-import net.ccbluex.liquidbounce.features.module.modules.render.esp.ModuleESP
-import net.ccbluex.liquidbounce.features.module.modules.render.esp.ModuleESP.modes
+import net.ccbluex.liquidbounce.features.module.modules.render.esp.runtime.EspModeRuntime
 import net.ccbluex.liquidbounce.render.EMPTY_BOX
-import net.ccbluex.liquidbounce.utils.entity.RenderedEntities
 import net.ccbluex.liquidbounce.utils.entity.interpolateCurrentPosition
 import net.ccbluex.liquidbounce.utils.entity.cameraDistanceSq
 import net.ccbluex.liquidbounce.utils.math.sq
@@ -39,11 +38,11 @@ sealed class EspMode(
     name: String,
     val requiresTrueSight: Boolean = false
 ) : Mode(name) {
-    final override val parent
-        get() = modes
+    final override val parent: ModeValueGroup<*>
+        get() = checkNotNull(base as? ModeValueGroup<*>) { "ESP mode is not attached to its parent" }
 
     fun shouldRender(entity: Entity?): Boolean {
-        return entity != null && entity.position().cameraDistanceSq() < ModuleESP.maximumDistance.sq()
+        return entity != null && entity.position().cameraDistanceSq() < EspModeRuntime.maximumDistance().sq()
     }
 
     sealed class BoxBased(name: String) : EspMode(name) {
@@ -53,7 +52,7 @@ sealed class EspMode(
         private val tickHandler = handler<GameTickEvent> {
             pool.recycleAll(prepared)
             prepared.clear()
-            for (entity in RenderedEntities) {
+            for (entity in EspModeRuntime.renderedEntities()) {
                 if (!shouldRender(entity)) continue
 
                 val dimensions = entity.getDimensions(entity.pose)

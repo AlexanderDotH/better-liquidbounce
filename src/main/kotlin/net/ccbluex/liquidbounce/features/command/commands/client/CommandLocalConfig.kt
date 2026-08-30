@@ -18,66 +18,20 @@
  */
 package net.ccbluex.liquidbounce.features.command.commands.client
 
-import kotlinx.coroutines.async
-import net.ccbluex.liquidbounce.api.core.ioScope
-import net.ccbluex.liquidbounce.api.models.client.AutoSettings
-import net.ccbluex.liquidbounce.config.ConfigSystem
-import net.ccbluex.fastutil.enumSetOf
-import net.ccbluex.liquidbounce.config.OptionalInclusion
-import net.ccbluex.liquidbounce.config.autoconfig.AutoConfigMetadata
-import net.ccbluex.liquidbounce.config.autoconfig.IncludeConfiguration
-import net.ccbluex.liquidbounce.config.autoconfig.LocalConfigCodec
-import net.ccbluex.liquidbounce.config.autoconfig.LocalConfigLoadSelection
-import net.ccbluex.liquidbounce.config.gson.publicGson
+import net.ccbluex.liquidbounce.features.autoconfig.LocalConfigLoadSelection
 import net.ccbluex.liquidbounce.features.command.Command
-import net.ccbluex.liquidbounce.features.command.CommandException
-import net.ccbluex.liquidbounce.features.command.CommandManager
 import net.ccbluex.liquidbounce.features.command.Parameter.Verificator.Result
 import net.ccbluex.liquidbounce.features.command.builder.CommandBuilder
-import net.ccbluex.liquidbounce.features.command.builder.ParameterBuilder
-import net.ccbluex.liquidbounce.features.command.builder.boolean
-import net.ccbluex.liquidbounce.features.command.preset.pagedQuery
 import net.ccbluex.liquidbounce.features.module.ClientModule
 import net.ccbluex.liquidbounce.features.module.ModuleCategories
 import net.ccbluex.liquidbounce.features.module.ModuleManager
-import net.ccbluex.liquidbounce.utils.text.asPlainText
-import net.ccbluex.liquidbounce.utils.client.chat
-import net.ccbluex.liquidbounce.utils.client.clickablePath
-import net.ccbluex.liquidbounce.utils.client.highlight
-import net.ccbluex.liquidbounce.utils.client.logger
-import net.ccbluex.liquidbounce.utils.client.markAsError
-import net.ccbluex.liquidbounce.utils.client.onClick
-import net.ccbluex.liquidbounce.utils.client.onHover
-import net.ccbluex.liquidbounce.utils.text.plus
-import net.ccbluex.liquidbounce.utils.client.regular
-import net.ccbluex.liquidbounce.utils.text.textOf
-import net.ccbluex.liquidbounce.utils.client.variable
-import net.ccbluex.liquidbounce.utils.client.warning
-import net.ccbluex.liquidbounce.utils.kotlin.unmodifiable
-import net.ccbluex.liquidbounce.utils.text.AsyncLoadingText
-import net.ccbluex.liquidbounce.utils.text.PlainText
-import net.minecraft.ChatFormatting
-import net.minecraft.SharedConstants
-import net.minecraft.network.chat.ClickEvent
-import net.minecraft.network.chat.HoverEvent
-import net.minecraft.network.chat.Style
-import net.minecraft.util.Util
-import java.io.File
-import java.time.Instant
-import java.time.ZoneId
 
-/**
- * LocalConfig Command
- *
- * Allows you to load, list, and create local configurations.
- */
+/** Local configuration load, list, browse, and save command facade. */
 object CommandLocalConfig : Command.Factory {
-
     private const val RENDER_SELECTION = "render"
 
     internal sealed interface LoadSelectionToken {
         data object Render : LoadSelectionToken
-
         data class Modules(val modules: Set<ClientModule>) : LoadSelectionToken
     }
 
@@ -85,189 +39,13 @@ object CommandLocalConfig : Command.Factory {
         val modules: Set<ClientModule>,
     ) : IllegalArgumentException()
 
-    override fun createCommand(): Command {
-        return CommandBuilder
-            .begin("localconfig")
-            .hub()
-            .subcommand(loadSubcommand())
-            .subcommand(listSubcommand())
-            .subcommand(browseSubcommand())
-            .subcommand(saveSubcommand())
-            .build()
-    }
-
-    private fun hoverText(file: File, settingName: String) =
-        textOf(
-            "Click to load ".asPlainText(ChatFormatting.GRAY),
-            settingName.asPlainText(Style.EMPTY + ChatFormatting.AQUA + ChatFormatting.BOLD),
-            PlainText.NEW_LINE,
-            AsyncLoadingText(
-                ioScope.async {
-                    file.bufferedReader().use { r ->
-                        publicGson.fromJson(r, AutoConfigMetadata::class.java)
-                    }.asText()
-                }
-            )
-        )
-
-    private fun saveSubcommand() = CommandBuilder
-        .begin("save")
-        .alias("create")
-        .parameter(
-            ParameterBuilder.begin<String>("name")
-                .verifiedBy(ParameterBuilder.STRING_VALIDATOR)
-                .autocompletedFrom {
-                    ConfigSystem.userConfigsFolder.listFiles()?.map { it.nameWithoutExtension }
-                }
-                .required()
-                .build()
-        )
-        .parameter(
-            ParameterBuilder.boolean("overwrite")
-                .optional()
-                .build()
-        )
-        .parameter(
-            ParameterBuilder.begin<String>("include")
-                .verifiedBy(ParameterBuilder.STRING_VALIDATOR)
-                .autocompletedFrom { listOf("binds", "hidden", "render", "fun") }
-                .vararg()
-                .optional()
-                .build()
-        )
-        .handler {
-            val name = args[0] as String
-
-            if (name.isBlank() || name.indexOfAny(SharedConstants.ILLEGAL_FILE_CHARACTERS) != -1) {
-                throw CommandException(command.result("invalidFileName", variable(name)))
-            }
-
-            val overwrite = args.getOrNull(1) as Boolean? ?: false
-            @Suppress("UNCHECKED_CAST")
-            val include = args.getOrNull(2) as Array<*>? ?: emptyArray<String>()
-            val inclusions = enumSetOf<OptionalInclusion>()
-            if (include.contains("render")) inclusions.add(OptionalInclusion.RENDER)
-            if (include.contains("fun")) inclusions.add(OptionalInclusion.FUN)
-
-            val includeConfiguration = IncludeConfiguration(
-                includeBinds = include.contains("binds"),
-                includeHidden = include.contains("hidden"),
-                optionalInclusions = inclusions,
-            )
-
-            val file = ConfigSystem.userConfigsFolder.resolve("$name.json")
-            try {
-                if (file.exists()) {
-                    if (overwrite) {
-                        file.delete()
-                    } else {
-                        chat(markAsError(command.result("alreadyExists", variable(name))))
-                        return@handler
-                    }
-                }
-
-                file.createNewFile()
-                LocalConfigCodec.serialize(file.bufferedWriter(), includeConfiguration)
-                chat(regular(command.result("created", variable(name))))
-            } catch (e: Exception) {
-                chat(regular(command.result("failedToCreate", variable(name))))
-                logger.error("Failed to create local config '$name'", e)
-            }
-        }
-        .build()
-
-    private fun browseSubcommand() = CommandBuilder.begin("browse").handler {
-        Util.getPlatform().openFile(ConfigSystem.userConfigsFolder)
-        chat(regular(command.result("browse", clickablePath(ConfigSystem.userConfigsFolder))))
-    }.build()
-
-    private fun listSubcommand() = CommandBuilder
-        .begin("list")
-        .pagedQuery(
-            pageSize = 8,
-            header = {
-                highlight("Local Configs:")
-            },
-            items = {
-                ConfigSystem.userConfigsFolder.listFiles { _, name ->
-                    name.endsWith(".json", ignoreCase = true)
-                }.unmodifiable()
-            },
-            eachRow = { _, file ->
-                val settingName = file.name.removeSuffix(".json")
-
-                val lastModified = Instant.ofEpochMilli(file.lastModified())
-                    .atZone(ZoneId.systemDefault())
-                    .toLocalDateTime()
-                    .format(AutoSettings.FORMATTER)
-
-                textOf(
-                    "\u2B25 ".asPlainText(ChatFormatting.BLUE),
-                    variable(file.name)
-                        .onClick(
-                            ClickEvent.SuggestCommand(
-                                CommandManager.GlobalSettings.prefix + "localconfig load $settingName"
-                            )
-                        )
-                        .onHover(HoverEvent.ShowText(hoverText(file, settingName))),
-                    regular(" ($lastModified)"),
-                )
-            }
-        )
-
-    private fun loadSubcommand() = CommandBuilder
-        .begin("load")
-        .parameter(
-            ParameterBuilder
-                .begin<String>("name")
-                .verifiedBy(ParameterBuilder.STRING_VALIDATOR)
-                .autocompletedFrom {
-                    ConfigSystem.userConfigsFolder.listFiles()?.map { it.nameWithoutExtension }
-                }
-                .required()
-                .build()
-        )
-        .parameter(
-            ParameterBuilder.begin<LoadSelectionToken>("selection")
-                .verifiedBy { sourceText -> parseLoadSelectionToken(sourceText) }
-                .autocompletedWith { begin, _ -> autocompleteLoadSelection(begin) }
-                .vararg()
-                .optional()
-                .build()
-        )
-        .handler {
-            val name = args[0] as String
-            val selectionTokens = (args.getOrNull(1) as? Array<*>)
-                ?.filterIsInstance<LoadSelectionToken>()
-                .orEmpty()
-            val selection = try {
-                combineLoadSelection(selectionTokens)
-            } catch (exception: RenderOptInRequiredException) {
-                val moduleNames = exception.modules.joinToString(", ") { it.name }
-                throw CommandException(command.result("renderRequiresOptIn", variable(moduleNames)))
-            }
-
-            ConfigSystem.userConfigsFolder.resolve("$name.json").runCatching {
-                if (!exists()) {
-                    chat(regular(command.result("notFound", variable(name))))
-                    return@handler
-                }
-
-                bufferedReader().use { r ->
-                    LocalConfigCodec.load(r, selection)
-                }
-            }.onFailure { error ->
-                logger.error("Failed to load config $name", error)
-                chat(markAsError(command.result("failedToLoad", variable(name))))
-            }.onSuccess { result ->
-                val resultKey = if (selection.includeRender) "loadedWithRender" else "loaded"
-                chat(regular(command.result(resultKey, variable(name))))
-
-                if (selection.includeRender && !result.hasRenderSnapshot) {
-                    chat(warning(command.result("renderMissing", variable(name))))
-                }
-            }
-        }
+    override fun createCommand(): Command = CommandBuilder
+        .begin("localconfig")
+        .hub()
+        .subcommand(localConfigLoadSubcommand())
+        .subcommand(localConfigListSubcommand())
+        .subcommand(localConfigBrowseSubcommand())
+        .subcommand(localConfigSaveSubcommand())
         .build()
 
     internal fun parseLoadSelectionToken(
@@ -277,33 +55,29 @@ object CommandLocalConfig : Command.Factory {
         if (sourceText.equals(RENDER_SELECTION, ignoreCase = true)) {
             return Result.Ok(LoadSelectionToken.Render)
         }
-
-        val resolvedModules = sourceText.split(',').mapNotNullTo(linkedSetOf()) { moduleName ->
+        val resolved = sourceText.split(',').mapNotNullTo(linkedSetOf()) { moduleName ->
             modules.find { module -> module.name.equals(moduleName, ignoreCase = true) }
         }
-
-        return if (resolvedModules.isEmpty()) {
+        return if (resolved.isEmpty()) {
             Result.Error("'$sourceText' contains no valid Module")
         } else {
-            Result.Ok(LoadSelectionToken.Modules(resolvedModules))
+            Result.Ok(LoadSelectionToken.Modules(resolved))
         }
     }
 
     internal fun combineLoadSelection(tokens: Iterable<LoadSelectionToken>): LocalConfigLoadSelection {
-        val includeRender = tokens.any { it === LoadSelectionToken.Render }
+        val includeRender = tokens.any { token -> token === LoadSelectionToken.Render }
         val selectedModules = tokens.asSequence()
             .filterIsInstance<LoadSelectionToken.Modules>()
-            .flatMap { it.modules.asSequence() }
+            .flatMap { token -> token.modules.asSequence() }
             .toCollection(linkedSetOf())
-        val selectedRenderModules = selectedModules.filterTo(linkedSetOf()) {
-            it.category == ModuleCategories.RENDER
+        val renderModules = selectedModules.filterTo(linkedSetOf()) { module ->
+            module.category == ModuleCategories.RENDER
         }
-
-        if (!includeRender && selectedRenderModules.isNotEmpty()) {
-            throw RenderOptInRequiredException(selectedRenderModules)
+        if (!includeRender && renderModules.isNotEmpty()) {
+            throw RenderOptInRequiredException(renderModules)
         }
-
-        selectedModules.removeAll(selectedRenderModules)
+        selectedModules.removeAll(renderModules)
         return LocalConfigLoadSelection(selectedModules, includeRender)
     }
 
@@ -315,14 +89,11 @@ object CommandLocalConfig : Command.Factory {
         val prefix = begin.substring(0, splitAt)
         val modulePrefix = begin.substring(splitAt)
         val suggestions = modules.asSequence()
-            .filter { it.name.startsWith(modulePrefix, ignoreCase = true) }
-            .mapTo(mutableListOf()) { prefix + it.name }
-
+            .filter { module -> module.name.startsWith(modulePrefix, ignoreCase = true) }
+            .mapTo(mutableListOf()) { module -> prefix + module.name }
         if (splitAt == 0 && RENDER_SELECTION.startsWith(begin, ignoreCase = true)) {
             suggestions.add(0, RENDER_SELECTION)
         }
-
         return suggestions.distinct()
     }
-
 }

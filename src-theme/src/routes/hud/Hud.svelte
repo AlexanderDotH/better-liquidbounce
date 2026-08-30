@@ -27,7 +27,7 @@
     import KeyBinds from "./elements/KeyBinds.svelte";
     import ClosedCaptions from "./elements/ClosedCaptions.svelte";
     import GenericPlayerInventory from "./elements/inventory/GenericPlayerInventory.svelte";
-    import {os} from "../clickgui/clickgui_store";
+    import {os} from "../../integration/clientEnvironment";
     import InventoryStatistics from "./elements/inventory/InventoryStatistics.svelte";
     import ModernWatermark from "./themes/modern/ModernWatermark.svelte";
     import {hudThemeSession} from "./theme/themeSession";
@@ -35,7 +35,7 @@
     import {
         HUD_EDITOR_ELEMENTS_CONTEXT,
         type HudEditorDragState
-    } from "../clickgui/tabs/hud_editor/constants";
+    } from "../../shared/hud-editor/HudEditorContracts";
     import Image from "./elements/Image.svelte";
 
     export let inEditor = false;

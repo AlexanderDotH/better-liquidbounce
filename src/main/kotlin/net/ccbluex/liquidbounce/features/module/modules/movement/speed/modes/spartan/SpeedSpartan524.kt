@@ -22,7 +22,7 @@ import net.ccbluex.liquidbounce.config.types.group.Mode
 import net.ccbluex.liquidbounce.config.types.group.ModeValueGroup
 import net.ccbluex.liquidbounce.event.events.PlayerMoveEvent
 import net.ccbluex.liquidbounce.event.handler
-import net.ccbluex.liquidbounce.features.module.modules.movement.speed.ModuleSpeed
+import net.ccbluex.liquidbounce.features.module.modules.movement.speed.runtime.SpeedModuleControl
 import net.ccbluex.liquidbounce.utils.network.MovePacketType
 import net.ccbluex.liquidbounce.utils.client.Timer
 import net.ccbluex.liquidbounce.utils.entity.airTicks
@@ -98,7 +98,7 @@ class SpeedSpartanV4043FastFall(override val parent: ModeValueGroup<*>) : Mode("
 
             event.movement.y = 0.42
         } else if (player.airTicks == 1) {
-            Timer.requestTimerSpeed(0.5f, Priority.NORMAL, ModuleSpeed, 0)
+            Timer.requestTimerSpeed(0.5f, Priority.NORMAL, SpeedModuleControl.module, 0)
 
             network.send(MovePacketType.FULL.generatePacket().apply { // for some reason full works best
                 onGround = true

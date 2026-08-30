@@ -10,6 +10,7 @@
  */
 package net.ccbluex.liquidbounce.features.module.modules.player.reach.interactable
 
+import net.ccbluex.liquidbounce.features.module.modules.player.reach.contract.*
 import net.ccbluex.liquidbounce.features.module.modules.player.reach.interactable.session.InteractableSessionCause
 import net.ccbluex.liquidbounce.features.module.modules.player.reach.interactable.session.InteractableSessionSettings
 import net.minecraft.world.phys.Vec3

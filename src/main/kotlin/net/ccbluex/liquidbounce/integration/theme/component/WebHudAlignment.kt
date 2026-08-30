@@ -12,8 +12,8 @@
 package net.ccbluex.liquidbounce.integration.theme.component
 
 import net.ccbluex.liquidbounce.render.engine.type.BoundingBox2f
-import net.ccbluex.liquidbounce.utils.render.Alignment.ScreenAxisX
-import net.ccbluex.liquidbounce.utils.render.Alignment.ScreenAxisY
+import net.ccbluex.liquidbounce.config.types.group.Alignment.ScreenAxisX
+import net.ccbluex.liquidbounce.config.types.group.Alignment.ScreenAxisY
 
 internal const val WEB_HUD_BASE_SCALE = 2f
 

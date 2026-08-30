@@ -18,15 +18,13 @@
  */
 package net.ccbluex.liquidbounce.features.module.modules.render
 
-import it.unimi.dsi.fastutil.objects.Object2IntOpenHashMap
 import it.unimi.dsi.fastutil.objects.ObjectArrayList
 import it.unimi.dsi.fastutil.objects.Reference2ObjectOpenHashMap
 import it.unimi.dsi.fastutil.objects.ReferenceOpenHashSet
-import net.ccbluex.fastutil.fastIterator
 import net.ccbluex.fastutil.mapToArray
 import net.ccbluex.liquidbounce.config.types.CurveValue.Axis.Companion.axis
 import net.ccbluex.liquidbounce.config.types.group.ToggleableValueGroup
-import net.ccbluex.liquidbounce.config.types.list.Tagged
+import net.ccbluex.liquidbounce.common.Tagged
 import net.ccbluex.liquidbounce.event.computedOn
 import net.ccbluex.liquidbounce.event.events.GameTickEvent
 import net.ccbluex.liquidbounce.event.events.OverlayRenderEvent
@@ -34,7 +32,6 @@ import net.ccbluex.liquidbounce.event.events.WorldChangeEvent
 import net.ccbluex.liquidbounce.event.handler
 import net.ccbluex.liquidbounce.features.module.ClientModule
 import net.ccbluex.liquidbounce.features.module.ModuleCategories
-import net.ccbluex.liquidbounce.features.module.modules.player.invcleaner.ItemAndComponents
 import net.ccbluex.liquidbounce.render.gui.ItemStackListRenderer.drawItemStackList
 import net.ccbluex.liquidbounce.render.engine.type.Color4b
 import net.ccbluex.liquidbounce.utils.collection.Filter
@@ -43,10 +40,11 @@ import net.ccbluex.liquidbounce.utils.entity.cameraDistance
 import net.ccbluex.liquidbounce.utils.entity.interpolateCurrentPosition
 import net.ccbluex.liquidbounce.utils.item.COMPARING_DESCRIPTION_ID
 import net.ccbluex.liquidbounce.utils.item.PreferStackSize
+import net.ccbluex.liquidbounce.utils.item.mergeItemStacksByComponents
 import net.ccbluex.liquidbounce.utils.kotlin.toTypedArray
 import net.ccbluex.liquidbounce.utils.math.average
 import net.ccbluex.liquidbounce.utils.math.sq
-import net.ccbluex.liquidbounce.utils.render.WorldToScreen
+import net.ccbluex.liquidbounce.render.WorldToScreen
 import net.ccbluex.liquidbounce.utils.world.entityGetter
 import net.ccbluex.liquidbounce.utils.world.filter
 import net.minecraft.core.component.DataComponents
@@ -136,19 +134,7 @@ object ModuleItemTags : ClientModule("ItemTags", ModuleCategories.RENDER) {
          * [ItemStack]s with same [Item] and same [net.minecraft.core.component.DataComponentPatch] will be merged.
          */
         BY_COMPONENTS("ByComponents", { stacks ->
-            val map = Object2IntOpenHashMap<ItemAndComponents>()
-
-            for (stack in stacks) {
-                map.addTo(ItemAndComponents(stack), stack.count)
-            }
-
-            val iter = map.fastIterator()
-            Array(map.size) {
-                val entry = iter.next()
-                entry.key.toItemStack(entry.intValue)
-            }.apply {
-                sortWith(itemStackComparator)
-            }
+            mergeItemStacksByComponents(stacks, itemStackComparator)
         }),
     }
 

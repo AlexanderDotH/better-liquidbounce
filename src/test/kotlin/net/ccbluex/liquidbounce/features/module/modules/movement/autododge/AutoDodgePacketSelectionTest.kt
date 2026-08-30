@@ -138,14 +138,17 @@ class AutoDodgePacketSelectionTest {
 
     @Test
     fun `Packet mode has no local movement or Movement fallback surface`() {
-        val source = Files.readString(MODULE_SOURCE)
-        val packetUpdate = bracedDeclaration(source, "private fun updatePacketDefense(")
-        val holdHandler = bracedDeclaration(source, "private val packetHoldHandler")
+        val moduleSource = Files.readString(MODULE_SOURCE)
+        val defenseSource = Files.readString(DEFENSE_RUNTIME_SOURCE)
+        val packetUpdate = bracedDeclaration(defenseSource, "private fun updatePacketDefense(")
+        val packetSuppression = expressionDeclaration(defenseSource, "fun shouldSuppressPacket(")
+        val holdHandler = bracedDeclaration(moduleSource, "private val packetHoldHandler")
         val packetController = Files.readString(PACKET_CONTROLLER_SOURCE)
-        val packetSurface = packetUpdate + holdHandler + packetController
+        val packetSurface = packetUpdate + packetSuppression + holdHandler + packetController
 
         assertTrue(packetUpdate.contains("updateThreatOnly("))
-        assertTrue(holdHandler.contains("shouldSuppressAutoDodgePacketHoldMovement("))
+        assertTrue(packetSuppression.contains("shouldSuppressAutoDodgePacketHoldMovement("))
+        assertTrue(holdHandler.contains("defense.shouldSuppressPacket(event)"))
         assertTrue(holdHandler.contains("event.cancelEvent()"))
         assertTrue(packetController.contains("toPacketThreatPrediction("))
         assertTrue(packetController.contains("selectArmedAutoDodgePacketCandidate("))
@@ -158,7 +161,7 @@ class AutoDodgePacketSelectionTest {
 
     @Test
     fun `Movement mode retains the existing projectile spear mace and action pipeline`() {
-        val source = Files.readString(MODULE_SOURCE)
+        val source = Files.readString(DEFENSE_RUNTIME_SOURCE)
         val movementUpdate = bracedDeclaration(source, "private fun updateMovementDefense(")
 
         listOf(
@@ -166,7 +169,7 @@ class AutoDodgePacketSelectionTest {
             "spearMovementController.update(",
             "maceMovementController.update(",
             "AutoDodgeMovementArbitrator.chooseAction(",
-            "executeMovementAction(",
+            "AutoDodgeMovementExecutor.execute(",
         ).forEach { operation ->
             assertTrue(movementUpdate.contains(operation), "Movement mode lost $operation")
         }
@@ -188,6 +191,14 @@ class AutoDodgePacketSelectionTest {
         error("Unclosed declaration: $marker")
     }
 
+    private fun expressionDeclaration(source: String, marker: String): String {
+        val markerIndex = source.indexOf(marker)
+        require(markerIndex >= 0) { "Missing declaration: $marker" }
+        val declarationEnd = source.indexOf("\n\n", markerIndex)
+        require(declarationEnd >= 0) { "Missing declaration end: $marker" }
+        return source.substring(markerIndex, declarationEnd)
+    }
+
     private fun candidate(
         threatType: AutoDodgePacketThreatType,
         entityId: Int,
@@ -205,6 +216,10 @@ class AutoDodgePacketSelectionTest {
     private companion object {
         val MODULE_SOURCE: Path = Path.of(
             "src/main/kotlin/net/ccbluex/liquidbounce/features/module/modules/movement/autododge/ModuleAutoDodge.kt",
+        )
+        val DEFENSE_RUNTIME_SOURCE: Path = Path.of(
+            "src/main/kotlin/net/ccbluex/liquidbounce/features/module/modules/movement/autododge/" +
+                "AutoDodgeDefenseRuntime.kt",
         )
         val PACKET_CONTROLLER_SOURCE: Path = Path.of(
             "src/main/kotlin/net/ccbluex/liquidbounce/features/module/modules/movement/autododge/" +

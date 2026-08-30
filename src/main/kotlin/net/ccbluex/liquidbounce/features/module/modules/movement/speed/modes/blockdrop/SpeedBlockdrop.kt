@@ -23,8 +23,8 @@ import net.ccbluex.liquidbounce.config.types.group.ModeValueGroup
 import net.ccbluex.liquidbounce.event.events.MovementInputEvent
 import net.ccbluex.liquidbounce.event.handler
 import net.ccbluex.liquidbounce.event.tickHandler
-import net.ccbluex.liquidbounce.features.module.modules.movement.speed.ModuleSpeed
-import net.ccbluex.liquidbounce.features.module.modules.movement.speed.ModuleSpeed.doOptimizationsPreventJump
+import net.ccbluex.liquidbounce.features.module.modules.movement.speed.runtime.SpeedModuleControl
+import net.ccbluex.liquidbounce.features.module.modules.movement.speed.runtime.SpeedModuleControl.doOptimizationsPreventJump
 import net.ccbluex.liquidbounce.utils.client.Timer
 import net.ccbluex.liquidbounce.utils.entity.moving
 import net.ccbluex.liquidbounce.utils.entity.withStrafe
@@ -67,7 +67,7 @@ class SpeedBlockdrop(override val parent: ModeValueGroup<*>) : Mode("Blockdrop")
         if (player.fallDistance > 0f) {
             player.deltaMovement = player.deltaMovement.withStrafe(speed = 0.2)
         }
-        Timer.requestTimerSpeed(1.1f, Priority.IMPORTANT_FOR_USAGE_1, ModuleSpeed)
+        Timer.requestTimerSpeed(1.1f, Priority.IMPORTANT_FOR_USAGE_1, SpeedModuleControl.module)
     }
 
     private fun handleFastHalf() {
@@ -75,7 +75,7 @@ class SpeedBlockdrop(override val parent: ModeValueGroup<*>) : Mode("Blockdrop")
             speed = player.getCalculatedBaseMovementSpeed() + 0.1
         )
         player.deltaMovement = player.deltaMovement.copy(y = player.deltaMovement.y + 0.008)
-        Timer.requestTimerSpeed(1.2f, Priority.IMPORTANT_FOR_USAGE_1, ModuleSpeed)
+        Timer.requestTimerSpeed(1.2f, Priority.IMPORTANT_FOR_USAGE_1, SpeedModuleControl.module)
 
         if (player.fallDistance > 0.5f) {
             player.deltaMovement = player.deltaMovement.withStrafe(speed = 0.2)

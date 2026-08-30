@@ -20,7 +20,7 @@ package net.ccbluex.liquidbounce.features.module.modules.world
 
 import net.ccbluex.liquidbounce.config.types.group.ValueGroup
 import net.ccbluex.liquidbounce.event.events.OverlayRenderEvent
-import net.ccbluex.liquidbounce.event.events.WorldRenderEvent
+import net.ccbluex.liquidbounce.render.events.WorldRenderEvent
 import net.ccbluex.liquidbounce.event.handler
 import net.ccbluex.liquidbounce.features.module.ClientModule
 import net.ccbluex.liquidbounce.features.module.ModuleCategories
@@ -30,21 +30,14 @@ import net.ccbluex.liquidbounce.features.module.modules.world.trialchamber.Trial
 import net.ccbluex.liquidbounce.features.module.modules.world.trialchamber.TrialChamberRenderSnapshotKey
 import net.ccbluex.liquidbounce.features.module.modules.world.trialchamber.TrialChamberRenderSettings
 import net.ccbluex.liquidbounce.features.module.modules.world.trialchamber.TrialChamberRenderTarget
-import net.ccbluex.liquidbounce.features.module.modules.world.trialchamber.TrialChamberRenderTargetKind
-import net.ccbluex.liquidbounce.features.trialchamber.TrialChamberPosition
+import net.ccbluex.liquidbounce.features.module.modules.world.trialchamber.SnapshotRenderTargetMapper
 import net.ccbluex.liquidbounce.features.trialchamber.TrialChamberRuntime
 import net.ccbluex.liquidbounce.features.trialchamber.TrialChamberSnapshot
-import net.ccbluex.liquidbounce.features.trialchamber.TrialLootType
-import net.ccbluex.liquidbounce.features.trialchamber.TrialSpawnerPhase
-import net.ccbluex.liquidbounce.features.trialchamber.TrialVaultStatus
 import net.ccbluex.liquidbounce.render.drawBox
 import net.ccbluex.liquidbounce.render.engine.esp.EspGlowSource
 import net.ccbluex.liquidbounce.render.engine.esp.EspGlowStyleConfig
 import net.ccbluex.liquidbounce.render.engine.esp.EspShaderRenderer
-import net.ccbluex.liquidbounce.render.engine.type.Color4b
-import net.ccbluex.liquidbounce.utils.render.WorldToScreen
-import net.minecraft.world.phys.AABB
-import net.minecraft.world.phys.Vec3
+import net.ccbluex.liquidbounce.render.WorldToScreen
 import java.util.concurrent.atomic.AtomicReference
 import kotlin.math.roundToInt
 
@@ -164,7 +157,7 @@ object ModuleTrialChamberTracker : ClientModule(
     ): List<TrialChamberRenderTarget> {
         if (key == cachedRenderTargetKey) return cachedRenderTargets
         cachedRenderTargetKey = key
-        cachedRenderTargets = snapshot.renderTargets()
+        cachedRenderTargets = SnapshotRenderTargetMapper.map(snapshot)
         return cachedRenderTargets
     }
 
@@ -175,72 +168,3 @@ object ModuleTrialChamberTracker : ClientModule(
         cachedRenderTargets = emptyList()
     }
 }
-
-private fun TrialChamberSnapshot.renderTargets(): List<TrialChamberRenderTarget> = buildList {
-    spawners.forEach { spawner ->
-        add(TrialChamberRenderTarget(
-            id = "spawner:${spawner.position.id}",
-            kind = TrialChamberRenderTargetKind.SPAWNER,
-            position = spawner.position.center,
-            worldBox = spawner.position.blockBox,
-            label = "Trial Spawner: ${spawner.phase.displayName}",
-            color = SPAWNER_COLOR,
-            completed = spawner.completed,
-        ))
-    }
-    vaults.forEach { vault ->
-        add(TrialChamberRenderTarget(
-            id = "vault:${vault.position.id}",
-            kind = if (vault.ominous) {
-                TrialChamberRenderTargetKind.OMINOUS_VAULT
-            } else {
-                TrialChamberRenderTargetKind.NORMAL_VAULT
-            },
-            position = vault.position.center,
-            worldBox = vault.position.blockBox,
-            label = "${if (vault.ominous) "Ominous " else ""}Vault: ${vault.status.displayName}",
-            color = if (vault.ominous) OMINOUS_VAULT_COLOR else VAULT_COLOR,
-            completed = vault.completed,
-        ))
-    }
-    loot.forEach { resource ->
-        val (kind, label, color) = when (resource.type) {
-            TrialLootType.CHEST -> Triple(TrialChamberRenderTargetKind.CHEST, "Chest", CHEST_COLOR)
-            TrialLootType.BARREL -> Triple(TrialChamberRenderTargetKind.BARREL, "Barrel", BARREL_COLOR)
-            TrialLootType.POT -> Triple(TrialChamberRenderTargetKind.POT, "Pot", POT_COLOR)
-            TrialLootType.DISPENSER -> Triple(TrialChamberRenderTargetKind.DISPENSER, "Dispenser", DISPENSER_COLOR)
-        }
-        add(TrialChamberRenderTarget(
-            id = "${resource.type.name.lowercase()}:${resource.position.id}",
-            kind = kind,
-            position = resource.position.center,
-            worldBox = resource.position.blockBox,
-            label = label,
-            color = color,
-            visited = resource.visited,
-        ))
-    }
-}
-
-private val TrialChamberPosition.id: String
-    get() = "$x,$y,$z"
-
-private val TrialChamberPosition.center: Vec3
-    get() = Vec3(x + 0.5, y + 0.5, z + 0.5)
-
-private val TrialChamberPosition.blockBox: AABB
-    get() = AABB(x.toDouble(), y.toDouble(), z.toDouble(), x + 1.0, y + 1.0, z + 1.0)
-
-private val TrialSpawnerPhase.displayName: String
-    get() = name.lowercase().replace('_', ' ').replaceFirstChar(Char::uppercase)
-
-private val TrialVaultStatus.displayName: String
-    get() = name.lowercase().replaceFirstChar(Char::uppercase)
-
-private val SPAWNER_COLOR = Color4b(255, 132, 48)
-private val VAULT_COLOR = Color4b(55, 210, 255)
-private val OMINOUS_VAULT_COLOR = Color4b(165, 92, 255)
-private val CHEST_COLOR = Color4b(40, 130, 255)
-private val BARREL_COLOR = Color4b(246, 130, 31)
-private val POT_COLOR = Color4b(224, 166, 45)
-private val DISPENSER_COLOR = Color4b(190, 190, 190)

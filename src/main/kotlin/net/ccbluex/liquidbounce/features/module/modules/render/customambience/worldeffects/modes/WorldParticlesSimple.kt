@@ -19,9 +19,9 @@
 
 package net.ccbluex.liquidbounce.features.module.modules.render.customambience.worldeffects.modes
 
-import net.ccbluex.liquidbounce.features.module.modules.render.customambience.worldeffects.WorldParticles.coords
-import net.ccbluex.liquidbounce.features.module.modules.render.customambience.worldeffects.WorldParticlesColorSettings
-import net.ccbluex.liquidbounce.features.module.modules.render.customambience.worldeffects.WorldParticlesMode
+import net.ccbluex.liquidbounce.features.module.modules.render.customambience.worldeffects.config.WorldParticlesColorSettings
+import net.ccbluex.liquidbounce.features.module.modules.render.customambience.worldeffects.model.WorldParticleStore
+import net.ccbluex.liquidbounce.features.module.modules.render.customambience.worldeffects.runtime.WorldParticlesMode
 import net.ccbluex.liquidbounce.render.AnchorPoint
 import net.ccbluex.liquidbounce.render.BuiltinParticle
 import net.ccbluex.liquidbounce.render.WorldRenderEnvironment
@@ -35,7 +35,7 @@ import kotlin.math.pow
 import kotlin.math.sqrt
 import kotlin.random.Random
 
-object WorldParticlesSimple : WorldParticlesMode("Simple") {
+internal class WorldParticlesSimple(store: WorldParticleStore) : WorldParticlesMode("Simple", store) {
 
     private val color = WorldParticlesColorSettings()
     private val builtinParticles by enumChoice("Particle", BuiltinParticle.SPARK)
@@ -45,7 +45,7 @@ object WorldParticlesSimple : WorldParticlesMode("Simple") {
     }
 
     override fun createParticleCoord(currentTime: Long) {
-        if (coords.size >= count) return
+        if (store.coords.size >= count) return
 
         lastSpawnTime = currentTime
 
@@ -58,7 +58,7 @@ object WorldParticlesSimple : WorldParticlesMode("Simple") {
         val rMaxCb = radius.last.toDouble().pow(3)
         val distance = cbrt(Random.nextDouble(rMinCb, rMaxCb))
 
-        coords.add(player.position().add(coord * distance), lifetime.last)
+        store.coords.add(player.position().add(coord * distance), lifetime.last)
     }
 
     override fun WorldRenderEnvironment.drawWorldParticle(progress: Float, age: Float) {

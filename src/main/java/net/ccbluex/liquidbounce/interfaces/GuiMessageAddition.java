@@ -18,8 +18,6 @@
  */
 package net.ccbluex.liquidbounce.interfaces;
 
-import net.ccbluex.liquidbounce.features.module.modules.misc.betterchat.ModuleBetterChat;
-
 /**
  * Additions to {@link net.minecraft.client.GuiMessage}.
  */
@@ -27,7 +25,7 @@ public interface GuiMessageAddition {
 
     /**
      * Sets the count of the message.
-     * This indicates how many times this massage has already been sent in {@link ModuleBetterChat}.
+     * This indicates how many times this message has already been sent by the BetterChat module.
      */
     void liquid_bounce$setCount(int count);
 

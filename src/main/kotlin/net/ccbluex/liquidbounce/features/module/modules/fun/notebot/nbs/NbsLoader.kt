@@ -18,10 +18,8 @@
  */
 package net.ccbluex.liquidbounce.features.module.modules.`fun`.notebot.nbs
 
-import net.ccbluex.liquidbounce.features.module.modules.`fun`.notebot.ModuleNotebot
-import net.ccbluex.liquidbounce.utils.client.chat
+import net.ccbluex.liquidbounce.features.module.modules.`fun`.notebot.contract.NotebotRuntimeBridge
 import net.ccbluex.liquidbounce.utils.client.logger
-import net.ccbluex.liquidbounce.utils.client.markAsError
 import okio.buffer
 import okio.source
 import java.io.File
@@ -31,7 +29,7 @@ object NbsLoader {
 
     fun load(nbsFile: File): SongData? {
         if (!nbsFile.exists()) {
-            chat(markAsError(ModuleNotebot.message("noNbs", nbsFile.absolutePath)), ModuleNotebot)
+            NotebotRuntimeBridge.reportLoadError("noNbs", nbsFile.absolutePath)
             return null
         }
 
@@ -44,7 +42,7 @@ object NbsLoader {
             SongData(nbsFile.nameWithoutExtension, nbs, notesByTick, songTickLength, songTicksPerGameTick)
         } catch (e: IOException) {
             logger.error("Failed to load NBS data from ${nbsFile.absolutePath}", e)
-            chat(markAsError(ModuleNotebot.message("couldNotParse")), ModuleNotebot)
+            NotebotRuntimeBridge.reportLoadError("couldNotParse")
             null
         }
     }

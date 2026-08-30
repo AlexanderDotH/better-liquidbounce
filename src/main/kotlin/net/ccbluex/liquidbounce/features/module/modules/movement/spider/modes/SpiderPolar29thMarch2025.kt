@@ -19,11 +19,9 @@
 package net.ccbluex.liquidbounce.features.module.modules.movement.spider.modes
 
 import net.ccbluex.liquidbounce.config.types.group.Mode
-import net.ccbluex.liquidbounce.config.types.group.ModeValueGroup
 import net.ccbluex.liquidbounce.event.events.BlockShapeEvent
 import net.ccbluex.liquidbounce.event.events.PlayerJumpEvent
 import net.ccbluex.liquidbounce.event.handler
-import net.ccbluex.liquidbounce.features.module.modules.movement.spider.ModuleSpider
 import net.ccbluex.liquidbounce.utils.math.shrink
 
 /**
@@ -35,8 +33,6 @@ import net.ccbluex.liquidbounce.utils.math.shrink
  */
 internal object SpiderPolar29thMarch2025 : Mode("Polar-29.03.2025") {
 
-    override val parent: ModeValueGroup<Mode>
-        get() = ModuleSpider.modes
 
     /**
      * Polar allows jumping 0.6 high, but it's faster to use 0.55 to hit the

@@ -18,11 +18,15 @@ import net.ccbluex.liquidbounce.features.baritone.BaritoneFeature
 import net.ccbluex.liquidbounce.features.baritone.core.BaritoneLogEntry
 import net.ccbluex.liquidbounce.features.baritone.core.BaritoneRevision
 import net.ccbluex.liquidbounce.features.baritone.core.BaritoneRoute
-import net.ccbluex.liquidbounce.integration.screen.CustomScreenType
-import net.ccbluex.liquidbounce.integration.screen.ScreenManager
 
 /** Publishes lightweight Baritone state at most five times per second while its dashboard is visible. */
 object BaritoneEventPublisher : EventListener {
+
+    init {
+        EventManager.registerEventClass(BaritoneStateEvent::class.java)
+        EventManager.registerEventClass(BaritoneRouteEvent::class.java)
+        EventManager.registerEventClass(BaritoneLogEvent::class.java)
+    }
 
     private val cursor = BaritonePublicationCursor()
     private var ticks = 0
@@ -30,7 +34,7 @@ object BaritoneEventPublisher : EventListener {
     @Suppress("unused")
     private val tickHandler = handler<GameTickEvent> {
         if (++ticks % PUBLICATION_INTERVAL_TICKS != 0) return@handler
-        if (ScreenManager.screen?.type != CustomScreenType.BARITONE) return@handler
+        if (!BaritoneFeature.isDashboardVisible()) return@handler
         val facade = BaritoneFeature.facadeOrNull() ?: return@handler
 
         val snapshot = facade.snapshot()

@@ -19,7 +19,7 @@
 package net.ccbluex.liquidbounce.features.module.modules.combat.killaura.features
 
 import net.ccbluex.liquidbounce.config.types.group.ToggleableValueGroup
-import net.ccbluex.liquidbounce.config.types.list.Tagged
+import net.ccbluex.liquidbounce.common.Tagged
 import net.ccbluex.liquidbounce.features.module.modules.combat.killaura.ModuleKillAura
 import net.ccbluex.liquidbounce.render.WorldRenderEnvironment
 import net.ccbluex.liquidbounce.render.drawCircleOutline
@@ -31,7 +31,7 @@ import net.ccbluex.liquidbounce.render.withPush
 import net.ccbluex.liquidbounce.utils.client.clientStartDurationMs
 import net.ccbluex.liquidbounce.utils.entity.boxedDistanceTo
 import net.ccbluex.liquidbounce.utils.entity.interpolateCurrentPosition
-import net.ccbluex.liquidbounce.utils.inventory.InventoryManager.isInventoryOpen
+import net.ccbluex.liquidbounce.features.inventory.InventoryManager.isInventoryOpen
 import net.minecraft.client.gui.screens.inventory.ContainerScreen
 import net.minecraft.util.Mth
 import net.minecraft.world.entity.LivingEntity

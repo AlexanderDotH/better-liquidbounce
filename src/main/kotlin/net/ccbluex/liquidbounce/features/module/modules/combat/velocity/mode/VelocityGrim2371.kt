@@ -124,7 +124,7 @@ internal object VelocityGrim2371 : VelocityMode("Grim2371") {
             return@handler
         }
 
-        event.action = BlinkManager.Action.QUEUE
+        event.action = net.ccbluex.liquidbounce.event.events.BlinkPacketAction.QUEUE
     }
 
     @Suppress("unused")

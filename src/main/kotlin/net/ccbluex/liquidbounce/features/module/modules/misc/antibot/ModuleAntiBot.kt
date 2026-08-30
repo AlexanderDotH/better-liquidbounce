@@ -24,6 +24,8 @@ import net.ccbluex.liquidbounce.event.events.WorldChangeEvent
 import net.ccbluex.liquidbounce.event.handler
 import net.ccbluex.liquidbounce.features.module.ClientModule
 import net.ccbluex.liquidbounce.features.module.ModuleCategories
+import net.ccbluex.liquidbounce.features.module.modules.misc.antibot.contract.AntiBotProfileBridge
+import net.ccbluex.liquidbounce.features.module.modules.misc.antibot.contract.AntiBotProfileHook
 import net.ccbluex.liquidbounce.features.module.modules.misc.antibot.modes.CustomAntiBotMode
 import net.ccbluex.liquidbounce.features.module.modules.misc.antibot.modes.HorizonAntiBotMode
 import net.ccbluex.liquidbounce.features.module.modules.misc.antibot.modes.IntaveHeavyAntiBotMode
@@ -42,6 +44,13 @@ object ModuleAntiBot : ClientModule("AntiBot", ModuleCategories.MISC) {
 
     private val literalNPC by boolean("LiteralNPC", false)
     private val notInTabList by boolean("NotInTabList", false)
+
+    init {
+        AntiBotProfileBridge.install(object : AntiBotProfileHook {
+            override fun isDuplicate(profile: GameProfile) = isADuplicate(profile)
+            override fun isUnique(profile: GameProfile) = isGameProfileUnique(profile)
+        })
+    }
 
     @Suppress("unused")
     private val tagHandler = handler<TagEntityEvent> {

@@ -22,8 +22,8 @@ package net.ccbluex.liquidbounce.injection.mixins.minecraft.gui.custom;
 import net.ccbluex.liquidbounce.api.thirdparty.IpInfoApi;
 import net.ccbluex.liquidbounce.event.EventManager;
 import net.ccbluex.liquidbounce.event.events.ServerConnectEvent;
-import net.ccbluex.liquidbounce.features.misc.HideAppearance;
-import net.ccbluex.liquidbounce.features.misc.proxy.ProxyManager;
+import net.ccbluex.liquidbounce.features.misc.HideAppearanceHook;
+import net.ccbluex.liquidbounce.features.misc.proxy.ProxyRuntimeHook;
 import net.ccbluex.liquidbounce.injection.mixins.minecraft.gui.MixinScreen;
 import net.ccbluex.liquidbounce.utils.text.PlainText;
 import net.ccbluex.liquidbounce.utils.text.TextList;
@@ -80,7 +80,7 @@ public abstract class MixinConnectScreen extends MixinScreen {
         var clientConnection = this.connection;
         var serverAddress = this.serverAddress;
 
-        if (clientConnection == null || this.serverAddress == null || HideAppearance.INSTANCE.isHidingNow()) {
+        if (clientConnection == null || this.serverAddress == null || HideAppearanceHook.isHidingNow()) {
             return;
         }
 
@@ -136,7 +136,7 @@ public abstract class MixinConnectScreen extends MixinScreen {
 
         var socket = PlainText.of(
             socketAddr,
-            ProxyManager.INSTANCE.getCurrentProxy() != null
+            ProxyRuntimeHook.hasCurrentProxy()
                 ? ChatFormatting.GOLD // No proxy - shows server address
                 : ChatFormatting.RED // Proxy good
         );

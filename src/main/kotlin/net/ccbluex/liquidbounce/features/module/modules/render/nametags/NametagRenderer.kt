@@ -66,38 +66,47 @@ internal fun GuiGraphicsExtractor.drawNametag(nametag: NametagRenderState, posX:
     if (nametag.entity == null) {
         return
     }
-
-    if (!nametag.equipments.equipment.isEmpty) {
-        drawItemStackList(nametag.equipments.stacksView)
-            .centerX(posX)
-            .centerY(posY - NAMETAG_PADDING * nametag.scale)
-            .scale(nametag.scale)
-            .itemStackRenderer(nametag.equipmentStackRenderer)
-            .rectBackground(Color4b.TRANSPARENT)
-            .draw()
-    }
-
+    drawEquipment(nametag, posX, posY)
     val fontRenderer = ModuleNametags.fontRenderer
     val fontScale = fontRenderer.scaleToVanillaFont
     val scale = fontScale * nametag.scale
-
     pose().pushMatrix()
     pose().translate(posX, posY)
     pose().scale(scale, scale)
-
     val processedText = fontRenderer.process(nametag.text)
     val textWidth = fontRenderer.getStringWidth(processedText, shadow = true)
-
-    // Make the model view matrix center the text when rendering
     pose().translate(-textWidth * 0.5f, -fontRenderer.height * 0.5f)
-
     val x1 = -BACKGROUND_X_OFFSET
     val y1 = fontRenderer.height * BACKGROUND_Y_OFFSET_TOP
     val x2 = textWidth + BACKGROUND_X_PADDING
     val y2 = fontRenderer.height * BACKGROUND_Y_OFFSET_BOTTOM
+    drawFrame(fontScale, x1, y1, x2, y2)
+    fontRenderer.draw(processedText) { shadow = true }
+    pose().popMatrix()
+}
+
+private fun GuiGraphicsExtractor.drawEquipment(nametag: NametagRenderState, posX: Float, posY: Float) {
+    if (nametag.equipments.equipment.isEmpty) {
+        return
+    }
+    drawItemStackList(nametag.equipments.stacksView)
+        .centerX(posX)
+        .centerY(posY - NAMETAG_PADDING * nametag.scale)
+        .scale(nametag.scale)
+        .itemStackRenderer(nametag.equipmentStackRenderer)
+        .rectBackground(Color4b.TRANSPARENT)
+        .draw()
+}
+
+private fun GuiGraphicsExtractor.drawFrame(
+    fontScale: Float,
+    x1: Float,
+    y1: Float,
+    x2: Float,
+    y2: Float,
+) {
     val frame = ModuleNametags.frameAppearance
     val frameRadius = frame.radius / fontScale
-
     frame.glow?.let { glow ->
         GuiGlowRenderer.requestRoundedFrame(
             pose = pose(),
@@ -111,8 +120,6 @@ internal fun GuiGraphicsExtractor.drawNametag(nametag: NametagRenderState, posX:
             backgroundBlurRadius = glow.backgroundBlurRadius,
         )
     }
-
-    // Background
     drawRoundedRect(
         x1 = x1,
         y1 = y1,
@@ -123,11 +130,4 @@ internal fun GuiGraphicsExtractor.drawNametag(nametag: NametagRenderState, posX:
         outlineColor = frame.border,
         outlineWidth = frame.borderWidth / fontScale,
     )
-
-    // Text
-    fontRenderer.draw(processedText) {
-        shadow = true
-    }
-
-    pose().popMatrix()
 }

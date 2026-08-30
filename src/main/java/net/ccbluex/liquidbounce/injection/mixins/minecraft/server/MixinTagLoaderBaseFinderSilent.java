@@ -18,7 +18,7 @@
  */
 package net.ccbluex.liquidbounce.injection.mixins.minecraft.server;
 
-import net.ccbluex.liquidbounce.features.module.modules.world.basefinder.BaseFinderBackgroundServer;
+import net.ccbluex.liquidbounce.features.module.modules.world.basefinder.BaseFinderServerHook;
 import net.minecraft.core.RegistryAccess;
 import net.minecraft.server.packs.resources.ResourceManager;
 import net.minecraft.tags.TagLoader;
@@ -47,7 +47,7 @@ public abstract class MixinTagLoaderBaseFinderSilent {
         RegistryAccess registryAccess,
         CallbackInfoReturnable<List<?>> cir
     ) {
-        if (BaseFinderBackgroundServer.isSuppressingSharedRegistryTagReload()) {
+        if (BaseFinderServerHook.isSuppressingSharedRegistryTagReload()) {
             cir.setReturnValue(List.of());
         }
     }

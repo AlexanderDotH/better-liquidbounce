@@ -19,10 +19,10 @@
 
 package net.ccbluex.liquidbounce.api.thirdparty.translator
 
-import net.ccbluex.liquidbounce.utils.client.copyable
-import net.ccbluex.liquidbounce.utils.client.markAsError
-import net.ccbluex.liquidbounce.utils.client.regular
-import net.ccbluex.liquidbounce.utils.client.variable
+import net.ccbluex.liquidbounce.utils.text.copyable
+import net.ccbluex.liquidbounce.utils.text.markAsError
+import net.ccbluex.liquidbounce.utils.text.regular
+import net.ccbluex.liquidbounce.utils.text.variable
 import net.ccbluex.liquidbounce.utils.text.textOf
 import net.minecraft.network.chat.Component
 

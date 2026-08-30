@@ -20,10 +20,12 @@
 package net.ccbluex.liquidbounce.utils.aiming.utils
 
 import net.ccbluex.fastutil.mapToArray
-import net.ccbluex.liquidbounce.features.module.modules.combat.aimbot.ModuleProjectileAimbot
-import net.ccbluex.liquidbounce.features.module.modules.render.ModuleDebug
-import net.ccbluex.liquidbounce.features.module.modules.render.ModuleDebug.debugGeometry
-import net.ccbluex.liquidbounce.render.engine.type.Color4b
+import net.ccbluex.liquidbounce.common.debug.DebugGeometry
+import net.ccbluex.liquidbounce.common.debug.DebugGeometrySink
+import net.ccbluex.liquidbounce.common.debug.DebuggedGeometryCollection
+import net.ccbluex.liquidbounce.common.debug.DebuggedLineSegment
+import net.ccbluex.liquidbounce.common.debug.DebuggedPoint
+import net.ccbluex.liquidbounce.utils.aiming.ProjectileAimingDebugOwner
 import net.ccbluex.liquidbounce.utils.client.world
 import net.ccbluex.liquidbounce.utils.math.add
 import net.ccbluex.liquidbounce.utils.math.vertices
@@ -104,6 +106,22 @@ inline fun projectPointsOnBox(
         return false
     }
 
+    val planeSection = createProjectedBoxSection(virtualEye, targetBox)
+
+    planeSection.castPointsOnUniformly(maxPoints) { point ->
+        // Extent the point from the face on.
+        val pointExtended = point.lerp(virtualEye, -100.0)
+
+        val pos = targetBox.clip(virtualEye, pointExtended).getOrNull() ?: return@castPointsOnUniformly
+
+        consumer(pos)
+    }
+
+    return true
+}
+
+@PublishedApi
+internal fun createProjectedBoxSection(virtualEye: Vec3, targetBox: AABB): PlaneSection {
     val playerToBoxLine = Line(position = virtualEye, direction = targetBox.center - virtualEye)
 
     // Find a point between the virtual eye and the target box such that every edge point of the box is behind it
@@ -137,18 +155,7 @@ inline fun projectPointsOnBox(
     val dirVecY = Vector3f(0f, maxY - minY, 0f).mul(toMatrix).toVec3d()
     val dirVecZ = Vector3f(0f, 0f, maxZ - minZ).mul(toMatrix).toVec3d()
 
-    val planeSection = PlaneSection(posVec, dirVecY, dirVecZ)
-
-    planeSection.castPointsOnUniformly(maxPoints) { point ->
-        // Extent the point from the face on.
-        val pointExtended = point.lerp(virtualEye, -100.0)
-
-        val pos = targetBox.clip(virtualEye, pointExtended).getOrNull() ?: return@castPointsOnUniformly
-
-        consumer(pos)
-    }
-
-    return true
+    return PlaneSection(posVec, dirVecY, dirVecZ)
 }
 
 /**
@@ -175,11 +182,11 @@ fun findVisiblePointFromVirtualEye(
 ): Vec3? {
     val points = projectPointsOnBox(virtualEyes, box) ?: return null
 
-    ModuleProjectileAimbot.debugGeometry("points") {
-        ModuleDebug.DebugCollection(points.map { ModuleDebug.DebuggedPoint(it, Color4b.BLUE, 0.01) })
+    DebugGeometrySink.publish(ProjectileAimingDebugOwner, "points") {
+        DebuggedGeometryCollection(points.map { DebuggedPoint(it, 0xFF0000FF.toInt(), 0.01) })
     }
 
-    val rays = ArrayList<ModuleDebug.DebuggedGeometry>()
+    val rays = ArrayList<DebugGeometry>()
 
     val center = box.center
     points.sortBy { it.distanceToSqr(center) }
@@ -193,15 +200,15 @@ fun findVisiblePointFromVirtualEye(
 
         val visible = visibilityPredicate.isVisible(rayStart, spotOnBox)
 
-        rays.add(ModuleDebug.DebuggedLineSegment(rayStart, spotOnBox, if (visible) Color4b.GREEN else Color4b.RED))
+        rays.add(DebuggedLineSegment(rayStart, spotOnBox, if (visible) 0xFF00FF00.toInt() else 0xFFFF0000.toInt()))
 
         if (visible) {
-            ModuleProjectileAimbot.debugGeometry("rays") { ModuleDebug.DebugCollection(rays) }
+            DebugGeometrySink.publish(ProjectileAimingDebugOwner, "rays") { DebuggedGeometryCollection(rays) }
             return spotOnBox
         }
     }
 
-    ModuleProjectileAimbot.debugGeometry("rays") { ModuleDebug.DebugCollection(rays) }
+    DebugGeometrySink.publish(ProjectileAimingDebugOwner, "rays") { DebuggedGeometryCollection(rays) }
 
     return null
 }

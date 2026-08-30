@@ -18,15 +18,20 @@
  */
 package net.ccbluex.liquidbounce.render.engine.type
 
-import net.ccbluex.liquidbounce.utils.kotlin.FloatFloatValuePair
-
 @JvmInline
-value class UV2f private constructor(private val pair: FloatFloatValuePair) {
+value class UV2f private constructor(private val bits: Long) {
     val u: Float inline get() = component1()
     val v: Float inline get() = component2()
 
-    constructor(u: Float, v: Float) : this(FloatFloatValuePair(u, v))
+    constructor(u: Float, v: Float) : this(pack(u, v))
 
-    operator fun component1(): Float = pair.left
-    operator fun component2(): Float = pair.right
+    operator fun component1(): Float = Float.fromBits((bits shr Int.SIZE_BITS).toInt())
+    operator fun component2(): Float = Float.fromBits(bits.toInt())
+
+    companion object {
+        private fun pack(u: Float, v: Float): Long =
+            (u.toRawBits().toLong() shl Int.SIZE_BITS) or (v.toRawBits().toLong() and UINT_MASK)
+
+        private const val UINT_MASK = 0xFFFF_FFFFL
+    }
 }

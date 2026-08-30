@@ -11,10 +11,10 @@
 package net.ccbluex.liquidbounce.features.baritone
 
 import net.ccbluex.liquidbounce.features.baritone.core.BaritoneFacade
-import net.ccbluex.liquidbounce.integration.screen.CustomScreenType
-import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.Assertions.assertSame
+import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 import java.lang.reflect.Proxy
 
@@ -34,15 +34,24 @@ class BaritoneFeatureTest {
     }
 
     @Test
-    fun `dashboard action opens the Baritone Minecraft screen`() {
-        var openedScreen: CustomScreenType? = null
-        BaritoneFeature.useDashboardOpener { openedScreen = it }
+    fun `dashboard port owns opening and visibility`() {
+        var visible = false
+        val dashboard = object : BaritoneDashboardPort {
+            override fun open() {
+                visible = true
+            }
+
+            override fun isVisible() = visible
+        }
+        BaritoneFeature.installDashboard(dashboard)
 
         try {
+            assertFalse(BaritoneFeature.isDashboardVisible())
             BaritoneFeature.openDashboard()
-            assertEquals(CustomScreenType.BARITONE, openedScreen)
+            assertTrue(visible)
+            assertTrue(BaritoneFeature.isDashboardVisible())
         } finally {
-            BaritoneFeature.restoreDashboardOpener()
+            BaritoneFeature.restoreDashboard()
         }
     }
 

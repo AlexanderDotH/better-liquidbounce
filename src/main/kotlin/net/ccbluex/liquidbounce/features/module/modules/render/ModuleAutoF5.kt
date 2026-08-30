@@ -22,8 +22,8 @@ import net.ccbluex.liquidbounce.event.events.PerspectiveEvent
 import net.ccbluex.liquidbounce.event.handler
 import net.ccbluex.liquidbounce.features.module.ClientModule
 import net.ccbluex.liquidbounce.features.module.ModuleCategories
-import net.ccbluex.liquidbounce.utils.inventory.CheckScreenHandlerTypeValueGroup
-import net.ccbluex.liquidbounce.utils.inventory.CheckScreenTitleValueGroup
+import net.ccbluex.liquidbounce.features.inventory.CheckScreenHandlerTypeValueGroup
+import net.ccbluex.liquidbounce.features.inventory.CheckScreenTitleValueGroup
 import net.minecraft.client.CameraType
 import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen
 

@@ -20,13 +20,12 @@
 package net.ccbluex.liquidbounce.features.module.modules.movement.fly.modes.hypixel
 
 import net.ccbluex.liquidbounce.config.types.group.Mode
-import net.ccbluex.liquidbounce.config.types.group.ModeValueGroup
 import net.ccbluex.liquidbounce.event.events.PacketEvent
 import net.ccbluex.liquidbounce.event.handler
 import net.ccbluex.liquidbounce.event.tickHandler
 import net.ccbluex.liquidbounce.event.tickUntil
 import net.ccbluex.liquidbounce.event.waitTicks
-import net.ccbluex.liquidbounce.features.module.modules.movement.fly.ModuleFly
+import net.ccbluex.liquidbounce.features.module.modules.movement.fly.runtime.FlyModuleControl
 import net.ccbluex.liquidbounce.features.module.modules.movement.fly.automation.FlyAutomationCapabilities
 import net.ccbluex.liquidbounce.features.module.modules.movement.fly.automation.FlyAutomationEnd
 import net.ccbluex.liquidbounce.features.module.modules.movement.fly.automation.FlyAutomationKind
@@ -48,8 +47,6 @@ import kotlin.random.Random
  */
 internal object FlyHypixelFlat : Mode("HypixelFlat"), FlyAutomationProfile {
 
-    override val parent: ModeValueGroup<*>
-        get() = ModuleFly.modes
 
     private val timer by float("Timer", 1.0f, 0.1f..1.0f)
     private val flySpeed by float("Speed", 1.66f, 0.8f..2.0f)
@@ -97,7 +94,7 @@ internal object FlyHypixelFlat : Mode("HypixelFlat"), FlyAutomationProfile {
 
         tickUntil { player.onGround() }
         automaticEnd.mark("Hypixel flat boost landed")
-        ModuleFly.enabled = false
+        FlyModuleControl.disable()
     }
 
     @Suppress("unused")
@@ -111,7 +108,7 @@ internal object FlyHypixelFlat : Mode("HypixelFlat"), FlyAutomationProfile {
             return@tickHandler
         }
 
-        Timer.requestTimerSpeed(timer, Priority.IMPORTANT_FOR_USAGE_1, ModuleFly)
+        Timer.requestTimerSpeed(timer, Priority.IMPORTANT_FOR_USAGE_1, FlyModuleControl.module)
         player.deltaMovement.y = 0.0314 + (Random.nextDouble() / 1000f)
         player.deltaMovement = player.deltaMovement.withFlyAutomationStrafe(player, player.horizontalSpeed)
     }

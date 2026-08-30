@@ -23,7 +23,7 @@ import com.google.gson.JsonObject
 import net.ccbluex.fastutil.enumSetAllOf
 import net.ccbluex.fastutil.enumSetOf
 import net.ccbluex.liquidbounce.config.types.group.ValueGroup
-import net.ccbluex.liquidbounce.utils.combat.Targets
+import net.ccbluex.liquidbounce.features.combat.model.Targets
 import java.util.EnumSet
 
 object GlobalSettingsTarget : ValueGroup(
@@ -58,6 +58,9 @@ object GlobalSettingsTarget : ValueGroup(
     inline val combat: EnumSet<Targets> get() = combatChoices.get() as EnumSet
 
     inline val visual: EnumSet<Targets> get() = visualChoices.get() as EnumSet
+
+    internal val rendersSelf: Boolean
+        get() = Targets.SELF in visual
 
     /** Persisted in file JSON, but intentionally excluded from REST and ClickGUI interop. */
     @Suppress("unused")

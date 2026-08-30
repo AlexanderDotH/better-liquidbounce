@@ -34,7 +34,7 @@ import net.ccbluex.liquidbounce.integration.theme.ThemeManager
 import net.ccbluex.liquidbounce.integration.theme.component.isBundledHudRendered
 import net.ccbluex.liquidbounce.integration.theme.component.components.NativeHudComponent
 import net.ccbluex.liquidbounce.render.engine.type.Color4b
-import net.ccbluex.liquidbounce.utils.render.Alignment
+import net.ccbluex.liquidbounce.config.types.group.Alignment
 
 /** Movable native overview for the selected Trial Chamber. */
 object TrialChamberHudComponent : NativeHudComponent(

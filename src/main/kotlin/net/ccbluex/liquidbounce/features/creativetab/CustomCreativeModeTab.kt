@@ -18,7 +18,7 @@
  */
 package net.ccbluex.liquidbounce.features.creativetab
 
-import net.ccbluex.liquidbounce.LiquidBounce
+import net.ccbluex.liquidbounce.utils.client.clientIdentifier
 import net.ccbluex.liquidbounce.utils.text.asPlainText
 import net.ccbluex.liquidbounce.utils.client.logger
 import net.fabricmc.fabric.api.creativetab.v1.FabricCreativeModeTab
@@ -54,7 +54,7 @@ open class CustomCreativeModeTab(
         // Add a creative tab to creative inventory
         Registry.register(
             BuiltInRegistries.CREATIVE_MODE_TAB,
-            LiquidBounce.identifier(plainName.lowercase()),
+            clientIdentifier(plainName.lowercase()),
             creativeTab
         )
 

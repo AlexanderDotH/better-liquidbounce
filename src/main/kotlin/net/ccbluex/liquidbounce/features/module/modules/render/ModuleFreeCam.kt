@@ -16,78 +16,49 @@
  * You should have received a copy of the GNU General Public License
  * along with LiquidBounce. If not, see <https://www.gnu.org/licenses/>.
  */
-@file:Suppress("detekt:TooManyFunctions")
-
 package net.ccbluex.liquidbounce.features.module.modules.render
 
 import com.mojang.blaze3d.platform.InputConstants
 import net.ccbluex.fastutil.enumSetOf
 import net.ccbluex.liquidbounce.config.types.group.ToggleableValueGroup
 import net.ccbluex.liquidbounce.config.types.group.ValueGroup
-import net.ccbluex.liquidbounce.config.types.list.Tagged
-import net.ccbluex.liquidbounce.event.Event
-import net.ccbluex.liquidbounce.event.EventManager
 import net.ccbluex.liquidbounce.event.events.GameTickEvent
-import net.ccbluex.liquidbounce.event.events.HealthUpdateEvent
 import net.ccbluex.liquidbounce.event.events.MouseButtonEvent
 import net.ccbluex.liquidbounce.event.events.MovementInputEvent
-import net.ccbluex.liquidbounce.event.events.PacketEvent
 import net.ccbluex.liquidbounce.event.events.PerspectiveEvent
 import net.ccbluex.liquidbounce.event.events.PlayerMoveEvent
-import net.ccbluex.liquidbounce.event.events.PlayerTickEvent
 import net.ccbluex.liquidbounce.event.events.RotationUpdateEvent
 import net.ccbluex.liquidbounce.event.events.WorldChangeEvent
 import net.ccbluex.liquidbounce.event.handler
-import net.ccbluex.liquidbounce.event.newEventHook
+import net.ccbluex.liquidbounce.features.combat.contract.CombatRuntimeEnvironment
 import net.ccbluex.liquidbounce.features.module.ClientModule
 import net.ccbluex.liquidbounce.features.module.ModuleCategories
-import net.ccbluex.liquidbounce.features.module.modules.movement.inventorymove.ModuleInventoryMove.shouldHandleInputs
+import net.ccbluex.liquidbounce.features.module.modules.render.freecam.FreeCamCancelOn
+import net.ccbluex.liquidbounce.features.module.modules.render.freecam.FreeCamCancellation
+import net.ccbluex.liquidbounce.features.module.modules.render.freecam.FreeCamMovementResolver
+import net.ccbluex.liquidbounce.features.module.modules.render.freecam.FreeCamMovementSpeed
+import net.ccbluex.liquidbounce.features.module.modules.render.freecam.FreeCamNavigation
+import net.ccbluex.liquidbounce.features.module.modules.render.freecam.findFreeCamLookTarget
+import net.ccbluex.liquidbounce.features.module.modules.render.freecam.suppressFreeCamPlayerMovement
 import net.ccbluex.liquidbounce.utils.aiming.RotationManager
-import net.ccbluex.liquidbounce.utils.aiming.RotationsValueGroup
+import net.ccbluex.liquidbounce.features.rotation.RotationsValueGroup
 import net.ccbluex.liquidbounce.utils.aiming.data.Rotation
-import net.ccbluex.liquidbounce.utils.entity.getMovementDirectionOfInput
 import net.ccbluex.liquidbounce.utils.entity.rotation
-import net.ccbluex.liquidbounce.utils.entity.withStrafe
-import net.ccbluex.liquidbounce.utils.input.isPressed
-import net.ccbluex.liquidbounce.utils.input.InputTracker.isPressedOnAny
 import net.ccbluex.liquidbounce.utils.kotlin.EventPriorityConvention.FINAL_DECISION
 import net.ccbluex.liquidbounce.utils.kotlin.EventPriorityConvention.FIRST_PRIORITY
 import net.ccbluex.liquidbounce.utils.kotlin.EventPriorityConvention.OBJECTION_AGAINST_EVERYTHING
 import net.ccbluex.liquidbounce.utils.kotlin.Priority
 import net.ccbluex.liquidbounce.utils.math.plus
 import net.ccbluex.liquidbounce.utils.movement.DirectionalInput
-import net.ccbluex.liquidbounce.utils.navigation.NavigationBaseValueGroup
-import net.ccbluex.liquidbounce.utils.raytracing.traceFromPoint
 import net.minecraft.client.CameraType
-import net.minecraft.core.Direction
-import net.minecraft.network.protocol.game.ClientboundPlayerPositionPacket
 import net.minecraft.world.entity.Entity
 import net.minecraft.world.phys.Vec3
-import java.util.function.Predicate
-import kotlin.math.abs
 
 /**
  * FreeCam module
  *
  * Allows you to move out of your body.
  */
-internal inline fun suppressFreeCamPlayerMovement(event: PlayerMoveEvent, setVelocity: (Vec3) -> Unit) {
-    event.movement = Vec3.ZERO
-    setVelocity(Vec3.ZERO)
-}
-
-internal data class FreeCamMovementSpeed(
-    val horizontalSpeed: Double,
-    val verticalSpeed: Double,
-)
-
-internal fun resolveFreeCamMovementSpeed(
-    baseSpeed: FreeCamMovementSpeed,
-    sprintSpeed: FreeCamMovementSpeed,
-    sprintSpeedEnabled: Boolean,
-    sprintBindingPressed: Boolean,
-) = if (sprintSpeedEnabled && sprintBindingPressed) sprintSpeed else baseSpeed
-
 object ModuleFreeCam : ClientModule("FreeCam", ModuleCategories.RENDER, disableOnQuit = true) {
 
     object BaseSpeed : ValueGroup("BaseSpeed") {
@@ -108,79 +79,9 @@ object ModuleFreeCam : ClientModule("FreeCam", ModuleCategories.RENDER, disableO
         val lookAt by boolean("LookAt", true)
     }
 
-    private class CancelTrigger<E : Event>(val eventType: Class<E>, val predicate: Predicate<E>)
-    private inline fun <reified E : Event> cancelTrigger(predicate: Predicate<E>) =
-        CancelTrigger(E::class.java, predicate)
+    private val cancelOn by multiEnumChoice("CancelOn", enumSetOf<FreeCamCancelOn>())
 
-    /**
-     * This is useful for cancelling FreeCam on certain events.
-     * For example, when the player takes damage.
-     */
-    private enum class CancelOn(
-        override val tag: String,
-        private val trigger: CancelTrigger<out Event>,
-    ) : Tagged {
-        DAMAGE("Damage", cancelTrigger<HealthUpdateEvent> { event ->
-            event.health < event.previousHealth
-        }),
-        TELEPORT("Teleport", cancelTrigger<PacketEvent> { event ->
-            // ClientboundPlayerPositionPacket not trigger PlayerMoveEvent
-            event.packet is ClientboundPlayerPositionPacket
-        }),
-        MOVE("Move", cancelTrigger<PlayerMoveEvent> { event ->
-            // Don't check movement.y because it's gravity / falling motion
-            abs(event.movement.x) > 0 || abs(event.movement.z) > 0
-        }),
-        LIQUID("Liquid", cancelTrigger<PlayerTickEvent> {
-            player.isInLiquid
-        });
-
-        init {
-            EventManager.registerEventHook(
-                this.trigger.eventType,
-                @Suppress("UNCHECKED_CAST")
-                newEventHook { event ->
-                    if (this in cancelOn && (this.trigger.predicate as Predicate<Event>).test(event)) {
-                        ModuleFreeCam.enabled = false
-                    }
-                }
-            )
-        }
-    }
-
-    private val cancelOn by multiEnumChoice("CancelOn", enumSetOf<CancelOn>())
-
-    /**
-     * Navigation configuration for the FreeCam module
-     */
-    private object Navigation : NavigationBaseValueGroup<Unit>(ModuleFreeCam, "Navigation", false) {
-
-        private val controlKey by key("Key", InputConstants.KEY_LCONTROL)
-
-        val shouldBeGoing
-            get() = running && controlKey != InputConstants.UNKNOWN && controlKey.isPressed
-
-        /**
-         * Creates context for navigation
-         */
-        override fun createNavigationContext() {
-            // Nothing to do
-        }
-
-        /**
-         * Calculates the desired position to move towards
-         *
-         * @return Target position as [Vec3]
-         */
-        override fun calculateGoalPosition(context: Unit): Vec3? {
-            return if (shouldBeGoing) {
-                getCameraLookingAt()
-            } else {
-                null
-            }
-        }
-
-    }
+    private object Navigation : FreeCamNavigation(ModuleFreeCam, ModuleFreeCam::getCameraLookingAt)
 
     private val midClickCameraTeleport by boolean("MidClickCameraTeleport", false)
 
@@ -193,6 +94,8 @@ object ModuleFreeCam : ClientModule("FreeCam", ModuleCategories.RENDER, disableO
         tree(SprintSpeed)
         tree(CameraInteract)
         tree(Navigation)
+        FreeCamCancellation.register(this, { cancelOn }) { enabled = false }
+        CombatRuntimeEnvironment.bindFreeCam { enabled }
     }
 
     object PositionState {
@@ -272,14 +175,9 @@ object ModuleFreeCam : ClientModule("FreeCam", ModuleCategories.RENDER, disableO
     }
 
     @Suppress("unused")
-    private val tickHandler = handler<GameTickEvent> { event ->
-        val directionalInput = DirectionalInput(mc.options)
-        var yAxisMovement = 0.0
-
-        if (shouldHandleInputs(mc.options.keyJump) && mc.options.keyJump.isPressedOnAny) yAxisMovement += 1.0f
-        if (shouldHandleInputs(mc.options.keyShift) && mc.options.keyShift.isPressedOnAny) yAxisMovement -= 1.0f
-
-        val movementSpeed = resolveFreeCamMovementSpeed(
+    private val tickHandler = handler<GameTickEvent> {
+        val movement = FreeCamMovementResolver.resolve(
+            rotation = PositionState.rot,
             baseSpeed = FreeCamMovementSpeed(
                 BaseSpeed.horizontalSpeed.toDouble(),
                 BaseSpeed.verticalSpeed.toDouble(),
@@ -289,21 +187,10 @@ object ModuleFreeCam : ClientModule("FreeCam", ModuleCategories.RENDER, disableO
                 SprintSpeed.verticalSpeed.toDouble(),
             ),
             sprintSpeedEnabled = SprintSpeed.enabled,
-            sprintBindingPressed = shouldHandleInputs(mc.options.keySprint) && mc.options.keySprint.isPressedOnAny,
         )
-        val hSpeed = movementSpeed.horizontalSpeed
-        val vSpeed = movementSpeed.verticalSpeed
-
-        ModuleDebug.debugParameter(this, "DirectionalInput", directionalInput)
-        val velocity = Vec3.ZERO
-            .withStrafe(
-                speed = hSpeed,
-                input = directionalInput,
-                yaw = getMovementDirectionOfInput(PositionState.rot.yaw, directionalInput)
-            )
-            .with(Direction.Axis.Y, yAxisMovement * vSpeed)
-        ModuleDebug.debugParameter(this, "Velocity", velocity)
-        PositionState.update(velocity)
+        ModuleDebug.debugParameter(this, "DirectionalInput", movement.directionalInput)
+        ModuleDebug.debugParameter(this, "Velocity", movement.velocity)
+        PositionState.update(movement.velocity)
 
         ModuleDebug.debugParameter(this, "Position", PositionState.pos)
         ModuleDebug.debugParameter(this, "Rotation", PositionState.rot)
@@ -360,15 +247,7 @@ object ModuleFreeCam : ClientModule("FreeCam", ModuleCategories.RENDER, disableO
 
     private fun getCameraLookingAt(): Vec3? {
         if (!PositionState.available) return null
-
-        val cameraPosition = PositionState.interpolate(1f)
-        val target = traceFromPoint(
-            range = 200.0,
-            start = cameraPosition,
-            direction = PositionState.rot.directionVector
-        )
-
-        return target.location
+        return findFreeCamLookTarget(PositionState.interpolate(1f), PositionState.rot)
     }
 
 }

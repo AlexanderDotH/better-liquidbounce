@@ -20,12 +20,11 @@ package net.ccbluex.liquidbounce.integration.theme
 
 import kotlinx.coroutines.future.future
 import kotlinx.coroutines.launch
-import net.ccbluex.liquidbounce.LiquidBounce
+import net.ccbluex.liquidbounce.common.ClientBuildMetadata
+import net.ccbluex.liquidbounce.common.ClientLifecycleState
 import net.ccbluex.liquidbounce.api.core.renderScope
-import net.ccbluex.liquidbounce.api.models.marketplace.MarketplaceItemType
 import net.ccbluex.liquidbounce.config.ConfigSystem
 import net.ccbluex.liquidbounce.config.types.Config
-import net.ccbluex.liquidbounce.features.marketplace.MarketplaceManager
 import net.ccbluex.liquidbounce.features.module.modules.render.ModuleClickGui
 import net.ccbluex.liquidbounce.features.module.modules.render.ModuleHud
 import net.ccbluex.liquidbounce.integration.backend.BrowserBackendManager
@@ -114,51 +113,15 @@ object ThemeManager : Config("theme") {
 
     suspend fun init() {
         // Load default theme
-        includedTheme = Theme.load(Theme.Origin.RESOURCE, File(LiquidBounce.CLIENT_NAME.lowercase()))
+        includedTheme = Theme.load(Theme.Origin.RESOURCE, File(ClientBuildMetadata.NAME.lowercase()))
     }
 
     suspend fun load() {
-        fun Theme.addIfUnloaded() {
-            if (themes.none { it.metadata.id.equals(this.metadata.id, true) }) {
-                themes.add(this)
-            } else {
-                logger.warn("Theme with ID '${this.metadata.id}' is already loaded, skipping duplicate.")
-            }
-        }
-
         themes.clear()
-
-        // 1st priority
-        themesFolder.listFiles { it.isDirectory }
-            ?.forEach { file ->
-                if (file.name.equals("default", true)) {
-                    return@forEach
-                }
-
-                runCatching {
-                    Theme.load(Theme.Origin.LOCAL, file.relativeTo(themesFolder))
-                        .addIfUnloaded()
-                }.onFailure { err ->
-                    logger.error("Failed to load theme '${file.name}'.", err)
-                }
-            }
-
-        // 2nd priority
-        MarketplaceManager.getSubscribedItemsOfType(MarketplaceItemType.THEME).forEach { item ->
-            runCatching {
-                val installationFolder = item.getInstallationFolder() ?: return@forEach
-                val relativeFile = installationFolder.relativeTo(MarketplaceManager.marketplaceRoot)
-                Theme.load(Theme.Origin.MARKETPLACE, relativeFile)
-                    .addIfUnloaded()
-            }.onFailure { err ->
-                logger.error("Failed to load theme '${item.name}'.", err)
-            }
-        }
-
-        includedTheme?.let { theme -> themes += theme }
+        themes.addAll(ThemeCatalogLoader(themesFolder, logger).load(includedTheme))
 
         ModuleHud.updateThemes()
-        if (LiquidBounce.isInitialized) {
+        if (ClientLifecycleState.isInitialized) {
             ScreenManager.update()
             ModuleHud.reopen()
             ModuleClickGui.invalidate()
@@ -262,4 +225,3 @@ object ThemeManager : Config("theme") {
     data class ScreenLocation(val theme: Theme, val url: String)
 
 }
-

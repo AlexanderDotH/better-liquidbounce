@@ -24,33 +24,32 @@ import net.ccbluex.liquidbounce.features.module.ClientModule
 import net.ccbluex.liquidbounce.features.module.ModuleCategories
 import net.ccbluex.liquidbounce.features.module.modules.render.jumpeffect.modes.JumpEffectImage
 import net.ccbluex.liquidbounce.features.module.modules.render.jumpeffect.modes.JumpEffectSimple
-import net.ccbluex.liquidbounce.utils.collection.ExpiringList.Companion.ExpiringList
-import net.minecraft.world.phys.Vec3
+import net.ccbluex.liquidbounce.features.module.modules.render.jumpeffect.runtime.JumpEffectRuntime
 
 object ModuleJumpEffect : ClientModule("JumpEffect", ModuleCategories.RENDER) {
 
-    val circles = ExpiringList<Vec3>()
+    private val runtime = JumpEffectRuntime(this)
 
-    val modes = choices("Mode", 0) {
+    val modes = choices("Mode", 0) { parent ->
         arrayOf(
-            JumpEffectSimple,
-            JumpEffectImage
+            JumpEffectSimple(parent, runtime),
+            JumpEffectImage(parent, runtime),
         )
     }.apply {
         tagBy(this)
         onChanged {
-            circles.clear()
+            runtime.circles.clear()
         }
     }
 
     @Suppress("unused")
     val playerJumpHandler = handler<PlayerJumpEvent> { _ ->
         // Adds new circle when the player jumps
-        circles.add(player.position(), modes.activeMode.lifetime.last)
+        runtime.circles.add(player.position(), modes.activeMode.lifetime.last)
     }
 
     override fun onDisabled() {
-        circles.clear()
+        runtime.circles.clear()
     }
 
 }

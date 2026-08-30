@@ -21,15 +21,14 @@ package net.ccbluex.liquidbounce.config.types.list
 
 import com.google.gson.Gson
 import com.google.gson.JsonElement
-import it.unimi.dsi.fastutil.objects.Object2ObjectRBTreeMap
 import net.ccbluex.fastutil.mapToArray
+import net.ccbluex.liquidbounce.common.Tagged
+import net.ccbluex.liquidbounce.common.Tagged.Companion.makeLookupTable
 import net.ccbluex.liquidbounce.config.gson.stategies.Exclude
 import net.ccbluex.liquidbounce.config.gson.stategies.ProtocolExclude
 import net.ccbluex.liquidbounce.config.types.Value
 import net.ccbluex.liquidbounce.config.types.ValueType
-import net.ccbluex.liquidbounce.config.types.list.Tagged.Companion.makeLookupTable
-import net.ccbluex.liquidbounce.script.ScriptApiRequired
-import java.util.SortedMap
+import net.ccbluex.liquidbounce.annotations.ScriptApiRequired
 
 class ChoiceListValue<T : Tagged>(
     name: String,
@@ -65,48 +64,4 @@ class ChoiceListValue<T : Tagged>(
         return choices.mapToArray { it.tag }
     }
 
-}
-
-interface Tagged {
-    val tag: String
-
-    val tagAliases: List<String> get() = emptyList()
-
-    companion object {
-        @JvmStatic
-        fun <T : Tagged> Iterable<T>.makeLookupTable(): SortedMap<String, T> {
-            val map = Object2ObjectRBTreeMap<String, T>(String.CASE_INSENSITIVE_ORDER)
-            for (item in this) {
-                if (map.put(item.tag, item) != null) {
-                    throw IllegalArgumentException("Duplicate tag: ${item.tag}")
-                }
-                for (alias in item.tagAliases) {
-                    if (map.put(alias, item) != null) {
-                        throw IllegalArgumentException("Duplicate alias: $alias")
-                    }
-                }
-            }
-            return map
-        }
-
-        @JvmName("of")
-        @JvmStatic
-        fun String.asTagged(): Tagged = object : Tagged, Comparable<Tagged> {
-            override val tag get() = this@asTagged
-
-            override fun equals(other: Any?): Boolean =
-                when (other) {
-                    is Tagged -> other.tag == this.tag
-                    is CharSequence -> this.tag == other
-                    is Enum<*> -> this.tag == other.name
-                    else -> false
-                }
-
-            override fun hashCode(): Int = this.tag.hashCode()
-
-            override fun toString(): String = this.tag
-
-            override fun compareTo(other: Tagged): Int = this.tag.compareTo(other.tag)
-        }
-    }
 }

@@ -22,99 +22,11 @@ import net.ccbluex.liquidbounce.features.command.Command
 import net.ccbluex.liquidbounce.features.command.Parameter.Verificator.Result
 import net.ccbluex.liquidbounce.features.command.builder.CommandBuilder
 import net.ccbluex.liquidbounce.features.command.builder.ParameterBuilder
-import net.ccbluex.liquidbounce.utils.client.MessageMetadata
-import net.ccbluex.liquidbounce.utils.text.asPlainText
-import net.ccbluex.liquidbounce.utils.text.asText
-import net.ccbluex.liquidbounce.utils.client.bold
-import net.ccbluex.liquidbounce.utils.client.chat
-import net.ccbluex.liquidbounce.utils.text.joinToText
-import net.ccbluex.liquidbounce.utils.client.onClickRun
-import net.ccbluex.liquidbounce.utils.client.onHover
+import net.ccbluex.liquidbounce.features.chat.MessageMetadata
+import net.ccbluex.liquidbounce.features.chat.chat
 import net.ccbluex.liquidbounce.utils.client.removeMessage
-import net.ccbluex.liquidbounce.utils.client.withColor
-import net.minecraft.ChatFormatting
 import net.minecraft.network.chat.Component
-import net.minecraft.network.chat.HoverEvent
-import net.minecraft.network.chat.MutableComponent
-import java.util.function.IntConsumer
 import kotlin.math.ceil
-
-private val TEXT_SPACE: Component = " ".asPlainText()
-
-@Suppress("CognitiveComplexMethod")
-private fun buildPaginationText(
-    currentPage: Int,
-    maxPage: Int,
-    boundaryLimit: Int = 3,
-    ellipsisThreshold: Int = 5,
-    sendPage: IntConsumer,
-): Component {
-    fun MutableComponent.disabled() = withColor(ChatFormatting.DARK_GRAY)
-    fun MutableComponent.pageAction(page: Int) = this
-        .onHover(HoverEvent.ShowText(page.toString().asPlainText()))
-        .onClickRun { sendPage.accept(page) }
-
-    val texts = mutableListOf<Component>()
-
-    // Previous page
-    texts += "\u2B9C".asText().apply {
-        if (currentPage == 1) disabled() else pageAction(currentPage - 1).withColor(ChatFormatting.GRAY)
-    }
-
-    // Numeral page text (clickable)
-    fun numeral(i: Int) = i.toString().asText().apply {
-        if (i == currentPage) disabled().bold(true) else pageAction(i)
-    }
-
-    // Ellipsis page text (clickable)
-    fun ellipsis(left: Int, right: Int) = "…".asText().pageAction((left + right) / 2)
-
-    var i: Int
-    when {
-        maxPage <= ellipsisThreshold -> {
-            i = 1
-            while (i <= maxPage) {
-                texts += numeral(i++)
-            }
-        }
-
-        currentPage <= boundaryLimit -> {
-            i = 1
-            while (i <= boundaryLimit) {
-                texts += numeral(i++)
-            }
-            texts += ellipsis(i, maxPage)
-            texts += numeral(maxPage)
-        }
-
-        currentPage >= maxPage - boundaryLimit + 1 -> {
-            i = maxPage - boundaryLimit + 1
-            texts += numeral(1)
-            texts += ellipsis(2, i)
-            while (i <= maxPage) {
-                texts += numeral(i++)
-            }
-        }
-
-        else -> {
-            i = currentPage - 1
-            texts += numeral(1)
-            texts += ellipsis(2, i)
-            while (i <= currentPage + 1) {
-                texts += numeral(i++)
-            }
-            texts += ellipsis(i, maxPage)
-            texts += numeral(maxPage)
-        }
-    }
-
-    // Next page
-    texts += "\u2B9E".asText().apply {
-        if (currentPage == maxPage) disabled() else pageAction(currentPage + 1).withColor(ChatFormatting.GRAY)
-    }
-
-    return texts.joinToText(TEXT_SPACE)
-}
 
 /**
  * Builds a general paged query command with one optional integer parameter.
@@ -143,11 +55,7 @@ fun <T> CommandBuilder.pagedQuery(
 
         val all = items()
         val maxPage = maxPage()
-        val currentPageItems = if (all is List<T>) {
-            all.subList((currentPage - 1) * pageSize, minOf(currentPage * pageSize, all.size))
-        } else {
-            all.drop((currentPage - 1) * pageSize).subList(0, minOf(pageSize, all.size))
-        }
+        val currentPageItems = pageItems(all, currentPage, pageSize)
 
         mc.gui.hud.chat.removeMessage(msgId) // remove old
 
@@ -163,19 +71,24 @@ fun <T> CommandBuilder.pagedQuery(
         }
     }
 
-    return parameter(
-        ParameterBuilder.begin<Int>("page")
-            .verifiedBy {
-                val input = it.toIntOrNull() ?: return@verifiedBy Result.Error("'$it' is not an integer")
-                val maxPage = maxPage()
-                if (input in 1..maxPage) {
-                    Result.Ok(input)
-                } else {
-                    Result.Error("'$it' is not in range 1..$maxPage")
-                }
-            }.optional().build()
-    ).handler {
+    return parameter(pageParameter(::maxPage)).handler {
         val currentPage = args.getOrNull(0) as Int? ?: 1
         command.sendPage(currentPage)
     }.build()
 }
+
+private fun pageParameter(maxPage: () -> Int) = ParameterBuilder.begin<Int>("page")
+    .verifiedBy {
+        val input = it.toIntOrNull() ?: return@verifiedBy Result.Error("'$it' is not an integer")
+        val lastPage = maxPage()
+        if (input in 1..lastPage) Result.Ok(input) else Result.Error("'$it' is not in range 1..$lastPage")
+    }
+    .optional()
+    .build()
+
+private fun <T> pageItems(all: Collection<T>, currentPage: Int, pageSize: Int): List<T> =
+    if (all is List<T>) {
+        all.subList((currentPage - 1) * pageSize, minOf(currentPage * pageSize, all.size))
+    } else {
+        all.drop((currentPage - 1) * pageSize).subList(0, minOf(pageSize, all.size))
+    }

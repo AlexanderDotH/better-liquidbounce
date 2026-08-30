@@ -19,7 +19,7 @@
 
 package net.ccbluex.liquidbounce.features.module.modules.combat.elytratarget
 
-import net.ccbluex.liquidbounce.config.types.list.Tagged
+import net.ccbluex.liquidbounce.common.Tagged
 import net.minecraft.world.entity.LivingEntity
 import net.minecraft.world.phys.Vec3
 

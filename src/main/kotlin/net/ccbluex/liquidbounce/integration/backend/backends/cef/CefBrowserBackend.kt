@@ -18,43 +18,19 @@
  */
 package net.ccbluex.liquidbounce.integration.backend.backends.cef
 
-import net.ccbluex.liquidbounce.api.core.HttpClient
 import net.ccbluex.liquidbounce.config.ConfigSystem
 import net.ccbluex.liquidbounce.event.EventListener
 import net.ccbluex.liquidbounce.integration.backend.BrowserAccelerationFlags
 import net.ccbluex.liquidbounce.integration.backend.BrowserBackend
-import net.ccbluex.liquidbounce.integration.backend.isBrowserAccelerationDisabled
 import net.ccbluex.liquidbounce.integration.backend.browser.BrowserSettings
 import net.ccbluex.liquidbounce.integration.backend.browser.BrowserState
 import net.ccbluex.liquidbounce.integration.backend.browser.BrowserViewport
 import net.ccbluex.liquidbounce.integration.backend.input.InputAcceptor
-import net.ccbluex.liquidbounce.integration.task.MCEFProgressForwarder
 import net.ccbluex.liquidbounce.integration.task.TaskManager
 import net.ccbluex.liquidbounce.mcef.MCEF
 import net.ccbluex.liquidbounce.mcef.MCEFAccelerationSupport
-import net.ccbluex.liquidbounce.utils.client.error.ErrorHandler
-import net.ccbluex.liquidbounce.utils.client.error.QuickFix
-import net.ccbluex.liquidbounce.utils.client.error.errors.JcefIsntCompatible
-import net.ccbluex.liquidbounce.utils.text.formatAsCapacity
-import net.ccbluex.liquidbounce.utils.client.env
 import net.ccbluex.liquidbounce.utils.client.logger
-import net.ccbluex.liquidbounce.utils.client.mc
 import net.ccbluex.liquidbounce.utils.kotlin.sortedInsert
-import net.ccbluex.liquidbounce.utils.validation.HashValidator
-import net.minecraft.util.Util
-import org.cef.browser.CefFrame
-import org.cef.handler.CefLifeSpanHandlerAdapter
-import org.cef.handler.CefLoadHandler
-import org.cef.handler.CefLoadHandlerAdapter
-import org.cef.network.CefRequest
-import java.nio.file.Path
-
-/**
- * The time threshold for cleaning up old cache directories.
- */
-private const val CACHE_CLEANUP_THRESHOLD = 1000 * 60 * 60 * 24 * 7 // 7 days
-
-private val CEF_SINGLETON_FILES = arrayOf("SingletonLock", "SingletonCookie", "SingletonSocket")
 
 /**
  * Uses a modified fork of the JCEF library browser backend made for Minecraft.
@@ -66,178 +42,34 @@ private val CEF_SINGLETON_FILES = arrayOf("SingletonLock", "SingletonCookie", "S
  *
  * @author Izuna <izuna.seikatsu@ccbluex.net>
  */
-@Suppress("TooManyFunctions")
 class CefBrowserBackend : BrowserBackend, EventListener {
 
     private val mcefFolder = ConfigSystem.rootFolder.resolve("mcef")
     private val librariesFolder = mcefFolder.resolve("libraries")
     private val cacheFolder = mcefFolder.resolve("cache")
+    private val cacheManager = CefCacheManager(cacheFolder)
+    private val dependencyInstaller = CefDependencyInstaller(librariesFolder, cacheManager)
 
     override val isInitialized: Boolean
         get() = MCEF.INSTANCE.isInitialized
     override var browsers = mutableListOf<CefBrowser>()
     override var accelerationFlags = BrowserAccelerationFlags.UNSUPPORTED
 
-    @Suppress("ThrowingExceptionsWithoutMessageOrCause")
     override fun makeDependenciesAvailable(taskManager: TaskManager, whenAvailable: () -> Unit) {
-        // Clean up old cache directories
-        cleanup()
-
-        if (!MCEF.INSTANCE.isInitialized) {
-            MCEF.INSTANCE.settings.apply {
-                userAgent = HttpClient.DEFAULT_AGENT
-                cacheDirectory = prepareCacheDirectory()
-                librariesDirectory = librariesFolder
-
-                val disableGpuAcceleration = shouldDisableGpuAcceleration()
-                val cefSwitches = CefSwitches.forConfiguration(disableGpuAcceleration)
-                appendCefSwitches(*cefSwitches.toTypedArray())
-                logger.info("Starting JCEF with switches: ${cefSwitches.joinToString(" ")}")
-                if (disableGpuAcceleration) {
-                    logger.warn("Starting JCEF with Chromium GPU acceleration disabled.")
-                }
-            }
-
-            val resourceManager = MCEF.INSTANCE.newResourceManager()
-
-            // Check if system is compatible with MCEF (JCEF)
-            if (!resourceManager.isSystemCompatible) {
-                throw JcefIsntCompatible()
-            }
-
-            HashValidator.validateFolder(resourceManager.commitDirectory)
-
-            if (resourceManager.requiresDownload()) {
-                taskManager.launch("MCEF") { task ->
-                    resourceManager.registerProgressListener(MCEFProgressForwarder(task))
-
-                    runCatching {
-                        resourceManager.downloadJcef()
-                        mc.execute(whenAvailable)
-                    }.onFailure {
-                        ErrorHandler.fatal(
-                            error = it,
-                            quickFix = QuickFix.DOWNLOAD_JCEF_FAILED,
-                            additionalMessage = "Downloading jcef"
-                        )
-                    }
-                }
-            } else {
-                whenAvailable()
-            }
-        }
+        dependencyInstaller.makeAvailable(taskManager, whenAvailable)
     }
-
-    /**
-     * Store CEF profile data outside the instance folder. Chromium's SingletonLock breaks when the
-     * Minecraft directory contains spaces (e.g. "Performium 21.1").
-     */
-    private fun prepareCacheDirectory(): java.io.File {
-        val instanceId = mc.gameDirectory.absolutePath.hashCode().toUInt().toString(16)
-        val sessionId = System.currentTimeMillis().toString(16)
-        val cacheDir = Path.of(
-            System.getProperty("user.home"),
-            ".cache",
-            "liquidbounce-mcef",
-            instanceId,
-            sessionId,
-        ).toFile()
-        cacheDir.mkdirs()
-        for (name in CEF_SINGLETON_FILES) {
-            cacheDir.resolve(name).delete()
-        }
-        cacheDir.deleteOnExit()
-        logger.info("Using JCEF cache directory: ${cacheDir.absolutePath}")
-        return cacheDir
-    }
-
-    private fun shouldDisableGpuAcceleration() = CefSwitches.shouldDisableGpuAcceleration(
-        isLinux = Util.getPlatform() == Util.OS.LINUX,
-        disableGpuAcceleration = isBrowserAccelerationDisabled,
-        disableDmabufRenderer = System.getenv("WEBKIT_DISABLE_DMABUF_RENDERER") == "1",
-        forceGpuAcceleration = env(
-            "LB_BROWSER_FORCE_ACCELERATION",
-            "net.ccbluex.liquidbounce.browser.forceAcceleration"
-        )?.toBoolean() == true,
-    )
 
     fun cleanup() {
-        cleanupCacheRoot(Path.of(System.getProperty("user.home"), ".cache", "liquidbounce-mcef"))
-        cleanupCacheRoot(cacheFolder.toPath())
-    }
-
-    private fun cleanupCacheRoot(root: Path) {
-        if (!root.toFile().exists()) {
-            return
-        }
-
-        runCatching {
-            root.toFile().listFiles { file ->
-                file.isDirectory && System.currentTimeMillis() - file.lastModified() > CACHE_CLEANUP_THRESHOLD
-            }?.sumOf { file ->
-                try {
-                    val fileSize = file.walkTopDown().sumOf { uFile -> uFile.length() }
-                    file.deleteRecursively()
-                    fileSize
-                } catch (e: Exception) {
-                    logger.error("Failed to clean up old cache directory", e)
-                    0
-                }
-            } ?: 0
-        }.onFailure {
-            logger.error("Failed to clean up old JCEF cache directories under $root", it)
-        }.onSuccess { size ->
-            if (size > 0) {
-                logger.info("Cleaned up ${size.formatAsCapacity()} JCEF cache directories under $root")
-            }
-        }
+        cacheManager.cleanup()
     }
 
     override fun start() {
         if (!MCEF.INSTANCE.isInitialized) {
             MCEF.INSTANCE.initialize()
-
-            MCEF.INSTANCE.client.handle.addLifeSpanHandler(object : CefLifeSpanHandlerAdapter() {
-                override fun onAfterCreated(cefBrowser: org.cef.browser.CefBrowser) {
-                    markInitialized(cefBrowser)
-                    super.onAfterCreated(cefBrowser)
-                }
-            })
-
-            MCEF.INSTANCE.client.addLoadHandler(object : CefLoadHandlerAdapter() {
-
-                override fun onLoadStart(
-                    cefBrowser: org.cef.browser.CefBrowser, frame: CefFrame?,
-                    transitionType: CefRequest.TransitionType?
-                ) {
-                    updateStateForBrowser(cefBrowser, BrowserState.Loading)
-                    super.onLoadStart(cefBrowser, frame, transitionType)
-                }
-
-                override fun onLoadEnd(cefBrowser: org.cef.browser.CefBrowser, frame: CefFrame?, httpStatusCode: Int) {
-                    updateStateForBrowser(cefBrowser, BrowserState.Success(httpStatusCode))
-                    super.onLoadEnd(cefBrowser, frame, httpStatusCode)
-                }
-
-                override fun onLoadError(
-                    cefBrowser: org.cef.browser.CefBrowser, frame: CefFrame?,
-                    errorCode: CefLoadHandler.ErrorCode?, errorText: String?, failedUrl: String?
-                ) {
-                    updateStateForBrowser(
-                        cefBrowser,
-                        BrowserState.Failure(
-                            errorCode?.code ?: -1,
-                            errorText ?: "Unknown Error",
-                            failedUrl ?: "Unknown URL"
-                        )
-                    )
-                    super.onLoadError(cefBrowser, frame, errorCode, errorText, failedUrl)
-                }
-
-            })
+            CefLifecycleHandlerInstaller.install(::markInitialized, ::updateStateForBrowser)
         }
 
-        if (shouldDisableGpuAcceleration()) {
+        if (shouldDisableCefGpuAcceleration()) {
             accelerationFlags = BrowserAccelerationFlags.UNSUPPORTED
             return
         }

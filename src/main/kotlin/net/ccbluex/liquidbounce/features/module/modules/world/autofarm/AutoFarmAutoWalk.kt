@@ -22,14 +22,14 @@ import net.ccbluex.fastutil.objectHashSetOf
 import net.ccbluex.fastutil.weightedMinByOrNullAtMost
 import net.ccbluex.liquidbounce.config.types.group.ToggleableValueGroup
 import net.ccbluex.liquidbounce.event.events.NotificationEvent
-import net.ccbluex.liquidbounce.utils.client.notification
+import net.ccbluex.liquidbounce.features.chat.notification
 import net.ccbluex.liquidbounce.utils.collection.Filter
 import net.ccbluex.liquidbounce.utils.collection.itemSortedSetOf
 import net.ccbluex.liquidbounce.utils.inventory.Slots
 import net.ccbluex.liquidbounce.utils.inventory.hasInventorySpace
 import net.ccbluex.liquidbounce.utils.math.center
 import net.ccbluex.liquidbounce.utils.math.sq
-import net.ccbluex.liquidbounce.utils.navigation.NavigationBaseValueGroup
+import net.ccbluex.liquidbounce.features.navigation.NavigationBaseValueGroup
 import net.ccbluex.liquidbounce.utils.world.entityGetter
 import net.ccbluex.liquidbounce.utils.world.filter
 import net.minecraft.world.entity.EntityTypes

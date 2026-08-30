@@ -24,7 +24,7 @@ import net.ccbluex.liquidbounce.integration.theme.component.HudComponentTweak
 import net.ccbluex.liquidbounce.integration.theme.component.WEB_HUD_BASE_SCALE
 import net.ccbluex.liquidbounce.integration.theme.component.resolveWebHudBounds
 import net.ccbluex.liquidbounce.render.engine.type.BoundingBox2f
-import net.ccbluex.liquidbounce.utils.render.Alignment
+import net.ccbluex.liquidbounce.config.types.group.Alignment
 
 abstract class NativeHudComponent(
     name: String,

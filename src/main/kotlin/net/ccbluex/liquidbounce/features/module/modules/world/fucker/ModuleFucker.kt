@@ -18,9 +18,8 @@
  */
 package net.ccbluex.liquidbounce.features.module.modules.world.fucker
 
-import it.unimi.dsi.fastutil.longs.LongOpenHashSet
 import net.ccbluex.liquidbounce.config.types.group.ToggleableValueGroup
-import net.ccbluex.liquidbounce.config.types.list.Tagged
+import net.ccbluex.liquidbounce.common.Tagged
 import net.ccbluex.liquidbounce.event.events.CancelBlockBreakingEvent
 import net.ccbluex.liquidbounce.event.events.RotationUpdateEvent
 import net.ccbluex.liquidbounce.event.handler
@@ -36,11 +35,11 @@ import net.ccbluex.liquidbounce.features.module.modules.world.ModuleAutoTool
 import net.ccbluex.liquidbounce.features.module.modules.world.packetmine.ModulePacketMine
 import net.ccbluex.liquidbounce.render.engine.type.Color4b
 import net.ccbluex.liquidbounce.utils.aiming.RotationManager
-import net.ccbluex.liquidbounce.utils.aiming.RotationsValueGroup
+import net.ccbluex.liquidbounce.features.rotation.RotationsValueGroup
 import net.ccbluex.liquidbounce.utils.aiming.utils.raytraceBlockRotation
 import net.ccbluex.liquidbounce.utils.block.DIRECTIONS_EXCLUDING_DOWN
-import net.ccbluex.liquidbounce.utils.block.bed.isSelfBedChoices
-import net.ccbluex.liquidbounce.utils.block.doBreak
+import net.ccbluex.liquidbounce.features.block.bed.isSelfBedChoices
+import net.ccbluex.liquidbounce.features.block.runtime.doBreak
 import net.ccbluex.liquidbounce.utils.block.getBlock
 import net.ccbluex.liquidbounce.utils.block.isAnyChest
 import net.ccbluex.liquidbounce.utils.math.distanceToSqr
@@ -53,14 +52,11 @@ import net.ccbluex.liquidbounce.utils.block.state
 import net.ccbluex.liquidbounce.utils.inventory.Slots
 import net.ccbluex.liquidbounce.utils.inventory.findBlocksEndingWith
 import net.ccbluex.liquidbounce.utils.kotlin.Priority
-import net.ccbluex.liquidbounce.utils.math.forAllFaces
-import net.ccbluex.liquidbounce.utils.math.samplePointOnSide
-import net.ccbluex.liquidbounce.utils.math.sq
 import net.ccbluex.liquidbounce.utils.math.withLength
 import net.ccbluex.liquidbounce.utils.raytracing.raytraceBlock
-import net.ccbluex.liquidbounce.utils.render.BreakingProgress
-import net.ccbluex.liquidbounce.utils.render.BreakingProgressRenderer
-import net.ccbluex.liquidbounce.utils.render.placement.PlacementRenderer
+import net.ccbluex.liquidbounce.render.progress.BreakingProgress
+import net.ccbluex.liquidbounce.render.progress.BreakingProgressRenderer
+import net.ccbluex.liquidbounce.render.placement.PlacementRenderer
 import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen
 import net.minecraft.core.BlockPos
 import net.minecraft.world.InteractionHand
@@ -68,13 +64,11 @@ import net.minecraft.world.InteractionResult
 import net.minecraft.world.level.ClipContext
 import net.minecraft.world.level.block.BedBlock
 import net.minecraft.world.level.block.state.BlockState
-import net.minecraft.world.phys.AABB
 import net.minecraft.world.phys.HitResult
 import net.minecraft.world.phys.Vec3
 import net.minecraft.world.phys.shapes.CollisionContext
 import net.minecraft.world.phys.shapes.Shapes
 import java.util.function.ToDoubleFunction
-import java.util.function.ToIntFunction
 import kotlin.math.max
 
 /**
@@ -160,8 +154,6 @@ object ModuleFucker : ClientModule(
         return BreakingProgress.Provider.Default.breakingProgress(target.pos)
     }
 
-    private val targetPointProportions = doubleArrayOf(0.1, 0.3, 0.5, 0.7, 0.9)
-    private const val MAX_SURROUNDING_PATH_BLOCKS = 8
     private const val RAYCAST_TARGET_EPSILON = 0.005
 
     override fun onDisabled() {
@@ -251,34 +243,31 @@ object ModuleFucker : ClientModule(
 
     private fun updateCurrentTarget() {
         val possibleBlocks = searchPossibleTargetPositions()
-
         validateCurrentTarget(possibleBlocks)
 
-        if (possibleBlocks.isEmpty()) {
+        if (possibleBlocks.isEmpty()) return
+
+        val effectiveRange = range.toDouble()
+        if (selectDirectTarget(possibleBlocks, effectiveRange) || currentTarget != null) return
+
+        possibleBlocks.forEach { pos -> considerIndirectTarget(pos, effectiveRange) }
+    }
+
+    private fun selectDirectTarget(possibleBlocks: Collection<BlockPos>, effectiveRange: Double): Boolean =
+        possibleBlocks.any { pos ->
+            val throughWallsRange =
+                if (FuckerEntrance.enabled && pos.hasEntrance) effectiveRange else wallRange.toDouble()
+            considerAsTarget(DestroyerTarget(pos, action, isTarget = true), effectiveRange, throughWallsRange) == true
+        }
+
+    private fun considerIndirectTarget(pos: BlockPos, effectiveRange: Double) {
+        if (FuckerEntrance.enabled && FuckerEntrance.breakFree) {
+            val weakBlock = pos.weakestNeighbor ?: return
+            considerAsTarget(DestroyerTarget(weakBlock, DestroyAction.DESTROY), effectiveRange, effectiveRange)
             return
         }
 
-        val range = range.toDouble()
-
-        // Find direct targets first
-        if (possibleBlocks.any { pos ->
-            // If the block has an entrance, we should ignore the wall range and act as if we are breaking normally.
-            val wallRange = if (FuckerEntrance.enabled && pos.hasEntrance) range else wallRange.toDouble()
-            considerAsTarget(DestroyerTarget(pos, action, isTarget = true), range, wallRange) == true
-        } || currentTarget != null) {
-            return
-        }
-
-        // Surrounding / Entrance
-        for (pos in possibleBlocks) {
-            // Is there any block in the way?
-            if (FuckerEntrance.enabled && FuckerEntrance.breakFree) {
-                val weakBlock = pos.weakestNeighbor ?: continue
-                considerAsTarget(DestroyerTarget(weakBlock, DestroyAction.DESTROY), range, range)
-            } else if (surroundings) {
-                updateSurroundings(pos)
-            }
-        }
+        if (surroundings) updateSurroundings(pos)
     }
 
     private fun clearCurrentTarget() {
@@ -372,7 +361,22 @@ object ModuleFucker : ClientModule(
 
     private fun updateSurroundings(initialPosition: BlockPos): Boolean {
         val eyePos = player.eyePosition
-        val path = findBestSurroundingPath(initialPosition, eyePos) ?: return false
+        val targetState = initialPosition.state ?: return false
+        val targetShape = if (chestAsFullBlock && targetState.isAnyChest) {
+            Shapes.block()
+        } else {
+            targetState.getShape(world, initialPosition)
+        }
+        val path = findBestSurroundingPath(
+            target = initialPosition,
+            eyePos = eyePos,
+            targetShape = targetShape,
+            range = range.toDouble(),
+            traceBlocks = { targetPoint -> traceBlocksToTarget(initialPosition, eyePos, targetPoint) },
+            blockResistance = { pos ->
+                pos.state?.takeUnless { it.isAir }?.let { state -> miningDuration(pos, state) }
+            },
+        ) ?: return false
 
         debugGeometry("targetPoint") {
             ModuleDebug.DebuggedPoint(path.info.targetPoint, Color4b.RED.alpha(100))
@@ -395,99 +399,26 @@ object ModuleFucker : ClientModule(
         ) == true
     }
 
-    @Suppress("CognitiveComplexMethod")
-    private fun findBestSurroundingPath(target: BlockPos, eyePos: Vec3): SurroundingPath? {
-        val rangeSquared = range.toDouble().sq()
-
-        fun createSurroundingPath(targetPoint: Vec3): SurroundingPath? {
-            val blocks = traceBlocksToTarget(target, eyePos, targetPoint)?.takeIf { it.isNotEmpty() } ?: return null
-            var resistance = 0.0
-
-            for (pos in blocks) {
-                val state = pos.state?.takeUnless { it.isAir } ?: return null
-                resistance += miningDuration(pos, state)
-            }
-
-            val firstBlock = blocks.first()
-            return SurroundingPath(
-                firstBlock = firstBlock,
-                blocks = blocks,
-                info = SurroundingInfo(
-                    actualTargetPos = target,
-                    targetPoint = targetPoint,
-                    resistance = resistance,
-                    blockerCount = blocks.size,
-                    firstBlockDistanceToTarget = firstBlock.distToCenterSqr(targetPoint),
-                    firstBlockDistanceToEyes = firstBlock.distToCenterSqr(eyePos),
-                )
-            )
-        }
-
-        var bestPath: SurroundingPath? = null
-
-        val targetState = target.state ?: return bestPath
-        val targetShape = if (chestAsFullBlock && targetState.isAnyChest) {
-            Shapes.block()
-        } else {
-            targetState.getShape(world, target)
-        }
-
-        targetShape.move(target).forAllFaces { side, minX, minY, minZ, maxX, maxY, maxZ ->
-            val face = AABB(minX, minY, minZ, maxX, maxY, maxZ)
-            for (a in targetPointProportions) {
-                for (b in targetPointProportions) {
-                    val targetPoint = face.samplePointOnSide(side, a, b)
-
-                    if (eyePos.distanceToSqr(targetPoint) <= rangeSquared) {
-                        val path = createSurroundingPath(targetPoint) ?: continue
-                        val currentBestPath = bestPath
-                        if (currentBestPath == null || currentBestPath >= path) {
-                            bestPath = path
-                        }
-                    }
-                }
-            }
-        }
-
-        return bestPath
-    }
-
     private fun traceBlocksToTarget(target: BlockPos, eyePos: Vec3, targetPoint: Vec3): List<BlockPos>? {
         val direction = targetPoint.subtract(eyePos).withLength(RAYCAST_TARGET_EPSILON)
         val end = targetPoint.add(direction)
         val clipContext = ClipContext(eyePos, end, ClipContext.Block.OUTLINE, ClipContext.Fluid.NONE, player)
-        val ignoredBlocks = ArrayList<BlockPos>(MAX_SURROUNDING_PATH_BLOCKS)
-        val visited = LongOpenHashSet(MAX_SURROUNDING_PATH_BLOCKS)
-        var reachedTarget = false
-        var invalidPath = false
 
-        while (!reachedTarget && !invalidPath) {
-            val raytraceResult = world.raycast(
-                context = clipContext,
-                exclude = ignoredBlocks,
-                include = null,
-                maxBlastResistance = null,
-            ).takeIf { result -> result.type == HitResult.Type.BLOCK }
-
-            if (raytraceResult == null) {
-                invalidPath = true
-            } else {
-                val blockPos = raytraceResult.blockPos
-                reachedTarget = blockPos == target
-
-                if (!reachedTarget) {
-                    val state = blockPos.state
-                    invalidPath = !visited.add(blockPos.asLong()) ||
-                        state == null || state.isAir || state.isNotBreakable(blockPos) ||
-                        ignoredBlocks.size >= MAX_SURROUNDING_PATH_BLOCKS
-                    if (!invalidPath) {
-                        ignoredBlocks += blockPos
-                    }
-                }
-            }
-        }
-
-        return ignoredBlocks.takeIf { reachedTarget }
+        return collectBlockingPath(
+            target = target,
+            raycastBlock = { ignoredBlocks ->
+                world.raycast(
+                    context = clipContext,
+                    exclude = ignoredBlocks,
+                    include = null,
+                    maxBlastResistance = null,
+                ).takeIf { result -> result.type == HitResult.Type.BLOCK }?.blockPos
+            },
+            isValidBlocker = { blockPos ->
+                val state = blockPos.state
+                state != null && !state.isAir && !state.isNotBreakable(blockPos)
+            },
+        )
     }
 
     @JvmRecord
@@ -513,44 +444,6 @@ object ModuleFucker : ClientModule(
             }
         }
     }
-
-    /**
-     * A candidate path that opens line of sight to a target outline point.
-     *
-     * @param firstBlock the block that should be broken first
-     * @param blocks all blocks that need to be broken for the path
-     * @param info scoring and target metadata for this path
-     */
-    private data class SurroundingPath(
-        val firstBlock: BlockPos,
-        val blocks: List<BlockPos>,
-        val info: SurroundingInfo
-    ) : Comparable<SurroundingPath> {
-        override fun compareTo(other: SurroundingPath): Int = info.compareTo(other.info)
-    }
-
-    /**
-     * @param actualTargetPos the target block this surrounding path opens
-     * @param targetPoint the outline point that should become visible from the player's eyes
-     * @param resistance proportional to the time it will take until the actual target is reached
-     * @param blockerCount number of blocks that need to be broken for the path
-     */
-    private data class SurroundingInfo(
-        val actualTargetPos: BlockPos,
-        val targetPoint: Vec3,
-        val resistance: Double,
-        val blockerCount: Int,
-        val firstBlockDistanceToTarget: Double,
-        val firstBlockDistanceToEyes: Double,
-    ) : Comparable<SurroundingInfo> {
-        override fun compareTo(other: SurroundingInfo): Int = SURROUNDING_INFO_COMPARATOR.compare(this, other)
-    }
-
-    private val SURROUNDING_INFO_COMPARATOR = Comparator
-        .comparingDouble(ToDoubleFunction<SurroundingInfo> { it.resistance })
-        .thenComparingInt(ToIntFunction { it.blockerCount })
-        .thenComparingDouble(ToDoubleFunction { it.firstBlockDistanceToTarget })
-        .thenComparingDouble(ToDoubleFunction { it.firstBlockDistanceToEyes })
 
     private enum class DestroyAction(override val tag: String) : Tagged {
         DESTROY("Destroy"), USE("Use")

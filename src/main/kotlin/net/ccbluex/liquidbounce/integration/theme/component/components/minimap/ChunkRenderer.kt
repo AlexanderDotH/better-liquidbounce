@@ -18,7 +18,7 @@
  */
 package net.ccbluex.liquidbounce.integration.theme.component.components.minimap
 
-import net.ccbluex.liquidbounce.utils.block.ChunkScanner
+import net.ccbluex.liquidbounce.features.block.runtime.ChunkScanner
 import net.ccbluex.liquidbounce.utils.client.logger
 import net.ccbluex.liquidbounce.utils.client.mc
 import net.ccbluex.liquidbounce.utils.math.dotProduct

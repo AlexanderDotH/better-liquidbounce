@@ -19,7 +19,7 @@
 package net.ccbluex.liquidbounce.features.module.modules.player.autoshop
 
 import com.google.gson.GsonBuilder
-import net.ccbluex.liquidbounce.config.types.list.Tagged
+import net.ccbluex.liquidbounce.common.Tagged
 import net.ccbluex.liquidbounce.event.events.NotificationEvent
 import net.ccbluex.liquidbounce.features.module.modules.player.autoshop.serializable.ItemInfo
 import net.ccbluex.liquidbounce.features.module.modules.player.autoshop.serializable.ShopConfig
@@ -27,7 +27,7 @@ import net.ccbluex.liquidbounce.features.module.modules.player.autoshop.serializ
 import net.ccbluex.liquidbounce.features.module.modules.player.autoshop.serializable.conditions.ConditionNode
 import net.ccbluex.liquidbounce.features.module.modules.player.autoshop.serializable.conditions.ItemConditionNode
 import net.ccbluex.liquidbounce.utils.client.logger
-import net.ccbluex.liquidbounce.utils.client.notification
+import net.ccbluex.liquidbounce.features.chat.notification
 import net.minecraft.client.Minecraft
 import java.io.Reader
 

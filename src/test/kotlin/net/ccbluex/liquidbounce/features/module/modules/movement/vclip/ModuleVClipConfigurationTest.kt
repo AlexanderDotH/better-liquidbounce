@@ -18,7 +18,6 @@ import net.ccbluex.liquidbounce.config.types.group.ToggleableValueGroup
 import net.ccbluex.liquidbounce.config.types.group.ValueGroup
 import net.ccbluex.liquidbounce.features.module.ModuleCategories
 import net.ccbluex.liquidbounce.features.module.modules.movement.ModuleVClip
-import net.ccbluex.liquidbounce.features.module.modules.movement.acceptsVClipControlInput
 import net.ccbluex.liquidbounce.test.MinecraftBootstrap
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse

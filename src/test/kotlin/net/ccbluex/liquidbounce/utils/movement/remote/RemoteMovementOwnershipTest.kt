@@ -10,7 +10,7 @@
  */
 package net.ccbluex.liquidbounce.utils.movement.remote
 
-import net.ccbluex.liquidbounce.features.module.modules.combat.RemoteKillMovementOwnership
+import net.ccbluex.liquidbounce.features.module.modules.combat.remotekill.RemoteKillMovementOwnership
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertNull

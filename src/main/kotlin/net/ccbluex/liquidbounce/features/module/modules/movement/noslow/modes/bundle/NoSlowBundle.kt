@@ -18,6 +18,6 @@
  */
 package net.ccbluex.liquidbounce.features.module.modules.movement.noslow.modes.bundle
 
-import net.ccbluex.liquidbounce.features.module.modules.movement.noslow.NoSlowUseActionHandler
+import net.ccbluex.liquidbounce.features.module.modules.movement.noslow.modes.shared.NoSlowUseActionHandler
 
 object NoSlowBundle : NoSlowUseActionHandler("Bundle")

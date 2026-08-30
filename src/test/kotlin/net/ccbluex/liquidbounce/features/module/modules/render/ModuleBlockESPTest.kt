@@ -22,6 +22,12 @@ import com.google.gson.JsonArray
 import com.google.gson.JsonObject
 import net.ccbluex.liquidbounce.config.types.RangedValue
 import net.ccbluex.liquidbounce.config.types.group.ValueGroup
+import net.ccbluex.liquidbounce.features.module.modules.render.blockesp.BlockEspTracerSettings
+import net.ccbluex.liquidbounce.features.module.modules.render.blockesp.BlockTracerSource
+import net.ccbluex.liquidbounce.features.module.modules.render.blockesp.collectBlockTracerTargets
+import net.ccbluex.liquidbounce.features.module.modules.render.blockesp.createBlockTracerBatch
+import net.ccbluex.liquidbounce.features.module.modules.render.blockesp.defaultBlockEspTargets
+import net.ccbluex.liquidbounce.features.module.modules.render.blockesp.migrateLegacyNetherPortalTarget
 import net.ccbluex.liquidbounce.render.engine.type.Color4b
 import net.ccbluex.liquidbounce.render.engine.type.Vec3f
 import net.ccbluex.liquidbounce.test.MinecraftBootstrap
@@ -34,13 +40,24 @@ import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.BeforeEach
+import org.junit.jupiter.api.MethodOrderer
+import org.junit.jupiter.api.Order
 import org.junit.jupiter.api.Test
+import org.junit.jupiter.api.TestMethodOrder
 
+@TestMethodOrder(MethodOrderer.OrderAnnotation::class)
 class ModuleBlockESPTest {
 
     @BeforeEach
     fun bootstrapMinecraft() {
         MinecraftBootstrap.ensureInitialized()
+    }
+
+    @Test
+    @Order(0)
+    fun `public mode access before module initialization keeps every choice non-null`() {
+        assertEquals("Glow", ModuleBlockESP.GlowMode.name)
+        assertEquals(listOf("Box", "Glow", "ShaderESP"), ModuleBlockESP.modeGroup.modes.map { it.name })
     }
 
     @Test

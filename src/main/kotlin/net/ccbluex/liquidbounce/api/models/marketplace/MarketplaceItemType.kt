@@ -19,9 +19,7 @@
 package net.ccbluex.liquidbounce.api.models.marketplace
 
 import com.google.gson.annotations.SerializedName
-import net.ccbluex.liquidbounce.config.types.list.Tagged
-import net.ccbluex.liquidbounce.integration.theme.ThemeManager
-import net.ccbluex.liquidbounce.script.ScriptManager
+import net.ccbluex.liquidbounce.common.Tagged
 
 enum class MarketplaceItemType(
     override val tag: String,
@@ -36,10 +34,4 @@ enum class MarketplaceItemType(
     THEME("Theme", true, true),
     @SerializedName("Other")
     OTHER("Other", false, false);
-
-    suspend fun reload() = when (this) {
-        THEME -> ThemeManager.load()
-        SCRIPT -> ScriptManager.reload()
-        else -> { }
-    }
 }

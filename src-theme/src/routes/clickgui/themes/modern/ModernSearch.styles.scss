@@ -1,0 +1,353 @@
+.modern-clickgui {
+  .modern-search {
+    position: relative;
+    width: 100%;
+    min-width: 0;
+    height: 34px;
+    display: grid;
+    grid-template-columns: 16px minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 7px;
+    padding: 0 9px;
+    color: var(--modern-text-muted, #919aa6);
+    background: var(--modern-surface-raised, rgba(255, 255, 255, 0.045));
+    border: 1px solid rgba(255, 255, 255, 0.085);
+    border-radius: 9px;
+    transition:
+      background-color var(--modern-motion-duration, 140ms) var(--modern-motion-easing, ease),
+      border-color var(--modern-motion-duration, 140ms) var(--modern-motion-easing, ease);
+  }
+
+  .modern-search:focus-within {
+    background: rgba(255, 255, 255, 0.065);
+    border-color: color-mix(in srgb, var(--accent-color) 44%, rgba(255, 255, 255, 0.12));
+  }
+
+  .search-icon {
+    width: 15px;
+    height: 15px;
+    fill: currentColor;
+  }
+
+  .search-input {
+    min-width: 0;
+    width: 100%;
+    height: 100%;
+    padding: 0;
+    color: var(--modern-text-primary, #edf0f4);
+    background: transparent;
+    border: 0;
+    outline: 0;
+    font-family: inherit;
+    font-size: 11px;
+  }
+
+  .search-input::placeholder {
+    color: var(--modern-text-muted, #8d96a3);
+  }
+
+  .clear-button {
+    width: 22px;
+    height: 22px;
+    display: grid;
+    place-items: center;
+    padding: 0;
+    color: #88919c;
+    background: transparent;
+    border: 0;
+    border-radius: 6px;
+    cursor: pointer;
+    animation:
+      modern-search-control-enter
+      var(--modern-motion-duration, 140ms)
+      var(--modern-motion-easing, cubic-bezier(0.2, 0.8, 0.2, 1))
+      backwards;
+    transition:
+      color
+      var(--modern-motion-duration, 140ms)
+      var(--modern-motion-easing, cubic-bezier(0.2, 0.8, 0.2, 1)),
+      background-color
+      var(--modern-motion-duration, 140ms)
+      var(--modern-motion-easing, cubic-bezier(0.2, 0.8, 0.2, 1));
+  }
+
+  .clear-button:hover {
+    color: #eef1f5;
+    background: rgba(255, 255, 255, 0.07);
+  }
+
+  .clear-button:focus-visible {
+    outline: 2px solid var(--modern-focus-ring, color-mix(in srgb, var(--accent-color) 78%, white));
+    outline-offset: 1px;
+  }
+
+  .clear-button svg {
+    width: 12px;
+    height: 12px;
+    fill: currentColor;
+  }
+
+  .shortcut-hint {
+    padding-right: 2px;
+    color: var(--modern-text-muted, #7f8894);
+    font-size: 9px;
+    white-space: nowrap;
+  }
+
+  .results,
+  .search-error {
+    position: absolute;
+    z-index: 1000002;
+    top: calc(100% + 8px);
+    right: 0;
+    left: 0;
+    overflow: hidden;
+    background: rgba(14, 17, 22, 0.97);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 11px;
+    box-shadow: 0 16px 36px rgba(0, 0, 0, 0.34);
+    animation:
+      results-enter
+      var(--modern-motion-entrance-duration, 260ms)
+      var(--modern-motion-entrance-easing, cubic-bezier(0.16, 1, 0.3, 1))
+      backwards;
+  }
+
+  .results {
+    max-height: min(340px, calc(var(--modern-logical-viewport-height, 100vh) - 110px));
+    overflow-y: auto;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(255, 255, 255, 0.14) transparent;
+  }
+
+  .result {
+    position: relative;
+    width: 100%;
+    min-height: 46px;
+    display: grid;
+    grid-template-columns: 7px minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 9px;
+    padding: 7px 10px;
+    color: #abb2bc;
+    background: transparent;
+    border: 0;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    overflow: hidden;
+    cursor: pointer;
+    font-family: inherit;
+    text-align: left;
+    transition:
+      color var(--modern-motion-duration, 140ms) var(--modern-motion-easing, ease),
+      background-color var(--modern-motion-duration, 140ms) var(--modern-motion-easing, ease),
+      transform var(--modern-motion-fast, 100ms) var(--modern-motion-easing, ease);
+    animation:
+      modern-search-result-enter
+      var(--modern-motion-entrance-duration, 260ms)
+      var(--modern-motion-entrance-easing, cubic-bezier(0.16, 1, 0.3, 1))
+      backwards;
+    animation-delay:
+      calc(
+        var(--modern-result-enter-index, 0)
+        * var(--modern-motion-stagger, 24ms)
+      );
+  }
+
+  .result::before {
+    position: absolute;
+    top: 22%;
+    bottom: 22%;
+    left: 0;
+    width: 2px;
+    content: "";
+    background: color-mix(in srgb, var(--accent-color) 78%, white);
+    border-radius: 0 2px 2px 0;
+    opacity: 0;
+    pointer-events: none;
+    transform: scaleY(0.25);
+    transform-origin: center;
+  }
+
+  .result:hover:not(:disabled) {
+    transform: translateX(2px);
+  }
+
+  .result:hover,
+  .result.selected {
+    color: #eef1f5;
+    background: rgba(255, 255, 255, 0.055);
+  }
+
+  .result.selected::before {
+    opacity: 1;
+    transform: scaleY(1);
+  }
+
+  .result:disabled {
+    cursor: progress;
+    opacity: 0.64;
+  }
+
+  .result:focus-visible {
+    position: relative;
+    outline: 2px solid var(--modern-focus-ring, color-mix(in srgb, var(--accent-color) 78%, white));
+    outline-offset: -2px;
+  }
+
+  .result-state {
+    --modern-result-state-scale: 1;
+
+    width: 6px;
+    height: 6px;
+    background: #555e69;
+    border-radius: 50%;
+    transition:
+      background-color
+      var(--modern-motion-duration, 140ms)
+      var(--modern-motion-easing, cubic-bezier(0.2, 0.8, 0.2, 1)),
+      transform
+      var(--modern-motion-duration, 140ms)
+      var(--modern-motion-easing, cubic-bezier(0.2, 0.8, 0.2, 1));
+  }
+
+  .result.enabled .result-state {
+    background: color-mix(in srgb, var(--accent-color) 82%, white);
+    animation:
+      modern-search-state-confirm
+      var(--modern-motion-entrance-duration, 260ms)
+      var(--modern-motion-entrance-easing, cubic-bezier(0.16, 1, 0.3, 1));
+  }
+
+  .result.selected .result-state {
+    --modern-result-state-scale: 1.3;
+
+    transform: scale(var(--modern-result-state-scale));
+  }
+
+  .result-copy {
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  .result-copy strong,
+  .result-copy span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .result-copy strong {
+    font-size: 11px;
+    font-weight: 620;
+  }
+
+  .result-copy span {
+    color: var(--modern-text-muted, #8d96a3);
+    font-size: 9px;
+  }
+
+  .result.enabled .result-copy strong {
+    color: color-mix(in srgb, var(--accent-color) 76%, white);
+  }
+
+  .result-action {
+    color: var(--modern-text-muted, #8d96a3);
+    font-size: 9px;
+    font-weight: 650;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+  }
+
+  .empty-result {
+    padding: 17px 12px;
+    color: #858e9a;
+    font-size: 11px;
+    text-align: center;
+  }
+
+  .result-footer {
+    position: sticky;
+    bottom: 0;
+    display: flex;
+    justify-content: center;
+    gap: 12px;
+    padding: 6px 8px;
+    color: var(--modern-text-muted, #828b97);
+    background: rgba(11, 14, 18, 0.97);
+    border-top: 1px solid rgba(255, 255, 255, 0.055);
+    font-size: 8px;
+    letter-spacing: 0.025em;
+  }
+
+  .search-error {
+    padding: 9px 11px;
+    color: #e5a5a5;
+    font-size: 10px;
+  }
+
+  @keyframes results-enter {
+    from {
+      transform: translateY(-6px);
+    }
+  }
+
+  @keyframes modern-search-result-enter {
+    from {
+      transform: translateY(-4px);
+    }
+  }
+
+  @keyframes modern-search-control-enter {
+    from {
+      transform: rotate(-45deg);
+    }
+  }
+
+  @keyframes modern-search-state-confirm {
+    0% {
+      transform: scale(0.82);
+    }
+
+    58% {
+      transform: scale(1.35);
+    }
+
+    100% {
+      transform: scale(var(--modern-result-state-scale));
+    }
+  }
+
+  @media (max-width: 760px) {
+    .shortcut-hint {
+      display: none;
+    }
+
+    .result-footer {
+      gap: 7px;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .modern-search,
+    .result,
+    .result::before,
+    .result-state,
+    .clear-button {
+      transition-duration: 0.01ms;
+    }
+
+    .results,
+    .search-error,
+    .result,
+    .result.enabled .result-state,
+    .clear-button {
+      animation: none;
+    }
+
+    .result:hover:not(:disabled) {
+      transform: none;
+    }
+  }
+}

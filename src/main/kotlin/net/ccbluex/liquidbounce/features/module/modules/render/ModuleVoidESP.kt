@@ -27,7 +27,7 @@ import net.ccbluex.liquidbounce.event.handler
 import net.ccbluex.liquidbounce.features.module.ClientModule
 import net.ccbluex.liquidbounce.features.module.ModuleCategories
 import net.ccbluex.liquidbounce.render.engine.type.Color4b
-import net.ccbluex.liquidbounce.utils.render.placement.PlacementRenderer
+import net.ccbluex.liquidbounce.render.placement.PlacementRenderer
 import net.minecraft.core.BlockPos
 import net.minecraft.core.Direction
 import net.minecraft.world.level.block.SupportType
@@ -72,62 +72,54 @@ object ModuleVoidESP : ClientModule("VoidESP", ModuleCategories.RENDER) {
      * Search positions around.
      */
     private fun search(): LongSet {
-        val positions = LongOpenHashSet()
+        val startPos = findStandingStart() ?: return LongSets.EMPTY_SET
+        return collectVoidPositions(startPos)
+    }
 
-        // Find the first place where the player can stand
+    private fun findStandingStart(): BlockPos.MutableBlockPos? {
         val startPos = posEnd.setWithOffset(player.blockPosition(), Direction.DOWN)
-        val yThreshold = yThreshold
-        var chunk = world.getChunk(startPos)
-        var flag = false
-
-        var i = 0
-        while (i++ < yThreshold) {
+        val chunk = world.getChunk(startPos)
+        repeat(yThreshold) {
             if (chunk.canBlockStandOn(startPos)) {
-                flag = true
-                break
+                return startPos
             }
             startPos.y--
         }
+        return null
+    }
 
-        if (!flag) {
-            return LongSets.EMPTY_SET
-        }
-
+    private fun collectVoidPositions(startPos: BlockPos): LongSet {
+        val positions = LongOpenHashSet()
         val facing = player.direction
         val side = facing.clockWise
-
         val from = posStart.set(startPos)
             .move(facing, rangeFacing).move(side.opposite, rangeSide)
         val to = posEnd.set(startPos)
             .move(facing.opposite, rangeFacing).move(side, rangeSide)
-
         BlockPos.betweenClosed(from, to).forEach {
-            chunk = world.getChunk(it)
-
-            if (chunk.canBlockStandOn(it)) {
-                return@forEach
+            if (isVoidColumn(it)) {
+                positions.add(it.asLong())
             }
-
-            posStart.set(it)
-
-            repeat(yThreshold) { _ ->
-                posStart.y--
-
-                if (chunk.canBlockStandOn(posStart)) {
-                    return@forEach
-                }
-
-                // Reach the bottom(void)
-                if (posStart.y <= chunk.minY) {
-                    positions.add(it.asLong())
-                    return@forEach
-                }
-            }
-
-            positions.add(it.asLong())
         }
-
         return positions
+    }
+
+    private fun isVoidColumn(pos: BlockPos): Boolean {
+        val chunk = world.getChunk(pos)
+        if (chunk.canBlockStandOn(pos)) {
+            return false
+        }
+        posStart.set(pos)
+        repeat(yThreshold) {
+            posStart.y--
+            if (chunk.canBlockStandOn(posStart)) {
+                return false
+            }
+            if (posStart.y <= chunk.minY) {
+                return true
+            }
+        }
+        return true
     }
 
     private val tickHandler = handler<PlayerTickEvent> {

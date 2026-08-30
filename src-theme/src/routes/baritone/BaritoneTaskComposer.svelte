@@ -1,8 +1,13 @@
 <script lang="ts">
-    import type {BaritoneTaskRequest, BaritoneTaskType} from "../../integration/baritone";
+    import type {BaritoneTaskRequest} from "../../integration/baritone";
     import BaritoneField from "./BaritoneField.svelte";
-
-    type ComposerKind = "navigate" | "mine" | "follow" | "farm" | "explore" | "build" | "elytra";
+    import {
+        buildBaritoneTaskRequest,
+        composerDescription,
+        composerHeading,
+        describeComposerError,
+        type BaritoneComposerKind,
+    } from "./baritoneTaskModel";
 
     let {
         kind,
@@ -13,7 +18,7 @@
         nativeTextInput = false,
         onSubmit,
     } = $props<{
-        kind: ComposerKind;
+        kind: BaritoneComposerKind;
         disabled?: boolean;
         busy?: boolean;
         blockOptions?: string[];
@@ -40,113 +45,12 @@
         event.preventDefault();
         localError = null;
         try {
-            await onSubmit(buildRequest());
+            await onSubmit(buildBaritoneTaskRequest(kind, {
+                x, y, z, block, player, count, radius, file, navigateTarget,
+            }));
         } catch (error) {
-            localError = describeError(error);
+            localError = describeComposerError(error);
         }
-    }
-
-    function buildRequest(): BaritoneTaskRequest {
-        switch (kind) {
-            case "navigate":
-                return navigateRequest();
-            case "mine":
-                return {type: "MINE", block: required(block, "Block"), count: positiveInteger(count, "Count")};
-            case "follow":
-                return {type: "FOLLOW", player: required(player, "Player")};
-            case "farm":
-                return {type: "FARM", radius: positiveNumber(radius, "Radius")};
-            case "explore":
-                return {type: "EXPLORE", x: finiteNumber(x, "X"), z: finiteNumber(z, "Z"), radius: positiveNumber(radius, "Radius")};
-            case "build":
-                return {
-                    type: "BUILD",
-                    file: required(file, "Schematic"),
-                    x: finiteNumber(x, "X"),
-                    y: finiteNumber(y, "Y"),
-                    z: finiteNumber(z, "Z"),
-                };
-            case "elytra":
-                return coordinateRequest("ELYTRA");
-        }
-
-        throw new Error(`Unsupported Baritone task composer: ${kind}`);
-    }
-
-    function navigateRequest(): BaritoneTaskRequest {
-        if (navigateTarget === "block") {
-            return {type: "GET_TO_BLOCK", block: required(block, "Block")};
-        }
-        return coordinateRequest("GOTO");
-    }
-
-    function coordinateRequest(type: BaritoneTaskType): BaritoneTaskRequest {
-        return {
-            type,
-            x: finiteNumber(x, "X"),
-            y: finiteNumber(y, "Y"),
-            z: finiteNumber(z, "Z"),
-        };
-    }
-
-    function finiteNumber(value: string, field: string): number {
-        const parsed = Number(value);
-        if (Number.isFinite(parsed)) {
-            return parsed;
-        }
-        throw new Error(`${field} must be a finite number.`);
-    }
-
-    function positiveNumber(value: string, field: string): number {
-        const parsed = finiteNumber(value, field);
-        if (parsed > 0) {
-            return parsed;
-        }
-        throw new Error(`${field} must be greater than zero.`);
-    }
-
-    function positiveInteger(value: string, field: string): number {
-        const parsed = positiveNumber(value, field);
-        if (Number.isInteger(parsed)) {
-            return parsed;
-        }
-        throw new Error(`${field} must be a whole number.`);
-    }
-
-    function required(value: string, field: string): string {
-        const trimmed = value.trim();
-        if (trimmed) {
-            return trimmed;
-        }
-        throw new Error(`${field} is required.`);
-    }
-
-    function describeError(error: unknown): string {
-        return error instanceof Error && error.message ? error.message : "Unable to create the task.";
-    }
-
-    function composerHeading(value: ComposerKind): string {
-        return ({
-            navigate: "Choose a destination",
-            mine: "Mine a block",
-            follow: "Follow a player",
-            farm: "Maintain an area",
-            explore: "Explore from a center",
-            build: "Build a schematic",
-            elytra: "Elytra pathing",
-        })[value];
-    }
-
-    function composerDescription(value: ComposerKind): string {
-        return ({
-            navigate: "Path to coordinates or the nearest matching block.",
-            mine: "Find and collect a target block up to the requested count.",
-            follow: "Keep a safe route to a named player as they move.",
-            farm: "Harvest and replant Baritone-supported crops inside the radius.",
-            explore: "Generate terrain outward from the selected center.",
-            build: "Load a supported schematic from Baritone's schematics directory.",
-            elytra: "Calculate a long-distance Elytra route to exact coordinates.",
-        })[value];
     }
 </script>
 
@@ -272,158 +176,5 @@
 </section>
 
 <style lang="scss">
-  .task-composer {
-    display: grid;
-    gap: 22px;
-  }
-
-  header {
-    display: flex;
-    align-items: flex-start;
-    justify-content: space-between;
-    gap: 20px;
-  }
-
-  .eyebrow {
-    margin: 0 0 5px;
-    color: color-mix(in srgb, var(--accent-color) 75%, #cbd0d7);
-    font-size: 10px;
-    font-weight: 750;
-    letter-spacing: 0.13em;
-    text-transform: uppercase;
-  }
-
-  h2 {
-    margin: 0;
-    color: var(--baritone-text-primary, #eef1f5);
-    font-size: 20px;
-    line-height: 1.2;
-  }
-
-  header p:last-child {
-    max-width: 620px;
-    margin: 7px 0 0;
-    color: var(--baritone-text-muted, #8d96a3);
-    font-size: 12px;
-    line-height: 1.5;
-  }
-
-  .task-kind {
-    padding: 6px 9px;
-    color: var(--baritone-text-secondary, #aeb5bf);
-    background: var(--baritone-surface-raised, rgba(255, 255, 255, 0.05));
-    border: 1px solid var(--baritone-border, rgba(255, 255, 255, 0.1));
-    border-radius: 999px;
-    font: 650 9px/1 "JetBrains Mono", monospace;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-  }
-
-  form {
-    display: grid;
-    gap: 16px;
-  }
-
-  .coordinate-grid,
-  .form-grid {
-    display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 12px;
-  }
-
-  .form-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
-  .select-field {
-    display: grid;
-    gap: 6px;
-  }
-
-  .select-field span {
-    color: var(--baritone-text-secondary, #aeb5bf);
-    font-size: 11px;
-    font-weight: 650;
-  }
-
-  select {
-    height: 36px;
-    padding: 0 11px;
-    color: var(--baritone-text-primary, #eef1f5);
-    background: #171b21;
-    border: 1px solid var(--baritone-border, rgba(255, 255, 255, 0.1));
-    border-radius: 8px;
-    outline: none;
-  }
-
-  select:focus-visible,
-  button:focus-visible {
-    outline: 2px solid color-mix(in srgb, var(--accent-color) 72%, white);
-    outline-offset: 2px;
-  }
-
-  .form-actions {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    padding-top: 4px;
-  }
-
-  .form-actions span {
-    color: var(--baritone-text-muted, #8d96a3);
-    font-size: 10px;
-  }
-
-  button.primary {
-    min-width: 112px;
-    height: 36px;
-    padding: 0 15px;
-    color: #0b0d10;
-    background: color-mix(in srgb, var(--accent-color) 78%, white);
-    border: 0;
-    border-radius: 8px;
-    font-size: 11px;
-    font-weight: 750;
-    cursor: pointer;
-    transition:
-      filter var(--baritone-motion-duration, 140ms) ease,
-      transform var(--baritone-motion-duration, 140ms) ease;
-  }
-
-  button.primary:hover:not(:disabled) {
-    filter: brightness(1.08);
-    transform: translateY(-1px);
-  }
-
-  button:disabled {
-    cursor: not-allowed;
-    opacity: 0.45;
-  }
-
-  .form-error {
-    margin: 0;
-    padding: 9px 11px;
-    color: #ffc2c2;
-    background: rgba(150, 40, 45, 0.15);
-    border: 1px solid rgba(255, 100, 108, 0.25);
-    border-radius: 8px;
-    font-size: 11px;
-  }
-
-  @media (max-width: 720px) {
-    .coordinate-grid,
-    .form-grid {
-      grid-template-columns: 1fr;
-    }
-  }
-
-  @media (prefers-reduced-motion: reduce) {
-    button.primary {
-      transition: none;
-    }
-
-    button.primary:hover:not(:disabled) {
-      transform: none;
-    }
-  }
+  @use "./BaritoneTaskComposer.styles";
 </style>

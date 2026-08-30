@@ -5,7 +5,7 @@
     import {convertToSpacedString, spaceSeperatedNames} from "../../../theme/theme_config";
     import type {Module} from "../../../integration/types";
     import {UNKNOWN_KEY} from "../../../util/utils";
-    import BindDisplay from "../../clickgui/setting/bind/BindDisplay.svelte";
+    import BindDisplay from "../../../components/bind/BindDisplay.svelte";
 
     let modules: Module[] = $state([]);
 

@@ -19,7 +19,6 @@
 
 package net.ccbluex.liquidbounce.utils.text;
 
-import net.ccbluex.liquidbounce.injection.mixins.minecraft.text.MixinStyleAccessor;
 import net.minecraft.network.chat.*;
 import org.jspecify.annotations.Nullable;
 
@@ -59,19 +58,18 @@ public final class StyleBuilder {
     public FontDescription font;
 
     public Style build() {
-        Style style = MixinStyleAccessor.create(
-            this.color == null ? this.base.getColor() : this.color,
-            this.shadowColor == null ? this.base.getShadowColor() : this.shadowColor,
-            this.bold == null ? this.base.isBold() : this.bold,
-            this.italic == null ? this.base.isItalic() : this.italic,
-            this.underlined == null ? this.base.isUnderlined() : this.underlined ,
-            this.strikethrough == null ? this.base.isStrikethrough() : this.strikethrough,
-            this.obfuscated == null ? this.base.isObfuscated() : this.obfuscated,
-            this.clickEvent == null ? this.base.getClickEvent() : this.clickEvent,
-            this.hoverEvent == null ? this.base.getHoverEvent() : this.hoverEvent,
-            this.insertion == null ? this.base.getInsertion() : this.insertion,
-            this.font == null ? this.base.getFont() : this.font
-        );
+        Style style = this.base;
+        if (this.color != null) style = style.withColor(this.color);
+        if (this.shadowColor != null) style = style.withShadowColor(this.shadowColor);
+        if (this.bold != null) style = style.withBold(this.bold);
+        if (this.italic != null) style = style.withItalic(this.italic);
+        if (this.underlined != null) style = style.withUnderlined(this.underlined);
+        if (this.strikethrough != null) style = style.withStrikethrough(this.strikethrough);
+        if (this.obfuscated != null) style = style.withObfuscated(this.obfuscated);
+        if (this.clickEvent != null) style = style.withClickEvent(this.clickEvent);
+        if (this.hoverEvent != null) style = style.withHoverEvent(this.hoverEvent);
+        if (this.insertion != null) style = style.withInsertion(this.insertion);
+        if (this.font != null) style = style.withFont(this.font);
         return style.equals(Style.EMPTY) ? Style.EMPTY : style;
     }
 

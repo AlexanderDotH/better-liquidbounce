@@ -22,17 +22,17 @@ package net.ccbluex.liquidbounce.features.module.modules.combat.aimbot.autobow
 import net.ccbluex.liquidbounce.config.types.group.ToggleableValueGroup
 import net.ccbluex.liquidbounce.event.events.GameTickEvent
 import net.ccbluex.liquidbounce.event.handler
-import net.ccbluex.liquidbounce.features.module.modules.combat.aimbot.ModuleAutoBow
 import net.ccbluex.liquidbounce.utils.aiming.RotationManager
-import net.ccbluex.liquidbounce.utils.aiming.RotationsValueGroup
+import net.ccbluex.liquidbounce.features.rotation.RotationsValueGroup
 import net.ccbluex.liquidbounce.utils.aiming.data.Rotation
 import net.ccbluex.liquidbounce.utils.aiming.projectiles.SituationalProjectileAngleCalculator
-import net.ccbluex.liquidbounce.utils.combat.TargetPriority
-import net.ccbluex.liquidbounce.utils.combat.TargetTracker
+import net.ccbluex.liquidbounce.features.combat.runtime.TargetPriority
+import net.ccbluex.liquidbounce.features.combat.runtime.TargetTracker
 import net.ccbluex.liquidbounce.utils.entity.handItems
 import net.ccbluex.liquidbounce.utils.entity.usingItemOrNull
 import net.ccbluex.liquidbounce.utils.kotlin.Priority
-import net.ccbluex.liquidbounce.utils.render.TargetRenderer
+import net.ccbluex.liquidbounce.render.target.TargetRenderer
+import net.ccbluex.liquidbounce.render.trajectory.VerifiedProjectileAngleCalculator
 import net.ccbluex.liquidbounce.utils.render.trajectory.HeldItemTrajectoryResolver
 import net.minecraft.world.item.BowItem
 import net.minecraft.world.item.CrossbowItem
@@ -41,16 +41,19 @@ import net.minecraft.world.item.TridentItem
 /**
  * Automatically shoots with your bow when you aim correctly at an enemy or when the bow is fully charged.
  */
-object AutoBowAimbotFeature : ToggleableValueGroup(ModuleAutoBow, "BowAimbot", true) {
+class AutoBowAimbotFeature(
+    private val owner: AutoBowFeatureOwner,
+) : ToggleableValueGroup(owner, "BowAimbot", true) {
 
     val targetTracker = TargetTracker(TargetPriority.DISTANCE)
     private val rotations = RotationsValueGroup(this)
     private val throughWalls by boolean("ThroughWalls", true)
 
     init {
+        SituationalProjectileAngleCalculator.VerifyHitResult.install(VerifiedProjectileAngleCalculator)
         tree(targetTracker)
         tree(rotations)
-        tree(TargetRenderer(AutoBowAimbotFeature, targetTracker))
+        tree(TargetRenderer(this, targetTracker::target))
     }
 
     @Suppress("unused")
@@ -87,7 +90,7 @@ object AutoBowAimbotFeature : ToggleableValueGroup(ModuleAutoBow, "BowAimbot", t
         RotationManager.setRotationTarget(
             rotation!!,
             priority = Priority.IMPORTANT_FOR_USAGE_1,
-            provider = ModuleAutoBow,
+            provider = owner,
             valueGroup = rotations
         )
     }

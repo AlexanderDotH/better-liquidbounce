@@ -19,14 +19,13 @@
 package net.ccbluex.liquidbounce.features.module.modules.movement.inventorymove.features
 
 import net.ccbluex.liquidbounce.config.types.group.ToggleableValueGroup
-import net.ccbluex.liquidbounce.config.types.list.Tagged
+import net.ccbluex.liquidbounce.common.Tagged
 import net.ccbluex.liquidbounce.event.events.SprintEvent
 import net.ccbluex.liquidbounce.event.handler
-import net.ccbluex.liquidbounce.features.module.modules.movement.inventorymove.ModuleInventoryMove
-import net.ccbluex.liquidbounce.utils.inventory.InventoryManager
+import net.ccbluex.liquidbounce.features.inventory.InventoryManager
 import net.ccbluex.liquidbounce.utils.kotlin.EventPriorityConvention
 
-object InventoryMoveSprintControlFeature : ToggleableValueGroup(ModuleInventoryMove, "SprintControl", false) {
+object InventoryMoveSprintControlFeature : ToggleableValueGroup(name = "SprintControl", enabled = false) {
 
     private val clientMode by enumChoice("Client", SprintMode.DO_NOT_CHANGE)
     private val serverMode by enumChoice("Server", SprintMode.DO_NOT_CHANGE)

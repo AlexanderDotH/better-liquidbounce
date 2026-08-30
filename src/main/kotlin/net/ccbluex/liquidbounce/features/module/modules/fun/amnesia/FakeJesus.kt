@@ -19,16 +19,20 @@
 
 package net.ccbluex.liquidbounce.features.module.modules.`fun`.amnesia
 
+import net.ccbluex.liquidbounce.features.module.modules.`fun`.amnesia.playermodel.PlayerModelFakeJesusState
+import net.ccbluex.liquidbounce.render.playermodel.PlayerModelActionState
+import net.ccbluex.liquidbounce.render.playermodel.PlayerModelVisualTransform
+
 import net.ccbluex.liquidbounce.config.types.group.ToggleableValueGroup
 import net.ccbluex.liquidbounce.event.events.GameRenderEvent
 import net.ccbluex.liquidbounce.event.handler
-import net.ccbluex.liquidbounce.features.module.modules.`fun`.ModuleAmnesia
+import net.ccbluex.liquidbounce.features.module.modules.`fun`.amnesia.contract.AmnesiaRuntimeBridge
 import net.ccbluex.liquidbounce.utils.client.mc
 import net.minecraft.world.entity.LivingEntity
 import net.minecraft.world.phys.Vec3
 
 object FakeJesus : ToggleableValueGroup(
-    ModuleAmnesia,
+    null,
     "FakeJesus",
     false,
     aliases = listOf("Fake Jesus"),
@@ -47,13 +51,13 @@ object FakeJesus : ToggleableValueGroup(
             return@handler
         }
 
-        val target = ModuleAmnesia.findTarget() ?: run {
+        val target = AmnesiaRuntimeBridge.findTarget() ?: run {
             PlayerModelFakeJesusState.reset()
             return@handler
         }
 
         val partialTicks = mc.deltaTracker.getGameTimeDeltaPartialTick(true)
-        val visualPos = ModuleAmnesia.getAuxiliaryVisualPosition(target, partialTicks) ?: target.position()
+        val visualPos = AmnesiaRuntimeBridge.auxiliaryVisualPosition(target, partialTicks) ?: target.position()
         PlayerModelFakeJesusState.tick(
             target = target,
             visualPos = visualPos,

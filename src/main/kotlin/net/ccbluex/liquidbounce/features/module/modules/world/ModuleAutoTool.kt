@@ -26,48 +26,23 @@ import net.ccbluex.liquidbounce.event.events.CancelBlockBreakingEvent
 import net.ccbluex.liquidbounce.event.handler
 import net.ccbluex.liquidbounce.features.module.ClientModule
 import net.ccbluex.liquidbounce.features.module.ModuleCategories
-import net.ccbluex.liquidbounce.utils.block.bed.BedBlockTracker
-import net.ccbluex.liquidbounce.utils.block.getCenterDistanceSquaredEyes
+import net.ccbluex.liquidbounce.features.module.modules.world.autotool.AutoToolNearBedRequirement
+import net.ccbluex.liquidbounce.features.module.modules.world.autotool.AutoToolSilkTouchHandler
+import net.ccbluex.liquidbounce.features.module.modules.world.autotool.selectAutoToolInventorySwapTarget
 import net.ccbluex.liquidbounce.utils.block.stateOrEmpty
 import net.ccbluex.liquidbounce.utils.client.SilentHotbar
 import net.ccbluex.liquidbounce.utils.client.SilentHotbarSelectionPolicy
 import net.ccbluex.liquidbounce.utils.collection.Filter
 import net.ccbluex.liquidbounce.utils.collection.blockSortedSetOf
-import net.ccbluex.liquidbounce.utils.combat.CombatManager
-import net.ccbluex.liquidbounce.utils.inventory.AnchoredHotbarSwapController
+import net.ccbluex.liquidbounce.features.combat.runtime.CombatManager
+import net.ccbluex.liquidbounce.features.inventory.AnchoredHotbarSwapController
 import net.ccbluex.liquidbounce.utils.inventory.HotbarItemSlot
-import net.ccbluex.liquidbounce.utils.inventory.InventoryConstraints
+import net.ccbluex.liquidbounce.features.inventory.InventoryConstraints
 import net.ccbluex.liquidbounce.utils.inventory.ItemSlot
 import net.ccbluex.liquidbounce.utils.inventory.Slots
 import net.ccbluex.liquidbounce.utils.inventory.findBestToolToMineBlock
-import net.ccbluex.liquidbounce.utils.item.getEnchantment
-import net.ccbluex.liquidbounce.utils.math.sq
 import net.minecraft.core.BlockPos
-import net.minecraft.world.entity.player.Inventory
-import net.minecraft.world.item.ItemStack
-import net.minecraft.world.item.enchantment.Enchantments
-import net.minecraft.world.level.block.Blocks
 import net.minecraft.world.level.block.state.BlockState
-import java.util.function.BiPredicate
-
-internal fun selectAutoToolInventorySwapTarget(
-    selectionPolicy: SilentHotbarSelectionPolicy,
-    visibleSlot: Int,
-    serverSlot: Int,
-    emptySlots: List<Int>,
-): Int {
-    require(Inventory.isHotbarSlot(visibleSlot)) { "Invalid visible hotbar slot: $visibleSlot" }
-    require(Inventory.isHotbarSlot(serverSlot)) { "Invalid server hotbar slot: $serverSlot" }
-
-    val preserveVisibleSlot = selectionPolicy.shouldKeepClientSlotVisible
-    emptySlots.firstOrNull { !preserveVisibleSlot || it != visibleSlot }?.let { return it }
-
-    if (!preserveVisibleSlot || serverSlot != visibleSlot) {
-        return serverSlot
-    }
-
-    return (visibleSlot + 1) % Inventory.SELECTION_SIZE
-}
 
 /**
  * AutoTool module
@@ -131,7 +106,7 @@ object ModuleAutoTool : ClientModule("AutoTool", ModuleCategories.WORLD) {
                 null
             }
 
-        protected abstract fun getToolSlot(blockState: BlockState): HotbarItemSlot?
+        protected open fun getToolSlot(blockState: BlockState): HotbarItemSlot? = null
     }
 
     private object DynamicSelectMode : ToolSelectorMode("Dynamic") {
@@ -184,10 +159,10 @@ object ModuleAutoTool : ClientModule("AutoTool", ModuleCategories.WORLD) {
 
         override fun getToolSlot(blockState: BlockState): HotbarItemSlot? {
             if (!ConsiderInventory.running) {
-                return Slots.Hotbar.findBestToolToMineBlock(blockState, ignoreDurability, SilkTouchHandler)
+                return Slots.Hotbar.findBestToolToMineBlock(blockState, ignoreDurability, silkTouchHandler)
             } else {
                 val slot = Slots.HotbarAndInventory
-                    .findBestToolToMineBlock(blockState, ignoreDurability, SilkTouchHandler)
+                    .findBestToolToMineBlock(blockState, ignoreDurability, silkTouchHandler)
 
                 return when (slot) {
                     is HotbarItemSlot -> {
@@ -218,23 +193,10 @@ object ModuleAutoTool : ClientModule("AutoTool", ModuleCategories.WORLD) {
     private val filter by enumChoice("Filter", Filter.BLACKLIST)
     private val blocks by blocks("Blocks", blockSortedSetOf())
 
-    private object SilkTouchHandler : ToggleableValueGroup(
-        this, "SilkTouchHandler", enabled = false
-    ), BiPredicate<ItemStack, BlockState> {
-        private val filter by enumChoice("Filter", Filter.WHITELIST)
-        private val blocks by blocks(
-            "Blocks",
-            blockSortedSetOf(Blocks.ENDER_CHEST, Blocks.GLOWSTONE, Blocks.SEA_LANTERN, Blocks.TURTLE_EGG),
-        )
-
-        override fun test(itemStack: ItemStack, blockState: BlockState): Boolean =
-            !running // If module AutoTool is disabled, this function returns true
-                || blockState.block !in blocks
-                || (filter == Filter.BLACKLIST) == (itemStack.getEnchantment(Enchantments.SILK_TOUCH) == 0)
-    }
+    private val silkTouchHandler = AutoToolSilkTouchHandler(this)
 
     init {
-        tree(SilkTouchHandler)
+        tree(silkTouchHandler)
     }
 
     private val swapPreviousDelay by int("SwapPreviousDelay", 20, 1..100, "ticks")
@@ -242,28 +204,10 @@ object ModuleAutoTool : ClientModule("AutoTool", ModuleCategories.WORLD) {
     private val requireSneaking by boolean("RequireSneaking", false)
     private val notDuringCombat by boolean("NotDuringCombat", false)
 
-    private object RequireNearBed : ToggleableValueGroup(
-        this, "RequireNearBed", enabled = false
-    ), BedBlockTracker.Subscriber {
-        override val maxLayers: Int get() = 1
-
-        override fun onEnabled() {
-            BedBlockTracker.subscribe(this)
-        }
-
-        override fun onDisabled() {
-            BedBlockTracker.unsubscribe(this)
-        }
-
-        private val distance by float("Distance", 10.0f, 3.0f..50.0f)
-
-        fun matches(): Boolean {
-            return BedBlockTracker.allPositions().any { it.getCenterDistanceSquaredEyes() <= distance.sq() }
-        }
-    }
+    private val nearBedRequirement = AutoToolNearBedRequirement(this)
 
     init {
-        tree(RequireNearBed)
+        tree(nearBedRequirement)
     }
 
     val isInventoryConsidered: Boolean
@@ -288,7 +232,7 @@ object ModuleAutoTool : ClientModule("AutoTool", ModuleCategories.WORLD) {
         val cancelDueToNotSneaking = requireSneaking && !player.isShiftKeyDown
         if (cancelDueToCombat
             || cancelDueToNotSneaking
-            || RequireNearBed.enabled && !RequireNearBed.matches()
+            || nearBedRequirement.enabled && !nearBedRequirement.matches()
         ) {
             switchMode.activeMode.resetActiveSelection()
 

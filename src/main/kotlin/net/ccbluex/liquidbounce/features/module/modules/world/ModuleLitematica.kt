@@ -24,9 +24,9 @@ import net.ccbluex.liquidbounce.features.litematica.domain.LitematicaAirPlaceMod
 import net.ccbluex.liquidbounce.features.litematica.domain.LitematicaPlannerSettings
 import net.ccbluex.liquidbounce.features.module.ClientModule
 import net.ccbluex.liquidbounce.features.module.ModuleCategories
-import net.ccbluex.liquidbounce.utils.aiming.RotationsValueGroup
+import net.ccbluex.liquidbounce.features.rotation.RotationsValueGroup
 import net.ccbluex.liquidbounce.utils.block.SwingMode
-import net.ccbluex.liquidbounce.utils.client.notification
+import net.ccbluex.liquidbounce.features.chat.notification
 
 object ModuleLitematica : ClientModule(
     name = "Litematica",

@@ -23,12 +23,14 @@ import com.mojang.blaze3d.textures.GpuTexture
 import net.ccbluex.liquidbounce.config.types.group.Mode
 import net.ccbluex.liquidbounce.config.types.group.ModeValueGroup
 import net.ccbluex.liquidbounce.config.types.group.ToggleableValueGroup
-import net.ccbluex.liquidbounce.config.types.list.Tagged
+import net.ccbluex.liquidbounce.common.Tagged
 import net.ccbluex.liquidbounce.features.module.ClientModule
 import net.ccbluex.liquidbounce.features.module.ModuleCategories
+import net.ccbluex.liquidbounce.features.module.modules.render.customambience.integration.CustomFogRenderAdapter
+import net.ccbluex.liquidbounce.features.module.modules.render.customambience.integration.DistantHorizonsFogAdapter
 import net.ccbluex.liquidbounce.features.module.modules.render.customambience.worldeffects.WorldParticles
 import net.ccbluex.liquidbounce.render.engine.type.Color4b
-import net.ccbluex.liquidbounce.utils.render.clearColor
+import net.ccbluex.liquidbounce.render.buffer.clearColor
 import net.minecraft.client.renderer.fog.FogData
 import net.minecraft.client.renderer.state.LightmapRenderState
 import org.joml.Vector4fc
@@ -42,10 +44,10 @@ object ModuleCustomAmbience : ClientModule("CustomAmbience", ModuleCategories.RE
 
     val weather = enumChoice("Weather", WeatherType.SNOWY)
     private val time = enumChoice("Time", TimeType.NIGHT)
+    private val worldParticles = WorldParticles(this)
 
     object Precipitation : ToggleableValueGroup(this, "ModifyPrecipitation", true) {
         val gradient by float("Gradient", 0.7f, 0.1f..1f)
-//        val layers by int("Layers", 3, 1..14)
     }
 
     /**
@@ -223,46 +225,30 @@ object ModuleCustomAmbience : ClientModule("CustomAmbience", ModuleCategories.RE
     }
 
     init {
+        CustomFogRenderAdapter.install(CustomAmbienceFogSettings)
+        DistantHorizonsFogAdapter.install(
+            unified = FogValueGroup::isUnified,
+            volumeRendering = { FogValueGroup.shouldRenderVolume },
+        )
         tree(Precipitation)
         tree(FogValueGroup)
         tree(CustomLightmap)
         tree(SkyColor)
-        tree(WorldParticles)
+        tree(worldParticles)
     }
 
     @JvmStatic
-    fun getWorldClockTime(original: Long): Long {
-        return if (running) {
-            when (time.get()) {
-                TimeType.NO_CHANGE -> original
-                TimeType.DAWN -> 23041L
-                TimeType.DAY -> 1000L
-                TimeType.NOON -> 6000L
-                TimeType.DUSK -> 12610L
-                TimeType.NIGHT -> 13000L
-                TimeType.MID_NIGHT -> 18000L
-            }
-        } else {
-            original
-        }
-    }
+    fun getWorldClockTime(original: Long): Long = resolveWorldClockTime(running, time.get(), original)
 
     @Suppress("unused")
     enum class WeatherType(override val tag: String) : Tagged {
-        NO_CHANGE("NoChange"),
-        SUNNY("Sunny"),
-        RAINY("Rainy"),
-        SNOWY("Snowy"),
+        NO_CHANGE("NoChange"), SUNNY("Sunny"), RAINY("Rainy"), SNOWY("Snowy"),
         THUNDER("Thunder")
     }
 
     enum class TimeType(override val tag: String) : Tagged {
-        NO_CHANGE("NoChange"),
-        DAWN("Dawn"),
-        DAY("Day"),
-        NOON("Noon"),
-        DUSK("Dusk"),
-        NIGHT("Night"),
+        NO_CHANGE("NoChange"), DAWN("Dawn"), DAY("Day"), NOON("Noon"),
+        DUSK("Dusk"), NIGHT("Night"),
         MID_NIGHT("MidNight")
     }
 

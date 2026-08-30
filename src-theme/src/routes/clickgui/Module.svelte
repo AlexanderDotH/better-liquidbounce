@@ -6,7 +6,7 @@
         setModuleEnabled,
     } from "../../integration/rest";
     import type {ConfigurableSetting} from "../../integration/types";
-    import GenericSetting from "./setting/common/GenericSetting.svelte";
+    import GenericSetting from "../../shared/settings/GenericSetting.svelte";
     import {slide} from "svelte/transition";
     import {quintOut} from "svelte/easing";
     import {description as descriptionStore, highlightModuleName} from "./clickgui_store";

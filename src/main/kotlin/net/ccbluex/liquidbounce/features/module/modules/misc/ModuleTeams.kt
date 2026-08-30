@@ -20,7 +20,7 @@ package net.ccbluex.liquidbounce.features.module.modules.misc
 
 import it.unimi.dsi.fastutil.objects.ObjectLinkedOpenHashSet
 import net.ccbluex.fastutil.enumSetOf
-import net.ccbluex.liquidbounce.config.types.list.Tagged
+import net.ccbluex.liquidbounce.common.Tagged
 import net.ccbluex.liquidbounce.event.events.TagEntityEvent
 import net.ccbluex.liquidbounce.event.handler
 import net.ccbluex.liquidbounce.features.module.ClientModule

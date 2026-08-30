@@ -13,7 +13,7 @@ package net.ccbluex.liquidbounce.integration.theme.component.components.seedcrac
 import net.ccbluex.liquidbounce.features.module.modules.world.seedcracker.CandidateSource
 import net.ccbluex.liquidbounce.features.module.modules.world.seedcracker.SeedCandidate
 import net.ccbluex.liquidbounce.features.module.modules.world.seedcracker.SeedCandidateKind
-import net.ccbluex.liquidbounce.utils.render.Alignment
+import net.ccbluex.liquidbounce.config.types.group.Alignment
 
 /** Pure defaults kept separate so layout behavior can be tested without constructing the Minecraft HUD. */
 internal object SeedCrackerHudLayout {

@@ -19,21 +19,21 @@
 
 package net.ccbluex.liquidbounce.features.module.modules.movement
 
-import net.ccbluex.liquidbounce.config.types.list.Tagged
+import net.ccbluex.liquidbounce.common.Tagged
 import net.ccbluex.liquidbounce.event.events.PacketEvent
 import net.ccbluex.liquidbounce.event.handler
-import net.ccbluex.liquidbounce.features.command.commands.module.teleport.CommandPlayerTeleport
-import net.ccbluex.liquidbounce.features.command.commands.module.teleport.CommandTeleport
 import net.ccbluex.liquidbounce.features.module.ClientModule
 import net.ccbluex.liquidbounce.features.module.ModuleCategories
 import net.ccbluex.liquidbounce.features.module.modules.exploit.disabler.ModuleDisabler
+import net.ccbluex.liquidbounce.features.module.modules.movement.teleport.contract.TeleportCommandPort
 import net.ccbluex.liquidbounce.utils.network.MovePacketType
-import net.ccbluex.liquidbounce.utils.client.chat
-import net.ccbluex.liquidbounce.utils.client.regular
-import net.ccbluex.liquidbounce.utils.network.sendPacketSilently
-import net.ccbluex.liquidbounce.utils.client.variable
-import net.ccbluex.liquidbounce.utils.client.warning
+import net.ccbluex.liquidbounce.features.chat.chat
+import net.ccbluex.liquidbounce.utils.text.regular
+import net.ccbluex.liquidbounce.features.network.sendPacketSilently
+import net.ccbluex.liquidbounce.utils.text.variable
+import net.ccbluex.liquidbounce.utils.text.warning
 import net.minecraft.network.protocol.game.ClientboundPlayerPositionPacket
+import net.minecraft.network.protocol.game.ServerboundMovePlayerPacket
 import net.minecraft.world.phys.Vec3
 import java.text.DecimalFormat
 import kotlin.math.abs
@@ -44,7 +44,7 @@ import kotlin.math.floor
  *
  * Configuration for teleport commands.
  *
- * Commands: [CommandTeleport], [CommandPlayerTeleport]
+ * Commands: `teleport` and `playerteleport`
  */
 object ModuleTeleport : ClientModule("Teleport", ModuleCategories.EXPLOIT, aliases = listOf("tp")) {
 
@@ -68,6 +68,14 @@ object ModuleTeleport : ClientModule("Teleport", ModuleCategories.EXPLOIT, alias
 
     private var indicatedTeleport: Vec3? = null
     private var teleportsToWait: Int = 0
+
+    init {
+        TeleportCommandPort.bind(
+            highTpProvider = { highTp },
+            highTpAmountProvider = { highTpAmount },
+            teleportAction = ::indicateTeleport,
+        )
+    }
 
     override fun onEnabled() {
         if (indicatedTeleport == null) {
@@ -134,41 +142,7 @@ object ModuleTeleport : ClientModule("Teleport", ModuleCategories.EXPLOIT, alias
     }
 
     fun teleport(x: Double = player.x, y: Double = player.y, z: Double = player.z) {
-        if (paperExploit) {
-            val deltaX = x - player.x
-            val deltaY = y - player.y
-            val deltaZ = z - player.z
-
-            val times = (floor((abs(deltaX) + abs(deltaY) + abs(deltaZ)) / 10) - 1).toInt()
-            val packetToSend = if (allFull) MovePacketType.FULL else MovePacketType.POSITION_AND_ON_GROUND
-            repeat(times) {
-                network.send(packetToSend.generatePacket().apply {
-                    this.x = player.x
-                    this.y = player.y
-                    this.z = player.z
-                    this.yRot = player.yRot
-                    this.xRot = player.xRot
-                    this.onGround = when (groundMode) {
-                        GroundMode.TRUE -> true
-                        GroundMode.FALSE -> false
-                        GroundMode.CORRECT -> player.onGround()
-                    }
-                })
-            }
-
-            network.send(packetToSend.generatePacket().apply {
-                this.x = x
-                this.y = y
-                this.z = z
-                this.yRot = player.yRot
-                this.xRot = player.xRot
-                this.onGround = when (groundMode) {
-                    GroundMode.TRUE -> true
-                    GroundMode.FALSE -> false
-                    GroundMode.CORRECT -> player.onGround()
-                }
-            })
-        }
+        if (paperExploit) sendPaperTeleportPackets(x, y, z)
 
         val entity = player.vehicle ?: player
         entity.absSnapTo(x, y, z)
@@ -184,6 +158,36 @@ object ModuleTeleport : ClientModule("Teleport", ModuleCategories.EXPLOIT, alias
             variable(decimalFormat.format(z)))
         ))
         this.enabled = false
+    }
+
+    private fun sendPaperTeleportPackets(x: Double, y: Double, z: Double) {
+        val distance = abs(x - player.x) + abs(y - player.y) + abs(z - player.z)
+        val intermediatePackets = (floor(distance / 10) - 1).toInt()
+        val packetType = if (allFull) MovePacketType.FULL else MovePacketType.POSITION_AND_ON_GROUND
+        repeat(intermediatePackets) {
+            network.send(packetType.generatePacket().apply {
+                this.x = player.x
+                this.y = player.y
+                this.z = player.z
+                applyTeleportRotationAndGround()
+            })
+        }
+        network.send(packetType.generatePacket().apply {
+            this.x = x
+            this.y = y
+            this.z = z
+            applyTeleportRotationAndGround()
+        })
+    }
+
+    private fun ServerboundMovePlayerPacket.applyTeleportRotationAndGround() {
+        yRot = player.yRot
+        xRot = player.xRot
+        onGround = when (groundMode) {
+            GroundMode.TRUE -> true
+            GroundMode.FALSE -> false
+            GroundMode.CORRECT -> player.onGround()
+        }
     }
 
 }

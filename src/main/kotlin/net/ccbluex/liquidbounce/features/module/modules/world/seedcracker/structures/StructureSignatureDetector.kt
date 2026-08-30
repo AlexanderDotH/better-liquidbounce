@@ -19,123 +19,9 @@
 package net.ccbluex.liquidbounce.features.module.modules.world.seedcracker.structures
 
 import net.ccbluex.liquidbounce.features.module.modules.world.seedcracker.ChunkCoordinate
-import net.ccbluex.liquidbounce.features.module.modules.world.seedcracker.CrackScope
 import net.ccbluex.liquidbounce.features.module.modules.world.seedcracker.EvidenceConfidence
-import net.ccbluex.liquidbounce.features.module.modules.world.seedcracker.EvidenceId
-import net.ccbluex.liquidbounce.features.module.modules.world.seedcracker.EvidenceStatus
-import net.ccbluex.liquidbounce.features.module.modules.world.seedcracker.StructureObservation
 import net.ccbluex.liquidbounce.features.module.modules.world.seedcracker.StructureType
-import java.nio.charset.StandardCharsets
-import java.security.MessageDigest
 import java.util.Collections
-
-/**
- * A copied, registry-stable block sample. The scanner must create this before retaining any Minecraft object.
- */
-internal class StructureBlockSnapshot(
-    val x: Int,
-    val y: Int,
-    val z: Int,
-    rawBlockId: String,
-) {
-    val blockId: String = rawBlockId.toStableBlockPath()
-
-    init {
-        require(blockId.isNotEmpty()) { "A structure block id must not be blank" }
-    }
-
-    override fun equals(other: Any?): Boolean =
-        other is StructureBlockSnapshot && x == other.x && y == other.y && z == other.z && blockId == other.blockId
-
-    override fun hashCode(): Int = (((x * 31 + y) * 31 + z) * 31) + blockId.hashCode()
-
-    override fun toString(): String = "StructureBlockSnapshot(x=$x, y=$y, z=$z, blockId=$blockId)"
-}
-
-/**
- * Immutable client-visible input to [StructureSignatureDetector]. It deliberately holds no chunk, state, or position
- * object supplied by Minecraft. The source collection is copied, so scanner reuse cannot mutate a submitted snapshot.
- */
-internal class StructureChunkSnapshot(
-    val chunkX: Int,
-    val chunkZ: Int,
-    rawDimensionKey: String,
-    val revision: Long,
-    blocks: Collection<StructureBlockSnapshot>,
-) {
-    val dimensionKey: String = rawDimensionKey.toStableDimensionKey()
-    val blocks: List<StructureBlockSnapshot> = Collections.unmodifiableList(
-        blocks.asSequence()
-            .sortedWith(
-                compareBy<StructureBlockSnapshot>(StructureBlockSnapshot::x)
-                    .thenBy(StructureBlockSnapshot::y)
-                    .thenBy(StructureBlockSnapshot::z)
-                    .thenBy(StructureBlockSnapshot::blockId),
-            )
-            .distinctBy { block -> Triple(block.x, block.y, block.z) }
-            .toList(),
-    )
-
-    init {
-        require(revision >= 0L) { "Structure snapshot revision must not be negative" }
-        require(dimensionKey.isNotEmpty()) { "A structure snapshot needs a dimension key" }
-    }
-
-    internal val snapshotHash: Long by lazy(LazyThreadSafetyMode.PUBLICATION) {
-        stableSnapshotHash()
-    }
-
-    private fun stableSnapshotHash(): Long {
-        val digest = MessageDigest.getInstance("SHA-256")
-        digest.add("$dimensionKey|$chunkX|$chunkZ|")
-        blocks.asSequence()
-            .forEach { block -> digest.add("${block.x},${block.y},${block.z},${block.blockId};") }
-        return digest.digest().take(Long.SIZE_BYTES).fold(0L) { hash, byte ->
-            (hash shl Byte.SIZE_BITS) or (byte.toLong() and 0xFFL)
-        }
-    }
-}
-
-/** A detected multi-block signature before it is persisted as a shared [StructureObservation]. */
-internal data class StructureSignatureMatch(
-    val type: StructureType,
-    val confidence: EvidenceConfidence,
-    val anchorChunk: ChunkCoordinate,
-    val snapshotHash: Long,
-    val matchedFeatureKeys: Set<String>,
-    val matchedBlockIds: Set<String>,
-    val sourceRevision: Long,
-) {
-    val anchorChunkX: Int
-        get() = anchorChunk.x
-
-    val anchorChunkZ: Int
-        get() = anchorChunk.z
-
-    val requiresPlayerConfirmation: Boolean
-        get() = confidence == EvidenceConfidence.AMBIGUOUS
-
-    /** Stable only for the same type, inferred start chunk, and copied client-visible snapshot. */
-    val deduplicationKey: String
-        get() = "${type.name.lowercase()}:${anchorChunk.x}:${anchorChunk.z}:$snapshotHash"
-
-    /** The only construction site for the shared observation model. */
-    fun toObservation(scope: CrackScope): StructureObservation = StructureObservation(
-        id = EvidenceId(deduplicationKey),
-        scope = scope,
-        type = type,
-        anchorChunk = anchorChunk,
-        snapshotHash = snapshotHash,
-        matchedBlockIds = matchedBlockIds,
-        confidence = confidence,
-        status = if (requiresPlayerConfirmation) {
-            EvidenceStatus.PENDING_CONFIRMATION
-        } else {
-            EvidenceStatus.ACCEPTED
-        },
-        revision = sourceRevision,
-    )
-}
 
 /**
  * Detects only client-visible, multi-block structure signatures. It never receives or queries server-side structure
@@ -319,20 +205,13 @@ internal object StructureSignatureDetector {
     private const val MINIMUM_FEATURES_FOR_AMBIGUOUS_EVIDENCE = 2
 }
 
-private fun String.toStableBlockPath(): String {
+internal fun String.toStableBlockPath(): String {
     val normalized = trim().substringBefore('[').lowercase()
     if (':' !in normalized) return normalized
 
     val namespace = normalized.substringBefore(':')
     val path = normalized.substringAfter(':')
     return if (namespace == "minecraft") path else "$namespace:$path"
-}
-
-private fun String.toStableDimensionKey(): String = trim().lowercase()
-
-private fun MessageDigest.add(value: String) {
-    update(value.toByteArray(StandardCharsets.UTF_8))
-    update(0)
 }
 
 private fun Iterable<String>.immutableSortedSet(): Set<String> = Collections.unmodifiableSet(toSortedSet())

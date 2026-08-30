@@ -20,6 +20,9 @@
 package net.ccbluex.liquidbounce.features.module.modules.render
 
 import net.ccbluex.liquidbounce.event.events.PlayerMoveEvent
+import net.ccbluex.liquidbounce.features.module.modules.render.freecam.FreeCamMovementSpeed
+import net.ccbluex.liquidbounce.features.module.modules.render.freecam.resolveFreeCamMovementSpeed
+import net.ccbluex.liquidbounce.features.module.modules.render.freecam.suppressFreeCamPlayerMovement
 import net.minecraft.world.entity.MoverType
 import net.minecraft.world.phys.Vec3
 import org.junit.jupiter.api.Assertions.assertEquals

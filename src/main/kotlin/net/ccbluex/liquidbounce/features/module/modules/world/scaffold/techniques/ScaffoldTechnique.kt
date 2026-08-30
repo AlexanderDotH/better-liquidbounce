@@ -22,8 +22,8 @@ import net.ccbluex.liquidbounce.config.types.group.Mode
 import net.ccbluex.liquidbounce.config.types.group.ModeValueGroup
 import net.ccbluex.liquidbounce.features.module.modules.world.scaffold.ModuleScaffold
 import net.ccbluex.liquidbounce.utils.aiming.data.Rotation
-import net.ccbluex.liquidbounce.utils.block.targetfinding.BlockPlacementTarget
-import net.ccbluex.liquidbounce.utils.block.targetfinding.BlockPlacementTargetFindingOptions
+import net.ccbluex.liquidbounce.features.block.contract.BlockPlacementTarget
+import net.ccbluex.liquidbounce.features.block.config.BlockPlacementTargetFindingOptions
 import net.ccbluex.liquidbounce.utils.math.geometry.Line
 import net.ccbluex.liquidbounce.utils.raytracing.traceFromPlayer
 import net.minecraft.core.BlockPos

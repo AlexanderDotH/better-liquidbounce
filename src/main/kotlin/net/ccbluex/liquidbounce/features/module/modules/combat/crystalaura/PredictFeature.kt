@@ -21,17 +21,17 @@ package net.ccbluex.liquidbounce.features.module.modules.combat.crystalaura
 import net.ccbluex.liquidbounce.config.types.group.Mode
 import net.ccbluex.liquidbounce.config.types.group.ModeValueGroup
 import net.ccbluex.liquidbounce.config.types.group.ToggleableValueGroup
-import net.ccbluex.liquidbounce.config.types.list.Tagged
+import net.ccbluex.liquidbounce.common.Tagged
+import net.ccbluex.liquidbounce.features.module.modules.combat.crystalaura.geometry.predictedEntityBoundingBox
 import net.ccbluex.liquidbounce.features.module.modules.render.ModuleDebug
 import net.ccbluex.liquidbounce.render.engine.type.Color4b
-import net.ccbluex.liquidbounce.utils.entity.PlayerSimulationCache
+import net.ccbluex.liquidbounce.features.simulation.PlayerSimulationCache
 import net.ccbluex.liquidbounce.utils.entity.getDamageFromExplosion
 import net.minecraft.core.BlockPos
 import net.minecraft.world.entity.LivingEntity
 import net.minecraft.world.entity.player.Player
 import net.minecraft.world.phys.AABB
 import net.minecraft.world.phys.Vec3
-import kotlin.math.abs
 
 /**
  * Tries to run calculations with simulated player positions.
@@ -80,15 +80,7 @@ abstract class PredictFeature(name: String) : ToggleableValueGroup(ModuleCrystal
         val simulation = getSnapshotPos(target, if (basePlace) basePlaceTicks else placeTicks)
 
         val boundingBox = target?.boundingBox ?: player.boundingBox
-        val halfWidth = abs(boundingBox.maxX - boundingBox.minX) / 2.0
-        val predictedBoundingBox = AABB(
-            simulation.x - halfWidth,
-            simulation.y,
-            simulation.z - halfWidth,
-            simulation.x + halfWidth,
-            simulation.y + boundingBox.maxY - boundingBox.minY,
-            simulation.z + halfWidth
-        )
+        val predictedBoundingBox = predictedEntityBoundingBox(boundingBox, simulation)
 
         mc.execute {
             ModuleDebug.debugGeometry(
@@ -117,17 +109,7 @@ abstract class PredictFeature(name: String) : ToggleableValueGroup(ModuleCrystal
         }
 
         val simulated = getSnapshotPos(player, ticks)
-
-        val boundingBox = player.boundingBox
-        val halfWidth = abs(boundingBox.maxX - boundingBox.minX) / 2.0
-        val predictedBoundingBox = AABB(
-            simulated.x - halfWidth,
-            simulated.y,
-            simulated.z - halfWidth,
-            simulated.x + halfWidth,
-            simulated.y + boundingBox.maxY - boundingBox.minY,
-            simulated.z + halfWidth
-        )
+        val predictedBoundingBox = predictedEntityBoundingBox(player.boundingBox, simulated)
 
         mc.execute {
             ModuleDebug.debugGeometry(

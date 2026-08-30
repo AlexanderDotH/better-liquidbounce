@@ -11,9 +11,8 @@
 
 package net.ccbluex.liquidbounce.render.engine
 
-import net.ccbluex.liquidbounce.LiquidBounce
-import net.ccbluex.liquidbounce.features.module.modules.render.ModuleDebug
-import net.ccbluex.liquidbounce.features.module.modules.render.customambience.ModuleCustomAmbience
+import net.ccbluex.liquidbounce.render.RENDER_CLIENT_NAME
+import org.apache.logging.log4j.LogManager
 
 data class UnifiedFogDebugState(
     val engine: String,
@@ -43,6 +42,8 @@ data class UnifiedFogDebugState(
 }
 
 object UnifiedFogDebug {
+
+    private val logger = LogManager.getLogger(RENDER_CLIENT_NAME)
 
     @Volatile
     private var current = inactive()
@@ -80,25 +81,13 @@ object UnifiedFogDebug {
     )
 
     private fun publish(state: UnifiedFogDebugState) {
-        ModuleDebug.debugParameter(ModuleCustomAmbience, "UnifiedFog.Engine", state.engine)
-        ModuleDebug.debugParameter(ModuleCustomAmbience, "UnifiedFog.VanillaReady", state.vanillaReady)
-        ModuleDebug.debugParameter(ModuleCustomAmbience, "UnifiedFog.DhReady", state.distantHorizonsReady)
-        ModuleDebug.debugParameter(ModuleCustomAmbience, "UnifiedFog.DhBackend", state.distantHorizonsBackend)
-        ModuleDebug.debugParameter(ModuleCustomAmbience, "UnifiedFog.DhApi", state.distantHorizonsApiVersion)
-        ModuleDebug.debugParameter(ModuleCustomAmbience, "UnifiedFog.FrameAge", state.frameAge)
-        ModuleDebug.debugParameter(
-            ModuleCustomAmbience,
-            "UnifiedFog.Horizon",
-            "${state.horizonStartBlocks}..${state.horizonEndBlocks} blocks",
-        )
-        ModuleDebug.debugParameter(ModuleCustomAmbience, "UnifiedFog.PassCount", state.passCount)
-        ModuleDebug.debugParameter(ModuleCustomAmbience, "UnifiedFog.SkipReason", state.skipReason)
+        CustomFogRenderBridge.publishDebug(state)
     }
 
     private fun reportTransition(state: UnifiedFogDebugState) {
         val key = state.diagnosticKey()
         if (key == lastDiagnosticKey) return
         lastDiagnosticKey = key
-        LiquidBounce.logger.info(state.runtimeSummary())
+        logger.info(state.runtimeSummary())
     }
 }

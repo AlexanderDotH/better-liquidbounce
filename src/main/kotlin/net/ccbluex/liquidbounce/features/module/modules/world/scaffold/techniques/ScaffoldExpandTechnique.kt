@@ -20,13 +20,13 @@ package net.ccbluex.liquidbounce.features.module.modules.world.scaffold.techniqu
 
 import net.ccbluex.liquidbounce.features.module.modules.world.scaffold.ModuleScaffold.getTargetedPosition
 import net.ccbluex.liquidbounce.utils.aiming.data.Rotation
-import net.ccbluex.liquidbounce.utils.block.targetfinding.BlockOffsetOptions
-import net.ccbluex.liquidbounce.utils.block.targetfinding.BlockPlacementTarget
-import net.ccbluex.liquidbounce.utils.block.targetfinding.BlockPlacementTargetFindingOptions
-import net.ccbluex.liquidbounce.utils.block.targetfinding.CenterTargetPositionFactory
-import net.ccbluex.liquidbounce.utils.block.targetfinding.FaceHandlingOptions
-import net.ccbluex.liquidbounce.utils.block.targetfinding.PlayerLocationOnPlacement
-import net.ccbluex.liquidbounce.utils.block.targetfinding.findBestBlockPlacementTarget
+import net.ccbluex.liquidbounce.features.block.config.BlockOffsetOptions
+import net.ccbluex.liquidbounce.features.block.contract.BlockPlacementTarget
+import net.ccbluex.liquidbounce.features.block.config.BlockPlacementTargetFindingOptions
+import net.ccbluex.liquidbounce.features.block.planner.CenterTargetPositionFactory
+import net.ccbluex.liquidbounce.features.block.config.FaceHandlingOptions
+import net.ccbluex.liquidbounce.features.block.config.PlayerLocationOnPlacement
+import net.ccbluex.liquidbounce.features.block.planner.findBestBlockPlacementTarget
 import net.ccbluex.liquidbounce.utils.math.center
 import net.ccbluex.liquidbounce.utils.math.toRadians
 import net.ccbluex.liquidbounce.utils.math.geometry.Line

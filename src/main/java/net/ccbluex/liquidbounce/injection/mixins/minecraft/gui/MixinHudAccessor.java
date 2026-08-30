@@ -20,6 +20,7 @@
 package net.ccbluex.liquidbounce.injection.mixins.minecraft.gui;
 
 import com.mojang.datafixers.util.Pair;
+import net.ccbluex.liquidbounce.integration.theme.component.HudContextualInfoAccess;
 import net.minecraft.client.gui.Hud;
 import net.minecraft.client.gui.contextualbar.ContextualBar;
 import net.minecraft.resources.Identifier;
@@ -30,8 +31,9 @@ import org.spongepowered.asm.mixin.gen.Accessor;
 import java.util.Comparator;
 
 @Mixin(Hud.class)
-public interface MixinHudAccessor {
+public interface MixinHudAccessor extends HudContextualInfoAccess {
 
+    @Override
     @Accessor("contextualInfoBar")
     Pair<Hud.ContextualInfo, ContextualBar> getContextualInfoBar();
 

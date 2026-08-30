@@ -26,118 +26,28 @@ import net.ccbluex.liquidbounce.features.command.Command
 import net.ccbluex.liquidbounce.features.command.CommandManager
 import net.ccbluex.liquidbounce.features.module.ClientModule
 import net.ccbluex.liquidbounce.features.module.ModuleManager
-import net.ccbluex.liquidbounce.lang.translation
-import net.ccbluex.liquidbounce.script.bindings.api.ScriptContextProvider.setupContext
 import net.ccbluex.liquidbounce.script.bindings.features.ScriptCommandBuilder
 import net.ccbluex.liquidbounce.script.bindings.features.ScriptMode
 import net.ccbluex.liquidbounce.script.bindings.features.ScriptModule
-import net.ccbluex.liquidbounce.utils.client.chat
-import net.ccbluex.liquidbounce.utils.client.copyable
 import net.ccbluex.liquidbounce.utils.client.logger
-import net.ccbluex.liquidbounce.utils.client.regular
-import net.ccbluex.liquidbounce.utils.client.underline
-import net.ccbluex.liquidbounce.utils.client.variable
-import net.minecraft.network.chat.HoverEvent
 import org.graalvm.polyglot.Context
-import org.graalvm.polyglot.HostAccess
 import org.graalvm.polyglot.Source
 import org.graalvm.polyglot.Value
-import org.graalvm.polyglot.io.IOAccess
 import java.io.File
-import java.net.BindException
-import java.net.ServerSocket
 import java.util.function.Consumer
-import java.util.function.Function
 import kotlin.time.measureTime
 
-@Suppress("TooManyFunctions")
 class PolyglotScript(
     val language: String, val file: File,
     val debugOptions: ScriptDebugOptions = ScriptDebugOptions()
 ) : AutoCloseable {
 
-    private val context: Context = Context.newBuilder(language)
-        .allowHostAccess(HostAccess.ALL) // Allow access to all Java classes
-        .allowHostClassLookup { true }
-        .currentWorkingDirectory(file.parentFile.toPath())
-        .allowIO(IOAccess.ALL) // Allow access to all IO operations
-        .allowCreateProcess(false) // Disable process creation
-        .allowCreateThread(true) // Enable thread creation
-        .allowNativeAccess(false) // Disable native access
-        .allowExperimentalOptions(true) // Allow experimental options
-        .applyJsFeatures()
-        .applyDebugOptions()
-        .build().apply {
-            // Global instances
-            val bindings = getBindings(language)
-
-            this.setupContext(language, bindings)
-
-            // Global functions
-            bindings.putMember("registerScript", RegisterScript())
-        }
-
-    private fun Context.Builder.applyJsFeatures(): Context.Builder {
-        if (language == "js") {
-            option("js.nashorn-compat", "true") // Enable Nashorn compatibility
-            option("js.ecmascript-version", "2023") // Enable ECMAScript 2023
-            option("js.commonjs-require", "true")
-            option("js.commonjs-require-cwd", file.parentFile.absolutePath)
-        }
-        return this
-    }
-
-    private fun Context.Builder.applyDebugOptions(): Context.Builder {
-        if (debugOptions.enabled) {
-            val protocolString = debugOptions.protocol.toString().lowercase()
-            option("${protocolString}.Suspend", debugOptions.suspendOnStart.toString())
-            option("${protocolString}.Internal", debugOptions.inspectInternals.toString())
-            option(protocolString, "${debugOptions.port}")
-
-            when (debugOptions.protocol) {
-                DebugProtocol.INSPECT -> {
-                    option("inspect.Path", file.name)
-
-                    val devtoolURL =
-                        "devtools://devtools/bundled/js_app.html?ws=127.0.0.1:${debugOptions.port}/${file.name}"
-
-                    chat(
-                        regular(translation("liquidbounce.scripts.debug.support", variable(file.toString())))
-                            .append(
-                                variable(devtoolURL)
-                                    .copyable(
-                                        copyContent = devtoolURL, hover = HoverEvent.ShowText(
-                                            regular(translation("liquidbounce.scripts.debug.inspect.url"))
-                                        )
-                                    )
-                                    .underline(true)
-                            )
-                    )
-                }
-
-                DebugProtocol.DAP -> {
-                    try {
-                        // this happens when trying to build the options before the port is bound.
-                        ServerSocket(debugOptions.port).close()
-                    } catch (e: BindException) {
-                        throw IllegalStateException("Debug port ${debugOptions.port} already in use", e)
-                    }
-
-                    chat(
-                        regular(
-                            translation("liquidbounce.scripts.debug.support", variable(file.toString())).append(
-                                translation(
-                                    "liquidbounce.scripts.debug.dap",
-                                    variable(debugOptions.port.toString())
-                                )
-                            )
-                        )
-                    )
-                }
-            }
-        }
-        return this
-    }
+    private val context: Context = PolyglotContextFactory.create(
+        language = language,
+        file = file,
+        debugOptions = debugOptions,
+        scriptMetadataRegistrar = metadataRegistrar(),
+    )
 
     // Script information
     lateinit var scriptName: String
@@ -181,31 +91,6 @@ class PolyglotScript(
             context.close()
             throw e
         }
-    }
-
-    @Suppress("UNCHECKED_CAST")
-    private inner class RegisterScript : Function<Map<String, Any>, PolyglotScript> {
-
-        /**
-         * Global function 'registerScript' which is called to register a script.
-         * @param scriptObject JavaScript object containing information about the script.
-         * @return The instance of this script.
-         */
-        override fun apply(scriptObject: Map<String, Any>): PolyglotScript {
-            scriptName = scriptObject["name"] as String
-            scriptVersion = scriptObject["version"] as String
-
-            val authors = scriptObject["authors"]
-            scriptAuthors = when (authors) {
-                is String -> arrayOf(authors)
-                is Array<*> -> authors as Array<String>
-                is List<*> -> (authors as List<String>).toTypedArray()
-                else -> error("Not valid authors type")
-            }
-
-            return this@PolyglotScript
-        }
-
     }
 
     /**

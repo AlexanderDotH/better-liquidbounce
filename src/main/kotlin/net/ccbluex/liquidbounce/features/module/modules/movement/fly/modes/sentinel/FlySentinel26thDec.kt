@@ -20,7 +20,6 @@
 package net.ccbluex.liquidbounce.features.module.modules.movement.fly.modes.sentinel
 
 import net.ccbluex.liquidbounce.config.types.group.Mode
-import net.ccbluex.liquidbounce.config.types.group.ModeValueGroup
 import net.ccbluex.liquidbounce.event.events.BlinkPacketEvent
 import net.ccbluex.liquidbounce.event.events.NotificationEvent
 import net.ccbluex.liquidbounce.event.events.PlayerMoveEvent
@@ -28,7 +27,7 @@ import net.ccbluex.liquidbounce.event.handler
 import net.ccbluex.liquidbounce.event.tickHandler
 import net.ccbluex.liquidbounce.event.waitTicks
 import net.ccbluex.liquidbounce.features.blink.BlinkManager
-import net.ccbluex.liquidbounce.features.module.modules.movement.fly.ModuleFly
+import net.ccbluex.liquidbounce.features.module.modules.movement.fly.runtime.FlyModuleControl
 import net.ccbluex.liquidbounce.features.module.modules.movement.fly.automation.FlyAutomationCapabilities
 import net.ccbluex.liquidbounce.features.module.modules.movement.fly.automation.FlyAutomationEnd
 import net.ccbluex.liquidbounce.features.module.modules.movement.fly.automation.FlyAutomationKind
@@ -39,12 +38,12 @@ import net.ccbluex.liquidbounce.features.module.modules.movement.fly.modes.flyAu
 import net.ccbluex.liquidbounce.features.module.modules.movement.fly.modes.flyAutomationSneak
 import net.ccbluex.liquidbounce.features.module.modules.movement.fly.modes.withFlyAutomationStrafe
 import net.ccbluex.liquidbounce.features.module.modules.movement.sentinel.isSentinelOutgoingMovementPacket
-import net.ccbluex.liquidbounce.features.module.modules.movement.speed.ModuleSpeed
+import net.ccbluex.liquidbounce.features.module.modules.movement.speed.contract.SpeedState
 import net.ccbluex.liquidbounce.lang.translation
 import net.ccbluex.liquidbounce.utils.client.Timer
-import net.ccbluex.liquidbounce.utils.client.chat
-import net.ccbluex.liquidbounce.utils.client.notification
-import net.ccbluex.liquidbounce.utils.client.regular
+import net.ccbluex.liquidbounce.features.chat.chat
+import net.ccbluex.liquidbounce.features.chat.notification
+import net.ccbluex.liquidbounce.utils.text.regular
 import net.ccbluex.liquidbounce.utils.kotlin.Priority
 import net.ccbluex.liquidbounce.utils.movement.stopXZVelocity
 import net.minecraft.network.protocol.game.ServerboundMovePlayerPacket
@@ -67,8 +66,6 @@ internal object FlySentinel26thDec : Mode("Sentinel26thDec"), FlyAutomationProfi
     private val timer by float("Timer", 0.5f, 0.1f..1f)
     private val nostalgia by boolean("Nostalgia", false)
 
-    override val parent: ModeValueGroup<*>
-        get() = ModuleFly.modes
 
     private var hasBeenHurt = false
     private var hasBeenTeleported = false
@@ -91,8 +88,8 @@ internal object FlySentinel26thDec : Mode("Sentinel26thDec"), FlyAutomationProfi
     override fun consumeAutomaticEnd(): FlyAutomationEnd? = automaticEnd.consume()
 
     override fun enable() {
-        if (ModuleSpeed.enabled) {
-            ModuleSpeed.enabled = false
+        if (SpeedState.enabled) {
+            SpeedState.disable()
         }
 
         hasBeenHurt = false
@@ -106,7 +103,7 @@ internal object FlySentinel26thDec : Mode("Sentinel26thDec"), FlyAutomationProfi
     override fun disable() {
         player.stopXZVelocity()
 
-        Timer.requestTimerSpeed(1.0f, Priority.IMPORTANT_FOR_USAGE_1, ModuleFly)
+        Timer.requestTimerSpeed(1.0f, Priority.IMPORTANT_FOR_USAGE_1, FlyModuleControl.module)
 
         BlinkManager.flush {
             true
@@ -116,17 +113,17 @@ internal object FlySentinel26thDec : Mode("Sentinel26thDec"), FlyAutomationProfi
     val repeatable = tickHandler {
         if (!player.onGround()) {
             automaticEnd.mark("Sentinel boost requires starting on the ground")
-            ModuleFly.enabled = false
+            FlyModuleControl.disable()
             return@tickHandler
         }
 
         boost()
 
-        Timer.requestTimerSpeed(timer, Priority.IMPORTANT_FOR_USAGE_1, ModuleFly, resetAfterTicks = ticks)
+        Timer.requestTimerSpeed(timer, Priority.IMPORTANT_FOR_USAGE_1, FlyModuleControl.module, resetAfterTicks = ticks)
         waitTicks(ticks)
 
         automaticEnd.mark("Sentinel damage boost completed")
-        ModuleFly.enabled = false
+        FlyModuleControl.disable()
         player.stopXZVelocity()
     }
 
@@ -191,9 +188,9 @@ internal object FlySentinel26thDec : Mode("Sentinel26thDec"), FlyAutomationProfi
         }
 
         event.action = if (isSentinelOutgoingMovementPacket(event.origin, event.packet)) {
-            BlinkManager.Action.QUEUE
+            net.ccbluex.liquidbounce.event.events.BlinkPacketAction.QUEUE
         } else {
-            BlinkManager.Action.PASS
+            net.ccbluex.liquidbounce.event.events.BlinkPacketAction.PASS
         }
     }
 }

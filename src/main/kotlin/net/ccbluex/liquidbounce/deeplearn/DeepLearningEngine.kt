@@ -22,7 +22,7 @@ import ai.djl.engine.Engine
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import net.ccbluex.liquidbounce.config.ConfigSystem.rootFolder
-import net.ccbluex.liquidbounce.integration.task.type.Task
+import net.ccbluex.liquidbounce.common.task.Task
 import net.ccbluex.liquidbounce.utils.client.clientLogger
 import java.util.Locale
 

@@ -19,12 +19,10 @@
 package net.ccbluex.liquidbounce.features.module.modules.movement.fly.modes.detector
 
 import net.ccbluex.liquidbounce.config.types.group.Mode
-import net.ccbluex.liquidbounce.config.types.group.ModeValueGroup
-import net.ccbluex.liquidbounce.config.types.list.Tagged
+import net.ccbluex.liquidbounce.common.Tagged
 import net.ccbluex.liquidbounce.event.events.PacketEvent
 import net.ccbluex.liquidbounce.event.handler
 import net.ccbluex.liquidbounce.event.tickHandler
-import net.ccbluex.liquidbounce.features.module.modules.movement.fly.ModuleFly
 import net.ccbluex.liquidbounce.features.module.modules.movement.fly.automation.FlyAutomationCapabilities
 import net.ccbluex.liquidbounce.features.module.modules.movement.fly.automation.FlyAutomationKind
 import net.ccbluex.liquidbounce.features.module.modules.movement.fly.automation.FlyAutomationProfile
@@ -60,8 +58,6 @@ import net.minecraft.network.protocol.game.ServerboundMovePlayerPacket
  */
 internal object FlyDetectorBypass : Mode("DetectorBypass"), FlyAutomationProfile {
 
-    override val parent: ModeValueGroup<*>
-        get() = ModuleFly.modes
 
     private enum class TargetStrictness(
         override val tag: String,

@@ -18,25 +18,21 @@
  */
 @file:Suppress("NOTHING_TO_INLINE")
 
+@file:JvmName("ErrorHandlerKt")
+@file:JvmMultifileClass
+
 package net.ccbluex.liquidbounce.utils.client.error
 
-import net.ccbluex.liquidbounce.LiquidBounce
+import net.ccbluex.liquidbounce.common.ClientBuildMetadata
 import net.ccbluex.liquidbounce.utils.client.browseUrl
 import net.ccbluex.liquidbounce.utils.client.error.errors.ClientError
 import net.ccbluex.liquidbounce.utils.client.logger
 import net.ccbluex.liquidbounce.utils.client.mc
-import net.minecraft.util.Util
-import net.minecraft.util.Util.OS.WINDOWS
 import org.lwjgl.util.tinyfd.TinyFileDialogs
 import kotlin.io.path.absolutePathString
 import kotlin.io.path.div
 import kotlin.math.min
 import kotlin.system.exitProcess
-
-private val MAX_STACKTRACE_LINES = when (Util.getPlatform()) {
-    WINDOWS -> 3
-    else -> 1
-}
 
 /**
  * The ErrorHandler class is responsible for handling and reporting errors encountered by the application.
@@ -75,7 +71,7 @@ class ErrorHandler private constructor(
         }
     }
 
-    private inline val title get() = "${LiquidBounce.CLIENT_NAME} Nextgen"
+    private inline val title get() = "${ClientBuildMetadata.NAME} Nextgen"
 
     private val builder = java.lang.StringBuilder()
 
@@ -140,7 +136,7 @@ class ErrorHandler private constructor(
         """
             OS: ${System.getProperty("os.name")} (${System.getProperty("os.arch")})
             Java: ${System.getProperty("java.version")}
-            Client version: ${LiquidBounce.clientVersion} (${LiquidBounce.clientCommit})
+            Client version: ${ClientBuildMetadata.version} (${ClientBuildMetadata.commit})
         """.trimIndent()
     )
 
@@ -178,8 +174,11 @@ class ErrorHandler private constructor(
             }
     }
 
-    @Suppress("MagicNumber")
     fun buildAndShowMessage(): Boolean {
+        return showMessage(buildMessage())
+    }
+
+    private fun buildMessage(): String {
         builder.apply {
             header()
             appendLine(2)
@@ -198,69 +197,35 @@ class ErrorHandler private constructor(
             }
         }
 
-        val message = builder.toString().replace("\"", "").replace("'", "")
-
-        return when {
-            !System.getenv("CI").isNullOrEmpty() -> {
-                logger.error(message)
-                false
-            }
-
-            needToReport -> {
-                TinyFileDialogs.tinyfd_messageBox(
-                    title,
-                    message,
-                    "yesno",
-                    "error",
-                    1,
-                ) == 1
-            }
-            else -> {
-                TinyFileDialogs.tinyfd_messageBox(
-                    title,
-                    message,
-                    "ok",
-                    "error",
-                    1,
-                )
-
-                false
-            }
-        }
+        return builder.toString().replace("\"", "").replace("'", "")
     }
-}
 
-private inline fun Appendable.appendQuickFixInstructionStep(
-    showStepIndex: Boolean,
-    steps: Array<String>
-): Appendable = apply {
-    steps
-        .map {
-            if (!it.endsWith('.')) {
-                "$it."
-            } else {
-                it
-            }
+    @Suppress("MagicNumber")
+    private fun showMessage(message: String): Boolean = when {
+        !System.getenv("CI").isNullOrEmpty() -> {
+            logger.error(message)
+            false
         }
-        .withIndex()
-        .joinToString("\n") { (index, line) ->
-            val stepIndex = if (showStepIndex) {
-                "${index + 1}."
-            } else {
-                "-"
-            }
 
-            "$stepIndex $line"
+        needToReport -> {
+            TinyFileDialogs.tinyfd_messageBox(
+                title,
+                message,
+                "yesno",
+                "error",
+                1,
+            ) == 1
         }
-        .let {
-            if (it.isNotEmpty()) {
-                append(it)
-            }
-        }
-}
+        else -> {
+            TinyFileDialogs.tinyfd_messageBox(
+                title,
+                message,
+                "ok",
+                "error",
+                1,
+            )
 
-private inline fun Appendable.appendLine(times: Int = 1): Appendable = apply {
-    repeat(times) {
-        append('\n')
+            false
+        }
     }
 }

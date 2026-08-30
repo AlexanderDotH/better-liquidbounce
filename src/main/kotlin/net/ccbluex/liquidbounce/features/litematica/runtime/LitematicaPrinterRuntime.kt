@@ -16,28 +16,26 @@ package net.ccbluex.liquidbounce.features.litematica.runtime
  * Each call to [beginTick] opens one scheduling window. At most one new interaction can be accepted
  * in that window, while confirmations from earlier windows remain independently pending.
  */
-@Suppress("TooManyFunctions")
 class LitematicaPrinterRuntime<T : Any>(
-    private val timeSource: PrinterTimeSource = PrinterTimeSource.SYSTEM,
+    internal val timeSource: PrinterTimeSource = PrinterTimeSource.SYSTEM,
 ) {
 
-    private val synchronizer = EasyPlaceSynchronizer()
-    private val pendingInteractions = linkedMapOf<PrinterInteractionId, PendingPrinterInteraction<T>>()
-    private val failureCounts = linkedMapOf<T, Int>()
-
-    private var phase = PrinterRuntimePhase.DISABLED
-    private var pauseReason: PrinterPauseReason? = null
-    private var activationMode = PrinterActivationMode.LITEMATICA_KEY
-    private var policy = PrinterRuntimePolicy()
-    private var moduleEnabled = false
-    private var litematicaKeyActive = false
-    private var externalPauseReason: PrinterPauseReason? = null
-    private var currentTick: Long? = null
-    private var lastStartedTick: Long? = null
-    private var lastObservedTime: Long? = null
-    private var nextInteractionId = 1L
-    private var ownedMiningSession: PrinterMiningSession<T>? = null
-    private var failedTarget: T? = null
+    internal val synchronizer = EasyPlaceSynchronizer()
+    internal val pendingInteractions = linkedMapOf<PrinterInteractionId, PendingPrinterInteraction<T>>()
+    internal val failureCounts = linkedMapOf<T, Int>()
+    internal var phase = PrinterRuntimePhase.DISABLED
+    internal var pauseReason: PrinterPauseReason? = null
+    internal var activationMode = PrinterActivationMode.LITEMATICA_KEY
+    internal var policy = PrinterRuntimePolicy()
+    internal var moduleEnabled = false
+    internal var litematicaKeyActive = false
+    internal var externalPauseReason: PrinterPauseReason? = null
+    internal var currentTick: Long? = null
+    internal var lastStartedTick: Long? = null
+    internal var lastObservedTime: Long? = null
+    internal var nextInteractionId = 1L
+    internal var ownedMiningSession: PrinterMiningSession<T>? = null
+    internal var failedTarget: T? = null
 
     val snapshot: PrinterRuntimeSnapshot<T>
         get() = PrinterRuntimeSnapshot(
@@ -170,102 +168,4 @@ class LitematicaPrinterRuntime<T : Any>(
         )
     }
 
-    private fun expireInteractions(now: Long): List<PendingPrinterInteraction<T>> {
-        val timedOut = pendingInteractions.values.filter {
-            now - it.startedAtMillis >= policy.confirmationTimeoutMillis
-        }
-        timedOut.forEach { interaction ->
-            pendingInteractions.remove(interaction.id)
-            releaseMiningSession(interaction.id)
-            registerFailure(interaction.target)
-        }
-        return timedOut
-    }
-
-    private fun registerFailure(target: T): Int {
-        val failures = failureCounts.getOrDefault(target, 0) + 1
-        failureCounts[target] = failures
-        if (failures >= policy.retryLimit && failedTarget == null) failedTarget = target
-        return failures
-    }
-
-    private fun lockTargetExceedingRetryLimit() {
-        if (failedTarget != null) return
-        failedTarget = failureCounts.entries.firstOrNull { it.value >= policy.retryLimit }?.key
-    }
-
-    private fun refreshPhase() {
-        when {
-            !moduleEnabled -> setPhase(PrinterRuntimePhase.DISABLED, null)
-            failedTarget != null -> setPhase(PrinterRuntimePhase.PAUSED, PrinterPauseReason.RETRY_LIMIT_REACHED)
-            !synchronizer.printerEnabled -> setPhase(
-                PrinterRuntimePhase.IDLE,
-                PrinterPauseReason.PRINTER_TOGGLE_DISABLED,
-            )
-            activationMode == PrinterActivationMode.LITEMATICA_KEY && !litematicaKeyActive -> setPhase(
-                PrinterRuntimePhase.IDLE,
-                PrinterPauseReason.LITEMATICA_KEY_IDLE,
-            )
-            externalPauseReason != null -> setPhase(PrinterRuntimePhase.PAUSED, externalPauseReason)
-            currentTick == null -> setPhase(PrinterRuntimePhase.IDLE, null)
-            else -> setPhase(PrinterRuntimePhase.READY, null)
-        }
-    }
-
-    private fun setPhase(newPhase: PrinterRuntimePhase, reason: PrinterPauseReason?) {
-        phase = newPhase
-        pauseReason = reason
-    }
-
-    private fun clearOwnedState(
-        removePositionProvider: Boolean,
-        clearOverlays: Boolean,
-    ): PrinterCleanup<T> {
-        val cleanup = PrinterCleanup(
-            cancelledInteractions = pendingInteractions.values.toList(),
-            miningSessionToStop = ownedMiningSession,
-            removePositionProvider = removePositionProvider,
-            clearOverlays = clearOverlays,
-        )
-        pendingInteractions.clear()
-        failureCounts.clear()
-        ownedMiningSession = null
-        failedTarget = null
-        currentTick = null
-        lastStartedTick = null
-        lastObservedTime = null
-        litematicaKeyActive = false
-        externalPauseReason = null
-        return cleanup
-    }
-
-    private fun releaseMiningSession(id: PrinterInteractionId) {
-        if (ownedMiningSession?.interactionId == id) ownedMiningSession = null
-    }
-
-    private fun monotonicTime(): Long {
-        val now = timeSource.nowMillis()
-        require(now >= 0L) { "Printer time must not be negative" }
-        require(lastObservedTime == null || now >= requireNotNull(lastObservedTime)) {
-            "Printer time must be monotonic"
-        }
-        lastObservedTime = now
-        return now
-    }
-
-    private fun nextId(): PrinterInteractionId {
-        check(nextInteractionId < Long.MAX_VALUE) { "Printer interaction ID space exhausted" }
-        return PrinterInteractionId(nextInteractionId++)
-    }
-
-    private fun rejected(reason: PrinterInteractionRejection): PrinterInteractionStart<T> {
-        return PrinterInteractionStart.Rejected(reason)
-    }
-
-    private fun unmatchedConfirmation() = PrinterConfirmation<T>(
-        matched = false,
-        interaction = null,
-        failureCount = 0,
-        paused = phase == PrinterRuntimePhase.PAUSED,
-    )
 }

@@ -24,7 +24,7 @@ import net.ccbluex.liquidbounce.event.events.PlayerMoveEvent
 import net.ccbluex.liquidbounce.event.handler
 import net.ccbluex.liquidbounce.event.tickHandler
 import net.ccbluex.liquidbounce.event.waitTicks
-import net.ccbluex.liquidbounce.features.module.modules.movement.speed.ModuleSpeed
+import net.ccbluex.liquidbounce.features.module.modules.movement.speed.runtime.SpeedModuleControl
 import net.ccbluex.liquidbounce.features.module.modules.movement.speed.modes.SpeedBHopBase
 import net.ccbluex.liquidbounce.utils.client.Timer
 import net.ccbluex.liquidbounce.utils.entity.moving
@@ -55,7 +55,7 @@ class SpeedVerusB3882(parent: ModeValueGroup<*>) : SpeedBHopBase("VerusB3882", p
 
     @Suppress("unused")
     private val timerHandler = tickHandler {
-        Timer.requestTimerSpeed(2.0F, Priority.IMPORTANT_FOR_USAGE_1, ModuleSpeed)
+        Timer.requestTimerSpeed(2.0F, Priority.IMPORTANT_FOR_USAGE_1, SpeedModuleControl.module)
         waitTicks(101)
     }
 

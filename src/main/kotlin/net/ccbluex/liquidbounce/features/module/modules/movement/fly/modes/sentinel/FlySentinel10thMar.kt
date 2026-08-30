@@ -20,13 +20,11 @@
 package net.ccbluex.liquidbounce.features.module.modules.movement.fly.modes.sentinel
 
 import net.ccbluex.liquidbounce.config.types.group.Mode
-import net.ccbluex.liquidbounce.config.types.group.ModeValueGroup
 import net.ccbluex.liquidbounce.event.events.MovementInputEvent
 import net.ccbluex.liquidbounce.event.events.PacketEvent
 import net.ccbluex.liquidbounce.event.handler
 import net.ccbluex.liquidbounce.event.tickHandler
 import net.ccbluex.liquidbounce.event.waitTicks
-import net.ccbluex.liquidbounce.features.module.modules.movement.fly.ModuleFly
 import net.ccbluex.liquidbounce.features.module.modules.movement.fly.automation.FlyAutomationCapabilities
 import net.ccbluex.liquidbounce.features.module.modules.movement.fly.automation.FlyAutomationKind
 import net.ccbluex.liquidbounce.features.module.modules.movement.fly.automation.FlyAutomationProfile
@@ -62,8 +60,6 @@ internal object FlySentinel10thMar : Mode("Sentinel10thMar"), FlyAutomationProfi
 
     override fun automationReadiness(): FlyAutomationReadiness = FlyAutomationReadiness.Ready
 
-    override val parent: ModeValueGroup<*>
-        get() = ModuleFly.modes
 
     val repeatable = tickHandler {
         player.deltaMovement.y = jumpHeight.toDouble()

@@ -39,7 +39,7 @@ enum class ValueType(
     INT_RANGE(HumanInputDeserializer.intRangeDeserializer, AutoCompletionProvider.rangedCompleter),
     TEXT(HumanInputDeserializer.textDeserializer),
     PLAYER(HumanInputDeserializer.textDeserializer),
-    COLOR(HumanInputDeserializer.colorDeserializer),
+    COLOR,
 
     // Registry Types
     BLOCK(registryItemDeserializer(BuiltInRegistries.BLOCK)),
@@ -51,7 +51,7 @@ enum class ValueType(
     ENTITY_TYPE(registryItemDeserializer(BuiltInRegistries.ENTITY_TYPE)),
     C2S_PACKET,
     S2C_PACKET,
-    CLIENT_MODULE(HumanInputDeserializer.clientModuleDeserializer),
+    CLIENT_MODULE,
 
     KEY(HumanInputDeserializer.keyDeserializer),
     FILE(HumanInputDeserializer.fileDeserializer),

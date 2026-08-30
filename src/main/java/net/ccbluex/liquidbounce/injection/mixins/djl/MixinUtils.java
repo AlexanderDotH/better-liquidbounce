@@ -20,7 +20,7 @@ package net.ccbluex.liquidbounce.injection.mixins.djl;
 
 import ai.djl.util.Utils;
 import net.ccbluex.liquidbounce.api.core.HttpClient;
-import net.ccbluex.liquidbounce.deeplearn.DeepLearningEngine;
+import net.ccbluex.liquidbounce.features.deeplearn.DeepLearningDownloadHook;
 import net.ccbluex.liquidbounce.mcef.listeners.OkHttpProgressInterceptor;
 import okhttp3.Headers;
 import okhttp3.OkHttpClient;
@@ -50,17 +50,8 @@ public abstract class MixinUtils {
     private static final OkHttpClient CLIENT = HttpClient.getClient().newBuilder()
             .addNetworkInterceptor(new OkHttpProgressInterceptor((bytesRead, contentLength, done) -> {
                 var url = CURRENT_URL.get();
-                var mainTask = DeepLearningEngine.getTask();
-
-                if (mainTask == null || url == null) {
-                    return;
-                }
-
-                var task = mainTask.getOrCreateFileTask(url);
-                task.update(bytesRead, contentLength);
-
-                if (done) {
-                    task.setCompleted(true);
+                DeepLearningDownloadHook.updateProgress(url, bytesRead, contentLength, done);
+                if (done && url != null) {
                     CURRENT_URL.remove();
                 }
             }))

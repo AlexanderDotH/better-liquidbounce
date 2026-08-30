@@ -23,7 +23,7 @@ import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
 import java.util.List;
 import net.ccbluex.liquidbounce.additions.GuiGraphicsExtractorAddition;
 import net.ccbluex.liquidbounce.features.module.modules.render.ModuleBetterInventory;
-import net.ccbluex.liquidbounce.render.engine.type.BoundingBox2f;
+import net.ccbluex.liquidbounce.utils.math.BoundingBox2f;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.screens.inventory.tooltip.ClientTooltipPositioner;

@@ -18,7 +18,7 @@
  */
 package net.ccbluex.liquidbounce.features.module.modules.movement
 
-import net.ccbluex.liquidbounce.config.types.list.Tagged
+import net.ccbluex.liquidbounce.common.Tagged
 import net.ccbluex.liquidbounce.event.events.GameTickEvent
 import net.ccbluex.liquidbounce.event.handler
 import net.ccbluex.liquidbounce.features.module.ClientModule
@@ -37,6 +37,12 @@ object ModuleNoPush : ClientModule("NoPush", ModuleCategories.MOVEMENT) {
 
     @JvmStatic
     fun canPush(by: NoPushBy) = !running || by in noPushBy
+
+    @JvmStatic
+    fun canPushLiquids() = canPush(NoPushBy.LIQUIDS)
+
+    @JvmStatic
+    fun canPushBlocks() = canPush(NoPushBy.BLOCKS)
 
     @Suppress("unused")
     private val tickHandler = handler<GameTickEvent> {

@@ -4,7 +4,7 @@
     import {addComponent, getComponentCatalog, getMetadata} from "../../../../../integration/rest";
     import DrawerHudComponent from "./DrawerHudComponent.svelte";
     import {fly} from "svelte/transition";
-    import {cefTextInput} from "../../../setting/common/cefTextInput";
+    import {cefTextInput} from "../../../../../integration/input/cefTextInput";
 
     let metadata: Metadata;
 

@@ -27,16 +27,15 @@ import net.ccbluex.liquidbounce.features.module.modules.`fun`.notebot.nbs.SongDa
 import net.ccbluex.liquidbounce.utils.block.getSortedSphere
 import net.ccbluex.liquidbounce.utils.block.state
 import net.ccbluex.liquidbounce.utils.block.stateOrEmpty
-import net.ccbluex.liquidbounce.utils.text.asPlainText
-import net.ccbluex.liquidbounce.utils.client.chat
+import net.ccbluex.liquidbounce.features.module.modules.`fun`.notebot.runtime.NoteBlockTracker
+import net.ccbluex.liquidbounce.features.module.modules.`fun`.notebot.runtime.NotebotBlocksAndRequirements
 import net.ccbluex.liquidbounce.utils.math.toBlockPos
-import net.minecraft.ChatFormatting
 import net.minecraft.world.level.block.Blocks
 import net.minecraft.world.level.block.state.properties.NoteBlockInstrument
 
 object NotebotScanner : MinecraftShortcuts {
-    fun scanBlocksAndCheckRequirements(songData: SongData): BlocksAndRequirements {
-        return BlocksAndRequirements(
+    fun scanBlocksAndCheckRequirements(songData: SongData): NotebotBlocksAndRequirements {
+        return NotebotBlocksAndRequirements(
             availableBlocks = scanSurroundingNoteBlocks(songData),
             requirements = calculateRequirements(songData)
         )
@@ -91,52 +90,5 @@ object NotebotScanner : MinecraftShortcuts {
         }
 
         return maxConcurrentCounts
-    }
-
-    class BlocksAndRequirements(
-        val availableBlocks: Map<NoteBlockInstrument, List<NoteBlockTracker>>,
-        val requirements: Object2IntMap<InstrumentNote>,
-    ) {
-        fun validateRequirements(): Boolean {
-            val totalRequired = requirements.values.sum()
-            val totalAvailable = this.availableBlocks.values.sumOf { it.size }
-            if (totalAvailable < totalRequired) {
-                return false
-            }
-
-            val requirementByInstrument = enumMapOf<NoteBlockInstrument, Int>()
-
-            requirements.forEach { (key, value) ->
-                requirementByInstrument.merge(key.instrumentEnum, value, Int::plus)
-            }
-
-            return requirementByInstrument.all { (instrument, required) ->
-                this.availableBlocks[instrument].let { it != null && it.size >= required }
-            }
-        }
-
-        fun printRequirements() {
-            val aggregatedRequirements = enumMapOf<NoteBlockInstrument, Int>()
-            for ((key1, count) in requirements) {
-                aggregatedRequirements.merge(key1.instrumentEnum, count, Int::plus)
-            }
-
-            val text = ModuleNotebot.message("notEnoughNoteBlocks").withStyle(ChatFormatting.RED)
-            aggregatedRequirements.entries.sortedBy { -it.value }.forEach { (instrument, requiredCount) ->
-                val availableCount = this.availableBlocks[instrument]?.size ?: 0
-
-                val messageLine = "\n - ${instrument.name} ($availableCount/$requiredCount)"
-
-                if (availableCount >= requiredCount) {
-                    text.append(messageLine.asPlainText(ChatFormatting.GREEN))
-                } else if (availableCount == 0) {
-                    text.append(messageLine.asPlainText(ChatFormatting.RED))
-                } else {
-                    text.append(messageLine.asPlainText(ChatFormatting.YELLOW))
-                }
-            }
-
-            chat(text, ModuleNotebot)
-        }
     }
 }

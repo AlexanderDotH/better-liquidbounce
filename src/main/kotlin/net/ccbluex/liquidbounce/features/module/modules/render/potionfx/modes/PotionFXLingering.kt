@@ -24,28 +24,27 @@ import net.ccbluex.fastutil.enumSetAllOf
 import net.ccbluex.liquidbounce.config.types.group.ToggleableValueGroup
 import net.ccbluex.liquidbounce.config.types.group.ValueGroup
 import net.ccbluex.liquidbounce.config.utils.TextureMode
-import net.ccbluex.liquidbounce.event.events.WorldRenderEvent
+import net.ccbluex.liquidbounce.render.events.WorldRenderEvent
 import net.ccbluex.liquidbounce.event.handler
-import net.ccbluex.liquidbounce.features.module.modules.render.potionfx.ModulePotionFX
-import net.ccbluex.liquidbounce.features.module.modules.render.potionfx.ModulePotionFX.PresetTexture
-import net.ccbluex.liquidbounce.features.module.modules.render.potionfx.ModulePotionFX.SecondaryPresetTexture
-import net.ccbluex.liquidbounce.features.module.modules.render.potionfx.ModulePotionFX.glow
+import net.ccbluex.liquidbounce.features.module.modules.render.potionfx.contract.ParticleColorBridge
+import net.ccbluex.liquidbounce.features.module.modules.render.potionfx.assets.PresetTexture
+import net.ccbluex.liquidbounce.features.module.modules.render.potionfx.assets.SecondaryPresetTexture
+import net.ccbluex.liquidbounce.features.module.modules.render.potionfx.assets.potionFxGlow
 import net.ccbluex.liquidbounce.features.module.modules.render.potionfx.modes.PotionFXLingering.MainEffect.extraRadius
 import net.ccbluex.liquidbounce.features.module.modules.render.potionfx.modes.PotionFXLingering.SecondEffects.Effect
 import net.ccbluex.liquidbounce.features.module.modules.render.potionfx.modes.PotionFXLingering.SecondEffects.Effect.secondaryTextureMode
 import net.ccbluex.liquidbounce.features.module.modules.render.potionfx.modes.PotionFXLingering.SecondEffects.Flash.animTime
-import net.ccbluex.liquidbounce.injection.mixins.minecraft.entity.MixinColorParticleOptionAccessor
 import net.ccbluex.liquidbounce.render.AnchorPoint
 import net.ccbluex.liquidbounce.render.drawSquareTexture
 import net.ccbluex.liquidbounce.render.renderEnvironment
 import net.ccbluex.liquidbounce.render.withPositionRelativeToCamera
 import net.ccbluex.liquidbounce.render.withPush
 import net.ccbluex.liquidbounce.utils.math.Easing
-import net.ccbluex.liquidbounce.utils.world.EntityLookup.Companion.EntityLookup
+import net.ccbluex.liquidbounce.features.entity.EntityLookup.Companion.EntityLookup
 import net.ccbluex.liquidbounce.utils.world.filterTo
 import net.minecraft.world.entity.EntityTypes
 
-object PotionFXLingering : ToggleableValueGroup(ModulePotionFX, "LingeringPotion", false) {
+object PotionFXLingering : ToggleableValueGroup(null, "LingeringPotion", false) {
 
     private object MainEffect : ValueGroup("MainEffect") {
         val extraRadius by float("ExtraRadius", 0.375f, 0f..10f)
@@ -106,7 +105,7 @@ object PotionFXLingering : ToggleableValueGroup(ModulePotionFX, "LingeringPotion
                 val secondRotation =
                     (entity.tickCount + event.partialTicks) * Effect.rotationSpeed
 
-                val color = (entity.particle as MixinColorParticleOptionAccessor).color
+                val color = ParticleColorBridge.color(entity.particle) ?: continue
 
                 withPositionRelativeToCamera(entity.position().add(0.0, 0.01, 0.0)) {
                     poseStack.withPush {
@@ -139,7 +138,7 @@ object PotionFXLingering : ToggleableValueGroup(ModulePotionFX, "LingeringPotion
                             withPush {
                                 mulPose(mc.gameRenderer.mainCamera().rotation())
                                 drawSquareTexture(
-                                    glow,
+                                    potionFxGlow,
                                     SecondEffects.Flash.radius * 2 * glowProgress,
                                     color,
                                     AnchorPoint.CENTER,

@@ -21,9 +21,9 @@ package net.ccbluex.liquidbounce.utils.aiming.projectiles
 
 import net.ccbluex.fastutil.component1
 import net.ccbluex.fastutil.component2
-import net.ccbluex.liquidbounce.features.module.modules.combat.aimbot.ModuleProjectileAimbot
-import net.ccbluex.liquidbounce.features.module.modules.render.ModuleDebug
-import net.ccbluex.liquidbounce.render.engine.type.Color4b
+import net.ccbluex.liquidbounce.common.debug.DebugGeometrySink
+import net.ccbluex.liquidbounce.common.debug.DebuggedLineSegment
+import net.ccbluex.liquidbounce.utils.aiming.ProjectileAimingDebugOwner
 import net.ccbluex.liquidbounce.utils.aiming.data.Rotation
 import net.ccbluex.liquidbounce.utils.entity.PositionExtrapolation
 import net.ccbluex.liquidbounce.utils.math.findFunctionMinimumByBisect
@@ -145,11 +145,7 @@ object CydhranianProjectileAngleCalculator: ProjectileAngleCalculator {
         targetDimensions: EntityDimensions,
         positionFunction: PositionExtrapolation,
     ): Vec3? {
-        val defaultBoxOffset = Vec3(
-            targetDimensions.width * 0.5,
-            targetDimensions.height * 0.5,
-            targetDimensions.width * 0.5
-        )
+        val defaultBoxOffset = getDefaultBoxOffset(targetDimensions)
 
         val ticksUntilImpact = calculatePossibleTravelTimeToTarget(
             trajectoryInfo,
@@ -168,14 +164,7 @@ object CydhranianProjectileAngleCalculator: ProjectileAngleCalculator {
         )
 
         val directionOnImpact = getVelocityOnImpact(trajectoryInfo, ticksUntilImpact, finalDirection).normalize()
-
-        ModuleDebug.debugGeometry(
-            ModuleProjectileAimbot, "inboundDirection", ModuleDebug.DebuggedLineSegment(
-                entityPositionOnImpact,
-                entityPositionOnImpact.add(directionOnImpact.withLength(2.0)),
-                Color4b.BLUE
-            )
-        )
+        publishInboundDirection(entityPositionOnImpact, directionOnImpact)
 
         val finalTargetPos = ProjectileTargetPointFinder.findHittablePosition(
             playerHeadPosition,
@@ -187,6 +176,23 @@ object CydhranianProjectileAngleCalculator: ProjectileAngleCalculator {
 
         return getDirectionByTime(trajectoryInfo, finalTargetPos, playerHeadPosition, round(ticksUntilImpact))
     }
+
+    private fun publishInboundDirection(impactPosition: Vec3, directionOnImpact: Vec3) {
+        DebugGeometrySink.publish(ProjectileAimingDebugOwner, "inboundDirection") {
+            DebuggedLineSegment(
+                impactPosition,
+                impactPosition.add(directionOnImpact.withLength(2.0)),
+                0xFF0000FF.toInt(),
+            )
+        }
+    }
+
+    private fun getDefaultBoxOffset(targetDimensions: EntityDimensions) =
+        Vec3(
+            targetDimensions.width * 0.5,
+            targetDimensions.height * 0.5,
+            targetDimensions.width * 0.5
+        )
 
 
 }

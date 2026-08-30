@@ -19,7 +19,7 @@
 package net.ccbluex.liquidbounce.features.module.modules.render
 
 import it.unimi.dsi.fastutil.objects.Object2ObjectOpenHashMap
-import net.ccbluex.liquidbounce.features.module.modules.player.ModuleBlink
+import net.ccbluex.liquidbounce.common.runtime.BlinkDummyState
 import net.ccbluex.liquidbounce.event.events.GameTickEvent
 import net.ccbluex.liquidbounce.event.events.PacketEvent
 import net.ccbluex.liquidbounce.event.events.WorldChangeEvent
@@ -27,8 +27,8 @@ import net.ccbluex.liquidbounce.event.events.WorldEntityRemoveEvent
 import net.ccbluex.liquidbounce.event.handler
 import net.ccbluex.liquidbounce.features.module.ClientModule
 import net.ccbluex.liquidbounce.features.module.ModuleCategories
-import net.ccbluex.liquidbounce.utils.client.chat
-import net.ccbluex.liquidbounce.utils.client.regular
+import net.ccbluex.liquidbounce.features.chat.chat
+import net.ccbluex.liquidbounce.utils.text.regular
 import net.ccbluex.liquidbounce.utils.entity.getActualHealth
 import net.ccbluex.liquidbounce.utils.network.entityIdC2SInteractOrAttack
 import net.ccbluex.liquidbounce.utils.render.entity
@@ -62,7 +62,7 @@ object ModuleLogoffSpot : ClientModule("LogoffSpot", ModuleCategories.RENDER) {
         val entity = event.entity
         if (entity !is Player
             || isLogoffEntity(entity.id)
-            || ModuleBlink.isDummyPlayer(entity.id)) {
+            || BlinkDummyState.isDummyPlayer(entity.id)) {
             return@handler
         }
 

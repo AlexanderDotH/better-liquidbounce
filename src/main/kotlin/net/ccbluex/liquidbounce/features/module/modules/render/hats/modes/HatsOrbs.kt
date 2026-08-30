@@ -19,110 +19,69 @@
 
 package net.ccbluex.liquidbounce.features.module.modules.render.hats.modes
 
+import com.mojang.blaze3d.vertex.PoseStack
+import com.mojang.blaze3d.vertex.VertexConsumer
 import net.ccbluex.liquidbounce.config.types.group.ToggleableValueGroup
 import net.ccbluex.liquidbounce.config.types.group.ValueGroup
-import net.ccbluex.liquidbounce.features.module.modules.render.hats.HatsMode
+import net.ccbluex.liquidbounce.config.types.group.ModeValueGroup
+import net.ccbluex.liquidbounce.features.module.modules.render.hats.runtime.HatsMode
 import net.ccbluex.liquidbounce.render.ClientRenderPipelines
 import net.ccbluex.liquidbounce.render.WorldRenderEnvironment
 import net.ccbluex.liquidbounce.render.drawCustomMesh
 import net.ccbluex.liquidbounce.render.engine.type.Color4b
 import net.ccbluex.liquidbounce.render.segmentAngle
-import net.ccbluex.liquidbounce.render.setColor
-import net.ccbluex.liquidbounce.utils.math.fastCos
-import net.ccbluex.liquidbounce.utils.math.fastSin
 import kotlin.math.cos
 import kotlin.math.sin
 
 /**
  * @author minecrrrr
  */
-internal object HatsOrbs : HatsMode("Orbs") {
+internal class HatsOrbs(parent: ModeValueGroup<*>) : HatsMode("Orbs", parent) {
 
     val color by color("color", Color4b(0, 0, 255, 125))
 
-    private object HatOrbsSettings : ValueGroup("HatSettings") {
+    private val settings = HatOrbsSettings()
+    private val waveSettings = WaveSettings()
+
+    private class HatOrbsSettings : ValueGroup("HatSettings") {
         val radius by float("Radius", 0.5f, 0f..2f)
         val speed by float("Speed", 0.5f, 0.1f..10f)
         val size by float("OrbsSize", 0.1f, 0.01f..0.5f)
         val count by int("OrbsCount", 6, 1..12)
-
-        object WaveSettings : ToggleableValueGroup(this@HatsOrbs, "Wave", true) {
-            val waveHeight by float("WaveHeight", 0.1f, 0.01f..1f)
-            val waveSpeed by float("WaveSpeed", 2.0f, 0.1f..10f)
-        }
-
         val spinSpeed by float("SpinSpeed", 2f, -10f..10f)
     }
 
+    private inner class WaveSettings : ToggleableValueGroup(this@HatsOrbs, "Wave", true) {
+        val waveHeight by float("WaveHeight", 0.1f, 0.01f..1f)
+        val waveSpeed by float("WaveSpeed", 2.0f, 0.1f..10f)
+    }
+
     init {
-        tree(HatOrbsSettings)
-        tree(HatOrbsSettings.WaveSettings)
+        tree(settings)
+        tree(waveSettings)
     }
 
     override fun WorldRenderEnvironment.drawHat(isHurt: Boolean) {
         drawCustomMesh(ClientRenderPipelines.triangles(noDepthTest = true)) { matrix ->
-            val time = ((System.currentTimeMillis() % 1000000L).toFloat() / 1000f) * HatOrbsSettings.speed
-
-            // Loop for rendering each individual orb (orbit).
-            for (i in 0 until HatOrbsSettings.count) {
-                val angle = (segmentAngle(i, HatOrbsSettings.count) + time)
-
-                val x = getPointX(angle, HatOrbsSettings.radius)
-                val z = getPointZ(angle, HatOrbsSettings.radius)
-
-                val y = if (HatOrbsSettings.WaveSettings.enabled) {
-                    sin(time * HatOrbsSettings.WaveSettings.waveSpeed + i) *
-                        HatOrbsSettings.WaveSettings.waveHeight
-                } else {
-                    0f
-                }
-
-                val rotAngle = getRotationAngle(HatOrbsSettings.spinSpeed)
-                val sinA = rotAngle.fastSin() * HatOrbsSettings.size
-                val cosA = rotAngle.fastCos() * HatOrbsSettings.size
-
-                val top = y + HatOrbsSettings.size
-                val bottom = y - HatOrbsSettings.size
-
-                val ax = x + sinA
-                val az = z + cosA
-                val bx = x + cosA
-                val bz = z - sinA
-                val cx = x - sinA
-                val cz = z - cosA
-                val dx = x - cosA
-                val dz = z + sinA
-
-                val color = if (!isHurt) color else Color4b(255, 0, 0, color.a)
-                // Rendering of the top part of the rhombus (4 faces/8 triangles).
-                addVertex(matrix, x, top, z).setColor(color)
-                addVertex(matrix, dx, y, dz).setColor(color)
-                addVertex(matrix, ax, y, az).setColor(color)
-                addVertex(matrix, x, top, z).setColor(color)
-                addVertex(matrix, ax, y, az).setColor(color)
-                addVertex(matrix, bx, y, bz).setColor(color)
-                addVertex(matrix, x, top, z).setColor(color)
-                addVertex(matrix, bx, y, bz).setColor(color)
-                addVertex(matrix, cx, y, cz).setColor(color)
-                addVertex(matrix, x, top, z).setColor(color)
-                addVertex(matrix, cx, y, cz).setColor(color)
-                addVertex(matrix, dx, y, dz).setColor(color)
-
-                // Rendering of the bottom part of the rhombus (4 faces/8 triangles).
-                addVertex(matrix, x, bottom, z).setColor(color)
-                addVertex(matrix, dx, y, dz).setColor(color)
-                addVertex(matrix, ax, y, az).setColor(color)
-                addVertex(matrix, x, bottom, z).setColor(color)
-                addVertex(matrix, ax, y, az).setColor(color)
-                addVertex(matrix, bx, y, bz).setColor(color)
-                addVertex(matrix, x, bottom, z).setColor(color)
-                addVertex(matrix, bx, y, bz).setColor(color)
-                addVertex(matrix, cx, y, cz).setColor(color)
-                addVertex(matrix, x, bottom, z).setColor(color)
-                addVertex(matrix, cx, y, cz).setColor(color)
-                addVertex(matrix, dx, y, dz).setColor(color)
+            val time = ((System.currentTimeMillis() % 1000000L).toFloat() / 1000f) * settings.speed
+            for (i in 0 until settings.count) {
+                drawOrb(matrix, i, time, isHurt)
             }
         }
+    }
+
+    private fun VertexConsumer.drawOrb(matrix: PoseStack.Pose, index: Int, time: Float, isHurt: Boolean) {
+        val angle = segmentAngle(index, settings.count) + time
+        val x = getPointX(angle, settings.radius)
+        val z = getPointZ(angle, settings.radius)
+        val y = if (waveSettings.enabled) {
+            sin(time * waveSettings.waveSpeed + index) * waveSettings.waveHeight
+        } else {
+            0f
+        }
+        val rotation = getRotationAngle(settings.spinSpeed)
+        val orbColor = if (isHurt) Color4b(255, 0, 0, color.a) else color
+        drawOrbRhombus(matrix, x, y, z, rotation, settings.size, orbColor)
     }
 
     private fun getPointX(angle: Float, radius: Float) = sin(angle) * radius

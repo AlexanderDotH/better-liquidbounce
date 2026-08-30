@@ -23,12 +23,9 @@ import com.llamalad7.mixinextras.injector.ModifyReturnValue;
 import com.llamalad7.mixinextras.sugar.Local;
 import net.ccbluex.liquidbounce.event.EventManager;
 import net.ccbluex.liquidbounce.event.events.WorldEntityRemoveEvent;
-import net.ccbluex.liquidbounce.features.module.modules.movement.ModuleNoPush;
-import net.ccbluex.liquidbounce.features.module.modules.movement.NoPushBy;
-import net.ccbluex.liquidbounce.features.module.modules.render.DoRender;
-import net.ccbluex.liquidbounce.features.module.modules.render.ModuleAntiBlind;
 import net.ccbluex.liquidbounce.features.module.modules.render.ModuleTrueSight;
-import net.ccbluex.liquidbounce.utils.render.PlayerModelParticleHook;
+import net.ccbluex.liquidbounce.interfaces.ClientLevelFeatureBridge;
+import net.ccbluex.liquidbounce.render.playermodel.PlayerModelParticleHook;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.particles.ExplosionParticleInfo;
@@ -86,7 +83,8 @@ public abstract class MixinClientLevel {
     @Inject(method = "addParticle(Lnet/minecraft/core/particles/ParticleOptions;DDDDDD)V", at = @At("HEAD"), cancellable = true)
     private void injectNoExplosionParticles(ParticleOptions parameters, double x, double y, double z, double velocityX, double velocityY, double velocityZ, CallbackInfo ci) {
         var type = parameters.getType();
-        if (!ModuleAntiBlind.canRender(DoRender.EXPLOSION_PARTICLES) && (type == ParticleTypes.EXPLOSION || type == ParticleTypes.EXPLOSION_EMITTER)) {
+        if (!ClientLevelFeatureBridge.canRenderExplosionParticles()
+            && (type == ParticleTypes.EXPLOSION || type == ParticleTypes.EXPLOSION_EMITTER)) {
             ci.cancel();
             return;
         }
@@ -161,21 +159,21 @@ public abstract class MixinClientLevel {
     @Inject(method = "trackExplosionEffects", at = @At("HEAD"), cancellable = true)
     private void hookAddBlockParticleEffects(
         Vec3 center, float radius, int blockCount, WeightedList<ExplosionParticleInfo> particles, CallbackInfo ci) {
-        if (!ModuleAntiBlind.canRender(DoRender.BLOCK_BREAK_PARTICLES)) {
+        if (!ClientLevelFeatureBridge.canRenderBlockBreakParticles()) {
             ci.cancel();
         }
     }
 
     @Inject(method = "addDestroyBlockEffect", at = @At("HEAD"), cancellable = true)
     private void hookAddBlockBreakParticles(BlockPos pos, BlockState state, CallbackInfo ci) {
-        if (!ModuleAntiBlind.canRender(DoRender.BLOCK_BREAK_PARTICLES)) {
+        if (!ClientLevelFeatureBridge.canRenderBlockBreakParticles()) {
             ci.cancel();
         }
     }
 
     @Inject(method = "getPushableEntities", at = @At("HEAD"), cancellable = true)
     private void hookGetPushableEntities(Entity pusher, AABB boundingBox, CallbackInfoReturnable<List<Entity>> cir) {
-        if (!ModuleNoPush.canPush(NoPushBy.ENTITIES)) {
+        if (!ClientLevelFeatureBridge.canPushEntities()) {
             cir.setReturnValue(List.of());
             cir.cancel();
         }

@@ -20,7 +20,7 @@
 package net.ccbluex.liquidbounce.config.types
 
 import net.ccbluex.liquidbounce.utils.input.InputBind
-import net.ccbluex.liquidbounce.utils.input.bind
+import net.ccbluex.liquidbounce.config.types.bind
 
 class BindValue(
     name: String,

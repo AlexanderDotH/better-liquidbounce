@@ -26,11 +26,10 @@ import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
 import com.llamalad7.mixinextras.sugar.Local;
 import com.llamalad7.mixinextras.sugar.ref.LocalIntRef;
-import net.ccbluex.liquidbounce.features.misc.FriendManager;
+import net.ccbluex.liquidbounce.features.misc.FriendStateHook;
 import net.ccbluex.liquidbounce.features.module.modules.misc.ModuleAntiStaff;
 import net.ccbluex.liquidbounce.features.module.modules.misc.ModuleBetterTab;
-import net.ccbluex.liquidbounce.features.module.modules.misc.Visibility;
-import net.ccbluex.liquidbounce.utils.render.PlayerModelAppearanceHook;
+import net.ccbluex.liquidbounce.render.playermodel.PlayerModelAppearanceHook;
 import net.ccbluex.liquidbounce.utils.text.PlainText;
 import net.ccbluex.liquidbounce.utils.text.TextBuilder;
 import net.minecraft.client.Minecraft;
@@ -87,7 +86,7 @@ public abstract class MixinPlayerTabOverlay {
             return original;
         }
 
-        return ModuleBetterTab.isVisible(Visibility.HEADER) ? original : null;
+        return ModuleBetterTab.isHeaderVisible() ? original : null;
     }
 
     @ModifyExpressionValue(method = "extractRenderState", at = @At(value = "FIELD", target = "Lnet/minecraft/client/gui/components/PlayerTabOverlay;footer:Lnet/minecraft/network/chat/Component;", ordinal = 0, opcode = Opcodes.GETFIELD))
@@ -96,7 +95,7 @@ public abstract class MixinPlayerTabOverlay {
             return original;
         }
 
-        return ModuleBetterTab.isVisible(Visibility.FOOTER) ? original : null;
+        return ModuleBetterTab.isFooterVisible() ? original : null;
     }
 
     @ModifyExpressionValue(method = "extractRenderState", at = @At(value = "FIELD", target = "Lnet/minecraft/client/gui/components/PlayerTabOverlay$ScoreDisplayEntry;name:Lnet/minecraft/network/chat/Component;", opcode = Opcodes.GETFIELD))
@@ -105,7 +104,7 @@ public abstract class MixinPlayerTabOverlay {
             return original;
         }
 
-        return ModuleBetterTab.isVisible(Visibility.NAME_ONLY)
+        return ModuleBetterTab.isNameOnlyVisible()
                 ? PlayerModelAppearanceHook.replacePlayerInfoName(entry, Component.nullToEmpty(entry.getProfile().name()))
                 : original;
 
@@ -117,7 +116,7 @@ public abstract class MixinPlayerTabOverlay {
             return original;
         }
 
-        return ModuleBetterTab.isVisible(Visibility.NAME_ONLY)
+        return ModuleBetterTab.isNameOnlyVisible()
                 ? PlayerModelAppearanceHook.replacePlayerInfoName(entry, Component.nullToEmpty(entry.getProfile().name()))
                 : original;
     }
@@ -178,7 +177,7 @@ public abstract class MixinPlayerTabOverlay {
             //noinspection DataFlowIssue
             if (highlight.getSelf().getRunning() && Objects.equals(entry.getProfile().name(), Minecraft.getInstance().player.getGameProfile().name())) {
                 drawColor = highlight.getSelf().getColor().argb();
-            } else if (highlight.getFriends().getRunning() && FriendManager.INSTANCE.isFriend(entry.getProfile().name())) {
+            } else if (highlight.getFriends().getRunning() && FriendStateHook.isFriend(entry.getProfile().name())) {
                 drawColor = highlight.getFriends().getColor().argb();
             } else if (others.getRunning() && others.getFilter().isInFilter(entry)) {
                 drawColor = others.getColor().argb();

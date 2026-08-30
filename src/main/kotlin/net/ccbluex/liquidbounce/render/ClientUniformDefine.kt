@@ -24,10 +24,9 @@ import com.mojang.blaze3d.buffers.GpuBufferSlice
 import com.mojang.blaze3d.pipeline.BindGroupLayout
 import com.mojang.blaze3d.shaders.UniformType
 import com.mojang.blaze3d.systems.RenderPass
-import net.ccbluex.liquidbounce.LiquidBounce
 import net.ccbluex.liquidbounce.render.ClientRenderPipelines.withBindGroupLayout
 import net.ccbluex.liquidbounce.utils.client.gpuDevice
-import net.ccbluex.liquidbounce.utils.render.std140Size
+import net.ccbluex.liquidbounce.render.buffer.std140Size
 import net.minecraft.client.renderer.MappableRingBuffer
 import java.util.function.Supplier
 
@@ -56,7 +55,7 @@ enum class ClientUniformDefine(val uboName: String, val size: Int) {
 
     fun appendTo(builder: BindGroupLayout.Builder) = builder.withUniform(this.uboName, UniformType.UNIFORM_BUFFER)
 
-    fun label(): String = "${LiquidBounce.CLIENT_NAME} Uniform ${this.uboName} (${this.size}b)"
+    fun label(): String = "$RENDER_CLIENT_NAME Uniform ${this.uboName} (${this.size}b)"
 
     @JvmOverloads
     fun createSingleBuffer(

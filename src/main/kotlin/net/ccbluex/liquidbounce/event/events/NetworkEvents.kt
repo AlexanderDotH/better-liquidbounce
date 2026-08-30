@@ -21,10 +21,9 @@ package net.ccbluex.liquidbounce.event.events
 
 import io.netty.channel.ChannelPipeline
 import net.ccbluex.liquidbounce.annotations.Tag
-import net.ccbluex.liquidbounce.config.types.list.Tagged
+import net.ccbluex.liquidbounce.common.Tagged
 import net.ccbluex.liquidbounce.event.CancellableEvent
 import net.ccbluex.liquidbounce.event.Event
-import net.ccbluex.liquidbounce.features.blink.BlinkManager
 import net.minecraft.network.protocol.Packet
 
 @Tag("pipeline")
@@ -36,13 +35,16 @@ class PacketEvent(val origin: TransferOrigin, val packet: Packet<*>, val origina
 @Tag("silentPacketSend")
 class SilentPacketSendEvent(val packet: Packet<*>) : CancellableEvent()
 
+@Tag("serverTransactionCaptureCompleted")
+class ServerTransactionCaptureCompletedEvent : Event()
+
 @Tag("queuePacket")
 class BlinkPacketEvent(
     val packet: Packet<*>?,
     val origin: TransferOrigin
 ) : Event() {
 
-    var action: BlinkManager.Action = BlinkManager.Action.FLUSH
+    var action: BlinkPacketAction = BlinkPacketAction.FLUSH
         set(value) {
             if (field == value || field.priority >= value.priority) {
                 return
@@ -51,6 +53,12 @@ class BlinkPacketEvent(
             field = value
         }
 
+}
+
+enum class BlinkPacketAction(val priority: Int) {
+    FLUSH(0),
+    PASS(1),
+    QUEUE(2),
 }
 
 enum class TransferOrigin(override val tag: String) : Tagged {

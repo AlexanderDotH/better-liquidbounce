@@ -28,4 +28,8 @@ pluginManagement {
     }
 }
 
+includeBuild("buildSrc") {
+    name = "build-logic-tests"
+}
+
 rootProject.name = "LiquidBounce"

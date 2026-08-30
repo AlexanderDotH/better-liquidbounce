@@ -19,30 +19,24 @@
 
 package net.ccbluex.liquidbounce.integration.theme
 
-import com.google.gson.JsonObject
 import com.mojang.blaze3d.platform.NativeImage
 import io.netty.handler.codec.http.HttpHeaderNames
-import it.unimi.dsi.fastutil.objects.Object2IntOpenHashMap
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import net.ccbluex.liquidbounce.api.core.BaseApi
 import net.ccbluex.liquidbounce.config.types.group.ValueGroup
-import net.ccbluex.liquidbounce.config.types.group.json
-import net.ccbluex.liquidbounce.config.types.list.Tagged
+import net.ccbluex.liquidbounce.common.Tagged
 import net.ccbluex.liquidbounce.event.EventManager
 import net.ccbluex.liquidbounce.event.events.ThemeColorChangeEvent
 import net.ccbluex.liquidbounce.integration.interop.ClientInteropServer
 import net.ccbluex.liquidbounce.integration.interop.middleware.AuthConfig
 import net.ccbluex.liquidbounce.integration.theme.component.HudComponent
-import net.ccbluex.liquidbounce.integration.theme.component.HudComponentFactory
 import net.ccbluex.liquidbounce.integration.theme.component.HudComponentFactory.JsonHudComponentFactory
 import net.ccbluex.liquidbounce.render.FontManager
-import net.ccbluex.liquidbounce.render.engine.type.Color4b
 import net.ccbluex.liquidbounce.utils.client.clientLogger
 import net.ccbluex.liquidbounce.utils.kotlin.Minecraft
-import net.ccbluex.liquidbounce.utils.text.capitalize
 import net.minecraft.server.packs.resources.ResourceManager
 import net.minecraft.server.packs.resources.ResourceManagerReloadListener
 import okhttp3.Headers
@@ -56,8 +50,11 @@ import java.util.Locale
  *
  * Can be local from [ClientInteropServer] or remote from the internet.
  */
-@Suppress("TooManyFunctions")
-class Theme private constructor(val origin: Origin, url: String) :
+class Theme private constructor(
+    val origin: Origin,
+    url: String,
+    private val routeSupport: MetadataThemeRouteSupport = MetadataThemeRouteSupport(),
+) :
     BaseApi(
         url.trimEnd('/'),
         // DO NOT use headersOf(...) because LunarClient uses an outdated version of
@@ -68,7 +65,7 @@ class Theme private constructor(val origin: Origin, url: String) :
                 "${AuthConfig.AUTH_COOKIE_NAME}=${ClientInteropServer.AUTH_CODE}",
             )
             .build()
-    ), Closeable, ResourceManagerReloadListener {
+    ), Closeable, ResourceManagerReloadListener, ThemeRouteSupport by routeSupport {
 
     enum class Origin(override val tag: String, val external: Boolean) : Tagged {
         RESOURCE("resource", false),
@@ -84,144 +81,36 @@ class Theme private constructor(val origin: Origin, url: String) :
     private suspend fun loadMetadata() {
         try {
             _metadata = get<ThemeMetadata>("/metadata.json").apply { checkNotNull() }
+            routeSupport.load(metadata)
         } catch (e: Exception) {
             logger.error("Failed to load theme metadata", e)
             throw IllegalStateException("Failed to load theme metadata", e)
         }
     }
 
-    private var componentFactories: Map<String, HudComponentFactory>? = null
-    private var componentSettings: ValueGroup? = null
+    private val componentRuntime = ThemeComponentRuntime(
+        loadFactory = { name ->
+            get<JsonHudComponentFactory>("/components/${name.lowercase(Locale.US)}.json")
+        },
+        onColorChanged = { themeId, name, color ->
+            EventManager.callEvent(ThemeColorChangeEvent(themeId, name, color))
+        },
+        unregisterComponent = { component -> EventManager.unregisterEventHandler(component) },
+        warn = { message, throwable -> logger.warn(message, throwable) },
+    )
+
     val components: List<HudComponent>
-        get() = requireNotNull(componentSettings) { "components not loaded" }
-            .inner.filterIsInstance<HudComponent>()
+        get() = componentRuntime.components
 
-    private var _settings: ValueGroup? = null
     val settings: ValueGroup
-        get() = requireNotNull(_settings) { "settings not loaded" }
+        get() = componentRuntime.settings
 
-    private var _colors: ValueGroup? = null
     val colors: ValueGroup
-        get() = requireNotNull(_colors) { "colors not loaded" }
+        get() = componentRuntime.colors
 
-    private suspend fun loadComponents() {
-        val componentFactoryList = metadata.components.mapNotNull { name ->
-            runCatching {
-                get<JsonHudComponentFactory>("/components/${name.lowercase(Locale.US)}.json")
-            }.onFailure {
-                logger.warn("Failed to load component $name", it)
-            }.getOrNull()
-        }
+    fun addComponent(sourceId: String): HudComponent? = componentRuntime.addComponent(sourceId)
 
-        componentFactories = buildMap {
-            for (factory in componentFactoryList) {
-                // Check for duplicated component names
-                check(this.put(factory.name, factory) == null) {
-                    "Found duplicated component name '${factory.name}'"
-                }
-            }
-        }
-
-        val initialComponents = requireNotNull(componentFactories).values.mapNotNull { factory ->
-            createComponent(factory)
-        }
-
-        _settings = ValueGroup(metadata.id.capitalize()).apply {
-            _colors = ValueGroup("Colors")
-            metadata.colors?.let { values ->
-                for ((name, value) in values) {
-                    val color4b = Color4b.fromHex(value)
-                    colors.color(name, color4b).apply {
-                        onChanged { color ->
-                            EventManager.callEvent(ThemeColorChangeEvent(metadata.id, name, color))
-                        }
-                    }
-                }
-            }
-            tree(colors)
-
-            metadata.values?.let { values ->
-                for (value in values) {
-                    json(value)
-                }
-            }
-
-            componentSettings = ComponentSettings().also { settings ->
-                initialComponents.forEach(settings::tree)
-                tree(settings)
-            }
-        }
-    }
-
-    private fun createComponent(factory: HudComponentFactory): HudComponent? = runCatching {
-        factory.createComponent()
-    }.onFailure {
-        logger.warn("Failed to create component ${factory.name}", it)
-    }.getOrNull()
-
-    private fun registerComponent(component: HudComponent) {
-        val settings = requireNotNull(componentSettings)
-        settings.tree(component)
-        component.walkInit()
-        settings.key?.let(component::walkKeyPath)
-    }
-
-    fun addComponent(sourceId: String): HudComponent? {
-        val source = components.find { it.id.toString() == sourceId } ?: return null
-        val factory = requireNotNull(componentFactories)[source.name] ?: return null
-
-        if (factory.singleton && components.any { it.name == source.name && it.enabled }) {
-            return null
-        }
-
-        val disabledComponent = components.find { it.name == source.name && !it.enabled }
-        val component = disabledComponent
-            ?: createComponent(factory)?.also(::registerComponent)
-            ?: return null
-
-        if (!factory.singleton && disabledComponent != null) {
-            component.restore()
-        }
-
-        component.enabled = true
-        return component
-    }
-
-    fun componentCatalog(): List<ComponentCatalogEntry> = requireNotNull(componentFactories).values
-        .mapNotNull { factory ->
-            val source = components.firstOrNull { it.name == factory.name } ?: return@mapNotNull null
-            ComponentCatalogEntry(
-                source.name,
-                source.componentDescription,
-                source.id.toString(),
-                factory.singleton,
-                !factory.singleton || components.none { it.name == factory.name && it.enabled },
-            )
-        }
-
-    private inner class ComponentSettings : ValueGroup("Components") {
-        override fun prepareDeserialize(jsonObject: JsonObject) {
-            val existingCounts = Object2IntOpenHashMap<String>()
-            components.forEach {
-                existingCounts.addTo(it.name, 1)
-            }
-
-            for (storedComponent in jsonObject.getAsJsonArray("value")) {
-                val name = storedComponent.asJsonObject["name"].asString
-                val remaining = existingCounts.getOrDefault(name, 0)
-                if (remaining > 0) {
-                    existingCounts.put(name, remaining - 1)
-                    continue
-                }
-
-                val factory = requireNotNull(componentFactories)[name] ?: continue
-                if (factory.singleton) {
-                    continue
-                }
-                createComponent(factory)?.let(::registerComponent)
-            }
-        }
-    }
+    fun componentCatalog(): List<ComponentCatalogEntry> = componentRuntime.componentCatalog()
 
     data class ComponentCatalogEntry(
         val name: String,
@@ -247,7 +136,7 @@ class Theme private constructor(val origin: Origin, url: String) :
 
     private suspend fun loadAll() = apply {
         loadMetadata()
-        loadComponents()
+        componentRuntime.load(metadata)
         loadFonts()
     }
 
@@ -327,12 +216,6 @@ class Theme private constructor(val origin: Origin, url: String) :
         return if (params.isNotEmpty()) "$baseUrlWithFragment?$params" else baseUrlWithFragment
     }
 
-    fun isSupported(name: String?) = isScreenSupported(name) || isOverlaySupported(name)
-
-    fun isScreenSupported(name: String?) = name != null && metadata.screens.contains(name)
-
-    fun isOverlaySupported(name: String?) = name != null && metadata.overlays.contains(name)
-
     override fun onResourceManagerReload(manager: ResourceManager) {
         backgroundShader?.onResourceReload()
         backgroundImage?.onResourceReload()
@@ -342,7 +225,7 @@ class Theme private constructor(val origin: Origin, url: String) :
     override fun close() {
         backgroundShader?.close()
         backgroundImage?.close()
-        componentSettings?.inner?.filterIsInstance<HudComponent>()?.forEach(EventManager::unregisterEventHandler)
+        componentRuntime.close()
     }
 
     override fun toString() = "Theme(name=${metadata.name}, origin=${origin.tag}, url=$baseUrl)"

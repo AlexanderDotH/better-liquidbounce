@@ -19,13 +19,14 @@
 
 package net.ccbluex.liquidbounce.injection.mixins.minecraft.network;
 
+import net.ccbluex.liquidbounce.render.progress.BlockBreakingProgressAccess;
 import net.minecraft.client.multiplayer.MultiPlayerGameMode;
 import net.minecraft.core.BlockPos;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.gen.Accessor;
 
 @Mixin(MultiPlayerGameMode.class)
-public interface MixinMultiPlayerGameModeAccessor {
+public interface MixinMultiPlayerGameModeAccessor extends BlockBreakingProgressAccess {
 
     @Accessor("destroyBlockPos")
     BlockPos liquid_bounce$getDestroyBlockPos();

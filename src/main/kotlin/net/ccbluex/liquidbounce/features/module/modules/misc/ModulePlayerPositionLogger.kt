@@ -20,7 +20,7 @@ package net.ccbluex.liquidbounce.features.module.modules.misc
 
 import net.ccbluex.liquidbounce.config.ConfigSystem
 import net.ccbluex.liquidbounce.config.gson.adapter.toUnderlinedString
-import net.ccbluex.liquidbounce.config.types.list.Tagged
+import net.ccbluex.liquidbounce.common.Tagged
 import net.ccbluex.liquidbounce.event.events.GameTickEvent
 import net.ccbluex.liquidbounce.event.events.PacketEvent
 import net.ccbluex.liquidbounce.event.events.PlayerJumpEvent
@@ -30,34 +30,28 @@ import net.ccbluex.liquidbounce.event.events.WorldChangeEvent
 import net.ccbluex.liquidbounce.event.handler
 import net.ccbluex.liquidbounce.features.module.ClientModule
 import net.ccbluex.liquidbounce.features.module.ModuleCategories
-import net.ccbluex.liquidbounce.features.module.modules.misc.playerpositionlogger.PlayerPositionChangeTracker
-import net.ccbluex.liquidbounce.features.module.modules.misc.playerpositionlogger.PlayerPositionIdentity
-import net.ccbluex.liquidbounce.features.module.modules.misc.playerpositionlogger.PlayerPositionJsonlWriter
+import net.ccbluex.liquidbounce.features.module.modules.misc.playerpositionlogger.PlayerPositionLogRecord
 import net.ccbluex.liquidbounce.features.module.modules.misc.playerpositionlogger.PlayerPositionLogEntry
 import net.ccbluex.liquidbounce.features.module.modules.misc.playerpositionlogger.PlayerPositionLogKind
 import net.ccbluex.liquidbounce.features.module.modules.misc.playerpositionlogger.PlayerPositionLogOrigin
-import net.ccbluex.liquidbounce.features.module.modules.misc.playerpositionlogger.PlayerPositionPacketObservation
-import net.ccbluex.liquidbounce.features.module.modules.misc.playerpositionlogger.PlayerPositionPacketRouter
-import net.ccbluex.liquidbounce.features.module.modules.misc.playerpositionlogger.PlayerPositionSample
-import net.ccbluex.liquidbounce.features.module.modules.misc.playerpositionlogger.PlayerPositionState
 import net.ccbluex.liquidbounce.features.module.modules.misc.playerpositionlogger.PlayerPositionSupplementalLogFactory
 import net.ccbluex.liquidbounce.features.module.modules.misc.playerpositionlogger.capturePositionSample
 import net.ccbluex.liquidbounce.features.module.modules.misc.playerpositionlogger.capturePositionState
+import net.ccbluex.liquidbounce.features.module.modules.misc.playerpositionlogger.integration.playerPositionLogFileLink
+import net.ccbluex.liquidbounce.features.module.modules.misc.playerpositionlogger.packet.PlayerPositionPacketRecordContext
+import net.ccbluex.liquidbounce.features.module.modules.misc.playerpositionlogger.packet.routePlayerPositionLogRecords
+import net.ccbluex.liquidbounce.features.module.modules.misc.playerpositionlogger.session.PlayerPositionLogSession
+import net.ccbluex.liquidbounce.features.module.modules.misc.playerpositionlogger.session.PlayerPositionChangeTracker
+import net.ccbluex.liquidbounce.features.module.modules.misc.playerpositionlogger.toLogEntry
+import net.ccbluex.liquidbounce.features.module.modules.misc.playerpositionlogger.summary
 import net.ccbluex.liquidbounce.features.module.modules.render.playermodel.ServerPlayerModelStateTracker
-import net.ccbluex.liquidbounce.utils.client.chat
-import net.ccbluex.liquidbounce.utils.client.markAsError
+import net.ccbluex.liquidbounce.features.chat.chat
+import net.ccbluex.liquidbounce.utils.text.markAsError
 import net.ccbluex.liquidbounce.utils.client.mc
-import net.ccbluex.liquidbounce.utils.client.onClick
-import net.ccbluex.liquidbounce.utils.client.onHover
-import net.ccbluex.liquidbounce.utils.client.regular
-import net.ccbluex.liquidbounce.utils.client.underline
+import net.ccbluex.liquidbounce.utils.text.regular
 import net.ccbluex.liquidbounce.utils.kotlin.EventPriorityConvention
-import net.ccbluex.liquidbounce.utils.text.asText
-import net.minecraft.network.chat.ClickEvent
-import net.minecraft.network.chat.HoverEvent
 import net.minecraft.network.protocol.Packet
 import net.minecraft.world.phys.Vec3
-import java.io.File
 import java.time.LocalDateTime
 import java.util.EnumSet
 
@@ -82,9 +76,7 @@ object ModulePlayerPositionLogger : ClientModule(
     private val outputDirectory = ConfigSystem.rootFolder.resolve("player-position-logger")
     private val positionTracker = PlayerPositionChangeTracker()
 
-    @Volatile
-    private var writer: PlayerPositionJsonlWriter? = null
-    private var writeFailureReported = false
+    private val session = PlayerPositionLogSession(outputDirectory)
 
     init {
         doNotIncludeAlways()
@@ -92,32 +84,20 @@ object ModulePlayerPositionLogger : ClientModule(
 
     override fun onEnabled() {
         positionTracker.clear()
-        writeFailureReported = false
-        writer = runCatching {
-            PlayerPositionJsonlWriter.create(
-                outputDirectory,
-                LocalDateTime.now().toUnderlinedString(),
-            )
-        }.onFailure {
+        session.open(LocalDateTime.now().toUnderlinedString()).onFailure {
             chat(markAsError("Failed to create player position log: $it"))
-        }.getOrNull()
-
-        writer?.file?.let { file ->
-            chat(regular("Recording player positions to "), fileLink(file), regular("."))
+        }.onSuccess { file ->
+            chat(regular("Recording player positions to "), playerPositionLogFileLink(file), regular("."))
         }
         super.onEnabled()
     }
 
     override fun onDisabled() {
-        val completedWriter = writer
-        writer = null
         positionTracker.clear()
-
-        runCatching { completedWriter?.close() }
-            .onFailure { chat(markAsError("Failed to close player position log: $it")) }
-
-        completedWriter?.file?.let { file ->
-            chat(regular("Player position log was written to "), fileLink(file), regular("."))
+        val result = session.close()
+        result.failure?.let { chat(markAsError("Failed to close player position log: $it")) }
+        result.file?.let { file ->
+            chat(regular("Player position log was written to "), playerPositionLogFileLink(file), regular("."))
         }
         super.onDisabled()
     }
@@ -142,30 +122,13 @@ object ModulePlayerPositionLogger : ClientModule(
         val level = mc.level ?: return
         val localPlayer = mc.player ?: return
 
-        PlayerPositionPacketRouter.route(
-            packet,
-            level,
-            localPlayer,
+        val context = PlayerPositionPacketRecordContext(
+            origin, packet, cancelled, original, level, localPlayer,
             ServerPlayerModelStateTracker.snapshot.capturePositionState(),
-        ) { uuid ->
-            mc.connection?.getPlayerInfo(uuid)?.profile?.name
-        }.forEach { routed ->
-            if (!includes(routed.identity.local)) {
-                return@forEach
-            }
-
-            record(
-                origin = origin.toLogOrigin(),
-                kind = routed.observation.kind,
-                sample = routed.sample,
-                identity = routed.identity,
-                observation = routed.observation,
-                packet = packet,
-                cancelled = cancelled,
-                original = original,
-                relatedEntityIds = routed.relatedEntityIds,
-            )
-        }
+        ) { uuid -> mc.connection?.getPlayerInfo(uuid)?.profile?.name }
+        routePlayerPositionLogRecords(context)
+            .filter { includes(it.identity?.local == true) }
+            .forEach(::record)
     }
 
     @Suppress("unused")
@@ -181,12 +144,12 @@ object ModulePlayerPositionLogger : ClientModule(
             .filter { includes(it.identity.local) }
 
         positionTracker.update(samples).forEach { change ->
-            record(
+            record(PlayerPositionLogRecord(
                 origin = PlayerPositionLogOrigin.CLIENT_STATE,
                 kind = change.kind,
                 sample = change.sample,
                 previousClientState = change.previousState,
-            )
+            ))
         }
     }
 
@@ -199,7 +162,7 @@ object ModulePlayerPositionLogger : ClientModule(
         }
 
         val localPlayer = mc.player ?: return@handler
-        record(
+        record(PlayerPositionLogRecord(
             origin = PlayerPositionLogOrigin.CLIENT_EVENT,
             kind = PlayerPositionLogKind.LOCAL_NETWORK_MOVEMENT,
             sample = localPlayer.capturePositionSample(local = true),
@@ -208,7 +171,7 @@ object ModulePlayerPositionLogger : ClientModule(
                 event.ground,
             ),
             eventState = event.state.stateName,
-        )
+        ))
     }
 
     @Suppress("unused")
@@ -220,12 +183,12 @@ object ModulePlayerPositionLogger : ClientModule(
         }
 
         val localPlayer = mc.player ?: return@handler
-        record(
+        record(PlayerPositionLogRecord(
             origin = PlayerPositionLogOrigin.CLIENT_EVENT,
             kind = PlayerPositionLogKind.LOCAL_JUMP,
             sample = localPlayer.capturePositionSample(local = true),
             observation = PlayerPositionSupplementalLogFactory.localJump(event.motion, event.yaw),
-        )
+        ))
     }
 
     @Suppress("unused")
@@ -242,45 +205,12 @@ object ModulePlayerPositionLogger : ClientModule(
         )
     }
 
-    @Suppress("LongParameterList")
-    private fun record(
-        origin: PlayerPositionLogOrigin,
-        kind: PlayerPositionLogKind,
-        sample: PlayerPositionSample? = null,
-        identity: PlayerPositionIdentity? = sample?.identity,
-        previousClientState: PlayerPositionState? = null,
-        observation: PlayerPositionPacketObservation? = null,
-        packet: Packet<*>? = null,
-        cancelled: Boolean? = null,
-        original: Boolean? = null,
-        relatedEntityIds: List<Int> = emptyList(),
-        eventState: String? = null,
-    ) {
-        val local = identity?.local == true
-        val entry = PlayerPositionLogEntry(
+    private fun record(record: PlayerPositionLogRecord) {
+        val entry = record.toLogEntry(
             timestampMs = System.currentTimeMillis(),
-            monotonicNanos = System.nanoTime(),
             tick = mc.player?.tickCount,
             dimension = mc.level?.dimension()?.identifier()?.toString(),
-            origin = origin,
-            kind = kind,
-            packetType = packet?.javaClass?.name?.substringAfter("net.minecraft.network.protocol.game."),
-            packetId = packet?.type()?.id?.toString(),
-            original = original,
-            cancelled = cancelled,
-            player = identity,
-            previousClientState = previousClientState,
-            clientState = sample?.state,
-            lastTransmittedState = if (local) {
-                ServerPlayerModelStateTracker.snapshot.capturePositionState()
-            } else {
-                null
-            },
-            packetState = observation?.packetState,
-            teleportId = observation?.teleportId,
-            relatedEntityId = observation?.relatedEntityId,
-            relatedEntityIds = relatedEntityIds,
-            eventState = eventState,
+            lastTransmittedState = ServerPlayerModelStateTracker.snapshot.capturePositionState(),
         )
         write(entry)
 
@@ -290,18 +220,7 @@ object ModulePlayerPositionLogger : ClientModule(
     }
 
     private fun write(entry: PlayerPositionLogEntry) {
-        val activeWriter = writer ?: return
-        runCatching { activeWriter.write(entry) }.onFailure { throwable ->
-            if (writer === activeWriter) {
-                writer = null
-            }
-            runCatching(activeWriter::close)
-
-            if (!writeFailureReported) {
-                writeFailureReported = true
-                chat(markAsError("Failed to write player position log: $throwable"))
-            }
-        }
+        session.write(entry)?.let { chat(markAsError("Failed to write player position log: $it")) }
     }
 
     private fun includes(local: Boolean): Boolean = when {
@@ -309,25 +228,8 @@ object ModulePlayerPositionLogger : ClientModule(
         else -> PlayerScope.REMOTE in playerScopes
     }
 
-    private fun fileLink(file: File) = file.absolutePath.asText()
-        .underline(true)
-        .onHover(HoverEvent.ShowText(regular("Browse...")))
-        .onClick(ClickEvent.OpenFile(file.absolutePath))
-
     private enum class PlayerScope(override val tag: String) : Tagged {
         LOCAL("Local"),
         REMOTE("OtherPlayers"),
     }
-}
-
-private fun TransferOrigin.toLogOrigin() = when (this) {
-    TransferOrigin.INCOMING -> PlayerPositionLogOrigin.INCOMING
-    TransferOrigin.OUTGOING -> PlayerPositionLogOrigin.OUTGOING
-}
-
-private fun PlayerPositionLogEntry.summary(): String {
-    val name = player?.name ?: "world"
-    val position = packetState?.resolvedPosition ?: clientState?.position
-    val coordinates = position?.let { " @ ${it.x}, ${it.y}, ${it.z}" }.orEmpty()
-    return "[PlayerPosition] ${origin.name} ${kind.name} $name$coordinates"
 }

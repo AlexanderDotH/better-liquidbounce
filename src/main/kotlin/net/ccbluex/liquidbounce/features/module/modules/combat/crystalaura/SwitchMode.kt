@@ -18,10 +18,14 @@
  */
 package net.ccbluex.liquidbounce.features.module.modules.combat.crystalaura
 
-import net.ccbluex.liquidbounce.config.types.list.Tagged
+import net.ccbluex.liquidbounce.common.Tagged
+import net.ccbluex.liquidbounce.utils.network.BlockSlotSwitchPolicy
 
-enum class SwitchMode(override val tag: String) : Tagged {
-    SILENT("Silent"),
-    NORMAL("Normal"),
-    NONE("None")
+enum class SwitchMode(
+    override val tag: String,
+    val slotSwitchPolicy: BlockSlotSwitchPolicy,
+) : Tagged {
+    SILENT("Silent", BlockSlotSwitchPolicy.RESTORE_AFTER_USE),
+    NORMAL("Normal", BlockSlotSwitchPolicy.KEEP_SELECTED),
+    NONE("None", BlockSlotSwitchPolicy.REQUIRE_SELECTED),
 }

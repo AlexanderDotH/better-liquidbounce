@@ -19,19 +19,24 @@
 
 package net.ccbluex.liquidbounce.features.module.modules.`fun`.amnesia
 
-import net.ccbluex.liquidbounce.config.types.list.Tagged
+import net.ccbluex.liquidbounce.features.module.modules.`fun`.amnesia.playermodel.PlayerModelFakeScaffoldState
+import net.ccbluex.liquidbounce.render.playermodel.PlayerModelActionState
+import net.ccbluex.liquidbounce.render.playermodel.PlayerModelVisualTransform
+
 import net.ccbluex.liquidbounce.config.types.group.ToggleableValueGroup
 import net.ccbluex.liquidbounce.event.events.GameRenderEvent
 import net.ccbluex.liquidbounce.event.handler
-import net.ccbluex.liquidbounce.features.module.modules.`fun`.ModuleAmnesia
+import net.ccbluex.liquidbounce.features.module.modules.`fun`.amnesia.contract.AmnesiaRuntimeBridge
+import net.ccbluex.liquidbounce.features.module.modules.`fun`.amnesia.model.ScaffoldStyle
+import net.ccbluex.liquidbounce.features.module.modules.`fun`.amnesia.model.ScaffoldYawMode
 import net.ccbluex.liquidbounce.render.engine.type.Color4b
 import net.ccbluex.liquidbounce.utils.client.mc
-import net.ccbluex.liquidbounce.utils.render.placement.PlacementRenderer
+import net.ccbluex.liquidbounce.render.placement.PlacementRenderer
 import net.minecraft.core.BlockPos
 import net.minecraft.world.entity.LivingEntity
 
 object FakeScaffold : ToggleableValueGroup(
-    ModuleAmnesia,
+    null,
     "FakeScaffold",
     false,
     aliases = listOf("Fake Scaffold"),
@@ -60,18 +65,6 @@ object FakeScaffold : ToggleableValueGroup(
     )
     private val renderedBlocks = LinkedHashSet<BlockPos>()
 
-    enum class ScaffoldStyle(override val tag: String) : Tagged {
-        NORMAL("Normal"),
-        TELLY("Telly"),
-        TOWER("Tower"),
-    }
-
-    enum class ScaffoldYawMode(override val tag: String) : Tagged {
-        MOVEMENT("Movement"),
-        SNAP_45("Snap45"),
-        REVERSE("Reverse"),
-    }
-
     @Suppress("unused")
     private val renderHandler = handler<GameRenderEvent>(priority = 2) {
         if (!running) {
@@ -79,13 +72,13 @@ object FakeScaffold : ToggleableValueGroup(
             return@handler
         }
 
-        val target = ModuleAmnesia.findTarget() ?: run {
+        val target = AmnesiaRuntimeBridge.findTarget() ?: run {
             resetState()
             return@handler
         }
 
         val partialTicks = mc.deltaTracker.getGameTimeDeltaPartialTick(true)
-        val visualPos = ModuleAmnesia.getAuxiliaryVisualPosition(target, partialTicks) ?: target.position()
+        val visualPos = AmnesiaRuntimeBridge.auxiliaryVisualPosition(target, partialTicks) ?: target.position()
         PlayerModelFakeScaffoldState.tick(
             target = target,
             partialTicks = partialTicks,

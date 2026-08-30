@@ -28,16 +28,15 @@ import net.ccbluex.liquidbounce.features.module.modules.render.ModuleAspect;
 import net.ccbluex.liquidbounce.features.module.modules.render.ModuleFreeCam;
 import net.ccbluex.liquidbounce.features.module.modules.render.ModuleFreeLook;
 import net.ccbluex.liquidbounce.features.module.modules.render.ModuleNoFov;
-import net.ccbluex.liquidbounce.features.module.modules.render.ModuleQuickPerspectiveSwap;
 import net.ccbluex.liquidbounce.features.module.modules.render.ModuleSmoothCamera;
 import net.ccbluex.liquidbounce.features.module.modules.render.ModuleZoom;
+import net.ccbluex.liquidbounce.injection.hooks.CameraOrientationHook;
 import net.ccbluex.liquidbounce.utils.aiming.data.Rotation;
 import net.minecraft.client.Camera;
 import net.minecraft.client.CameraType;
 import net.minecraft.client.Minecraft;
 import net.minecraft.util.Mth;
 import net.minecraft.world.entity.Entity;
-import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.phys.Vec3;
 import org.jspecify.annotations.Nullable;
 import org.spongepowered.asm.mixin.Final;
@@ -92,43 +91,18 @@ public abstract class MixinCamera {
 
     @Inject(method = "alignWithEntity", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/Camera;setPosition(DDD)V", shift = At.Shift.AFTER), cancellable = true)
     private void modifyCameraOrientation(float partialTicks, CallbackInfo ci) {
-        var freeLook = ModuleFreeLook.INSTANCE.getRunning();
-        var freeLockInvertedView = ModuleFreeLook.INSTANCE.isInvertedView();
-        var qps = ModuleQuickPerspectiveSwap.INSTANCE.getRunning();
-        var rearView = qps && ModuleQuickPerspectiveSwap.INSTANCE.getRearView() && !freeLook
-            && this.minecraft.options.getCameraType().isFirstPerson();
-
-        if (freeLook || qps) {
-            this.detached = true;
-
-            if (freeLook) {
-                var cameraYaw = ModuleFreeLook.INSTANCE.getCameraYaw();
-                var cameraPitch = ModuleFreeLook.INSTANCE.getCameraPitch();
-
-                if (freeLockInvertedView) {
-                    setRotation(cameraYaw + 180, -cameraPitch);
-                } else {
-                    setRotation(cameraYaw, cameraPitch);
-                }
-            }
-
-            if (qps && !rearView) {
-                setRotation(yRot + 180.0f, freeLook && !freeLockInvertedView ? xRot : -xRot);
-            }
-
-            float scale = this.entity instanceof LivingEntity livingEntity ? livingEntity.getScale() : 1.0F;
-            float desiredCameraDistance = PerspectiveEvent.INSTANCE.getDistance();
-
-            move(-getMaxZoom(desiredCameraDistance * scale), 0.0f, 0.0f);
-
+        if (CameraOrientationHook.apply(
+            this.entity,
+            this.minecraft,
+            () -> this.detached = true,
+            () -> this.yRot,
+            () -> this.xRot,
+            this::setRotation,
+            this::getMaxZoom,
+            this::move,
+            this::setPosition
+        )) {
             ci.cancel();
-            return;
-        }
-        var screen = ModuleDroneControl.INSTANCE.getScreen();
-
-        if (screen != null) {
-            this.setPosition(screen.getCameraPos());
-            this.setRotation(screen.getCameraRotation().yRot(), screen.getCameraRotation().xRot());
         }
     }
 

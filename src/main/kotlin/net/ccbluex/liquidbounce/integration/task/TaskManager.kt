@@ -22,7 +22,7 @@ package net.ccbluex.liquidbounce.integration.task
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
-import net.ccbluex.liquidbounce.integration.task.type.Task
+import net.ccbluex.liquidbounce.common.task.Task
 import java.util.concurrent.ConcurrentHashMap
 
 /**

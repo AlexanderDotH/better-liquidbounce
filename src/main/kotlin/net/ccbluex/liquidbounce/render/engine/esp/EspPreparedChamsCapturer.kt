@@ -15,14 +15,12 @@ import com.mojang.blaze3d.pipeline.RenderTarget
 import com.mojang.blaze3d.systems.RenderSystem
 import com.mojang.blaze3d.textures.FilterMode
 import net.ccbluex.liquidbounce.common.EspMaskLayer
-import net.ccbluex.liquidbounce.features.module.modules.render.ModuleStorageESP
-import net.ccbluex.liquidbounce.features.module.modules.render.esp.modes.EspChamsMode
 import net.ccbluex.liquidbounce.interfaces.PreparedFrameAddition
 import net.ccbluex.liquidbounce.render.ClientRenderPipelines
 import net.ccbluex.liquidbounce.render.ClientUniformDefine
 import net.ccbluex.liquidbounce.render.createRenderPass
-import net.ccbluex.liquidbounce.utils.render.withOutputTextureOverride
-import net.ccbluex.liquidbounce.utils.render.writeStd140
+import net.ccbluex.liquidbounce.render.buffer.withOutputTextureOverride
+import net.ccbluex.liquidbounce.render.buffer.writeStd140
 
 internal class EspPreparedChamsCapturer : AutoCloseable {
     private val mask = EspRenderTargetHolder("LiquidBounce ESP Chams Mask", true, GpuFormat.RGBA8_UNORM)
@@ -41,20 +39,22 @@ internal class EspPreparedChamsCapturer : AutoCloseable {
     fun capture(bridge: PreparedFrameAddition, mainTarget: RenderTarget) {
         val entityNodes = bridge.`liquid_bounce$hasEspMask`(EspMaskLayer.ENTITY_CHAMS)
         val storageNodes = bridge.`liquid_bounce$hasEspMask`(EspMaskLayer.STORAGE_CHAMS)
-        if (!entityNodes && !storageNodes && !ModuleStorageESP.ChamsMode.running) return
+        val entityProvider = EspFeatureRendererRegistry.chams(EspMaskLayer.ENTITY_CHAMS)
+        val storageProvider = EspFeatureRendererRegistry.chams(EspMaskLayer.STORAGE_CHAMS)
+        val entityStyle = entityProvider?.style?.invoke()
+        val storageStyle = storageProvider?.style?.invoke()
+        if (!entityNodes && !storageNodes && storageStyle == null) return
 
         val target = mask.initAndClear(mainTarget.width, mainTarget.height)
         if (entityNodes) execute(bridge, EspMaskLayer.ENTITY_CHAMS, target)
         if (storageNodes) execute(bridge, EspMaskLayer.STORAGE_CHAMS, target)
-        val cachedStorage = ModuleStorageESP.ChamsMode.running && ModuleStorageESP.ChamsMode.drawMask(target)
+        val cachedStorage = storageStyle != null && storageProvider.drawMask(target)
         hasContribution = entityNodes || storageNodes || cachedStorage
         if (!hasContribution) return
 
         style = EspShaderStyleResolver.resolveChams(
-            EspChamsMode.style.takeIf { EspChamsMode.running && entityNodes },
-            ModuleStorageESP.ChamsMode.style.takeIf {
-                ModuleStorageESP.ChamsMode.running && (storageNodes || cachedStorage)
-            },
+            entityStyle.takeIf { entityNodes },
+            storageStyle.takeIf { storageNodes || cachedStorage },
         )
     }
 

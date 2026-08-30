@@ -20,7 +20,7 @@
 package net.ccbluex.liquidbounce.utils.item
 
 import com.google.common.base.Predicates
-import net.ccbluex.liquidbounce.config.types.list.Tagged
+import net.ccbluex.liquidbounce.common.Tagged
 import net.minecraft.world.item.ItemStack
 import net.minecraft.world.item.MaceItem
 import net.minecraft.world.item.enchantment.Enchantments

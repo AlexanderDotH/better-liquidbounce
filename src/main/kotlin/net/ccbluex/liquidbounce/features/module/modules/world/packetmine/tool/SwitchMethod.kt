@@ -18,16 +18,16 @@
  */
 package net.ccbluex.liquidbounce.features.module.modules.world.packetmine.tool
 
-import net.ccbluex.liquidbounce.config.types.list.Tagged
+import net.ccbluex.liquidbounce.common.Tagged
 import net.ccbluex.liquidbounce.features.module.MinecraftShortcuts
 import net.ccbluex.liquidbounce.features.module.modules.world.ModuleAutoTool
 import net.ccbluex.liquidbounce.features.module.modules.world.packetmine.MineTarget
 import net.ccbluex.liquidbounce.features.module.modules.world.packetmine.ModulePacketMine
 import net.ccbluex.liquidbounce.utils.client.SilentHotbar
-import net.ccbluex.liquidbounce.utils.client.chat
-import net.ccbluex.liquidbounce.utils.client.markAsError
+import net.ccbluex.liquidbounce.features.chat.chat
+import net.ccbluex.liquidbounce.utils.text.markAsError
 import net.ccbluex.liquidbounce.utils.client.usesViaFabricPlus
-import net.ccbluex.liquidbounce.utils.client.warning
+import net.ccbluex.liquidbounce.utils.text.warning
 import net.ccbluex.liquidbounce.utils.inventory.HotbarItemSlot
 import net.ccbluex.liquidbounce.utils.inventory.InventoryAction
 import net.ccbluex.liquidbounce.utils.inventory.Slots

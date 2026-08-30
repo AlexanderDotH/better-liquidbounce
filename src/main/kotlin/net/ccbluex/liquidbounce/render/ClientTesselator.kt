@@ -23,7 +23,7 @@ import com.mojang.blaze3d.pipeline.RenderPipeline
 import com.mojang.blaze3d.vertex.BufferBuilder
 import com.mojang.blaze3d.vertex.ByteBufferBuilder
 import net.ccbluex.fastutil.Pool
-import net.ccbluex.liquidbounce.utils.render.begin
+import net.ccbluex.liquidbounce.render.buffer.begin
 
 object ClientTesselator {
 

@@ -19,14 +19,18 @@
 package net.ccbluex.liquidbounce.features.module.modules.render
 
 import com.mojang.blaze3d.vertex.PoseStack
-import net.ccbluex.liquidbounce.config.types.list.Tagged
+import net.ccbluex.liquidbounce.common.Tagged
 import net.ccbluex.liquidbounce.event.events.GameRenderEvent
 import net.ccbluex.liquidbounce.event.events.GameTickEvent
-import net.ccbluex.liquidbounce.event.events.WorldRenderEvent
+import net.ccbluex.liquidbounce.render.events.WorldRenderEvent
 import net.ccbluex.liquidbounce.event.handler
 import net.ccbluex.liquidbounce.features.module.ClientModule
 import net.ccbluex.liquidbounce.features.module.ModuleCategories
 import net.ccbluex.liquidbounce.features.module.modules.render.playermodel.PlayerModelRenderStateApplier
+import net.ccbluex.liquidbounce.features.module.modules.render.playermodel.PlayerModelPart
+import net.ccbluex.liquidbounce.features.module.modules.render.playermodel.PlayerModelSettingsBridge
+import net.ccbluex.liquidbounce.features.module.modules.render.playermodel.PlayerModelSettingsHook
+import net.ccbluex.liquidbounce.features.module.modules.render.playermodel.PlayerModelState
 import net.ccbluex.liquidbounce.features.module.modules.render.playermodel.ServerPlayerModelStateTracker
 import net.ccbluex.liquidbounce.render.drawBox
 import net.ccbluex.liquidbounce.render.drawLine
@@ -36,7 +40,7 @@ import net.ccbluex.liquidbounce.render.renderEnvironment
 import net.ccbluex.liquidbounce.utils.aiming.RotationManager
 import net.ccbluex.liquidbounce.utils.aiming.data.Rotation
 import net.ccbluex.liquidbounce.utils.kotlin.EventPriorityConvention
-import net.ccbluex.liquidbounce.utils.math.toVec3f
+import net.ccbluex.liquidbounce.render.engine.type.toVec3f
 import net.ccbluex.liquidbounce.utils.render.isCustom
 import net.ccbluex.liquidbounce.utils.render.scaleLightCoords
 import net.minecraft.client.CameraType
@@ -104,6 +108,15 @@ object ModulePlayerModel : ClientModule(
     fun interpolatedModelRotation(partialTicks: Float): Rotation? {
         val current = modelRotation ?: return null
         return (prevModelRotation ?: current).interpolateTo(current, partialTicks)
+    }
+
+    init {
+        PlayerModelSettingsBridge.install(object : PlayerModelSettingsHook {
+            override fun replacementEnabled() = running && displayMode == Display.REPLACE
+            override fun stateEnabled(state: PlayerModelState) = isStateEnabled(State.valueOf(state.name))
+            override fun partAllowed(part: PlayerModelPart) = isPartAllowed(BodyPart.valueOf(part.name))
+            override fun interpolatedRotation(partialTicks: Float) = interpolatedModelRotation(partialTicks)
+        })
     }
 
     @Suppress("unused")

@@ -24,18 +24,18 @@ import net.ccbluex.liquidbounce.features.command.builder.CommandBuilder
 import net.ccbluex.liquidbounce.features.command.builder.ParameterBuilder
 import net.ccbluex.liquidbounce.features.command.builder.playerName
 import net.ccbluex.liquidbounce.features.misc.FriendManager
-import net.ccbluex.liquidbounce.utils.client.MessageMetadata
-import net.ccbluex.liquidbounce.utils.client.bold
-import net.ccbluex.liquidbounce.utils.client.bypassNameProtection
-import net.ccbluex.liquidbounce.utils.client.chat
-import net.ccbluex.liquidbounce.utils.client.copyable
-import net.ccbluex.liquidbounce.utils.client.italic
+import net.ccbluex.liquidbounce.features.chat.MessageMetadata
+import net.ccbluex.liquidbounce.utils.text.bold
+import net.ccbluex.liquidbounce.utils.text.bypassNameProtection
+import net.ccbluex.liquidbounce.features.chat.chat
+import net.ccbluex.liquidbounce.utils.text.copyable
+import net.ccbluex.liquidbounce.utils.text.italic
 import net.ccbluex.liquidbounce.utils.client.mc
-import net.ccbluex.liquidbounce.utils.client.onClick
-import net.ccbluex.liquidbounce.utils.client.onHover
-import net.ccbluex.liquidbounce.utils.client.regular
+import net.ccbluex.liquidbounce.utils.text.onClick
+import net.ccbluex.liquidbounce.utils.text.onHover
+import net.ccbluex.liquidbounce.utils.text.regular
 import net.ccbluex.liquidbounce.utils.client.removeMessage
-import net.ccbluex.liquidbounce.utils.client.variable
+import net.ccbluex.liquidbounce.utils.text.variable
 import net.minecraft.ChatFormatting
 import net.minecraft.network.chat.ClickEvent
 import net.minecraft.network.chat.HoverEvent
@@ -204,30 +204,21 @@ object CommandFriend : Command.Factory {
             )
             .handler {
                 val friend = FriendManager.Friend(args[0] as String, args.getOrNull(1) as String?)
-
-                if (FriendManager.friends.add(friend)) {
-                    if (friend.alias == null) {
-                        chat(
-                            regular(command.result(MSG_SUCCESS, variable(friend.name))),
-                            metadata = MessageMetadata(id = MESSAGE_ID)
-                        )
-                    } else {
-                        chat(
-                            regular(
-                                command.result(
-                                    "successAlias",
-                                    variable(friend.name),
-                                    variable(friend.alias!!)
-                                )
-                            ),
-                            metadata = MessageMetadata(id = MESSAGE_ID)
-                        )
-                    }
-                } else {
-                    throw CommandException(command.result("alreadyFriends", variable(friend.name)))
-                }
-
+                addFriend(command, friend)
             }
             .build()
+    }
+
+    private fun addFriend(command: Command, friend: FriendManager.Friend) {
+        if (!FriendManager.friends.add(friend)) {
+            throw CommandException(command.result("alreadyFriends", variable(friend.name)))
+        }
+        val result = friend.alias?.let { alias ->
+            command.result("successAlias", variable(friend.name), variable(alias))
+        } ?: command.result(MSG_SUCCESS, variable(friend.name))
+        chat(
+            regular(result),
+            metadata = MessageMetadata(id = MESSAGE_ID),
+        )
     }
 }

@@ -20,8 +20,7 @@ package net.ccbluex.liquidbounce.injection.mixins.minecraft.render.entity.featur
 
 import com.llamalad7.mixinextras.injector.ModifyExpressionValue;
 import com.llamalad7.mixinextras.sugar.Local;
-import net.ccbluex.liquidbounce.api.models.cosmetics.CosmeticCategory;
-import net.ccbluex.liquidbounce.features.cosmetic.CosmeticService;
+import net.ccbluex.liquidbounce.features.cosmetic.CosmeticRenderHook;
 import net.ccbluex.liquidbounce.interfaces.EntityRenderStateAddition;
 import net.minecraft.client.renderer.entity.layers.Deadmau5EarsLayer;
 import net.minecraft.client.renderer.entity.state.AvatarRenderState;
@@ -37,7 +36,7 @@ public abstract class MixinDeadmau5EarsLayer {
         if (original) return true;
 
         var entity = ((EntityRenderStateAddition) playerEntityRenderState).liquid_bounce$getEntity();
-        return entity != null && CosmeticService.INSTANCE.hasCosmetic(entity.getUUID(), CosmeticCategory.DEADMAU5_EARS);
+        return entity != null && CosmeticRenderHook.hasDeadmau5Ears(entity.getUUID());
     }
 
 }

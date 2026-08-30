@@ -21,19 +21,22 @@ package net.ccbluex.liquidbounce.features.module.modules.render.jumpeffect.modes
 
 import com.mojang.math.Axis
 import net.ccbluex.fastutil.enumSetAllOf
-import net.ccbluex.liquidbounce.LiquidBounce
-import net.ccbluex.liquidbounce.LiquidBounce.CLIENT_NAME
+import net.ccbluex.liquidbounce.common.ClientBuildMetadata
 import net.ccbluex.liquidbounce.config.utils.TextureMode
-import net.ccbluex.liquidbounce.features.module.modules.render.jumpeffect.JumpEffectColorSettings
-import net.ccbluex.liquidbounce.features.module.modules.render.jumpeffect.JumpEffectMode
+import net.ccbluex.liquidbounce.config.types.group.ModeValueGroup
+import net.ccbluex.liquidbounce.features.module.modules.render.jumpeffect.config.JumpEffectColorSettings
+import net.ccbluex.liquidbounce.features.module.modules.render.jumpeffect.runtime.JumpEffectMode
+import net.ccbluex.liquidbounce.features.module.modules.render.jumpeffect.runtime.JumpEffectRuntime
 import net.ccbluex.liquidbounce.render.AnchorPoint
 import net.ccbluex.liquidbounce.render.WorldRenderEnvironment
 import net.ccbluex.liquidbounce.render.drawSquareTextureGradient
 import net.ccbluex.liquidbounce.render.withPush
 import net.ccbluex.liquidbounce.utils.render.asTexture
 import net.ccbluex.liquidbounce.utils.render.readNativeImage
+import net.ccbluex.liquidbounce.utils.io.resource
 
-internal object JumpEffectImage : JumpEffectMode("Image") {
+internal class JumpEffectImage(parent: ModeValueGroup<*>, runtime: JumpEffectRuntime) :
+    JumpEffectMode("Image", parent, runtime) {
 
     private val colors = JumpEffectColorSettings()
     private val rotationSpeed by int("RotationSpeed", 10, -360..360)
@@ -71,10 +74,10 @@ internal object JumpEffectImage : JumpEffectMode("Image") {
 
     @Suppress("unused")
     private enum class PresetTexture(override val tag: String, val path: String) : TextureMode.Builtin.Preset {
-        LIQUIDBOUNCE(CLIENT_NAME, "jump_effect/liquidbounce.png"),
-        LIQUIDBOUNCE_LOGO(CLIENT_NAME + "WithLogo", "jump_effect/liquidbounce_with_logo.png");
+        LIQUIDBOUNCE(ClientBuildMetadata.NAME, "jump_effect/liquidbounce.png"),
+        LIQUIDBOUNCE_LOGO(ClientBuildMetadata.NAME + "WithLogo", "jump_effect/liquidbounce_with_logo.png");
 
-        override val texture = LiquidBounce.resource(this.path)
+        override val texture = resource("/resources/liquidbounce/$path")
             .readNativeImage().asTexture { "JumpEffect Image $tag" }
     }
 }

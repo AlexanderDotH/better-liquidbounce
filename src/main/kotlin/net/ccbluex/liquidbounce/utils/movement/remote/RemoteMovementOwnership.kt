@@ -10,39 +10,63 @@
  */
 package net.ccbluex.liquidbounce.utils.movement.remote
 
-import net.ccbluex.liquidbounce.features.module.modules.combat.RemoteKillMovementOwnership
+import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicLong
+import java.util.concurrent.atomic.AtomicReference
 
 /**
  * Feature-neutral access to the one server-visible movement stream.
  *
- * Existing combat callers keep using [RemoteKillMovementOwnership], while Reach and future
- * non-combat routes use this facade. Both APIs acquire the same underlying exclusive lease.
+ * Every feature, including combat routes, acquires the same process-wide exclusive lease through
+ * this neutral owner. Feature-specific compatibility facades must delegate here, never the reverse.
  */
 internal object RemoteMovementOwnership {
 
+    private val nextLeaseId = AtomicLong()
+    private val activeLease = AtomicReference<LeaseRecord?>()
+
     val active: Boolean
-        get() = RemoteKillMovementOwnership.active
+        get() = activeLease.get() != null
 
     val currentOwner: String?
-        get() = RemoteKillMovementOwnership.currentOwner
+        get() = activeLease.get()?.owner
 
     val leaseCount: Int
-        get() = RemoteKillMovementOwnership.leaseCount
+        get() = if (active) 1 else 0
 
     fun acquire(owner: String): Lease = checkNotNull(tryAcquire(owner)) {
         "Remote movement is already owned by ${currentOwner ?: "another route"}"
     }
 
-    fun tryAcquire(owner: String): Lease? =
-        RemoteKillMovementOwnership.tryAcquire(owner)?.let(::Lease)
+    /** Atomically reserves the one server-visible movement stream without side effects on failure. */
+    fun tryAcquire(owner: String): Lease? {
+        require(owner.isNotBlank()) { "Remote movement owner must not be blank" }
+        val record = LeaseRecord(nextLeaseId.incrementAndGet(), owner)
+        return if (activeLease.compareAndSet(null, record)) Lease(record.id) else null
+    }
 
     internal class Lease internal constructor(
-        private val delegate: RemoteKillMovementOwnership.Lease,
+        private val leaseId: Long,
     ) : AutoCloseable {
 
-        val active: Boolean
-            get() = delegate.active
+        private val closed = AtomicBoolean()
 
-        override fun close() = delegate.close()
+        val active: Boolean
+            get() = !closed.get()
+
+        override fun close() {
+            if (closed.compareAndSet(false, true)) {
+                release(leaseId)
+            }
+        }
     }
+
+    private fun release(leaseId: Long) {
+        while (true) {
+            val current = activeLease.get()?.takeIf { it.id == leaseId } ?: return
+            if (activeLease.compareAndSet(current, null)) return
+        }
+    }
+
+    private data class LeaseRecord(val id: Long, val owner: String)
 }

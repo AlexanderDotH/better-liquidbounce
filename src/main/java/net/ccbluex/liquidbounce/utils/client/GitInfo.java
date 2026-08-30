@@ -21,9 +21,7 @@ package net.ccbluex.liquidbounce.utils.client;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
-import java.util.Collections;
 import java.util.Map;
-import java.util.Properties;
 import java.util.Set;
 
 @NullMarked
@@ -31,37 +29,24 @@ public final class GitInfo {
 
   private GitInfo() {}
 
-  private static final Properties properties = new Properties();
-
-  static {
-    var inputStream = GitInfo.class.getClassLoader().getResourceAsStream("git.properties");
-    if (inputStream != null) {
-      try (inputStream) {
-        properties.load(inputStream);
-      } catch (Exception ignored) {
-        // NOP
-      }
-    }
-  }
-
   public static String version() {
-    return getOrDefault("git.build.version", "unofficial");
+    return net.ccbluex.liquidbounce.common.GitInfo.version();
   }
 
   public static String branch() {
-    return getOrDefault("git.branch", "nextgen");
+    return net.ccbluex.liquidbounce.common.GitInfo.branch();
   }
 
   public static @Nullable String get(String key) {
-    return properties.getProperty(key);
+    return net.ccbluex.liquidbounce.common.GitInfo.get(key);
   }
 
   public static String getOrDefault(String key, String defaultValue) {
-    return properties.getProperty(key, defaultValue);
+    return net.ccbluex.liquidbounce.common.GitInfo.getOrDefault(key, defaultValue);
   }
 
   public static Set<Map.Entry<Object, Object>> entries() {
-    return Collections.unmodifiableSet(properties.entrySet());
+    return net.ccbluex.liquidbounce.common.GitInfo.entries();
   }
 
 }

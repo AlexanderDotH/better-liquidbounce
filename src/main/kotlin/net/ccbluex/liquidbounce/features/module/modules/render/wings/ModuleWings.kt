@@ -19,26 +19,20 @@
 
 package net.ccbluex.liquidbounce.features.module.modules.render.wings
 
-import net.ccbluex.liquidbounce.config.types.group.ValueGroup
 import net.ccbluex.liquidbounce.features.module.ClientModule
 import net.ccbluex.liquidbounce.features.module.ModuleCategories
+import net.ccbluex.liquidbounce.features.module.modules.render.wings.config.WingsPosition
 import net.ccbluex.liquidbounce.features.module.modules.render.wings.modes.WingsLines
 
 object ModuleWings : ClientModule("Wings", ModuleCategories.RENDER) {
-
-    object WingsPosition : ValueGroup("wingsPosition") {
-        val wingsHeight by float("wingsHeight", 0.3f, -1f..1f)
-        val behindScale by float("BackOffset", 0.25f, 0f..0.5f)
-        val equipmentOffset by float("equipmentOffset", 0.1f, 0f..1f)
-    }
 
     init {
         tree(WingsPosition)
     }
 
-    val modes = choices("Mode", 0) {
+    val modes = choices("Mode", 0) { parent ->
         arrayOf(
-            WingsLines,
+            WingsLines(parent),
         )
     }.apply { tagBy(this) }
 

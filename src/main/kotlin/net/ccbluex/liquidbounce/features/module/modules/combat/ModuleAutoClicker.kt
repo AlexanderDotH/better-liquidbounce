@@ -21,7 +21,7 @@ package net.ccbluex.liquidbounce.features.module.modules.combat
 import it.unimi.dsi.fastutil.objects.ReferenceOpenHashSet
 import net.ccbluex.fastutil.enumSetOf
 import net.ccbluex.liquidbounce.config.types.group.ToggleableValueGroup
-import net.ccbluex.liquidbounce.config.types.list.Tagged
+import net.ccbluex.liquidbounce.common.Tagged
 import net.ccbluex.liquidbounce.event.events.PacketEvent
 import net.ccbluex.liquidbounce.event.events.SprintEvent
 import net.ccbluex.liquidbounce.event.handler
@@ -30,12 +30,13 @@ import net.ccbluex.liquidbounce.event.tickUntil
 import net.ccbluex.liquidbounce.event.waitTicks
 import net.ccbluex.liquidbounce.features.module.ClientModule
 import net.ccbluex.liquidbounce.features.module.ModuleCategories
+import net.ccbluex.liquidbounce.features.module.modules.combat.autoclicker.AutoClickerUseButton
 import net.ccbluex.liquidbounce.features.module.modules.combat.criticals.ModuleCriticals.CriticalsSelectionMode
-import net.ccbluex.liquidbounce.utils.clicking.Clicker
+import net.ccbluex.liquidbounce.features.clicking.Clicker
 import net.ccbluex.liquidbounce.utils.collection.blockSortedSetOf
 import net.ccbluex.liquidbounce.utils.collection.itemSortedSetOf
-import net.ccbluex.liquidbounce.utils.combat.shouldBeAttacked
-import net.ccbluex.liquidbounce.utils.input.InputTracker.isPressedOnAny
+import net.ccbluex.liquidbounce.features.combat.runtime.shouldBeAttacked
+import net.ccbluex.liquidbounce.features.input.InputTracker.isPressedOnAny
 import net.ccbluex.liquidbounce.utils.item.WeaponType
 import net.ccbluex.liquidbounce.utils.kotlin.matchesAny
 import net.minecraft.client.KeyMapping
@@ -134,31 +135,6 @@ object ModuleAutoClicker : ClientModule("AutoClicker", ModuleCategories.COMBAT, 
 
     }
 
-    object UseButton : ToggleableValueGroup(this, "Use", false) {
-        val clicker = tree(Clicker(this, mc.options.keyUse, null))
-        internal val holdingItemsForIgnore by items(
-            "HoldingItemsForIgnore",
-            default = itemSortedSetOf(
-                Items.WATER_BUCKET,
-                Items.LAVA_BUCKET,
-                Items.ENDER_PEARL,
-                Items.ENDER_EYE,
-                Items.PLAYER_HEAD,
-            ),
-        )
-        internal val blocksForIgnore by blocks(
-            "BlocksForIgnore",
-            default = BuiltInRegistries.BLOCK.filterTo(blockSortedSetOf()) {
-                it is DoorBlock || it is FenceGateBlock || it is TrapDoorBlock
-            },
-        )
-        internal val delayStart by boolean("DelayStart", false)
-        internal val onlyBlock by boolean("OnlyBlock", false)
-        internal val requiresNoInput by boolean("RequiresNoInput", false)
-
-        internal var needToWait = true
-    }
-
     private val SPECIAL_ITEMS_FOR_IGNORE = ReferenceOpenHashSet.of(
         Items.BED.red,
         Items.PLAYER_HEAD,
@@ -171,16 +147,18 @@ object ModuleAutoClicker : ClientModule("AutoClicker", ModuleCategories.COMBAT, 
         Items.SLIME_BALL,
     )
 
+    private val useButton = AutoClickerUseButton { this }
+
     init {
         tree(AttackButton)
-        tree(UseButton)
+        tree(useButton)
     }
 
     val attack: Boolean
         get() = mc.options.keyAttack.isPressedOnAny || AttackButton.requiresNoInput
 
     val use: Boolean
-        get() = mc.options.keyUse.isPressedOnAny || UseButton.requiresNoInput
+        get() = mc.options.keyUse.isPressedOnAny || useButton.requiresNoInput
 
     @Volatile
     private var lastFinishBreak = 0L
@@ -234,7 +212,7 @@ object ModuleAutoClicker : ClientModule("AutoClicker", ModuleCategories.COMBAT, 
             }
         }
 
-        UseButton.run {
+        useButton.run {
             if (!enabled) return@run
 
             if (!use) {

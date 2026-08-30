@@ -1,7 +1,7 @@
 <script lang="ts">
     import {listen} from "../../../integration/ws";
     import type {ClosedCaptionEntry, ClosedCaptionsEvent} from "../../../integration/events";
-    import TextComponent from "../../menu/common/TextComponent.svelte";
+    import TextComponent from "../../../components/text/TextComponent.svelte";
     import {intToHex} from "../../../integration/util";
 
     let entries: ClosedCaptionEntry[] = [];

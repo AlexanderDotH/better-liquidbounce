@@ -22,7 +22,7 @@ package net.ccbluex.liquidbounce.config.gson.serializer
 import com.google.gson.JsonPrimitive
 import com.google.gson.JsonSerializationContext
 import com.google.gson.JsonSerializer
-import net.ccbluex.liquidbounce.config.types.list.Tagged
+import net.ccbluex.liquidbounce.common.Tagged
 import java.lang.reflect.Type
 
 object TaggedSerializer : JsonSerializer<Tagged> {

@@ -18,10 +18,10 @@
  */
 package net.ccbluex.liquidbounce.features.module.modules.`fun`.notebot
 
-import net.ccbluex.liquidbounce.features.module.modules.`fun`.notebot.ModuleNotebot.NotebotStage
+import net.ccbluex.liquidbounce.features.module.modules.`fun`.notebot.contract.NotebotStage
 import net.ccbluex.liquidbounce.render.engine.type.Color4b
 import net.ccbluex.liquidbounce.utils.client.Chronometer
-import net.ccbluex.liquidbounce.utils.render.placement.PlacementRenderer
+import net.ccbluex.liquidbounce.render.placement.PlacementRenderer
 
 object NotebotRenderer : PlacementRenderer("Render", true, ModuleNotebot) {
     private const val TRANSITION_TIME = 300L
@@ -37,14 +37,14 @@ object NotebotRenderer : PlacementRenderer("Render", true, ModuleNotebot) {
     private var lastStage = NotebotStage.TEST
 
     override fun getColor(id: Int): Color4b {
-        return lastStage.blockColor().interpolateTo(currentStage.blockColor(), getTransitionProgress())
+        return blockColor(lastStage).interpolateTo(blockColor(currentStage), getTransitionProgress())
     }
 
     override fun getOutlineColor(id: Int): Color4b {
-        return lastStage.blockOutlineColor().interpolateTo(currentStage.blockOutlineColor(), getTransitionProgress())
+        return blockOutlineColor(lastStage).interpolateTo(blockOutlineColor(currentStage), getTransitionProgress())
     }
 
-    fun onStateChange(stage: NotebotStage) {
+    internal fun onStateChange(stage: NotebotStage) {
         // Only change the target color if the animation was not finished to prevent sudden color changes.
         if (!stageChangeChronometer.hasElapsed(TRANSITION_TIME)) {
             this.currentStage = stage
@@ -67,5 +67,17 @@ object NotebotRenderer : PlacementRenderer("Render", true, ModuleNotebot) {
         this.lastStage = NotebotStage.TEST
 
         this.clearSilently()
+    }
+
+    private fun blockColor(stage: NotebotStage): Color4b = when (stage) {
+        NotebotStage.TEST -> testColor
+        NotebotStage.TUNE -> tuneColor
+        NotebotStage.PLAY -> colorSetting
+    }
+
+    private fun blockOutlineColor(stage: NotebotStage): Color4b = when (stage) {
+        NotebotStage.TEST -> outlineTestColor
+        NotebotStage.TUNE -> outlineTuneColor
+        NotebotStage.PLAY -> outlineColorSetting
     }
 }

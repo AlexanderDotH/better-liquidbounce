@@ -11,11 +11,8 @@
 package net.ccbluex.liquidbounce.features.litematica.integration.loader
 
 import net.ccbluex.liquidbounce.features.litematica.integration.api.LitematicaAvailability
-import net.ccbluex.liquidbounce.features.litematica.integration.api.LitematicaBridgeResult
-import net.ccbluex.liquidbounce.features.litematica.integration.api.LitematicaCapabilities
 import net.ccbluex.liquidbounce.features.litematica.integration.api.LitematicaIntegrationVersions
 import net.ccbluex.liquidbounce.features.litematica.integration.api.LitematicaPort
-import net.ccbluex.liquidbounce.features.litematica.integration.api.LitematicaPortFactory
 import net.ccbluex.liquidbounce.features.litematica.integration.api.LitematicaUnavailableReason
 import net.fabricmc.loader.api.FabricLoader
 import java.lang.reflect.InvocationTargetException
@@ -51,13 +48,14 @@ object LitematicaPortLoader {
     fun load(): LitematicaPortLoadResult = ReflectiveLitematicaPortLoader().load()
 }
 
-@Suppress("TooManyFunctions")
 internal class ReflectiveLitematicaPortLoader(
     private val versionLookup: LitematicaModVersionLookup = FabricLitematicaModVersionLookup,
     private val classLookup: LitematicaClassLookup = defaultClassLookup(),
     private val requiredExternalClasses: List<String> = REQUIRED_EXTERNAL_CLASSES,
     private val bridgeFactoryClassName: String = LitematicaPortLoader.BRIDGE_FACTORY_CLASS,
 ) {
+    private val bridgeLoader = ReflectiveLitematicaBridgeLoader(classLookup, bridgeFactoryClassName)
+
     fun load(): LitematicaPortLoadResult {
         val versions = try {
             installedVersions()
@@ -71,7 +69,7 @@ internal class ReflectiveLitematicaPortLoader(
             return unavailable(versions, LitematicaUnavailableReason.VERSION_MISMATCH, it)
         }
         resolveExternalClasses(versions)?.let { return it }
-        return createBridge(versions)
+        return bridgeLoader.create(versions)
     }
 
     private fun installedVersions() = LitematicaIntegrationVersions(
@@ -120,80 +118,12 @@ internal class ReflectiveLitematicaPortLoader(
         return null
     }
 
-    private fun createBridge(versions: LitematicaIntegrationVersions): LitematicaPortLoadResult = try {
-        val factoryClass = classLookup.resolve(bridgeFactoryClassName, true)
-        val factory = instantiateFactory(factoryClass)
-        when (val bridge = factory.create()) {
-            is LitematicaBridgeResult.Ready -> ready(versions, bridge.port)
-            is LitematicaBridgeResult.Unsupported -> unavailable(
-                versions,
-                LitematicaUnavailableReason.CAPABILITY_MISMATCH,
-                bridge.detail,
-                bridge.capabilities,
-            )
-        }
-    } catch (failure: ClassNotFoundException) {
-        unavailable(
-            versions,
-            LitematicaUnavailableReason.MISSING_CLASS,
-            classDetail(bridgeFactoryClassName, failure),
-        )
-    } catch (failure: ReflectiveOperationException) {
-        unavailable(
-            versions,
-            LitematicaUnavailableReason.INVALID_BRIDGE_FACTORY,
-            failureDetail(failure),
-        )
-    } catch (failure: LinkageError) {
-        unavailable(versions, LitematicaUnavailableReason.BRIDGE_FAILURE, failureDetail(failure))
-    } catch (failure: RuntimeException) {
-        unavailable(versions, LitematicaUnavailableReason.BRIDGE_FAILURE, failureDetail(failure))
-    }
-
-    private fun instantiateFactory(factoryClass: Class<*>): LitematicaPortFactory {
-        if (!LitematicaPortFactory::class.java.isAssignableFrom(factoryClass)) {
-            throw ReflectiveOperationException(
-                "$bridgeFactoryClassName must implement ${LitematicaPortFactory::class.java.name}",
-            )
-        }
-        return factoryClass.getDeclaredConstructor().newInstance() as LitematicaPortFactory
-    }
-
-    private fun ready(
-        versions: LitematicaIntegrationVersions,
-        port: LitematicaPort,
-    ): LitematicaPortLoadResult {
-        val missingCapabilities = port.capabilities.missingRequired()
-        if (missingCapabilities.isNotEmpty()) {
-            port.close()
-            return unavailable(
-                versions,
-                LitematicaUnavailableReason.CAPABILITY_MISMATCH,
-                "Bridge is missing required capabilities: " +
-                    missingCapabilities.sortedBy { it.name }.joinToString(),
-            )
-        }
-        if (port.versions != versions) {
-            port.close()
-            return unavailable(
-                versions,
-                LitematicaUnavailableReason.VERSION_MISMATCH,
-                "Bridge reported ${port.versions}, but Fabric reported $versions",
-            )
-        }
-        return LitematicaPortLoadResult.Ready(
-            port = port,
-            availability = LitematicaAvailability.Available(versions, port.capabilities),
-        )
-    }
-
     private fun unavailable(
         versions: LitematicaIntegrationVersions,
         reason: LitematicaUnavailableReason,
         detail: String,
-        capabilities: LitematicaCapabilities? = null,
     ) = LitematicaPortLoadResult.Unavailable(
-        LitematicaAvailability.Unavailable(versions, reason, detail, capabilities),
+        LitematicaAvailability.Unavailable(versions, reason, detail),
     )
 
     private fun lookupFailure(failure: Throwable) = unavailable(

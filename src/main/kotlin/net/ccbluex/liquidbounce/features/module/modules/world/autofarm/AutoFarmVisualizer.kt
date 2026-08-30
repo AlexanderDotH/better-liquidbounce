@@ -19,7 +19,7 @@
 package net.ccbluex.liquidbounce.features.module.modules.world.autofarm
 
 import net.ccbluex.liquidbounce.config.types.group.ToggleableValueGroup
-import net.ccbluex.liquidbounce.event.events.WorldRenderEvent
+import net.ccbluex.liquidbounce.render.events.WorldRenderEvent
 import net.ccbluex.liquidbounce.event.handler
 import net.ccbluex.liquidbounce.render.FULL_BOX
 import net.ccbluex.liquidbounce.render.WorldRenderEnvironment
@@ -33,7 +33,7 @@ import net.ccbluex.liquidbounce.render.withPositionRelativeToCamera
 import net.ccbluex.liquidbounce.utils.entity.interpolateCurrentPosition
 import net.ccbluex.liquidbounce.utils.math.horizontalDistanceToSqr
 import net.ccbluex.liquidbounce.utils.math.sq
-import net.ccbluex.liquidbounce.utils.math.toVec3f
+import net.ccbluex.liquidbounce.render.engine.type.toVec3f
 
 object AutoFarmVisualizer : ToggleableValueGroup(ModuleAutoFarm, "Visualize", true) {
     private object Path : ToggleableValueGroup(this, "Path", true) {

@@ -21,7 +21,7 @@ package net.ccbluex.liquidbounce.features.command.commands.client
 import com.mojang.blaze3d.platform.InputConstants
 import net.ccbluex.liquidbounce.features.command.Command
 import net.ccbluex.liquidbounce.features.command.CommandException
-import net.ccbluex.liquidbounce.features.command.CommandExecutor
+import net.ccbluex.liquidbounce.features.command.CommandRuntime
 import net.ccbluex.liquidbounce.features.command.builder.CommandBuilder
 import net.ccbluex.liquidbounce.features.command.builder.ParameterBuilder
 import net.ccbluex.liquidbounce.features.command.builder.enumChoice
@@ -31,24 +31,24 @@ import net.ccbluex.liquidbounce.features.command.preset.pagedQuery
 import net.ccbluex.liquidbounce.features.module.ClientModule
 import net.ccbluex.liquidbounce.features.module.ModuleManager
 import net.ccbluex.liquidbounce.features.module.modules.render.ModuleClickGui
-import net.ccbluex.liquidbounce.utils.client.MessageMetadata
+import net.ccbluex.liquidbounce.features.chat.MessageMetadata
 import net.ccbluex.liquidbounce.utils.text.asText
-import net.ccbluex.liquidbounce.utils.client.bold
-import net.ccbluex.liquidbounce.utils.client.chat
-import net.ccbluex.liquidbounce.utils.client.copyable
-import net.ccbluex.liquidbounce.utils.client.highlight
-import net.ccbluex.liquidbounce.utils.client.markAsError
-import net.ccbluex.liquidbounce.utils.client.onClickRun
-import net.ccbluex.liquidbounce.utils.client.onHover
-import net.ccbluex.liquidbounce.utils.client.regular
-import net.ccbluex.liquidbounce.utils.client.variable
-import net.ccbluex.liquidbounce.utils.client.withColor
+import net.ccbluex.liquidbounce.utils.text.bold
+import net.ccbluex.liquidbounce.features.chat.chat
+import net.ccbluex.liquidbounce.utils.text.copyable
+import net.ccbluex.liquidbounce.utils.text.highlight
+import net.ccbluex.liquidbounce.utils.text.markAsError
+import net.ccbluex.liquidbounce.utils.text.onClickRun
+import net.ccbluex.liquidbounce.utils.text.onHover
+import net.ccbluex.liquidbounce.utils.text.regular
+import net.ccbluex.liquidbounce.utils.text.variable
+import net.ccbluex.liquidbounce.utils.text.withColor
 import net.ccbluex.liquidbounce.utils.input.InputBind
 import net.ccbluex.liquidbounce.utils.input.availableInputKeys
-import net.ccbluex.liquidbounce.utils.input.bind
+import net.ccbluex.liquidbounce.config.types.bind
 import net.ccbluex.liquidbounce.utils.input.inputByName
 import net.ccbluex.liquidbounce.utils.input.renderText
-import net.ccbluex.liquidbounce.utils.input.unbind
+import net.ccbluex.liquidbounce.config.types.unbind
 import net.minecraft.ChatFormatting
 import net.minecraft.network.chat.HoverEvent
 
@@ -103,7 +103,7 @@ object CommandBinds : Command.Factory {
                             .onClickRun {
                                 runCatching {
                                     handleRemoveBind(setOf(module))
-                                }.onFailure(CommandExecutor::handleExceptions)
+                                }.onFailure(CommandRuntime::handleExceptions)
                             }
                     )
                     .append(highlight(module.name).copyable())

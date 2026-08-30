@@ -18,18 +18,22 @@
  */
 package net.ccbluex.liquidbounce.injection.mixins.minecraft.server;
 
+import net.ccbluex.liquidbounce.interfaces.MinecraftServerStateAccess;
 import net.minecraft.server.MinecraftServer;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.gen.Accessor;
 
 @Mixin(MinecraftServer.class)
-public interface MixinMinecraftServerAccessor {
+public interface MixinMinecraftServerAccessor extends MinecraftServerStateAccess {
+    @Override
     @Accessor("isReady")
     void liquidbounce$setReady(boolean ready);
 
+    @Override
     @Accessor("stopped")
     void liquidbounce$setStopped(boolean stopped);
 
+    @Override
     @Accessor("running")
     boolean liquidbounce$isRunningField();
 }

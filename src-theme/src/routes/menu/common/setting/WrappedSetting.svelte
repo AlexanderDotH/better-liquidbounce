@@ -2,7 +2,7 @@
     import type {BooleanSetting as TBooleanSetting, ModuleSetting,} from "../../../../integration/types";
     import {fade} from "svelte/transition";
     import SwitchSetting from "./SwitchSetting.svelte";
-    import GenericSetting from "../../../clickgui/setting/common/GenericSetting.svelte";
+    import GenericSetting from "../../../../shared/settings/GenericSetting.svelte";
     import {quintOut} from "svelte/easing";
     import {convertToSpacedString} from "../../../../theme/theme_config";
 
@@ -117,4 +117,3 @@
     width: 100%;
   }
 </style>
-

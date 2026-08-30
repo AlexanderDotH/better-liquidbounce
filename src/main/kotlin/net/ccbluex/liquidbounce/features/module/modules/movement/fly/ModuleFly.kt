@@ -29,41 +29,14 @@ import net.ccbluex.liquidbounce.features.module.ClientModule
 import net.ccbluex.liquidbounce.features.module.ModuleCategories
 import net.ccbluex.liquidbounce.features.module.modules.movement.fly.automation.FlyAutomation
 import net.ccbluex.liquidbounce.features.module.modules.movement.fly.automation.FlyAutomationInput
-import net.ccbluex.liquidbounce.features.module.modules.movement.fly.modes.FlyAirWalk
-import net.ccbluex.liquidbounce.features.module.modules.movement.fly.modes.FlyCreative
-import net.ccbluex.liquidbounce.features.module.modules.movement.fly.modes.FlyEnderpearl
-import net.ccbluex.liquidbounce.features.module.modules.movement.fly.modes.FlyExplosion
-import net.ccbluex.liquidbounce.features.module.modules.movement.fly.modes.FlyJetpack
-import net.ccbluex.liquidbounce.features.module.modules.movement.fly.modes.FlyPacket
+import net.ccbluex.liquidbounce.features.module.modules.movement.fly.automation.FlyAutomationModulePort
+import net.ccbluex.liquidbounce.features.module.modules.movement.fly.automation.FlyAutomationProfile
+import net.ccbluex.liquidbounce.features.module.modules.movement.fly.contract.FlyState
 import net.ccbluex.liquidbounce.features.module.modules.movement.fly.modes.FlyVanilla
-import net.ccbluex.liquidbounce.features.module.modules.movement.fly.modes.fireball.FlyFireball
-import net.ccbluex.liquidbounce.features.module.modules.movement.fly.modes.grim.FlyGrim2373Jan15
-import net.ccbluex.liquidbounce.features.module.modules.movement.fly.modes.grim.FlyGrim2859V
-import net.ccbluex.liquidbounce.features.module.modules.movement.fly.modes.hypixel.FlyHypixel
-import net.ccbluex.liquidbounce.features.module.modules.movement.fly.modes.hypixel.FlyHypixelFlat
-import net.ccbluex.liquidbounce.features.module.modules.movement.fly.modes.intave.FlyIntave
-import net.ccbluex.liquidbounce.features.module.modules.movement.fly.modes.megacraft.FlyMegacraft
-import net.ccbluex.liquidbounce.features.module.modules.movement.fly.modes.megacraft.FlyMegacraftNoDown
-import net.ccbluex.liquidbounce.features.module.modules.movement.fly.modes.polar.FlyHycraftDamage
-import net.ccbluex.liquidbounce.features.module.modules.movement.fly.modes.sentinel.FlyCubecraftDamage
-import net.ccbluex.liquidbounce.features.module.modules.movement.fly.modes.sentinel.FlySentinelNoDown
-import net.ccbluex.liquidbounce.features.module.modules.movement.fly.modes.sentinel.FlySentinel10thMar
-import net.ccbluex.liquidbounce.features.module.modules.movement.fly.modes.sentinel.FlySentinel20thApr
-import net.ccbluex.liquidbounce.features.module.modules.movement.fly.modes.sentinel.FlySentinel26thDec
-import net.ccbluex.liquidbounce.features.module.modules.movement.fly.modes.sentinel.FlySentinel27thJan
-import net.ccbluex.liquidbounce.features.module.modules.movement.fly.modes.sentry.FlySentry
-import net.ccbluex.liquidbounce.features.module.modules.movement.fly.modes.spartan.FlySpartan524
-import net.ccbluex.liquidbounce.features.module.modules.movement.fly.modes.specific.FlyNcpClip
-import net.ccbluex.liquidbounce.features.module.modules.movement.fly.modes.detector.FlyDetectorBypass
-import net.ccbluex.liquidbounce.features.module.modules.movement.fly.modes.vanilla.FlyAntiKickFly
-import net.ccbluex.liquidbounce.features.module.modules.movement.fly.modes.verus.FlyVerusB3869Flat
-import net.ccbluex.liquidbounce.features.module.modules.movement.fly.modes.verus.FlyVerusB3896Damage
-import net.ccbluex.liquidbounce.features.module.modules.movement.fly.modes.vulcan.FlyVulcan277
-import net.ccbluex.liquidbounce.features.module.modules.movement.fly.modes.vulcan.FlyVulcan286
-import net.ccbluex.liquidbounce.features.module.modules.movement.fly.modes.vulcan.FlyVulcan286MC18
-import net.ccbluex.liquidbounce.features.module.modules.movement.fly.modes.vulcan.FlyVulcan286Teleport
-import net.ccbluex.liquidbounce.utils.client.chat
-import net.ccbluex.liquidbounce.utils.client.markAsError
+import net.ccbluex.liquidbounce.features.module.modules.movement.fly.registry.builtInFlyModes
+import net.ccbluex.liquidbounce.features.module.modules.movement.fly.runtime.FlyModuleControl
+import net.ccbluex.liquidbounce.features.chat.chat
+import net.ccbluex.liquidbounce.utils.text.markAsError
 import net.ccbluex.liquidbounce.utils.kotlin.EventPriorityConvention.FINAL_DECISION
 import net.ccbluex.liquidbounce.utils.movement.DirectionalInput
 import net.minecraft.network.protocol.game.ClientboundPlayerAbilitiesPacket
@@ -80,52 +53,40 @@ object ModuleFly : ClientModule("Fly", ModuleCategories.MOVEMENT, aliases = list
     override val running: Boolean
         get() = super.running && !FlyAutomation.runtimeSuspended
 
+    init {
+        FlyModuleControl.bind(this) { modes.activeMode }
+        FlyAutomation.bind(ModuleFlyAutomationPort)
+        FlyState.bind(enabledProvider = { enabled }, runningProvider = { running })
+    }
+
+    private object ModuleFlyAutomationPort : FlyAutomationModulePort {
+        override val enabled: Boolean
+            get() = FlyModuleControl.enabled
+
+        override val running: Boolean
+            get() = FlyModuleControl.running
+
+        override val selectedModeName: String
+            get() = FlyModuleControl.activeMode.name
+
+        override val selectedProfile: FlyAutomationProfile?
+            get() = FlyModuleControl.activeMode as? FlyAutomationProfile
+
+        override fun setModuleEnabled(enabled: Boolean) {
+            FlyModuleControl.setEnabled(enabled)
+        }
+
+        override fun enableSelectedMode() {
+            FlyModuleControl.activeMode.enable()
+        }
+
+        override fun disableSelectedMode() {
+            FlyModuleControl.activeMode.disable()
+        }
+    }
+
     internal val modes = choices<Mode>(
-        "Mode", FlyVanilla, arrayOf(
-            // Generic fly modes
-            FlyVanilla,
-            FlyPacket,
-            FlyCreative,
-            FlyJetpack,
-            FlyEnderpearl,
-            FlyAirWalk,
-            FlyExplosion,
-            FlyFireball,
-
-            // Bypass our own PlayerCheatDetector observer checks
-            FlyDetectorBypass,
-
-            // Anti-cheat specific fly modes
-            FlyVulcan277,
-            FlyVulcan286,
-            FlyVulcan286MC18,
-            FlyVulcan286Teleport,
-            FlyGrim2859V,
-            FlyGrim2373Jan15,
-            FlySpartan524,
-            FlyIntave,
-            FlySentinelNoDown,
-
-            // Server specific fly modes
-            FlyCubecraftDamage,
-            FlySentinel20thApr,
-            FlySentinel27thJan,
-            FlySentinel10thMar,
-            FlySentinel26thDec,
-            FlySentry,
-            FlyMegacraft,
-            FlyMegacraftNoDown,
-
-            FlyVerusB3896Damage,
-            FlyVerusB3869Flat,
-            FlyNcpClip,
-            FlyAntiKickFly,
-
-            FlyHypixel,
-            FlyHypixelFlat,
-
-            FlyHycraftDamage
-        )
+        "Mode", FlyVanilla, builtInFlyModes()
     ).apply {
         tagBy(this)
         onChanged { FlyAutomation.onSelectedModeChanged(activeMode.name) }

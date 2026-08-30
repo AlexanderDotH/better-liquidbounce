@@ -54,6 +54,20 @@ class FlyAutomationProfileCompletenessTest {
     }
 
     @Test
+    fun `top level fly mode order remains stable`() {
+        val expected = listOf(
+            "Vanilla", "Packet", "Creative", "Jetpack", "Enderpearl", "AirWalk", "Explosion", "Fireball",
+            "DetectorBypass", "Vulcan277", "Vulcan286-113", "Vulcan286-18", "Vulcan286-Teleport-18",
+            "Grim2859-V", "Grim2373Jan15", "Spartan524", "Intave", "SentinelNoDown", "CubecraftDamage",
+            "Sentinel20thApr", "Sentinel27thJan", "Sentinel10thMar", "Sentinel26thDec", "Sentry", "Megacraft",
+            "MegacraftNoDown", "VerusB3896Damage", "VerusB3896Flat", "NcpClip", "AntiKickFly", "Hypixel",
+            "HypixelFlat", "HycraftDamage",
+        )
+
+        assertEquals(expected, ModuleFly.modes.modes.map { it.name })
+    }
+
+    @Test
     fun `specialized fly modes publish their actual steering limits`() {
         val expected = mapOf(
             "Enderpearl" to CapabilitySignature(true, true, true, true, FlyAutomationKind.CONTINUOUS,

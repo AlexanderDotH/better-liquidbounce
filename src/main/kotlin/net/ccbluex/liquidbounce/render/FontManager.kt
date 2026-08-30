@@ -20,13 +20,13 @@ package net.ccbluex.liquidbounce.render
 
 import it.unimi.dsi.fastutil.objects.Object2ObjectOpenHashMap
 import it.unimi.dsi.fastutil.objects.ObjectImmutableList
-import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.asCoroutineDispatcher
 import kotlinx.coroutines.withContext
 import net.ccbluex.liquidbounce.api.core.AsyncLazy
 import net.ccbluex.liquidbounce.render.engine.font.FontGlyphPageManager
 import net.ccbluex.liquidbounce.utils.client.clientLogger
+import net.ccbluex.liquidbounce.utils.client.mc
 import net.ccbluex.liquidbounce.utils.io.createFont
-import net.ccbluex.liquidbounce.utils.kotlin.Minecraft
 import net.minecraft.util.Util
 import net.minecraft.util.Util.OS.LINUX
 import net.minecraft.util.Util.OS.OSX
@@ -38,6 +38,7 @@ import java.io.InputStream
 object FontManager {
 
     private val logger = clientLogger("FontManager")
+    private val minecraftDispatcher = mc.asCoroutineDispatcher()
 
     private val STYLES = intArrayOf(
         Font.PLAIN,
@@ -85,7 +86,7 @@ object FontManager {
         put(COMMON_FONT.name, COMMON_FONT)
     }
 
-    private suspend fun addFontFace(fontFace: FontFace) = withContext(Dispatchers.Minecraft) {
+    private suspend fun addFontFace(fontFace: FontFace) = withContext(minecraftDispatcher) {
         if (fontFaces.put(fontFace.name, fontFace) != null) {
             logger.warn("FontFace ${fontFace.name} already exists, previous one has been replaced")
         }

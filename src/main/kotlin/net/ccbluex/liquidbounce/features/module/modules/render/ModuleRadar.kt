@@ -20,7 +20,6 @@
 package net.ccbluex.liquidbounce.features.module.modules.render
 
 import com.mojang.blaze3d.platform.NativeImage
-import net.ccbluex.liquidbounce.LiquidBounce
 import net.ccbluex.liquidbounce.config.types.CurveValue.Axis.Companion.axis
 import net.ccbluex.liquidbounce.config.types.group.Mode
 import net.ccbluex.liquidbounce.config.types.group.ModeValueGroup
@@ -41,10 +40,11 @@ import net.ccbluex.liquidbounce.utils.math.fastSin
 import net.ccbluex.liquidbounce.utils.math.floorToInt
 import net.ccbluex.liquidbounce.utils.client.scaledDimension
 import net.ccbluex.liquidbounce.utils.math.toRadians
-import net.ccbluex.liquidbounce.utils.entity.RenderedEntities
+import net.ccbluex.liquidbounce.features.render.RenderedEntities
 import net.ccbluex.liquidbounce.utils.entity.cameraDistance
 import net.ccbluex.liquidbounce.utils.entity.interpolateCurrentPosition
 import net.ccbluex.liquidbounce.utils.kotlin.unaryMinus
+import net.ccbluex.liquidbounce.utils.io.resource
 import net.ccbluex.liquidbounce.utils.render.asTexture
 import net.ccbluex.liquidbounce.utils.render.textureSetup
 import net.ccbluex.liquidbounce.utils.render.readNativeImage
@@ -110,8 +110,8 @@ object ModuleRadar : ClientModule("Radar", ModuleCategories.RENDER, aliases = li
     private val pointerModes = choices("PointerMode", 0) {
         arrayOf(
             PointerMode.Triangle,
-            PointerMode.ImageMode("Image1", LiquidBounce.resource("misc/triangle1.png").readNativeImage()),
-            PointerMode.ImageMode("Image2", LiquidBounce.resource("misc/triangle2.png").readNativeImage()),
+            PointerMode.ImageMode("Image1", resource("/resources/liquidbounce/misc/triangle1.png").readNativeImage()),
+            PointerMode.ImageMode("Image2", resource("/resources/liquidbounce/misc/triangle2.png").readNativeImage()),
         )
     }
 

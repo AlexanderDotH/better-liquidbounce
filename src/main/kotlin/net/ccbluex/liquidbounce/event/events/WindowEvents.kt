@@ -21,9 +21,11 @@ package net.ccbluex.liquidbounce.event.events
 
 import com.mojang.blaze3d.platform.InputConstants
 import net.ccbluex.liquidbounce.annotations.Tag
+import net.ccbluex.liquidbounce.common.input.KeyboardInputState
+import net.ccbluex.liquidbounce.common.input.MouseInputState
 import net.ccbluex.liquidbounce.event.CancellableEvent
 import net.ccbluex.liquidbounce.event.Event
-import net.ccbluex.liquidbounce.integration.interop.protocol.event.WebSocketEvent
+import net.ccbluex.liquidbounce.event.WebSocketEvent
 import net.minecraft.client.gui.screens.Screen
 
 @Tag("windowResize")
@@ -34,14 +36,14 @@ class FramebufferResizeEvent(val width: Int, val height: Int) : Event()
 
 @Tag("mouseButton")
 class MouseButtonEvent(
-    val key: InputConstants.Key,
-    val button: Int,
+    override val key: InputConstants.Key,
+    override val button: Int,
     val action: Int,
-    val mods: Int,
+    override val mods: Int,
     val screen: Screen? = null
-) : Event(), WebSocketEvent {
-    val isPressed: Boolean get() = action == InputConstants.PRESS
-    val isReleased: Boolean get() = action == InputConstants.RELEASE
+) : Event(), WebSocketEvent, MouseInputState {
+    override val isPressed: Boolean get() = action == InputConstants.PRESS
+    override val isReleased: Boolean get() = action == InputConstants.RELEASE
 
     val isLeftButton: Boolean get() = button == InputConstants.MOUSE_BUTTON_LEFT
     val isMiddleButton: Boolean get() = button == InputConstants.MOUSE_BUTTON_MIDDLE
@@ -63,15 +65,15 @@ class MouseCursorEvent(val x: Double, val y: Double) : Event()
 
 @Tag("keyboardKey")
 class KeyboardKeyEvent(
-    val key: InputConstants.Key,
-    val keyCode: Int,
-    val scanCode: Int,
+    override val key: InputConstants.Key,
+    override val keyCode: Int,
+    override val scanCode: Int,
     val action: Int,
-    val mods: Int,
+    override val mods: Int,
     val screen: Screen? = null
-) : Event(), WebSocketEvent {
-    val isPressed: Boolean get() = action == InputConstants.PRESS
-    val isReleased: Boolean get() = action == InputConstants.RELEASE
+) : Event(), WebSocketEvent, KeyboardInputState {
+    override val isPressed: Boolean get() = action == InputConstants.PRESS
+    override val isReleased: Boolean get() = action == InputConstants.RELEASE
     val isRepeat: Boolean get() = action == InputConstants.REPEAT
 }
 

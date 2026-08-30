@@ -15,7 +15,7 @@ import net.ccbluex.liquidbounce.features.litematica.integration.loader.Litematic
 import net.ccbluex.liquidbounce.features.litematica.integration.loader.LitematicaPortLoader
 import net.ccbluex.liquidbounce.features.litematica.render.LitematicaRenderBridge
 import net.ccbluex.liquidbounce.features.module.ClientModule
-import net.ccbluex.liquidbounce.utils.aiming.RotationsValueGroup
+import net.ccbluex.liquidbounce.features.rotation.RotationsValueGroup
 
 sealed interface LitematicaApplicationCreation {
     data class Ready(val application: LitematicaApplication) : LitematicaApplicationCreation

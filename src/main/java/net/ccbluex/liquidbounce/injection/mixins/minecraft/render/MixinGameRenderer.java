@@ -24,23 +24,24 @@ import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
 import com.llamalad7.mixinextras.sugar.Local;
 import com.mojang.blaze3d.pipeline.RenderTarget;
 import com.mojang.blaze3d.vertex.PoseStack;
-import com.mojang.math.Axis;
 import net.ccbluex.liquidbounce.event.EventManager;
 import net.ccbluex.liquidbounce.event.events.GameRenderEvent;
 import net.ccbluex.liquidbounce.event.events.PerspectiveEvent;
-import net.ccbluex.liquidbounce.event.events.WorldRenderEvent;
-import net.ccbluex.liquidbounce.features.module.modules.fun.ModuleDankBobbing;
-import net.ccbluex.liquidbounce.features.module.modules.render.*;
+import net.ccbluex.liquidbounce.features.module.modules.render.ModuleAntiBlind;
+import net.ccbluex.liquidbounce.features.module.modules.render.ModuleItemChams;
+import net.ccbluex.liquidbounce.features.module.modules.render.ModuleNoHurtCam;
 import net.ccbluex.liquidbounce.features.module.modules.render.customambience.ModuleCustomAmbience;
+import net.ccbluex.liquidbounce.injection.hooks.GameRendererBobbingHook;
 import net.ccbluex.liquidbounce.render.WorldRenderEnvironment;
 import net.ccbluex.liquidbounce.render.engine.CustomFogBlurRenderer;
 import net.ccbluex.liquidbounce.render.engine.CustomFogVolumeRenderer;
 import net.ccbluex.liquidbounce.render.engine.UnifiedFogRenderer;
 import net.ccbluex.liquidbounce.render.engine.esp.EspShaderRenderer;
 import net.ccbluex.liquidbounce.render.engine.gui.GuiGlowRenderer;
+import net.ccbluex.liquidbounce.render.events.WorldRenderEvent;
 import net.ccbluex.liquidbounce.utils.aiming.RotationManager;
 import net.ccbluex.liquidbounce.utils.collection.Pools;
-import net.ccbluex.liquidbounce.utils.render.WorldToScreen;
+import net.ccbluex.liquidbounce.render.WorldToScreen;
 import net.minecraft.client.Camera;
 import net.minecraft.client.CameraType;
 import net.minecraft.client.DeltaTracker;
@@ -49,7 +50,6 @@ import net.minecraft.client.renderer.GameRenderer;
 import net.minecraft.client.renderer.Lightmap;
 import net.minecraft.client.renderer.fog.FogRenderer;
 import net.minecraft.client.renderer.state.level.CameraRenderState;
-import net.minecraft.util.Mth;
 import net.minecraft.world.item.ItemStack;
 import org.joml.Matrix4f;
 import org.joml.Matrix4fc;
@@ -244,46 +244,21 @@ public abstract class MixinGameRenderer {
      */
     @Inject(method = "bobView", at = @At("HEAD"), cancellable = true)
     private void injectBobView(CameraRenderState cameraState, PoseStack poseStack, CallbackInfo ci) {
-        if (ModuleNoBob.INSTANCE.getRunning() ||
-            ModuleTracers.INSTANCE.getRunning() ||
-            ModuleBlockESP.INSTANCE.showTracers() ||
-            (ModuleItemESP.INSTANCE.getRunning() && ModuleItemESP.INSTANCE.getShowTracers()) ||
-            (ModuleOrbESP.INSTANCE.getRunning() && ModuleOrbESP.INSTANCE.getShowTracers()) ||
-            ModuleStorageESP.INSTANCE.showTracers()) {
-
+        if (GameRendererBobbingHook.apply(cameraState, poseStack)) {
             ci.cancel();
-            return;
         }
-
-        if (!ModuleDankBobbing.INSTANCE.getRunning()) {
-            return;
-        }
-
-        final var entityRenderState = cameraState.entityRenderState;
-        if (!entityRenderState.isPlayer) {
-            return;
-        }
-
-        float additionalBobbing = ModuleDankBobbing.INSTANCE.getMotion();
-        float g = entityRenderState.backwardsInterpolatedWalkDistance;
-        float h = entityRenderState.bob;
-        poseStack.translate(Mth.sin(g * Mth.PI) * h * 0.5f, -Math.abs(Mth.cos(g * Mth.PI) * h), 0.0f);
-        poseStack.mulPose(Axis.ZP.rotationDegrees(Mth.sin(h * Mth.PI) * h * (3.0F + additionalBobbing)));
-        poseStack.mulPose(Axis.XP.rotationDegrees(Math.abs(Mth.cos(h * Mth.PI - (0.2F + additionalBobbing)) * h) * 5.0F));
-
-        ci.cancel();
     }
 
     @Inject(method = "displayItemActivation", at = @At("HEAD"), cancellable = true)
     private void hookShowFloatingItem(ItemStack floatingItem, CallbackInfo ci) {
-        if (!ModuleAntiBlind.canRender(DoRender.FLOATING_ITEMS)) {
+        if (!ModuleAntiBlind.canRenderFloatingItems()) {
             ci.cancel();
         }
     }
 
     @ModifyExpressionValue(method = "renderLevel", at = @At(value = "INVOKE", target = "Ljava/lang/Math;max(FF)F", ordinal = 0, remap = false))
     private float hookAntiNausea(float original) {
-        if (!ModuleAntiBlind.canRender(DoRender.NAUSEA)) {
+        if (!ModuleAntiBlind.canRenderNausea()) {
             return 0f;
         }
 

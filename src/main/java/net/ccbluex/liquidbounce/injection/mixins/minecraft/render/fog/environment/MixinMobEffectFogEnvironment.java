@@ -20,7 +20,6 @@
 package net.ccbluex.liquidbounce.injection.mixins.minecraft.render.fog.environment;
 
 import com.llamalad7.mixinextras.injector.ModifyReturnValue;
-import net.ccbluex.liquidbounce.features.module.modules.render.DoRender;
 import net.ccbluex.liquidbounce.features.module.modules.render.ModuleAntiBlind;
 import net.minecraft.client.renderer.fog.environment.MobEffectFogEnvironment;
 import net.minecraft.core.Holder;
@@ -45,10 +44,10 @@ public abstract class MixinMobEffectFogEnvironment {
         var effect = getMobEffect();
 
         if (effect == MobEffects.BLINDNESS) {
-            return ModuleAntiBlind.canRender(DoRender.BLINDING);
+            return ModuleAntiBlind.canRenderBlinding();
         }
         if (effect == MobEffects.DARKNESS) {
-            return ModuleAntiBlind.canRender(DoRender.DARKNESS);
+            return ModuleAntiBlind.canRenderDarkness();
         }
 
         return true;

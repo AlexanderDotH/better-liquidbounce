@@ -20,7 +20,7 @@ package net.ccbluex.liquidbounce.features.module.modules.movement.speed.modes.in
 
 import net.ccbluex.liquidbounce.config.types.group.ModeValueGroup
 import net.ccbluex.liquidbounce.event.tickHandler
-import net.ccbluex.liquidbounce.features.module.modules.movement.speed.ModuleSpeed
+import net.ccbluex.liquidbounce.features.module.modules.movement.speed.runtime.SpeedModuleControl
 import net.ccbluex.liquidbounce.features.module.modules.movement.speed.modes.SpeedBHopBase
 import net.ccbluex.liquidbounce.utils.client.Timer
 import net.ccbluex.liquidbounce.utils.entity.airTicks
@@ -48,7 +48,7 @@ class SpeedIntave14Fast(parent: ModeValueGroup<*>) : SpeedBHopBase("Intave14Fast
         }
 
         if (timer) {
-            Timer.requestTimerSpeed(1.002f, Priority.NOT_IMPORTANT, ModuleSpeed)
+            Timer.requestTimerSpeed(1.002f, Priority.NOT_IMPORTANT, SpeedModuleControl.module)
         }
     }
 }

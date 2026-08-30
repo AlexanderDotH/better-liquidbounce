@@ -24,19 +24,19 @@ import net.ccbluex.liquidbounce.annotations.Tag
 import net.ccbluex.liquidbounce.config.gson.accessibleInteropGson
 import net.ccbluex.liquidbounce.config.types.Value
 import net.ccbluex.liquidbounce.config.types.group.ValueGroup
-import net.ccbluex.liquidbounce.config.types.list.Tagged
+import net.ccbluex.liquidbounce.common.Tagged
+import net.ccbluex.liquidbounce.common.interop.ClientChatUserPayload
+import net.ccbluex.liquidbounce.common.interop.HudComponentPayload
+import net.ccbluex.liquidbounce.common.interop.PlayerDataPayload
+import net.ccbluex.liquidbounce.common.interop.ProxyCheckPayload
+import net.ccbluex.liquidbounce.common.interop.ThemeColorPayload
+import net.ccbluex.liquidbounce.common.interop.VirtualScreenTypePayload
 import net.ccbluex.liquidbounce.event.CancellableEvent
 import net.ccbluex.liquidbounce.event.Event
-import net.ccbluex.liquidbounce.features.chat.packet.AxoUser
-import net.ccbluex.liquidbounce.features.misc.proxy.Proxy
-import net.ccbluex.liquidbounce.integration.interop.protocol.event.WebSocketEvent
-import net.ccbluex.liquidbounce.integration.interop.protocol.rest.v1.game.PlayerData
-import net.ccbluex.liquidbounce.integration.screen.CustomScreenType
-import net.ccbluex.liquidbounce.integration.theme.component.HudComponent
-import net.ccbluex.liquidbounce.render.engine.type.Color4b
+import net.ccbluex.liquidbounce.event.WebSocketEvent
 import net.ccbluex.liquidbounce.utils.block.bed.BedState
 import net.ccbluex.liquidbounce.utils.inventory.InventoryAction
-import net.ccbluex.liquidbounce.utils.inventory.InventoryConstraints
+import net.ccbluex.liquidbounce.utils.inventory.InventoryConstraintPolicy
 import net.ccbluex.liquidbounce.utils.kotlin.Priority
 import net.ccbluex.liquidbounce.utils.kotlin.unmodifiable
 import net.minecraft.client.multiplayer.ServerData
@@ -44,7 +44,7 @@ import net.minecraft.world.level.GameType
 import net.minecraft.world.level.block.Block
 
 @Tag("themeColorChange")
-class ThemeColorChangeEvent(val themeId: String, val name: String, val value: Color4b) : Event(), WebSocketEvent
+class ThemeColorChangeEvent(val themeId: String, val name: String, val value: ThemeColorPayload) : Event(), WebSocketEvent
 
 @Deprecated(
     "The `clickGuiScaleChange` event has been deprecated.",
@@ -97,7 +97,7 @@ class NotificationEvent(val title: String, val message: String, val severity: Se
 class GameModeChangeEvent(val gameMode: GameType) : Event(), WebSocketEvent
 
 @Tag("targetChange")
-class TargetChangeEvent(val target: PlayerData?) : Event(), WebSocketEvent
+class TargetChangeEvent(val target: PlayerDataPayload?) : Event(), WebSocketEvent
 
 @Tag("blockCountChange")
 class BlockCountChangeEvent(val nextBlock: Block?, val count: Int?) : Event(), WebSocketEvent
@@ -130,7 +130,7 @@ class ClientChatStateChange(val state: State) : Event(), WebSocketEvent {
 
 @Tag("clientChatMessage")
 class ClientChatMessageEvent(
-    val user: AxoUser,
+    val user: ClientChatUserPayload,
     val message: String,
     val chatGroup: ChatGroup,
 ) : Event(), WebSocketEvent {
@@ -165,14 +165,14 @@ class AccountManagerAdditionResultEvent(
 class AccountManagerRemovalResultEvent(val username: String?) : Event(), WebSocketEvent
 
 @Tag("proxyCheckResult")
-class ProxyCheckResultEvent(val proxy: Proxy? = null, val error: String? = null) : Event(), WebSocketEvent
+class ProxyCheckResultEvent(val proxy: ProxyCheckPayload? = null, val error: String? = null) : Event(), WebSocketEvent
 
 @Tag("browserReady")
 object BrowserReadyEvent : Event()
 
 @Tag("virtualScreen")
 class VirtualScreenEvent(
-    val type: CustomScreenType,
+    val type: VirtualScreenTypePayload,
     @Deprecated("Use `type` instead") val screenName: String = type.routeName,
     val action: Action
 ) : Event(), WebSocketEvent {
@@ -193,7 +193,7 @@ class ServerPingedEvent(val server: ServerData) : Event(), WebSocketEvent
 @Tag("componentsUpdate")
 class ComponentsUpdateEvent(
     val source: Source,
-    val components: List<HudComponent>,
+    val components: List<HudComponentPayload>,
     val themeId: String? = null,
 ) : Event(), WebSocketEvent {
     enum class Source {
@@ -222,7 +222,7 @@ class ScaleFactorChangeEvent(val scaleFactor: Int) : Event(), WebSocketEvent
 class ScheduleInventoryActionEvent(val schedule: MutableList<InventoryAction.Chain> = mutableListOf()) : Event() {
 
     fun schedule(
-        constrains: InventoryConstraints,
+        constrains: InventoryConstraintPolicy,
         action: InventoryAction,
         priority: Priority = Priority.NORMAL
     ) {
@@ -230,7 +230,7 @@ class ScheduleInventoryActionEvent(val schedule: MutableList<InventoryAction.Cha
     }
 
     fun schedule(
-        constrains: InventoryConstraints,
+        constrains: InventoryConstraintPolicy,
         vararg actions: InventoryAction,
         priority: Priority = Priority.NORMAL
     ) {
@@ -238,7 +238,7 @@ class ScheduleInventoryActionEvent(val schedule: MutableList<InventoryAction.Cha
     }
 
     fun schedule(
-        constrains: InventoryConstraints,
+        constrains: InventoryConstraintPolicy,
         actions: List<InventoryAction>,
         priority: Priority = Priority.NORMAL
     ) {

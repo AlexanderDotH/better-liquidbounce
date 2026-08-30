@@ -19,7 +19,6 @@
 
 package net.ccbluex.liquidbounce.injection.mixins.minecraft.render.blockentity;
 
-import net.ccbluex.liquidbounce.features.module.modules.render.DoRender;
 import net.ccbluex.liquidbounce.features.module.modules.render.ModuleAntiBlind;
 import net.minecraft.client.renderer.blockentity.BeaconRenderer;
 import net.minecraft.world.level.block.entity.BeaconBeamOwner;
@@ -37,7 +36,7 @@ public abstract class MixinBeaconRenderer<T extends BlockEntity & BeaconBeamOwne
             cancellable = true
     )
     private void hookRenderBeaconBlock(CallbackInfo ci) {
-        if (!ModuleAntiBlind.canRender(DoRender.BEACON_BEAMS)) {
+        if (!ModuleAntiBlind.canRenderBeaconBeams()) {
             ci.cancel();
         }
     }

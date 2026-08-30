@@ -38,72 +38,49 @@ object MurderMysteryFontDetection {
         stream.readJson<HashMap<String, BooleanArray>>()
     }
 
-    @Suppress("all")
     fun readContractLine(mapData: MapItemSavedData): String {
-        val rgb = extractBitmapFromMap(mapData)
-        val contractLine = filterContractLine(rgb)
-
+        val contractLine = filterContractLine(extractBitmapFromMap(mapData))
         val output = StringBuilder()
-
         var lastNonEmptyScanline = -1
         var emptyScanlines = 0
-
         for (x in 0 until 128) {
-            var isEmpty = true
-
-            for (y in 0 until 7) {
-                if (contractLine[128 * y + x] == -1) {
-                    isEmpty = false
-                    break
-                }
-            }
-
+            val isEmpty = isEmptyScanline(contractLine, x)
             if (isEmpty) {
-                if (emptyScanlines++ > 3) {
+                if (emptyScanlines > 3) {
                     output.append(' ')
                     emptyScanlines = 0
+                } else {
+                    emptyScanlines++
                 }
             }
-
             if (lastNonEmptyScanline != -1 && isEmpty) {
-                var yOff = lastNonEmptyScanline
-                var off: Int
-
-                val w = x - lastNonEmptyScanline
-                val h = 7
-
-                val fingerPrint = BooleanArray(w * h)
-
-                var y1 = 0
-
-                while (y1 < h) {
-                    off = yOff
-
-                    for (x1 in 0 until w) {
-                        fingerPrint[y1 * w + x1] = contractLine[off++] == -1
-                    }
-
-                    y1++
-                    yOff += 128
-                }
-
-                val letter = LETTER_MAP.entries.firstOrNull { (_, value1) ->
-                    value1.contentEquals(fingerPrint)
-                }?.key ?: "?"
-
-                output.append(letter)
-
+                output.append(readLetter(contractLine, lastNonEmptyScanline, x))
                 lastNonEmptyScanline = -1
             }
-
             if (!isEmpty && lastNonEmptyScanline == -1) {
                 lastNonEmptyScanline = x
                 emptyScanlines = 0
             }
         }
+        return output.trim { it <= ' ' }.toString()
+    }
 
-        val outs = output.trim { it <= ' ' }.toString()
-        return outs
+    private fun isEmptyScanline(contractLine: IntArray, x: Int): Boolean =
+        (0 until 7).none { y -> contractLine[128 * y + x] == -1 }
+
+    private fun readLetter(contractLine: IntArray, startX: Int, endX: Int): String {
+        val width = endX - startX
+        val height = 7
+        val fingerprint = BooleanArray(width * height)
+        for (y in 0 until height) {
+            val sourceOffset = 128 * y + startX
+            for (x in 0 until width) {
+                fingerprint[y * width + x] = contractLine[sourceOffset + x] == -1
+            }
+        }
+        return LETTER_MAP.entries.firstOrNull { (_, expected) ->
+            expected.contentEquals(fingerprint)
+        }?.key ?: "?"
     }
 
     private fun filterContractLine(rgb: IntArray): IntArray {

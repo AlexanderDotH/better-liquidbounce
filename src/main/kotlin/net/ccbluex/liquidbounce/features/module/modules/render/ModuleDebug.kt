@@ -19,38 +19,29 @@
 package net.ccbluex.liquidbounce.features.module.modules.render
 
 import it.unimi.dsi.fastutil.objects.Object2ObjectRBTreeMap
-import net.ccbluex.fastutil.forEachFloat
-import net.ccbluex.fastutil.step
-import net.ccbluex.liquidbounce.config.types.CurveValue.Axis.Companion.axis
-import net.ccbluex.liquidbounce.config.types.group.ToggleableValueGroup
 import net.ccbluex.liquidbounce.event.events.GameTickEvent
-import net.ccbluex.liquidbounce.event.events.MovementInputEvent
 import net.ccbluex.liquidbounce.event.events.OverlayRenderEvent
-import net.ccbluex.liquidbounce.event.events.WorldRenderEvent
+import net.ccbluex.liquidbounce.render.events.WorldRenderEvent
 import net.ccbluex.liquidbounce.event.handler
 import net.ccbluex.liquidbounce.features.misc.DebuggedOwner
 import net.ccbluex.liquidbounce.features.module.ClientModule
 import net.ccbluex.liquidbounce.features.module.ModuleCategories
-import net.ccbluex.liquidbounce.render.FontManager
+import net.ccbluex.liquidbounce.features.module.modules.render.debug.DebugGraphGroup
+import net.ccbluex.liquidbounce.features.module.modules.render.debug.DebugParameterCapture
+import net.ccbluex.liquidbounce.features.module.modules.render.debug.DebugParameterKey
+import net.ccbluex.liquidbounce.features.module.modules.render.debug.DebugSimulatedPlayerGroup
+import net.ccbluex.liquidbounce.features.module.modules.render.debug.buildDebugParameterLines
+import net.ccbluex.liquidbounce.features.module.modules.render.debug.renderDebugParameterOverlay
 import net.ccbluex.liquidbounce.render.WorldRenderEnvironment
 import net.ccbluex.liquidbounce.render.drawBox
 import net.ccbluex.liquidbounce.render.drawLine
-import net.ccbluex.liquidbounce.render.drawLineStrip
-import net.ccbluex.liquidbounce.render.drawQuad
 import net.ccbluex.liquidbounce.render.drawTriangle
 import net.ccbluex.liquidbounce.render.engine.type.Color4b
 import net.ccbluex.liquidbounce.render.renderEnvironment
-import net.ccbluex.liquidbounce.render.utils.MutableVertexList
 import net.ccbluex.liquidbounce.render.withPositionRelativeToCamera
-import net.ccbluex.liquidbounce.utils.text.asPlainText
-import net.ccbluex.liquidbounce.utils.text.textOf
-import net.ccbluex.liquidbounce.utils.math.vector2f
-import net.ccbluex.liquidbounce.utils.entity.PlayerSimulationCache
 import net.ccbluex.liquidbounce.utils.kotlin.EventPriorityConvention.FIRST_PRIORITY
 import net.ccbluex.liquidbounce.utils.math.geometry.Line
-import net.ccbluex.liquidbounce.utils.math.toVec3f
-import net.minecraft.ChatFormatting
-import net.minecraft.network.chat.Component
+import net.ccbluex.liquidbounce.render.engine.type.toVec3f
 import net.minecraft.world.phys.AABB
 import net.minecraft.world.phys.Vec3
 
@@ -71,109 +62,17 @@ object ModuleDebug : ClientModule("Debug", ModuleCategories.RENDER) {
 
     private val expireTime by int("Expires", 5, 1..30, "secs")
 
-    private val fontRenderer
-        get() = FontManager.FONT_RENDERER
-
-    object RenderSimulatedPlayer : ToggleableValueGroup(this, "SimulatedPlayer", false) {
-
-        private val ticksToPredict by int("TicksToPredict", 20, 5..100)
-
-        @Suppress("unused")
-        private val movementInputHandler = handler<MovementInputEvent> { _ ->
-            PlayerSimulationCache.getSimulationForLocalPlayer().simulateUntil(this.ticksToPredict)
-        }
-
-        @Suppress("unused")
-        private val renderHandler = handler<WorldRenderEvent> { event ->
-            val cachedPositions = PlayerSimulationCache
-                .getSimulationForLocalPlayer()
-                .getSnapshotsBetween(0 until this.ticksToPredict)
-
-            event.renderEnvironment {
-                drawLineStrip(
-                    Color4b.BLUE.argb,
-                    positions = MutableVertexList(cachedPositions.size)
-                        .addAllRelativeToCamera(cachedPositions, camera) { it.pos },
-                )
-            }
-        }
-
-    }
-
-    object Graph : ToggleableValueGroup(this, "Graph", false) {
-
-        private val curve = curve(
-            "Curve", mutableListOf(
-                0f vector2f 120f,
-                50f vector2f 60f,
-                140f vector2f 120f,
-                180f vector2f 90f
-            ),
-            xAxis = "X Axis" axis 0f..180f,
-            yAxis = "Y Axis" axis 40f..120f
-        )
-
-        @Suppress("unused")
-        private val screenRenderHandler = handler<OverlayRenderEvent> { event ->
-            val context = event.context
-
-            with(context) {
-                var posX = 300
-                var posY = 500
-
-                fontRenderer.draw("Graph".asPlainText()) {
-                    x = posX.toFloat()
-                    y = posY.toFloat()
-                    shadow = true
-                    scale = 0.3f
-                }
-
-                curve.xAxis.range.step(0.1f).forEachFloat { x ->
-                    var y = curve.transform(x)
-                    this.drawQuad(
-                        posX + x,
-                        posY - y,
-                        posX + x + 1,
-                        posY - y + 1,
-                        Color4b.GREEN
-                    )
-                }
-
-                val points = curve.get()
-                for (point in curve.get()) {
-                    var x = point[0]
-                    var y = point[1]
-
-                    this.drawQuad(
-                        posX + x - 2,
-                        posY - y - 2,
-                        posX + x + 2,
-                        posY - y + 2,
-                        Color4b.WHITE
-                    )
-                }
-            }
-        }
-
-    }
-
     init {
-        tree(RenderSimulatedPlayer)
-        tree(Graph)
+        tree(DebugSimulatedPlayerGroup)
+        tree(DebugGraphGroup)
     }
 
-    @JvmRecord
-    private data class DebuggedKey(val owner: DebuggedOwner, val name: String)
+    private val keyComparator = compareBy<DebugParameterKey> { it.owner.debugOwnerId }
+        .thenComparing(DebugParameterKey::name)
 
-    private val KEY_COMPARATOR = compareBy<DebuggedKey> { it.owner.debugOwnerId }
-        .thenComparing(DebuggedKey::name)
+    private val debugParameters = Object2ObjectRBTreeMap<DebugParameterKey, DebugParameterCapture>(keyComparator)
 
-    @JvmRecord
-    private data class ParameterCapture(val time: Long = System.currentTimeMillis(), val value: Any?)
-
-    private val debugParameters = Object2ObjectRBTreeMap<DebuggedKey, ParameterCapture>(KEY_COMPARATOR)
-
-    private val debuggedGeometry = Object2ObjectRBTreeMap<DebuggedKey, DebuggedGeometry>(KEY_COMPARATOR)
+    private val debuggedGeometry = Object2ObjectRBTreeMap<DebugParameterKey, DebuggedGeometry>(keyComparator)
 
     @Suppress("unused")
     private val renderHandler = handler<WorldRenderEvent> { event ->
@@ -199,62 +98,10 @@ object ModuleDebug : ClientModule("Debug", ModuleCategories.RENDER) {
 
     @Suppress("unused")
     private val screenRenderHandler = handler<OverlayRenderEvent> { event ->
-        val context = event.context
-
         if (mc.options.keyPlayerList.isDown || !parameters) {
             return@handler
         }
-
-        /**
-         * Separate the debugged owner from its parameter
-         * Structure should be like this:
-         * Owner ->
-         *   Parameter Name: Parameter Value
-         *   Parameter Name: Parameter Value
-         *   Parameter Name: Parameter Value
-         */
-        val textList = mutableListOf<Component>()
-
-        val debuggedOwners = debugParameters.keys.groupBy { it.owner }
-
-        val currentTime = System.currentTimeMillis()
-
-        debuggedOwners.forEach { (owner, parameters) ->
-            textList += owner.debugDisplayName
-
-            for (debuggedParameter in parameters) {
-                val parameterName = debuggedParameter.name
-                val parameterCapture = debugParameters[debuggedParameter] ?: continue
-                val duration = (currentTime - parameterCapture.time) / 1000
-                textList += textOf(
-                    "$parameterName: ".asPlainText(ChatFormatting.WHITE),
-                    parameterCapture.value.toString().asPlainText(ChatFormatting.GREEN),
-                    " [${duration}s ago]".asPlainText(ChatFormatting.GRAY),
-                )
-            }
-        }
-
-        with(event.context) {
-            val vanillaScale = fontRenderer.scaleToVanillaFont
-
-            // Draw
-            fontRenderer.draw("Debugging".asPlainText()) {
-                x = 120f
-                y = 22f
-                shadow = true
-                scale = vanillaScale * 2
-            }
-
-            // Draw text line one by one
-            textList.forEachIndexed { index, text ->
-                fontRenderer.draw(text) {
-                    x = 120f
-                    y = 40 + ((fontRenderer.height * vanillaScale) * index)
-                    shadow = true
-                    scale = vanillaScale
-                }
-            }
-        }
+        renderDebugParameterOverlay(event, buildDebugParameterLines(debugParameters))
     }
 
     fun debugGeometry(owner: DebuggedOwner, name: String, geometry: DebuggedGeometry?) {
@@ -264,9 +111,9 @@ object ModuleDebug : ClientModule("Debug", ModuleCategories.RENDER) {
         }
 
         if (geometry != null) {
-            debuggedGeometry[DebuggedKey(owner, name)] = geometry
+            debuggedGeometry[DebugParameterKey(owner, name)] = geometry
         } else {
-            debuggedGeometry.remove(DebuggedKey(owner, name))
+            debuggedGeometry.remove(DebugParameterKey(owner, name))
         }
     }
 
@@ -283,7 +130,7 @@ object ModuleDebug : ClientModule("Debug", ModuleCategories.RENDER) {
             return
         }
 
-        debugParameters[DebuggedKey(owner, name)] = ParameterCapture(value = value)
+        debugParameters[DebugParameterKey(owner, name)] = DebugParameterCapture(value = value)
     }
 
     inline fun DebuggedOwner.debugParameter(name: String, lazyValue: () -> Any?) {

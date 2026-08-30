@@ -18,10 +18,7 @@
  */
 package net.ccbluex.liquidbounce.features.module.modules.misc.nameprotect
 
-import it.unimi.dsi.fastutil.objects.ObjectArrayList
 import net.ccbluex.fastutil.LfuCache
-import net.ccbluex.fastutil.Pool
-import net.ccbluex.fastutil.Pool.Companion.use
 import net.ccbluex.liquidbounce.config.types.group.ToggleableValueGroup
 import net.ccbluex.liquidbounce.event.events.GameTickEvent
 import net.ccbluex.liquidbounce.event.handler
@@ -32,13 +29,11 @@ import net.ccbluex.liquidbounce.render.GenericColorMode
 import net.ccbluex.liquidbounce.render.GenericRainbowColorMode
 import net.ccbluex.liquidbounce.render.GenericStaticColorMode
 import net.ccbluex.liquidbounce.render.engine.type.Color4b
-import net.ccbluex.liquidbounce.utils.client.bypassesNameProtection
 import net.ccbluex.liquidbounce.utils.text.toText
 import net.ccbluex.liquidbounce.utils.collection.Pools
 import net.minecraft.network.chat.Component
 import net.minecraft.network.chat.Style
 import net.minecraft.util.FormattedCharSequence
-import net.minecraft.util.FormattedCharSink
 import net.minecraft.util.StringDecomposer
 
 private const val DEFAULT_CACHE_SIZE = 512
@@ -89,6 +84,7 @@ object ModuleNameProtect : ClientModule("NameProtect", ModuleCategories.MISC) {
     }
 
     private val replacementMappings = NameProtectMappings()
+    private val orderedTextMapper = NameProtectOrderedTextMapper(replacementMappings)
 
     private val coloringInfo = NameProtectMappings.ColoringInfo(
         username = { this.colorMode.activeMode.getColor(Unit) },
@@ -126,15 +122,6 @@ object ModuleNameProtect : ClientModule("NameProtect", ModuleCategories.MISC) {
 
     private val stringMappingCache =
         LfuCache<String, String>(DEFAULT_CACHE_SIZE)
-    private val orderedTextMappingCache =
-        LfuCache<FormattedCharSequence, WrappedOrderedText>(DEFAULT_CACHE_SIZE) { _, v ->
-            mappedCharListPool.recycle(v.mappedCharacters)
-        }
-    private val mappedCharListPool = Pool(
-        initializer = { ObjectArrayList(128) },
-        finalizer = ObjectArrayList<MappedCharacter>::clear,
-    ).synchronized()
-
     fun replace(original: String): String =
         when {
             !running -> original
@@ -177,97 +164,9 @@ object ModuleNameProtect : ClientModule("NameProtect", ModuleCategories.MISC) {
     fun wrap(original: FormattedCharSequence): FormattedCharSequence =
         when {
             !running -> original
-            mc.isSameThread -> orderedTextMappingCache.getOrPut(original) { uncachedWrap(original) }
-            else -> uncachedWrap(original)
+            mc.isSameThread -> orderedTextMapper.wrapCached(original)
+            else -> orderedTextMapper.wrap(original)
         }
-
-    /**
-     * Wraps an [FormattedCharSequence] to apply name protection.
-     */
-    private fun uncachedWrap(original: FormattedCharSequence): WrappedOrderedText {
-        val mappedCharacters = mappedCharListPool.borrow()
-
-        val originalCharacters = mappedCharListPool.borrow()
-
-        original.accept { _, style, codePoint ->
-            originalCharacters += MappedCharacter(
-                style,
-                style.color?.bypassesNameProtection ?: false,
-                codePoint
-            )
-
-            true
-        }
-
-        val replacements = Pools.StringBuilder.use {
-            it.ensureCapacity(originalCharacters.size)
-            for (c in originalCharacters) {
-                it.appendCodePoint(c.codePoint)
-            }
-            replacementMappings.findReplacements(it)
-        }
-
-        var currReplacementIndex = 0
-        var currentIndex = 0
-
-        while (currentIndex < originalCharacters.size) {
-            val replacement = replacements.getOrNull(currReplacementIndex)
-
-            val replacementStartIdx = replacement?.first?.start
-
-            if (replacementStartIdx == currentIndex) {
-                if (originalCharacters[replacementStartIdx].bypassesNameProtection) {
-                    currReplacementIndex++
-
-                    continue
-                }
-
-                val color = replacement.second.colorGetter()
-
-                mappedCharacters.ensureCapacity(mappedCharacters.size + replacement.second.newName.length)
-                replacement.second.newName.mapTo(mappedCharacters) { ch ->
-                    MappedCharacter(
-                        originalCharacters[currentIndex].style.withColor(color.argb),
-                        false,
-                        ch.code
-                    )
-                }
-
-                currentIndex = replacement.first.end + 1
-                currReplacementIndex += 1
-            } else {
-                val maxCopyIdx = replacementStartIdx ?: originalCharacters.size
-
-                mappedCharacters.addAll(originalCharacters.subList(currentIndex, maxCopyIdx))
-
-                currentIndex = maxCopyIdx
-            }
-        }
-
-        mappedCharListPool.recycle(originalCharacters)
-
-        return WrappedOrderedText(mappedCharacters)
-    }
-
-    private class MappedCharacter(
-        @JvmField val style: Style,
-        @JvmField val bypassesNameProtection: Boolean,
-        @JvmField val codePoint: Int,
-    )
-
-    private class WrappedOrderedText(@JvmField val mappedCharacters: ObjectArrayList<MappedCharacter>) :
-        FormattedCharSequence {
-        override fun accept(visitor: FormattedCharSink): Boolean {
-            for (index in 0 until mappedCharacters.size) {
-                val char = mappedCharacters[index] as MappedCharacter
-                if (!visitor.accept(index, char.style, char.codePoint)) {
-                    return false
-                }
-            }
-
-            return true
-        }
-    }
 }
 
 /**

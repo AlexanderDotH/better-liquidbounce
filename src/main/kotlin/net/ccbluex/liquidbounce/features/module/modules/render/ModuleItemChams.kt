@@ -24,18 +24,17 @@ import com.mojang.blaze3d.textures.GpuTexture
 import com.mojang.blaze3d.textures.GpuTextureView
 import net.ccbluex.liquidbounce.config.types.Value
 import net.ccbluex.liquidbounce.config.types.group.ToggleableValueGroup
-import net.ccbluex.liquidbounce.config.types.list.Tagged
+import net.ccbluex.liquidbounce.common.Tagged
 import net.ccbluex.liquidbounce.features.module.ClientModule
 import net.ccbluex.liquidbounce.features.module.ModuleCategories
-import net.ccbluex.liquidbounce.injection.mixins.minecraft.render.MixinGameRenderer
 import net.ccbluex.liquidbounce.render.ClientRenderPipelines
 import net.ccbluex.liquidbounce.render.ClientUniformDefine
 import net.ccbluex.liquidbounce.render.createRenderPass
 import net.ccbluex.liquidbounce.render.engine.type.Color4b
-import net.ccbluex.liquidbounce.utils.render.copyFrom
-import net.ccbluex.liquidbounce.utils.render.copyFully
-import net.ccbluex.liquidbounce.utils.render.putVec4
-import net.ccbluex.liquidbounce.utils.render.writeStd140
+import net.ccbluex.liquidbounce.render.buffer.copyFrom
+import net.ccbluex.liquidbounce.render.buffer.copyFully
+import net.ccbluex.liquidbounce.render.buffer.putVec4
+import net.ccbluex.liquidbounce.render.buffer.writeStd140
 import net.minecraft.util.ARGB
 
 /**
@@ -43,7 +42,7 @@ import net.minecraft.util.ARGB
  *
  * Applies visual effects to your held items.
  *
- * @see MixinGameRenderer
+ * The game-renderer injection delegates held-item lightmap effects to this facade.
  * @see net.minecraft.client.renderer.Lightmap
  *
  * @author ccetl

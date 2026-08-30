@@ -10,7 +10,7 @@
     import {onMount} from "svelte";
     import {getContextualBar, getPlayerData} from "../../../../integration/rest";
     import {fade} from "svelte/transition";
-    import TextComponent from "../../../menu/common/TextComponent.svelte";
+    import TextComponent from "../../../../components/text/TextComponent.svelte";
     import type {
         ClientPlayerDataEvent,
         ContextualBarEvent,
@@ -211,71 +211,5 @@
 {/if}
 
 <style lang="scss">
-
-  .pair {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    column-gap: 25px;
-  }
-
-  .status {
-    display: flex;
-    flex-direction: column;
-    margin-bottom: 5px;
-    row-gap: 5px;
-    column-gap: 20px;
-  }
-
-  .hotbar-elements {
-    background-color: var(--hotbar-slot-background-color);
-    position: relative;
-    border-radius: 5px;
-    overflow: hidden;
-
-    .slider {
-      border: solid 2px var(--hotbar-slot-border-color);
-      height: 45px;
-      width: 45px;
-      position: absolute;
-      left: 0;
-      border-radius: 5px;
-    }
-
-    .slots {
-      display: flex;
-    }
-
-    .slot {
-      height: 45px;
-      width: 45px;
-    }
-  }
-
-  .offhand-slot {
-    height: 45px;
-    width: 45px;
-    border-radius: 5px;
-    background-color: var(--hotbar-slot-background-color);
-    position: absolute;
-    bottom: 0;
-    left: -65px;
-  }
-
-  .item-name {
-    color: var(--hotbar-text-color);
-    font-size: 14px;
-    margin: 0 auto 15px;
-    font-weight: 500;
-    background-color: var(--hotbar-item-name-background-color);
-    padding: 5px 8px;
-    border-radius: 5px;
-    width: max-content;
-  }
-
-  .overlay-message {
-    text-align: center;
-    color: var(--hotbar-text-color);
-    margin-bottom: 15px;
-    overflow: hidden;
-  }
+  @use "./HotBar.styles";
 </style>

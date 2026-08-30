@@ -20,18 +20,14 @@
 package net.ccbluex.liquidbounce.features.module.modules.movement.fly.modes.fireball.trigger
 
 import net.ccbluex.liquidbounce.config.types.group.Mode
-import net.ccbluex.liquidbounce.config.types.group.ModeValueGroup
 import net.ccbluex.liquidbounce.event.events.GameTickEvent
 import net.ccbluex.liquidbounce.event.handler
-import net.ccbluex.liquidbounce.features.module.modules.movement.fly.modes.fireball.FlyFireball
+import net.ccbluex.liquidbounce.features.module.modules.movement.fly.modes.fireball.runtime.FlyFireballRuntime
 
 object FlyFireballInstantTrigger : Mode("Instant") {
 
-    override val parent: ModeValueGroup<Mode>
-        get() = FlyFireball.trigger
-
     val repeatable = handler<GameTickEvent> {
-        FlyFireball.wasTriggered = true
+        FlyFireballRuntime.wasTriggered = true
     }
 
 }

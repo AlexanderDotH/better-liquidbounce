@@ -25,7 +25,7 @@ import net.ccbluex.liquidbounce.event.handler
 import net.ccbluex.liquidbounce.features.module.modules.combat.criticals.ModuleCriticals
 import net.ccbluex.liquidbounce.features.module.modules.combat.criticals.ModuleCriticals.wouldDoCriticalHit
 import net.ccbluex.liquidbounce.utils.client.Timer
-import net.ccbluex.liquidbounce.utils.combat.findEnemy
+import net.ccbluex.liquidbounce.features.combat.runtime.findEnemy
 import net.ccbluex.liquidbounce.utils.kotlin.Priority
 
 object CriticalsTimer : Mode("Timer") {
@@ -47,5 +47,4 @@ object CriticalsTimer : Mode("Timer") {
     }
 
 }
-
 

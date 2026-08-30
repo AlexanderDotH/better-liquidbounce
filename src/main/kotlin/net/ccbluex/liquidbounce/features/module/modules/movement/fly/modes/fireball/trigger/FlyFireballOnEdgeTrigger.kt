@@ -20,18 +20,14 @@
 package net.ccbluex.liquidbounce.features.module.modules.movement.fly.modes.fireball.trigger
 
 import net.ccbluex.liquidbounce.config.types.group.Mode
-import net.ccbluex.liquidbounce.config.types.group.ModeValueGroup
 import net.ccbluex.liquidbounce.event.events.MovementInputEvent
 import net.ccbluex.liquidbounce.event.handler
-import net.ccbluex.liquidbounce.features.module.modules.movement.fly.modes.fireball.FlyFireball
+import net.ccbluex.liquidbounce.features.module.modules.movement.fly.modes.fireball.runtime.FlyFireballRuntime
 import net.ccbluex.liquidbounce.features.module.modules.movement.fly.automation.FlyAutomationInput
 import net.ccbluex.liquidbounce.utils.entity.isCloseToEdge
 import net.ccbluex.liquidbounce.utils.kotlin.EventPriorityConvention
 
 object FlyFireballOnEdgeTrigger : Mode("OnEdge") {
-
-    override val parent: ModeValueGroup<Mode>
-        get() = FlyFireball.trigger
 
     private val edgeDistance by float("EdgeDistance", 0.01f, 0.01f..0.5f)
 
@@ -43,7 +39,7 @@ object FlyFireballOnEdgeTrigger : Mode("OnEdge") {
 
         val directionalInput = FlyAutomationInput.directional(event.directionalInput)
         if (shouldBeActive && player.isCloseToEdge(directionalInput, edgeDistance.toDouble())) {
-            FlyFireball.wasTriggered = true
+            FlyFireballRuntime.wasTriggered = true
         }
     }
 

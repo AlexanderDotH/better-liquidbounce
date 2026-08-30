@@ -19,12 +19,16 @@
 
 package net.ccbluex.liquidbounce.features.module.modules.`fun`.amnesia
 
-import net.ccbluex.liquidbounce.config.types.list.Tagged
+import net.ccbluex.liquidbounce.features.module.modules.`fun`.amnesia.playermodel.PlayerModelFakeCriticalsState
+import net.ccbluex.liquidbounce.render.playermodel.PlayerModelActionState
+import net.ccbluex.liquidbounce.render.playermodel.PlayerModelVisualTransform
+
 import net.ccbluex.liquidbounce.config.types.group.ToggleableValueGroup
 import net.ccbluex.liquidbounce.event.events.EntityHealthUpdateEvent
 import net.ccbluex.liquidbounce.event.events.GameRenderEvent
 import net.ccbluex.liquidbounce.event.handler
-import net.ccbluex.liquidbounce.features.module.modules.`fun`.ModuleAmnesia
+import net.ccbluex.liquidbounce.features.module.modules.`fun`.amnesia.contract.AmnesiaRuntimeBridge
+import net.ccbluex.liquidbounce.features.module.modules.`fun`.amnesia.model.CriticalsMode
 import net.ccbluex.liquidbounce.features.module.modules.misc.antibot.ModuleAntiBot
 import net.ccbluex.liquidbounce.utils.client.mc
 import net.ccbluex.liquidbounce.utils.entity.squaredBoxedDistanceTo
@@ -33,7 +37,7 @@ import net.minecraft.world.entity.LivingEntity
 import net.minecraft.world.entity.player.Player
 
 object FakeCriticals : ToggleableValueGroup(
-    ModuleAmnesia,
+    null,
     "FakeCriticals",
     false,
     aliases = listOf("Fake Criticals"),
@@ -51,12 +55,6 @@ object FakeCriticals : ToggleableValueGroup(
     internal val rotateToVictim by boolean("RotateToVictim", true)
     internal val swing by boolean("Swing", true)
 
-    enum class CriticalsMode(override val tag: String) : Tagged {
-        MICRO_HOP("MicroHop"),
-        PACKET("Packet"),
-        BOTH("Both"),
-    }
-
     @Suppress("unused")
     private val renderHandler = handler<GameRenderEvent>(priority = 2) {
         if (!running) {
@@ -64,7 +62,7 @@ object FakeCriticals : ToggleableValueGroup(
             return@handler
         }
 
-        val target = ModuleAmnesia.findTarget() ?: run {
+        val target = AmnesiaRuntimeBridge.findTarget() ?: run {
             PlayerModelFakeCriticalsState.reset()
             return@handler
         }
@@ -78,7 +76,7 @@ object FakeCriticals : ToggleableValueGroup(
             return@handler
         }
 
-        val target = ModuleAmnesia.findTarget() ?: return@handler
+        val target = AmnesiaRuntimeBridge.findTarget() ?: return@handler
         val victim = event.entity
         if (!isValidVictim(target, victim)) {
             return@handler

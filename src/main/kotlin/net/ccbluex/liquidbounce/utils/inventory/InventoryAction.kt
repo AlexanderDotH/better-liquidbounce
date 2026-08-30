@@ -32,12 +32,6 @@ import net.minecraft.world.item.ItemStack
 
 sealed interface InventoryAction {
 
-    fun canPerformAction(inventoryConstraints: InventoryConstraints): Boolean
-
-    fun performAction(): Boolean
-
-    fun requiresPlayerInventoryOpen(): Boolean
-
     @JvmRecord
     data class Click(
         val screen: AbstractContainerScreen<*>? = null,
@@ -119,7 +113,7 @@ sealed interface InventoryAction {
 
         }
 
-        override fun canPerformAction(inventoryConstraints: InventoryConstraints): Boolean {
+        override fun canPerformAction(inventoryConstraints: InventoryConstraintPolicy): Boolean {
             // Check constrains
             if (!inventoryConstraints.passesRequirements(this)) {
                 return false
@@ -144,30 +138,9 @@ sealed interface InventoryAction {
             return screen.syncId == this.screen.syncId
         }
 
-        override fun performAction(): Boolean {
-            val slotId = slot.getIdForServer(screen) ?: return false
-            interaction.handleContainerInput(screen?.syncId ?: 0, slotId, button, actionType, player)
-            InventoryManager.lastClickedSlot = slotId
+        override fun performAction() = ContainerClickExecutor.perform(this)
 
-            return true
-        }
-
-        fun performMissClick(): Boolean {
-            if (slot !is ContainerItemSlot || screen == null) {
-                return false
-            }
-
-            val itemsInContainer = screen.getSlotsInContainer()
-            // Find the closest item to the slot which is empty
-            val closestEmptySlot = itemsInContainer
-                .filter { it.itemStack.isEmpty }
-                .minByOrNull { slot.distance(it) } ?: return false
-
-            val slotId = closestEmptySlot.getIdForServer(screen)
-            interaction.handleContainerInput(screen.syncId, slotId, 0, ContainerInput.PICKUP, player)
-            InventoryManager.lastClickedSlot = slotId
-            return true
-        }
+        fun performMissClick() = ContainerClickExecutor.performMiss(this)
 
         override fun requiresPlayerInventoryOpen() = screen == null
 
@@ -179,8 +152,8 @@ sealed interface InventoryAction {
         val requester: Any? = null,
     ) : InventoryAction {
 
-        override fun canPerformAction(inventoryConstraints: InventoryConstraints) =
-            !InventoryManager.isInventoryOpen && !isInContainerScreen && !isInInventoryScreen
+        override fun canPerformAction(inventoryConstraints: InventoryConstraintPolicy) =
+            !InventoryRuntimeHooks.isInventoryOpen && !isInContainerScreen && !isInInventoryScreen
 
         override fun performAction(): Boolean {
             SilentHotbar.selectSlotSilently(requester, hotbarItemSlot, 1)
@@ -198,7 +171,7 @@ sealed interface InventoryAction {
     ) : InventoryAction {
 
         // Check if current handler is the same as the screen we want to close
-        override fun canPerformAction(inventoryConstraints: InventoryConstraints) =
+        override fun canPerformAction(inventoryConstraints: InventoryConstraintPolicy) =
             player.containerMenu.containerId == screen.syncId
 
         override fun performAction(): Boolean {
@@ -224,7 +197,7 @@ sealed interface InventoryAction {
             fun performFillSlot(itemStack: ItemStack, slot: ItemSlot) = Creative(itemStack, slot)
         }
 
-        override fun canPerformAction(inventoryConstraints: InventoryConstraints): Boolean {
+        override fun canPerformAction(inventoryConstraints: InventoryConstraintPolicy): Boolean {
             // Check constrains
             if (!inventoryConstraints.passesRequirements(this)) {
                 return false
@@ -246,7 +219,7 @@ sealed interface InventoryAction {
             if (slot != null) {
                 val slotId = slot.getIdForServer(null) ?: return false
                 interaction.handleCreativeModeItemAdd(itemStack, slotId)
-                InventoryManager.lastClickedSlot = slotId
+                InventoryRuntimeHooks.recordClickedSlot(slotId)
             } else {
                 interaction.handleCreativeModeItemDrop(itemStack)
             }
@@ -263,7 +236,7 @@ sealed interface InventoryAction {
      */
     @JvmRecord
     data class Chain(
-        val inventoryConstraints: InventoryConstraints,
+        val inventoryConstraints: InventoryConstraintPolicy,
         val actions: List<InventoryAction>,
         val priority: Priority,
     ) {
@@ -275,5 +248,11 @@ sealed interface InventoryAction {
         fun requiresInventoryOpen() = actions.any { it is Click && it.screen == null }
 
     }
+
+    fun canPerformAction(inventoryConstraints: InventoryConstraintPolicy): Boolean
+
+    fun performAction(): Boolean
+
+    fun requiresPlayerInventoryOpen(): Boolean
 
 }

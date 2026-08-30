@@ -22,7 +22,7 @@ import net.ccbluex.liquidbounce.features.module.modules.player.invcleaner.Module
 import net.ccbluex.liquidbounce.features.module.modules.player.offhand.ModuleOffhand
 import net.ccbluex.liquidbounce.test.MinecraftBootstrap
 import net.ccbluex.liquidbounce.utils.inventory.HotbarItemSlot
-import net.ccbluex.liquidbounce.utils.inventory.OffhandReservationManager
+import net.ccbluex.liquidbounce.features.inventory.OffhandReservationManager
 import net.ccbluex.liquidbounce.utils.kotlin.Priority
 import kotlin.test.AfterTest
 import kotlin.test.BeforeTest

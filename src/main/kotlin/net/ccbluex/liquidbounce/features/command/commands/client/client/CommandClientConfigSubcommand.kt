@@ -19,7 +19,7 @@
 package net.ccbluex.liquidbounce.features.command.commands.client.client
 
 import net.ccbluex.liquidbounce.config.ConfigSystem
-import net.ccbluex.liquidbounce.config.autoconfig.AutoConfig
+import net.ccbluex.liquidbounce.features.autoconfig.AutoConfig
 import net.ccbluex.liquidbounce.config.gson.adapter.toUnderlinedString
 import net.ccbluex.liquidbounce.config.types.Config
 import net.ccbluex.liquidbounce.features.command.builder.CommandBuilder
@@ -27,11 +27,11 @@ import net.ccbluex.liquidbounce.features.command.builder.ParameterBuilder
 import net.ccbluex.liquidbounce.features.command.builder.configs
 import net.ccbluex.liquidbounce.features.module.ModuleManager.modulesConfig
 import net.ccbluex.liquidbounce.features.module.modules.render.ModuleHud
-import net.ccbluex.liquidbounce.utils.client.chat
-import net.ccbluex.liquidbounce.utils.client.markAsError
-import net.ccbluex.liquidbounce.utils.client.regular
+import net.ccbluex.liquidbounce.features.chat.chat
+import net.ccbluex.liquidbounce.utils.text.markAsError
+import net.ccbluex.liquidbounce.utils.text.regular
 import net.ccbluex.liquidbounce.utils.text.toLowerCamelCase
-import net.ccbluex.liquidbounce.utils.client.variable
+import net.ccbluex.liquidbounce.utils.text.variable
 import net.minecraft.util.Util
 import java.time.LocalDateTime
 
@@ -112,7 +112,6 @@ object CommandClientConfigSubcommand {
             }
         }.build()
 
-    @Suppress("CognitiveComplexMethod")
     private fun resetSubCommand() = CommandBuilder
         .begin("reset")
         .parameter(
@@ -129,20 +128,7 @@ object CommandClientConfigSubcommand {
             AutoConfig.withLoading {
                 runCatching {
                     chat(regular(command.result("resetting", variable(formattedNames))))
-
-                    for (config in configs) {
-                        // TODO: We could straight up use configurable.restore(), however, we
-                        //   want to filter out the ModuleHud module
-
-                        for (value in config.inner) {
-                            // TODO: Remove when HUD no longer contains the Element Configuration
-                            if (value is ModuleHud) {
-                                continue
-                            }
-
-                            value.restore()
-                        }
-                    }
+                    restoreConfigsWithoutHud(configs)
                 }.onSuccess {
                     chat(regular(command.result("reset")))
                 }.onFailure { exception ->
@@ -151,6 +137,16 @@ object CommandClientConfigSubcommand {
             }
         }
         .build()
+
+    private fun restoreConfigsWithoutHud(configs: Collection<Config>) {
+        for (config in configs) {
+            for (value in config.inner) {
+                if (value !is ModuleHud) {
+                    value.restore()
+                }
+            }
+        }
+    }
 
     private fun browseSubcommand() = CommandBuilder.begin("browse").handler {
         Util.getPlatform().openFile(ConfigSystem.backupFolder)

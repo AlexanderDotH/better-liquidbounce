@@ -19,8 +19,7 @@
 
 package net.ccbluex.liquidbounce.utils.validation
 
-import net.ccbluex.liquidbounce.LiquidBounce
-import net.ccbluex.liquidbounce.config.gson.util.readJson
+import com.google.gson.JsonParser
 import net.ccbluex.liquidbounce.utils.client.logger
 import net.minecraft.util.Util
 import org.apache.commons.codec.digest.DigestUtils
@@ -53,7 +52,8 @@ object HashValidator {
     @JvmStatic
     private fun validateHashFile(hashFile: File) {
         val delete = try {
-            val hashes = hashFile.readJson<Map<String, String>>()
+            val hashes = hashFile.reader().use(JsonParser::parseReader).asJsonObject.entrySet()
+                .associate { (name, hash) -> name to hash.asString }
             shouldDelete(hashFile, hashes)
         } catch (e: Exception) {
             logger.warn("Invalid hash file ${hashFile.absolutePath}", e)
@@ -78,7 +78,7 @@ object HashValidator {
                 runCatching {
                     folderToDelete.deleteRecursively()
                 }.onFailure {
-                    LiquidBounce.logger.error("Failed to delete ${folderToDelete.absolutePath}.", it)
+                    logger.error("Failed to delete ${folderToDelete.absolutePath}.", it)
                 }
             })
         }

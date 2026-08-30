@@ -16,10 +16,12 @@
  * You should have received a copy of the GNU General Public License
  * along with LiquidBounce. If not, see <https://www.gnu.org/licenses/>.
  */
+@file:JvmName("ProminentBlockColorResolverKt")
+@file:JvmMultifileClass
+
 package net.ccbluex.liquidbounce.render
 
 import com.mojang.blaze3d.platform.NativeImage
-import net.ccbluex.liquidbounce.injection.mixins.minecraft.render.MixinSpriteContentsAccessor
 import net.ccbluex.liquidbounce.render.engine.type.Color4b
 import net.minecraft.client.Minecraft
 import net.minecraft.client.renderer.block.BlockAndTintGetter
@@ -170,7 +172,7 @@ internal class ProminentBlockColorResolver {
 
     private fun sampledPixels(contents: SpriteContents): IntArray = spritePixels.getOrPut(contents) {
         runCatching {
-            val image = (contents as MixinSpriteContentsAccessor).originalImage
+            val image = (contents as SpriteContentsImageAccess).originalImage
             samplePixels(image)
         }.getOrDefault(IntArray(0))
     }
@@ -219,72 +221,5 @@ internal class ProminentBlockColorResolver {
         const val MAX_RESOLVED_COLORS = 4096
         const val NO_TINT_INDEX = -1
         const val NO_TINT = -1
-    }
-}
-
-internal class ProminentColorAccumulator {
-
-    private val buckets = arrayOfNulls<ColorBucket>(COLOR_BUCKET_COUNT)
-
-    fun add(argb: Int, weight: Int = 1) {
-        if (weight <= 0) return
-
-        val alpha = ARGB.alpha(argb)
-        if (alpha < MIN_VISIBLE_ALPHA) return
-
-        val red = ARGB.red(argb)
-        val green = ARGB.green(argb)
-        val blue = ARGB.blue(argb)
-        val bucketIndex = colorBucketIndex(red, green, blue)
-        val bucket = buckets[bucketIndex] ?: ColorBucket().also { buckets[bucketIndex] = it }
-        bucket.add(red, green, blue, weight.toLong() * alpha)
-    }
-
-    fun prominentColor(): Color4b? = buckets.asSequence()
-        .filterNotNull()
-        .maxWithOrNull(compareBy<ColorBucket> { it.weight }
-            .thenBy { it.chroma }
-            .thenBy { it.brightness })
-        ?.toColor()
-
-    private fun colorBucketIndex(red: Int, green: Int, blue: Int): Int =
-        ((red ushr COLOR_BUCKET_SHIFT) shl (COLOR_BUCKET_BITS * 2)) or
-            ((green ushr COLOR_BUCKET_SHIFT) shl COLOR_BUCKET_BITS) or
-            (blue ushr COLOR_BUCKET_SHIFT)
-
-    private class ColorBucket {
-        var weight = 0L
-            private set
-        var chroma = 0L
-            private set
-        var brightness = 0L
-            private set
-        private var red = 0L
-        private var green = 0L
-        private var blue = 0L
-
-        fun add(red: Int, green: Int, blue: Int, weight: Long) {
-            this.weight += weight
-            this.red += red * weight
-            this.green += green * weight
-            this.blue += blue * weight
-            this.chroma += (maxOf(red, green, blue) - minOf(red, green, blue)) * weight
-            this.brightness += maxOf(red, green, blue) * weight
-        }
-
-        fun toColor() = Color4b(
-            averaged(red),
-            averaged(green),
-            averaged(blue),
-        )
-
-        private fun averaged(channel: Long) = ((channel + weight / 2) / weight).toInt()
-    }
-
-    private companion object {
-        const val MIN_VISIBLE_ALPHA = 16
-        const val COLOR_BUCKET_BITS = 3
-        const val COLOR_BUCKET_SHIFT = 8 - COLOR_BUCKET_BITS
-        const val COLOR_BUCKET_COUNT = 1 shl (COLOR_BUCKET_BITS * 3)
     }
 }

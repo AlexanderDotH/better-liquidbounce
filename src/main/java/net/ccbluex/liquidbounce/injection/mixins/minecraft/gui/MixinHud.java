@@ -27,10 +27,9 @@ import net.ccbluex.liquidbounce.event.EventManager;
 import net.ccbluex.liquidbounce.event.events.OverlayMessageEvent;
 import net.ccbluex.liquidbounce.event.events.OverlayRenderEvent;
 import net.ccbluex.liquidbounce.event.events.PerspectiveEvent;
-import net.ccbluex.liquidbounce.features.misc.HideAppearance;
+import net.ccbluex.liquidbounce.features.misc.HideAppearanceHook;
 import net.ccbluex.liquidbounce.features.module.modules.combat.ModuleSwordBlock;
 import net.ccbluex.liquidbounce.features.module.modules.player.ModuleReach;
-import net.ccbluex.liquidbounce.features.module.modules.render.DoRender;
 import net.ccbluex.liquidbounce.features.module.modules.render.ModuleAntiBlind;
 import net.ccbluex.liquidbounce.features.module.modules.render.ModuleFreeCam;
 import net.ccbluex.liquidbounce.features.module.modules.render.ModuleHud;
@@ -91,7 +90,7 @@ public abstract class MixinHud {
      */
     @Inject(method = "extractHotbarAndDecorations", at = @At("HEAD"))
     private void hookRenderEventStart(GuiGraphicsExtractor context, DeltaTracker tickCounter, CallbackInfo ci) {
-        if (HideAppearance.INSTANCE.isHidingNow()) {
+        if (HideAppearanceHook.isHidingNow()) {
             return;
         }
 
@@ -107,7 +106,7 @@ public abstract class MixinHud {
 
     @Inject(method = "extractSpyglassOverlay", at = @At("HEAD"), cancellable = true)
     private void hookRenderSpyglassOverlay(GuiGraphicsExtractor context, float scale, CallbackInfo ci) {
-        if (!ModuleAntiBlind.canRender(DoRender.SPYGLASS_OVERLAY)) {
+        if (!ModuleAntiBlind.canRenderSpyglassOverlay()) {
             ci.cancel();
         }
     }
@@ -118,12 +117,12 @@ public abstract class MixinHud {
             return;
         }
 
-        if (!ModuleAntiBlind.canRender(DoRender.PUMPKIN_BLUR) && ModuleAntiBlind.TEXTURE_PUMPKIN_BLUR.equals(texture)) {
+        if (!ModuleAntiBlind.canRenderPumpkinBlur() && ModuleAntiBlind.TEXTURE_PUMPKIN_BLUR.equals(texture)) {
             callback.cancel();
             return;
         }
 
-        if (!ModuleAntiBlind.canRender(DoRender.POWDER_SNOW_FOG) && POWDER_SNOW_OUTLINE_LOCATION.equals(texture)) {
+        if (!ModuleAntiBlind.canRenderPowderSnowFog() && POWDER_SNOW_OUTLINE_LOCATION.equals(texture)) {
             callback.cancel();
         }
     }
@@ -138,7 +137,7 @@ public abstract class MixinHud {
 
     @Inject(method = "extractPortalOverlay", at = @At("HEAD"), cancellable = true)
     private void hookRenderPortalOverlay(CallbackInfo ci) {
-        if (!ModuleAntiBlind.canRender(DoRender.PORTAL_OVERLAY)) {
+        if (!ModuleAntiBlind.canRenderPortalOverlay()) {
             ci.cancel();
         }
     }
@@ -311,14 +310,14 @@ public abstract class MixinHud {
 
     @Inject(method = "extractTitle", at = @At("HEAD"), cancellable = true)
     private void hookRenderTitleAndSubtitle(CallbackInfo ci) {
-        if (!ModuleAntiBlind.canRender(DoRender.TITLE)) {
+        if (!ModuleAntiBlind.canRenderTitle()) {
             ci.cancel();
         }
     }
 
     @Inject(method = "extractConfusionOverlay", at = @At("HEAD"), cancellable = true)
     private void hookNauseaOverlay(GuiGraphicsExtractor context, float distortionStrength, CallbackInfo ci) {
-        if (!ModuleAntiBlind.canRender(DoRender.NAUSEA)) {
+        if (!ModuleAntiBlind.canRenderNausea()) {
             ci.cancel();
         }
     }

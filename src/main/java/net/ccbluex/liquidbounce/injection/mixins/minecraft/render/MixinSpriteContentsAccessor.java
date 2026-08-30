@@ -20,6 +20,7 @@
 package net.ccbluex.liquidbounce.injection.mixins.minecraft.render;
 
 import com.mojang.blaze3d.platform.NativeImage;
+import net.ccbluex.liquidbounce.render.SpriteContentsImageAccess;
 import net.minecraft.client.renderer.texture.SpriteContents;
 import org.jspecify.annotations.NullMarked;
 import org.spongepowered.asm.mixin.Mixin;
@@ -27,8 +28,9 @@ import org.spongepowered.asm.mixin.gen.Accessor;
 
 @NullMarked
 @Mixin(SpriteContents.class)
-public interface MixinSpriteContentsAccessor {
+public interface MixinSpriteContentsAccessor extends SpriteContentsImageAccess {
 
+    @Override
     @Accessor
     NativeImage getOriginalImage();
 

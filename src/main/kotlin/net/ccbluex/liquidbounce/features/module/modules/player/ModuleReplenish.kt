@@ -19,7 +19,7 @@
 package net.ccbluex.liquidbounce.features.module.modules.player
 
 import net.ccbluex.fastutil.enumMapOf
-import net.ccbluex.liquidbounce.config.types.list.Tagged
+import net.ccbluex.liquidbounce.common.Tagged
 import net.ccbluex.liquidbounce.event.events.ScheduleInventoryActionEvent
 import net.ccbluex.liquidbounce.event.events.ScreenEvent
 import net.ccbluex.liquidbounce.event.events.WorldChangeEvent
@@ -32,7 +32,7 @@ import net.ccbluex.liquidbounce.utils.inventory.HotbarItemSlot
 import net.ccbluex.liquidbounce.utils.inventory.InventoryAction.Click
 import net.ccbluex.liquidbounce.utils.inventory.InventoryItemSlot
 import net.ccbluex.liquidbounce.utils.inventory.ItemSlot
-import net.ccbluex.liquidbounce.utils.inventory.PlayerInventoryConstraints
+import net.ccbluex.liquidbounce.features.inventory.PlayerInventoryConstraints
 import net.ccbluex.liquidbounce.utils.inventory.Slots
 import net.ccbluex.liquidbounce.utils.item.isMergeable
 import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen

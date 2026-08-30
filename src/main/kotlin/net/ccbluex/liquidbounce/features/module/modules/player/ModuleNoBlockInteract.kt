@@ -24,7 +24,7 @@ import net.ccbluex.liquidbounce.event.events.MovementInputEvent
 import net.ccbluex.liquidbounce.event.handler
 import net.ccbluex.liquidbounce.features.module.ClientModule
 import net.ccbluex.liquidbounce.features.module.ModuleCategories
-import net.ccbluex.liquidbounce.injection.mixins.minecraft.client.MinecraftAccessor
+import net.ccbluex.liquidbounce.interfaces.MinecraftUseItemAccess
 import net.ccbluex.liquidbounce.utils.block.getBlock
 import net.ccbluex.liquidbounce.utils.block.isInteractable
 import net.ccbluex.liquidbounce.utils.block.state
@@ -56,7 +56,7 @@ object ModuleNoBlockInteract : ClientModule("NoBlockInteract", ModuleCategories.
     @Suppress("unused")
     private val handleGameTick = handler<GameTickEvent> {
         if (interacting) {
-            (mc as MinecraftAccessor).callStartUseItem()
+            (mc as MinecraftUseItemAccess).callStartUseItem()
             interacting = false
             sneaking = false
         }

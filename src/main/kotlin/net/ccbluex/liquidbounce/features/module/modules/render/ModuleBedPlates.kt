@@ -32,21 +32,21 @@ import net.ccbluex.liquidbounce.event.handler
 import net.ccbluex.liquidbounce.event.suspendHandler
 import net.ccbluex.liquidbounce.features.module.ClientModule
 import net.ccbluex.liquidbounce.features.module.ModuleCategories
+import net.ccbluex.liquidbounce.features.module.modules.render.bedplates.BedPlateRenderState
+import net.ccbluex.liquidbounce.features.module.modules.render.bedplates.bedLayerLabel
 import net.ccbluex.liquidbounce.render.gui.ItemStackListRenderer.createItemStackForRendering
 import net.ccbluex.liquidbounce.render.gui.ItemStackListRenderer.drawItemStackList
 import net.ccbluex.liquidbounce.render.engine.type.Color4b
 import net.ccbluex.liquidbounce.render.withPush
-import net.ccbluex.liquidbounce.utils.block.bed.BedBlockTracker
-import net.ccbluex.liquidbounce.utils.block.bed.BedState
-import net.ccbluex.liquidbounce.utils.block.bed.SurroundingBlock
-import net.ccbluex.liquidbounce.utils.block.bed.isSelfBedChoices
+import net.ccbluex.liquidbounce.features.block.bed.BedBlockTracker
+import net.ccbluex.liquidbounce.features.block.bed.isSelfBedChoices
 import net.ccbluex.liquidbounce.utils.collection.Filter
 import net.ccbluex.liquidbounce.utils.collection.blockSortedSetOf
 import net.ccbluex.liquidbounce.utils.entity.cameraDistance
 import net.ccbluex.liquidbounce.utils.inventory.Slots
 import net.ccbluex.liquidbounce.utils.kotlin.Minecraft
 import net.ccbluex.liquidbounce.utils.kotlin.addAll
-import net.ccbluex.liquidbounce.utils.render.WorldToScreen
+import net.ccbluex.liquidbounce.render.WorldToScreen
 import net.minecraft.core.BlockPos
 import net.minecraft.world.item.ItemStack
 import net.minecraft.world.level.block.Block
@@ -55,8 +55,6 @@ import org.joml.Vector2f
 import java.util.function.Predicate
 
 object ModuleBedPlates : ClientModule("BedPlates", ModuleCategories.RENDER), BedBlockTracker.Subscriber {
-    private val ROMAN_NUMERALS = arrayOf("", "I", "II", "III", "IV", "V", "VI", "VII", "VIII")
-
     private val backgroundColor by color("BackgroundColor", Color4b.DEFAULT_BG_COLOR)
     private val outline by boolean("Outline", false)
 
@@ -114,20 +112,7 @@ object ModuleBedPlates : ClientModule("BedPlates", ModuleCategories.RENDER), Bed
         }
     }
 
-    private data class BedStateRenderState(
-        @JvmField val bedState: BedState,
-        @JvmField var distance: Double,
-        @JvmField var surrounding: List<SurroundingBlock>,
-        @JvmField var itemStacksForRender: List<ItemStack>,
-    ) : Comparable<BedStateRenderState> {
-        constructor(bedState: BedState) : this(bedState, 0.0, emptyList(), emptyList())
-
-        override fun compareTo(other: BedStateRenderState): Int {
-            return distance.compareTo(other.distance)
-        }
-    }
-
-    private val beds = ArrayList<BedStateRenderState>()
+    private val beds = ArrayList<BedPlateRenderState>()
 
     private fun updateAndSortBeds() {
         beds.forEach { renderState ->
@@ -159,7 +144,7 @@ object ModuleBedPlates : ClientModule("BedPlates", ModuleCategories.RENDER), Bed
     private val bedStateChangeHandler = suspendHandler<BedStateChangeEvent>(Dispatchers.Minecraft) { event ->
         beds.clear()
         beds.ensureCapacity(event.bedStates.size)
-        event.bedStates.mapTo(beds, ::BedStateRenderState)
+        event.bedStates.mapTo(beds, ::BedPlateRenderState)
         updateAndSortBeds()
     }
 
@@ -170,9 +155,8 @@ object ModuleBedPlates : ClientModule("BedPlates", ModuleCategories.RENDER), Bed
 
     @Suppress("unused")
     private val renderHandler = handler<OverlayRenderEvent> { event ->
-        fun isAdjacentAndNotEquals(pos1: BlockPos, pos2: BlockPos): Boolean {
-            return pos1 != pos2 && pos1.distManhattan(pos2) <= 1
-        }
+        fun isAdjacentAndNotEquals(pos1: BlockPos, pos2: BlockPos) =
+            pos1 != pos2 && pos1.distManhattan(pos2) <= 1
 
         beds.sort()
 
@@ -208,7 +192,6 @@ object ModuleBedPlates : ClientModule("BedPlates", ModuleCategories.RENDER), Bed
                 .rectBackground(backgroundColor, outlineColor)
                 .itemStackRenderer { textRenderer, index, stack, x, y ->
                     if (index == 0 && showBed) {
-                        // bed
                         item(stack, x, y)
                         drawStackCount(textRenderer, stack, x, y, "${distance.toInt()}m")
                     } else {
@@ -226,18 +209,16 @@ object ModuleBedPlates : ClientModule("BedPlates", ModuleCategories.RENDER), Bed
                         item(stack, x, y)
                         val countString = stack.count.toString()
                         pose().withPush {
-                            // draw layer text
                             if (!compact) {
                                 text(
                                     textRenderer,
-                                    ROMAN_NUMERALS[surroundingBlock.layer],
+                                    bedLayerLabel(surroundingBlock.layer),
                                     x,
                                     y,
                                     color,
                                     textShadow,
                                 )
                             }
-                            // drawStackCount, with custom color (copied from DrawContext)
                             text(
                                 textRenderer,
                                 countString,

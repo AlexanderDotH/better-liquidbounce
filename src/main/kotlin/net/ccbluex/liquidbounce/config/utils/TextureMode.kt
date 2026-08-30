@@ -21,7 +21,7 @@ package net.ccbluex.liquidbounce.config.utils
 
 import net.ccbluex.liquidbounce.config.types.group.Mode
 import net.ccbluex.liquidbounce.config.types.group.ModeValueGroup
-import net.ccbluex.liquidbounce.config.types.list.Tagged
+import net.ccbluex.liquidbounce.common.Tagged
 import net.ccbluex.liquidbounce.config.types.toTextureProperty
 import net.minecraft.client.renderer.texture.DynamicTexture
 

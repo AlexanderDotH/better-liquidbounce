@@ -21,8 +21,8 @@ package net.ccbluex.liquidbounce.integration.task
 
 import net.ccbluex.liquidbounce.integration.backend.BrowserBackendManager
 import net.ccbluex.liquidbounce.integration.backend.isBrowserDisabled
-import net.ccbluex.liquidbounce.integration.task.type.ResourceTask
-import net.ccbluex.liquidbounce.integration.task.type.Task
+import net.ccbluex.liquidbounce.common.task.ResourceTask
+import net.ccbluex.liquidbounce.common.task.Task
 import net.ccbluex.liquidbounce.utils.client.mc
 import net.ccbluex.liquidbounce.utils.collection.Pools
 import net.ccbluex.liquidbounce.utils.text.PlainText
@@ -48,72 +48,61 @@ class TaskProgressScreen(
 
     override fun extractRenderState(context: GuiGraphicsExtractor, mouseX: Int, mouseY: Int, partialTick: Float) {
         extractMenuBackground(context)
-
         val cx = width / 2.0
         val cy = height / 2.0
-
         val progressBarWidth = width / 1.5
-
-        val poseStack = context.pose()
-
-        // Progress
         val progress = taskManager.progress
         val textLines = getTaskLines(progress)
+        val progressBarY = drawProgressText(context, cx, cy, textLines)
+        drawProgressBar(context, cx, progressBarY, progressBarWidth, progress)
+    }
 
-        // Draw text
+    private fun drawProgressText(
+        context: GuiGraphicsExtractor,
+        centerX: Double,
+        centerY: Double,
+        textLines: List<Component>,
+    ): Int {
         val textHeight = textLines.size * (font.lineHeight + 2)
-        var yOffset = (cy - textHeight / 2).toInt() - 40
-
-        // Draw title
+        var yOffset = (centerY - textHeight / 2).toInt() - 40
         context.text(
             font,
             title.string.asPlainText(ChatFormatting.GOLD),
-            (cx - font.width(title.string) / 2).toInt(),
+            (centerX - font.width(title.string) / 2).toInt(),
             yOffset,
             -1,
-            true
+            true,
         )
-
         yOffset += font.lineHeight + 10
-
-        // Draw task information
         for (line in textLines) {
-            context.text(
-                font,
-                line,
-                (cx - font.width(line) / 2).toInt(),
-                yOffset,
-                -1,
-                false
-            )
+            context.text(font, line, (centerX - font.width(line) / 2).toInt(), yOffset, -1, false)
             yOffset += font.lineHeight + 2
         }
+        return yOffset
+    }
 
+    private fun drawProgressBar(
+        context: GuiGraphicsExtractor,
+        centerX: Double,
+        yOffset: Int,
+        progressBarWidth: Double,
+        progress: Float,
+    ) {
         val progressBarHeight = 14
-
-        // Draw progress bar
+        val poseStack = context.pose()
         poseStack.pushMatrix()
-        poseStack.translate(cx.toFloat(), yOffset.toFloat() + 18.0f)
+        poseStack.translate(centerX.toFloat(), yOffset.toFloat() + 18.0f)
         poseStack.translate(progressBarWidth.toFloat() * -0.5f, progressBarHeight.toFloat() * -0.5f)
-
-        // Bar border
-        context.fill(
-            0, 0,
-            progressBarWidth.toInt(), progressBarHeight.toInt(),
-            -1
-        )
-
-        // Bar background
+        context.fill(0, 0, progressBarWidth.toInt(), progressBarHeight, -1)
         context.fill(
             2, 2,
             (progressBarWidth - 2).toInt(), (progressBarHeight - 2).toInt(),
-            ARGB.color(255, 24, 26, 27)
+            ARGB.color(255, 24, 26, 27),
         )
-
         context.fill(
             4, 4,
             ((progressBarWidth - 4) * progress).toInt(), (progressBarHeight - 4).toInt(),
-            -1
+            -1,
         )
         poseStack.popMatrix()
     }

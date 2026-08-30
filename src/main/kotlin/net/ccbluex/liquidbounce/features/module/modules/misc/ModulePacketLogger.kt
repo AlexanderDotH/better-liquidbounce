@@ -22,26 +22,26 @@ import kotlinx.atomicfu.atomic
 import net.ccbluex.fastutil.mapToArray
 import net.ccbluex.liquidbounce.config.ConfigSystem
 import net.ccbluex.liquidbounce.config.gson.adapter.toUnderlinedString
-import net.ccbluex.liquidbounce.config.types.list.Tagged
+import net.ccbluex.liquidbounce.common.Tagged
 import net.ccbluex.liquidbounce.event.events.PacketEvent
 import net.ccbluex.liquidbounce.event.events.TransferOrigin
 import net.ccbluex.liquidbounce.event.handler
 import net.ccbluex.liquidbounce.features.misc.HideAppearance.isDestructed
 import net.ccbluex.liquidbounce.features.module.ClientModule
 import net.ccbluex.liquidbounce.features.module.ModuleCategories
-import net.ccbluex.liquidbounce.utils.client.MessageMetadata
+import net.ccbluex.liquidbounce.features.module.modules.misc.packetlogger.collectPacketFields
+import net.ccbluex.liquidbounce.features.chat.MessageMetadata
 import net.ccbluex.liquidbounce.utils.text.asPlainText
 import net.ccbluex.liquidbounce.utils.text.asText
-import net.ccbluex.liquidbounce.utils.client.bold
-import net.ccbluex.liquidbounce.utils.client.chat
-import net.ccbluex.liquidbounce.utils.client.copyable
-import net.ccbluex.liquidbounce.utils.client.highlight
-import net.ccbluex.liquidbounce.utils.client.regular
+import net.ccbluex.liquidbounce.utils.text.bold
+import net.ccbluex.liquidbounce.features.chat.chat
+import net.ccbluex.liquidbounce.utils.text.copyable
+import net.ccbluex.liquidbounce.utils.text.highlight
+import net.ccbluex.liquidbounce.utils.text.regular
 import net.ccbluex.liquidbounce.utils.client.toName
-import net.ccbluex.liquidbounce.utils.client.variable
+import net.ccbluex.liquidbounce.utils.text.variable
 import net.ccbluex.liquidbounce.utils.collection.Filter
 import net.ccbluex.liquidbounce.utils.kotlin.EventPriorityConvention
-import net.ccbluex.liquidbounce.utils.kotlin.isNotRoot
 import net.ccbluex.liquidbounce.utils.kotlin.toFullString
 import net.ccbluex.liquidbounce.utils.text.PlainText
 import net.ccbluex.liquidbounce.utils.text.buildText
@@ -53,8 +53,6 @@ import okio.appendingSink
 import okio.buffer
 import java.io.File
 import java.lang.reflect.Field
-import java.lang.reflect.Modifier
-import java.lang.reflect.Type
 import java.time.LocalDateTime
 import java.util.concurrent.ConcurrentHashMap
 
@@ -189,7 +187,7 @@ object ModulePacketLogger : ClientModule("PacketLogger", ModuleCategories.MISC) 
                         .writeByte(','.code)
                         .writeByte('"'.code)
 
-                    collectFields(clazz, packet).forEach { (name, type, value) ->
+                    collectPacketFields(clazz, packet).forEach { (name, type, value) ->
                         it.writeUtf8(name)
                             .writeByte(':'.code)
                             .writeUtf8(type.toFullString())
@@ -206,41 +204,8 @@ object ModulePacketLogger : ClientModule("PacketLogger", ModuleCategories.MISC) 
         abstract fun handle(origin: TransferOrigin, packet: Packet<*>, canceled: Boolean, packetId: Identifier)
     }
 
-    @JvmRecord
-    private data class PacketField(val name: String, val type: Type, val value: Any?)
-
-    private fun collectFields(clazz: Class<out Packet<*>>, packet: Packet<*>): List<PacketField> {
-        val fields = mutableListOf<PacketField>()
-
-        var currentClass: Class<*>? = clazz
-
-        while (currentClass.isNotRoot()) {
-            currentClass.declaredFields.forEach { field ->
-                if (Modifier.isStatic(field.modifiers)) {
-                    return@forEach
-                }
-
-                field.isAccessible = true
-
-                val name = field.name
-
-                val value = try {
-                    field.get(packet)?.toString()
-                } catch (@Suppress("SwallowedException") _: IllegalAccessException) {
-                    "null"
-                }
-
-                fields += PacketField(name, field.genericType, value)
-            }
-
-            currentClass = currentClass.superclass
-        }
-
-        return fields
-    }
-
     private fun MutableComponent.appendFields(clazz: Class<out Packet<*>>, packet: Packet<*>) {
-        val fieldTexts = collectFields(clazz, packet).mapToArray { (name, type, value) ->
+        val fieldTexts = collectPacketFields(clazz, packet).mapToArray { (name, type, value) ->
             buildText {
                 add("- ".asPlainText(ChatFormatting.GRAY))
                 add(name.asText().withStyle(ChatFormatting.AQUA).copyable(copyContent = name))

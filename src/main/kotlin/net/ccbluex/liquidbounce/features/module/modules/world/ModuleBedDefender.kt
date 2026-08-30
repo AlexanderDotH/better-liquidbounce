@@ -28,8 +28,8 @@ import net.ccbluex.liquidbounce.features.module.ModuleCategories
 import net.ccbluex.liquidbounce.features.module.modules.render.ModuleDebug
 import net.ccbluex.liquidbounce.features.module.modules.render.ModuleDebug.debugGeometry
 import net.ccbluex.liquidbounce.render.engine.type.Color4b
-import net.ccbluex.liquidbounce.utils.block.bed.isSelfBedChoices
-import net.ccbluex.liquidbounce.utils.block.placer.BlockPlacer
+import net.ccbluex.liquidbounce.features.block.bed.isSelfBedChoices
+import net.ccbluex.liquidbounce.features.block.placer.BlockPlacer
 import net.ccbluex.liquidbounce.utils.block.searchBedLayer
 import net.ccbluex.liquidbounce.utils.block.searchBlocksInCuboid
 import net.ccbluex.liquidbounce.utils.inventory.HotbarItemSlot

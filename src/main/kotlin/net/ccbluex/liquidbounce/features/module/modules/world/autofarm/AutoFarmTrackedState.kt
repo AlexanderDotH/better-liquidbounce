@@ -21,7 +21,7 @@ package net.ccbluex.liquidbounce.features.module.modules.world.autofarm
 
 import net.ccbluex.fastutil.enumSetOf
 import net.ccbluex.fastutil.objectArraySetOf
-import net.ccbluex.liquidbounce.config.types.list.Tagged
+import net.ccbluex.liquidbounce.common.Tagged
 import net.ccbluex.liquidbounce.utils.client.world
 import net.minecraft.core.BlockPos
 import net.minecraft.core.Direction

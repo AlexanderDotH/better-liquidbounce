@@ -18,23 +18,23 @@
  */
 package net.ccbluex.liquidbounce.features.module.modules.world
 
-import net.ccbluex.liquidbounce.config.types.list.Tagged
+import net.ccbluex.liquidbounce.common.Tagged
 import net.ccbluex.liquidbounce.event.events.PacketEvent
 import net.ccbluex.liquidbounce.event.events.RotationUpdateEvent
 import net.ccbluex.liquidbounce.event.handler
 import net.ccbluex.liquidbounce.features.module.ClientModule
 import net.ccbluex.liquidbounce.features.module.ModuleCategories
-import net.ccbluex.liquidbounce.utils.block.placer.BlockPlacer
-import net.ccbluex.liquidbounce.utils.block.placer.placeInstantOnBlockUpdate
-import net.ccbluex.liquidbounce.utils.client.FloatValueProvider
+import net.ccbluex.liquidbounce.features.block.placer.BlockPlacer
+import net.ccbluex.liquidbounce.features.block.placer.placeInstantOnBlockUpdate
+import net.ccbluex.liquidbounce.config.types.FloatValueProvider
 import net.ccbluex.liquidbounce.utils.collection.Filter
 import net.ccbluex.liquidbounce.utils.collection.blockSortedSetOf
 import net.ccbluex.liquidbounce.utils.collection.getSlot
-import net.ccbluex.liquidbounce.utils.combat.TargetPriority
-import net.ccbluex.liquidbounce.utils.combat.TargetTracker
+import net.ccbluex.liquidbounce.features.combat.runtime.TargetPriority
+import net.ccbluex.liquidbounce.features.combat.runtime.TargetTracker
 import net.ccbluex.liquidbounce.utils.kotlin.Priority
 import net.ccbluex.liquidbounce.utils.kotlin.range
-import net.ccbluex.liquidbounce.utils.render.TargetRenderer
+import net.ccbluex.liquidbounce.render.target.TargetRenderer
 import net.minecraft.core.BlockPos
 import net.minecraft.util.Mth
 import net.minecraft.world.entity.Entity
@@ -72,7 +72,7 @@ object ModuleBlockTrap : ClientModule("BlockTrap", ModuleCategories.WORLD) {
     ))
 
     init {
-        tree(TargetRenderer(this, targetTracker))
+        tree(TargetRenderer(this, targetTracker::target))
     }
 
     override fun onDisabled() {

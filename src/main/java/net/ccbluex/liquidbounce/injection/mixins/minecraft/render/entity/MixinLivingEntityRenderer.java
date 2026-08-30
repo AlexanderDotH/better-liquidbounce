@@ -26,14 +26,17 @@ import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
 import com.llamalad7.mixinextras.sugar.Local;
 import com.mojang.blaze3d.vertex.PoseStack;
 import kotlin.Pair;
-import net.ccbluex.liquidbounce.api.models.cosmetics.CosmeticCategory;
-import net.ccbluex.liquidbounce.features.cosmetic.CosmeticService;
-import net.ccbluex.liquidbounce.features.module.modules.render.*;
+import net.ccbluex.liquidbounce.features.cosmetic.CosmeticRenderHook;
+import net.ccbluex.liquidbounce.features.module.modules.render.ModuleAntiBlind;
+import net.ccbluex.liquidbounce.features.module.modules.render.ModuleChams;
+import net.ccbluex.liquidbounce.features.module.modules.render.ModuleFreeCam;
+import net.ccbluex.liquidbounce.features.module.modules.render.ModuleLogoffSpot;
+import net.ccbluex.liquidbounce.features.module.modules.render.ModulePlayerModel;
+import net.ccbluex.liquidbounce.features.module.modules.render.ModuleTrueSight;
 import net.ccbluex.liquidbounce.interfaces.EntityRenderStateAddition;
 import net.ccbluex.liquidbounce.render.engine.type.Color4b;
 import net.ccbluex.liquidbounce.utils.aiming.data.Rotation;
-import net.ccbluex.liquidbounce.utils.combat.CombatExtensionsKt;
-import net.ccbluex.liquidbounce.utils.render.PlayerModelDelayHook;
+import net.ccbluex.liquidbounce.render.playermodel.PlayerModelDelayHook;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.model.EntityModel;
 import net.minecraft.client.model.Model;
@@ -181,7 +184,7 @@ public abstract class MixinLivingEntityRenderer<T extends LivingEntity, S extend
             return original;
         }
 
-        return original || CosmeticService.INSTANCE.hasCosmetic(entity.getUUID(), CosmeticCategory.DINNERBONE);
+        return original || CosmeticRenderHook.hasDinnerbone(entity.getUUID());
     }
 
     // Chams
@@ -217,7 +220,7 @@ public abstract class MixinLivingEntityRenderer<T extends LivingEntity, S extend
     // AntiBlind
     @Inject(method = "submit", at = @At("HEAD"), cancellable = true)
     private void hideInvisibleEntities(S state, PoseStack poseStack, SubmitNodeCollector submitNodeCollector, CameraRenderState camera, CallbackInfo ci) {
-        if (state.isInvisible && !ModuleAntiBlind.canRender(DoRender.INVISIBLE_ENTITIES)) {
+        if (state.isInvisible && !ModuleAntiBlind.canRenderInvisibleEntities()) {
             ci.cancel();
         }
     }

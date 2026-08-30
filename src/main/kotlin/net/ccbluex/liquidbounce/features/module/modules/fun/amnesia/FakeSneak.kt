@@ -20,10 +20,9 @@
 package net.ccbluex.liquidbounce.features.module.modules.`fun`.amnesia
 
 import net.ccbluex.liquidbounce.config.types.group.ToggleableValueGroup
-import net.ccbluex.liquidbounce.features.module.modules.`fun`.ModuleAmnesia
 
 object FakeSneak : ToggleableValueGroup(
-    ModuleAmnesia,
+    null,
     "FakeSneak",
     false,
     aliases = listOf("Fake Sneak"),

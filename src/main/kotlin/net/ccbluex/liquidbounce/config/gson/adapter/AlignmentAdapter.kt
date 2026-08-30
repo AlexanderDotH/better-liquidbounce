@@ -25,8 +25,8 @@ import com.google.gson.JsonElement
 import com.google.gson.JsonObject
 import com.google.gson.JsonSerializationContext
 import com.google.gson.JsonSerializer
-import net.ccbluex.liquidbounce.utils.render.Alignment
-import net.ccbluex.liquidbounce.utils.render.Alignment.ScreenAxisX
+import net.ccbluex.liquidbounce.config.types.group.Alignment
+import net.ccbluex.liquidbounce.config.types.group.Alignment.ScreenAxisX
 import java.lang.reflect.Type
 
 object AlignmentAdapter : JsonDeserializer<Alignment>, JsonSerializer<Alignment> {

@@ -18,6 +18,7 @@
  */
 package net.ccbluex.liquidbounce.features.module.modules.world
 
+import net.ccbluex.liquidbounce.features.module.modules.world.autotool.selectAutoToolInventorySwapTarget
 import net.ccbluex.liquidbounce.utils.client.SilentHotbarSelectionPolicy
 import net.minecraft.world.entity.player.Inventory
 import kotlin.test.Test

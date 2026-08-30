@@ -19,12 +19,11 @@
 package net.ccbluex.liquidbounce.features.module.modules.world.scaffold.tower
 
 import net.ccbluex.liquidbounce.event.tickHandler
-import net.ccbluex.liquidbounce.features.module.modules.world.scaffold.ModuleScaffold
 import net.ccbluex.liquidbounce.lang.translation
-import net.ccbluex.liquidbounce.utils.client.chat
+import net.ccbluex.liquidbounce.features.chat.chat
 import net.ccbluex.liquidbounce.utils.client.isEqual1_8
-import net.ccbluex.liquidbounce.utils.client.markAsError
-import net.ccbluex.liquidbounce.utils.client.warning
+import net.ccbluex.liquidbounce.utils.text.markAsError
+import net.ccbluex.liquidbounce.utils.text.warning
 import net.ccbluex.liquidbounce.utils.entity.horizontalSpeed
 
 object ScaffoldTowerHypixel : ScaffoldTower("Hypixel") {
@@ -33,7 +32,7 @@ object ScaffoldTowerHypixel : ScaffoldTower("Hypixel") {
 
     @Suppress("unused")
     private val tickHandler = tickHandler {
-        if (!mc.options.keyJump.isDown || ModuleScaffold.blockCount <= 0) {
+        if (!mc.options.keyJump.isDown || ScaffoldTowerRuntimeBridge.requireRuntime().blockCount <= 0) {
             return@tickHandler
         }
 

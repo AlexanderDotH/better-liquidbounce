@@ -18,6 +18,12 @@
  */
 package net.ccbluex.liquidbounce.features.module.modules.movement.autododge
 
+import net.ccbluex.liquidbounce.features.module.modules.movement.autododge.spearteleport.SpearTeleportPlan
+import net.ccbluex.liquidbounce.features.module.modules.movement.autododge.spearteleport.SpearTeleportPoint
+
+import net.ccbluex.liquidbounce.features.module.modules.movement.autododge.spearshield.SpearShieldCommand
+import net.ccbluex.liquidbounce.features.module.modules.movement.autododge.spearshield.SpearShieldInventoryLayout
+import net.ccbluex.liquidbounce.features.module.modules.movement.autododge.spearshield.SpearShieldInventorySnapshot
 import net.ccbluex.liquidbounce.utils.movement.DirectionalInput
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse

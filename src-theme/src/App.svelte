@@ -77,59 +77,46 @@
         setThemeColor("surface-color", mixColors(defaultSurfaceColor, themeColorToHex(color), SURFACE_TINT_MIX));
     }
 
-    onMount(async () => {
-        let metadata = await getMetadata();
-        let defaultSurfaceColor = metadata.colors.Tint;
-
-        let theme = await getTheme(metadata.id);
-
-        applyAccentColor(theme.colors.accent);
-        applyTintColor(defaultSurfaceColor, theme.colors.tint);
-
-        await insertPersistentData();
-
-        listenAlways("themeColorChange", async (event: ThemeColorChangeEvent) => {
-            if (event.themeId !== metadata?.id) {
-                return;
-            }
-
-            switch (event.name) {
-                case "Accent":
-                    applyAccentColor(event.value);
-                    break;
-                case "Tint":
-                    applyTintColor(defaultSurfaceColor, event.value);
-                    break;
-            }
-        });
-
-        if (isStatic) {
-            return;
-        }
-
-        listenAlways("socketReady", async () => {
-            const virtualScreen = await getVirtualScreen();
-            await changeRoute(virtualScreen.name || "none");
-        });
-
-        listenAlways("virtualScreen", async (event: any) => {
-            console.log(`[Router] Virtual screen change to ${event.screenName}`);
-            const action = event.action;
-
-            switch (action) {
-                case "close":
-                    releaseDocumentFocus();
-                    await changeRoute("none");
-                    break;
-                case "open":
-                    await changeRoute(event.screenName || "none");
-                    break;
-            }
-        });
-
+    async function navigateToVirtualScreen() {
         const virtualScreen = await getVirtualScreen();
         await changeRoute(virtualScreen.name || "none");
-    });
+    }
+
+    async function handleVirtualScreen(event: any) {
+        console.log(`[Router] Virtual screen change to ${event.screenName}`);
+        if (event.action === "close") {
+            releaseDocumentFocus();
+            await changeRoute("none");
+            return;
+        }
+        if (event.action === "open") {
+            await changeRoute(event.screenName || "none");
+        }
+    }
+
+    function registerThemeListener(themeId: string, defaultSurfaceColor: string) {
+        listenAlways("themeColorChange", async (event: ThemeColorChangeEvent) => {
+            if (event.themeId !== themeId) return;
+            if (event.name === "Accent") applyAccentColor(event.value);
+            if (event.name === "Tint") applyTintColor(defaultSurfaceColor, event.value);
+        });
+    }
+
+    async function initializeApplication() {
+        const metadata = await getMetadata();
+        const defaultSurfaceColor = metadata.colors.Tint;
+        const theme = await getTheme(metadata.id);
+        applyAccentColor(theme.colors.accent);
+        applyTintColor(defaultSurfaceColor, theme.colors.tint);
+        await insertPersistentData();
+        registerThemeListener(metadata.id, defaultSurfaceColor);
+        if (isStatic) return;
+        listenAlways("socketReady", navigateToVirtualScreen);
+        listenAlways("virtualScreen", handleVirtualScreen);
+        await navigateToVirtualScreen();
+    }
+
+    onMount(initializeApplication);
 </script>
 
 <main>

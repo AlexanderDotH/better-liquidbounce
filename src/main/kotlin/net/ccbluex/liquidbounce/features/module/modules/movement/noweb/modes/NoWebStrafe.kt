@@ -19,10 +19,7 @@
 
 package net.ccbluex.liquidbounce.features.module.modules.movement.noweb.modes
 
-import net.ccbluex.liquidbounce.config.types.group.ModeValueGroup
 import net.ccbluex.liquidbounce.config.types.group.ToggleableValueGroup
-import net.ccbluex.liquidbounce.features.module.modules.movement.noweb.ModuleNoWeb.modes
-import net.ccbluex.liquidbounce.features.module.modules.movement.noweb.NoWebMode
 import net.ccbluex.liquidbounce.utils.entity.moving
 import net.ccbluex.liquidbounce.utils.entity.withStrafe
 import net.minecraft.core.BlockPos
@@ -34,9 +31,6 @@ import net.minecraft.core.BlockPos
  * @author XeContrast
  */
 object NoWebStrafe : NoWebMode("Strafe") {
-    override val parent: ModeValueGroup<NoWebMode>
-        get() = modes
-
     private val strength by float("Strength", 0.23f, 0.01f..0.8f)
     private val motionY = tree(Motion())
     private val onlyGround by boolean("OnlyOnGround", false)

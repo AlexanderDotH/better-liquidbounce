@@ -1,0 +1,32 @@
+.contained-element {
+  min-width: 50px;
+  min-height: 50px;
+}
+
+.editor-mode {
+  background-color: var(--clickgui-hud-editor-draggable-element-background-color);
+  outline: solid 1px var(--clickgui-hud-editor-draggable-element-outline-color);
+  transition: background-color 100ms ease;
+}
+
+.magnetically-referenced {
+  background-color: var(--clickgui-hud-editor-magnetic-reference-background-color);
+}
+
+.position {
+  position: absolute;
+  top: calc(100% + 5px);
+  left: 0;
+  width: max-content;
+  height: 14px;
+  color: var(--clickgui-text-dimmed-color);
+  font-size: 12px;
+  text-wrap: nowrap;
+  background-color: var(--clickgui-hud-editor-draggable-element-position-background-color);
+  outline: solid 1px var(--clickgui-hud-editor-draggable-element-position-outline-color);
+}
+
+.position.top {
+  top: auto;
+  bottom: calc(100% + 5px);
+}

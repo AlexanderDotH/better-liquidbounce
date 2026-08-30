@@ -19,9 +19,8 @@
 package net.ccbluex.liquidbounce.features.module.modules.render
 
 import com.mojang.blaze3d.platform.InputConstants
-import net.ccbluex.liquidbounce.LiquidBounce
 import net.ccbluex.liquidbounce.config.types.group.ToggleableValueGroup
-import net.ccbluex.liquidbounce.config.types.list.Tagged
+import net.ccbluex.liquidbounce.common.Tagged
 import net.ccbluex.liquidbounce.event.EventManager
 import net.ccbluex.liquidbounce.event.events.BrowserReadyEvent
 import net.ccbluex.liquidbounce.event.events.ClickGuiScaleChangeEvent
@@ -32,13 +31,11 @@ import net.ccbluex.liquidbounce.event.events.WorldChangeEvent
 import net.ccbluex.liquidbounce.event.handler
 import net.ccbluex.liquidbounce.event.sequenceHandler
 import net.ccbluex.liquidbounce.event.waitSeconds
+import net.ccbluex.liquidbounce.features.autoconfig.contract.AutoConfigUiBridge
 import net.ccbluex.liquidbounce.features.module.ClientModule
 import net.ccbluex.liquidbounce.features.module.ModuleCategories
-import net.ccbluex.liquidbounce.integration.interop.protocol.rest.v1.game.isTyping
-import net.ccbluex.liquidbounce.integration.screen.CustomScreenType
-import net.ccbluex.liquidbounce.integration.screen.ScreenManager
-import net.ccbluex.liquidbounce.integration.screen.impl.CustomSharedMinecraftScreen
-import net.ccbluex.liquidbounce.integration.screen.impl.CustomStandaloneMinecraftScreen
+import net.ccbluex.liquidbounce.features.module.modules.render.clickgui.CachedClickGuiScreenBridge
+import net.ccbluex.liquidbounce.features.module.modules.render.clickgui.ClickGuiRuntimeBridge
 import net.ccbluex.liquidbounce.utils.client.inGame
 import net.ccbluex.liquidbounce.utils.kotlin.EventPriorityConvention.OBJECTION_AGAINST_EVERYTHING
 import net.ccbluex.liquidbounce.utils.kotlin.EventPriorityConvention.READ_FINAL_STATE
@@ -76,13 +73,11 @@ object ModuleClickGui :
 
     val isInSearchBar: Boolean
         get() {
-            if (!isTyping) {
+            if (!ClickGuiRuntimeBridge.isTyping()) {
                 return false
             }
 
-            val screen = mc.gui.screen() ?: return false
-            return screen is CustomSharedMinecraftScreen && screen.screenType == CustomScreenType.CLICK_GUI ||
-                screen is CustomStandaloneMinecraftScreen && screen.screenType == CustomScreenType.CLICK_GUI
+            return ClickGuiRuntimeBridge.isClickGuiScreen(mc.gui.screen())
         }
 
     object Snapping : ToggleableValueGroup(this, "Snapping", true) {
@@ -101,6 +96,7 @@ object ModuleClickGui :
 
     init {
         tree(Snapping)
+        AutoConfigUiBridge.installClickGuiSync(::sync)
     }
 
     @Suppress("UnusedPrivateProperty")
@@ -109,21 +105,21 @@ object ModuleClickGui :
     }
 
     // Standalone screen instance for caching
-    private var standaloneScreen: CustomStandaloneMinecraftScreen? = null
+    private var standaloneScreen: CachedClickGuiScreenBridge? = null
 
     @Suppress("unused")
     private val browserReadyHandler = handler<BrowserReadyEvent>(priority = READ_FINAL_STATE) {
-        tree(ScreenManager.browserSettings)
+        tree(ClickGuiRuntimeBridge.browserSettings())
     }
 
     override fun onEnabled() {
-        if (!LiquidBounce.isInitialized || !inGame) {
+        if (!ClickGuiRuntimeBridge.isClientInitialized() || !inGame) {
             return
         }
 
         updateStandaloneScreen()
         mc.execute {
-            mc.gui.setScreen(standaloneScreen ?: CustomSharedMinecraftScreen(CustomScreenType.CLICK_GUI))
+            mc.gui.setScreen(standaloneScreen?.screen ?: ClickGuiRuntimeBridge.createSharedScreen())
         }
         super.onEnabled()
     }
@@ -151,14 +147,14 @@ object ModuleClickGui :
     @Suppress("unused")
     private val tickHandler = handler<GameTickEvent> {
         // For some reason, we actually need this.
-        standaloneScreen?.browser?.visible = mc.gui.screen() == standaloneScreen
+        standaloneScreen?.browserVisible = mc.gui.screen() == standaloneScreen?.screen
     }
 
     fun updateStandaloneScreen(): Boolean {
         // Standalone Screen Cache
         if (useStandaloneScreen) {
             if (standaloneScreen == null) {
-                standaloneScreen = CustomStandaloneMinecraftScreen(CustomScreenType.CLICK_GUI)
+                standaloneScreen = ClickGuiRuntimeBridge.createStandaloneScreen()
             } else {
                 // Used in [worldChangeHandler] to determine if we need to sync.
                 return true
@@ -172,7 +168,7 @@ object ModuleClickGui :
     }
 
     fun sync() {
-        if (!LiquidBounce.isInitialized) {
+        if (!ClickGuiRuntimeBridge.isClientInitialized()) {
             return
         }
 
@@ -181,7 +177,7 @@ object ModuleClickGui :
 
     fun invalidate() {
         val standaloneScreen = standaloneScreen ?: return
-        val wasOpen = mc.gui.screen() == standaloneScreen
+        val wasOpen = mc.gui.screen() == standaloneScreen.screen
 
         // Close and invalidate old cache
         if (wasOpen) {
@@ -193,7 +189,7 @@ object ModuleClickGui :
         // Only bother updating now if it was open before.
         if (wasOpen) {
             updateStandaloneScreen()
-            mc.gui.setScreen(this.standaloneScreen ?: CustomSharedMinecraftScreen(CustomScreenType.CLICK_GUI))
+            mc.gui.setScreen(this.standaloneScreen?.screen ?: ClickGuiRuntimeBridge.createSharedScreen())
         }
     }
 

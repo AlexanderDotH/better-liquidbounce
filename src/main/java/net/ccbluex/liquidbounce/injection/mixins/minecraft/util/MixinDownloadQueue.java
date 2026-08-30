@@ -21,7 +21,7 @@ package net.ccbluex.liquidbounce.injection.mixins.minecraft.util;
 
 import com.llamalad7.mixinextras.injector.ModifyExpressionValue;
 import com.llamalad7.mixinextras.sugar.Local;
-import net.ccbluex.liquidbounce.features.spoofer.SpooferFingerprint;
+import net.ccbluex.liquidbounce.features.spoofer.ClientBrandHook;
 import net.minecraft.client.Minecraft;
 import net.minecraft.server.packs.DownloadQueue;
 import org.spongepowered.asm.mixin.Final;
@@ -43,7 +43,7 @@ public abstract class MixinDownloadQueue {
     private Path hookResolve(Path original, @Local(argsOnly = true, name = "id") UUID id) {
         // Check if our fingerprint spoofer is enabled or,
         // the folder has been altered with by another mod.
-        if (!SpooferFingerprint.INSTANCE.getRunning() || !original.getParent().equals(cacheDir)) {
+        if (!ClientBrandHook.isFingerprintSpoofing() || !original.getParent().equals(cacheDir)) {
             return original;
         }
 

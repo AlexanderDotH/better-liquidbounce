@@ -20,7 +20,9 @@ package net.ccbluex.liquidbounce.features.command.commands.client.marketplace.it
 
 import net.ccbluex.liquidbounce.api.models.marketplace.MarketplaceItemType
 import net.ccbluex.liquidbounce.api.services.marketplace.MarketplaceApi
-import net.ccbluex.liquidbounce.features.command.CommandExecutor.suspendHandler
+import net.ccbluex.liquidbounce.features.command.Command
+import net.ccbluex.liquidbounce.features.command.Parameter
+import net.ccbluex.liquidbounce.features.command.builder.CommandBuilder
 import net.ccbluex.liquidbounce.features.command.builder.ParameterBuilder
 import net.ccbluex.liquidbounce.features.command.builder.enumChoice
 import net.ccbluex.liquidbounce.features.command.dsl.addParam
@@ -28,62 +30,71 @@ import net.ccbluex.liquidbounce.features.command.dsl.buildCommand
 import net.ccbluex.liquidbounce.features.command.dsl.cast
 import net.ccbluex.liquidbounce.features.command.dsl.castVararg
 import net.ccbluex.liquidbounce.features.command.preset.accountOrException
+import net.ccbluex.liquidbounce.features.command.CommandRuntime.suspendHandler
 import net.ccbluex.liquidbounce.features.cosmetic.ClientAccountManager
-import net.ccbluex.liquidbounce.utils.client.chat
-import net.ccbluex.liquidbounce.utils.client.regular
-import net.ccbluex.liquidbounce.utils.client.variable
+import net.ccbluex.liquidbounce.features.chat.chat
+import net.ccbluex.liquidbounce.utils.text.regular
+import net.ccbluex.liquidbounce.utils.text.variable
 
 /**
  * Edit marketplace item
  */
 fun marketplaceEditItemCommand() = buildCommand("edit") {
+    val parameters = marketplaceEditParameters()
+    suspendHandler { updateMarketplaceItem(this, parameters) }
+}
 
+private data class MarketplaceEditParameters(
+    val id: Parameter<Int>,
+    val name: Parameter<String>,
+    val type: Parameter<MarketplaceItemType>,
+    val description: Parameter<String>,
+) {
+    fun read(context: Command.Handler.Context) = with(context) {
+        MarketplaceItemUpdate(id.cast(), name.cast(), type.cast(), description.castVararg().joinToString(" "))
+    }
+}
+
+private data class MarketplaceItemUpdate(
+    val id: Int,
+    val name: String,
+    val type: MarketplaceItemType,
+    val description: String,
+)
+
+private fun CommandBuilder.marketplaceEditParameters(): MarketplaceEditParameters {
     val id = addParam("id") {
         verifiedBy(ParameterBuilder.INTEGER_VALIDATOR)
             .required()
     }
-
     val name = addParam("name") {
         verifiedBy(ParameterBuilder.STRING_VALIDATOR)
             .required()
     }
-
     val type = addParam {
         enumChoice<MarketplaceItemType>("type") { it.isListable }
             .required()
     }
-
     val description = addParam("description") {
         verifiedBy(ParameterBuilder.STRING_VALIDATOR)
             .required()
             .vararg()
     }
+    return MarketplaceEditParameters(id, name, type, description)
+}
 
-    suspendHandler {
-        val clientAccount = ClientAccountManager.accountOrException()
-
-        val id = id.cast()
-        val name = name.cast()
-        val type = type.cast()
-        val description = description.castVararg().joinToString(" ")
-
-        val response = MarketplaceApi.updateMarketplaceItem(
-            clientAccount.takeSession(),
-            id,
-            name,
-            type,
-            description
-        )
-
-        chat(
-            regular(
-                command.result(
-                    "success",
-                    variable(response.id.toString()),
-                    variable(response.name)
-                )
-            )
-        )
-    }
-
+private suspend fun updateMarketplaceItem(
+    context: Command.Handler.Context,
+    parameters: MarketplaceEditParameters,
+) {
+    val clientAccount = ClientAccountManager.accountOrException()
+    val update = parameters.read(context)
+    val response = MarketplaceApi.updateMarketplaceItem(
+        clientAccount.takeSession(),
+        update.id,
+        update.name,
+        update.type,
+        update.description,
+    )
+    chat(regular(context.command.result("success", variable(response.id.toString()), variable(response.name))))
 }

@@ -20,7 +20,6 @@
 package net.ccbluex.liquidbounce.common;
 
 import com.mojang.blaze3d.platform.NativeImage;
-import net.ccbluex.liquidbounce.LiquidBounce;
 import net.fabricmc.api.EnvType;
 import net.fabricmc.api.Environment;
 import net.minecraft.client.renderer.texture.MipmapStrategy;
@@ -32,6 +31,7 @@ import net.minecraft.server.packs.resources.ResourceManager;
 import org.jspecify.annotations.NullMarked;
 
 import java.io.IOException;
+import java.util.Locale;
 import java.util.Objects;
 
 /**
@@ -43,7 +43,8 @@ import java.util.Objects;
 @Environment(EnvType.CLIENT)
 public final class ClientLogoTexture extends ReloadableTexture {
 
-    public static final Identifier CLIENT_LOGO = LiquidBounce.identifier("logo");
+    public static final Identifier CLIENT_LOGO = Identifier.fromNamespaceAndPath(
+        ClientBuildMetadata.NAME.toLowerCase(Locale.ROOT), "logo");
     public static final int WIDTH = 1920;
     public static final int HEIGHT = 721;
 
@@ -53,7 +54,7 @@ public final class ClientLogoTexture extends ReloadableTexture {
 
     @Override
     public TextureContents loadContents(ResourceManager resourceManager) {
-        try (var stream = LiquidBounce.class.getResourceAsStream("/resources/liquidbounce/logo_banner.png")) {
+        try (var stream = ClientLogoTexture.class.getResourceAsStream("/resources/liquidbounce/logo_banner.png")) {
             var nativeImage = NativeImage.read(Objects.requireNonNull(stream));
 
             return new TextureContents(nativeImage, new TextureMetadataSection(true, false, MipmapStrategy.AUTO, TextureMetadataSection.DEFAULT_ALPHA_CUTOFF_BIAS));

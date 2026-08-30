@@ -15,7 +15,7 @@
     import {getClientInfo, getGameWindow, setHudEditorSelected, setTyping} from "../../integration/rest";
     import {listen} from "../../integration/ws";
     import type {ScaleFactorChangeEvent} from "../../integration/events";
-    import HudEditor from "./tabs/hud_editor/HudEditor.svelte";
+    import HudEditor from "../../shared/hud-editor/HudEditor.svelte";
 
     const tabs = [
         {title: "ClickGUI", content: ClickGui},

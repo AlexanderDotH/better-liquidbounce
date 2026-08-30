@@ -20,7 +20,6 @@
 package net.ccbluex.liquidbounce.features.module.modules.movement.fly.modes.verus
 
 import net.ccbluex.liquidbounce.config.types.group.Mode
-import net.ccbluex.liquidbounce.config.types.group.ModeValueGroup
 import net.ccbluex.liquidbounce.event.events.BlinkPacketEvent
 import net.ccbluex.liquidbounce.event.events.BlockShapeEvent
 import net.ccbluex.liquidbounce.event.events.PacketEvent
@@ -29,7 +28,7 @@ import net.ccbluex.liquidbounce.event.events.TransferOrigin
 import net.ccbluex.liquidbounce.event.handler
 import net.ccbluex.liquidbounce.event.tickHandler
 import net.ccbluex.liquidbounce.features.blink.BlinkManager
-import net.ccbluex.liquidbounce.features.module.modules.movement.fly.ModuleFly
+import net.ccbluex.liquidbounce.features.module.modules.movement.fly.runtime.FlyModuleControl
 import net.ccbluex.liquidbounce.features.module.modules.movement.fly.automation.FlyAutomationCapabilities
 import net.ccbluex.liquidbounce.features.module.modules.movement.fly.automation.FlyAutomationKind
 import net.ccbluex.liquidbounce.features.module.modules.movement.fly.automation.FlyAutomationProfile
@@ -51,8 +50,6 @@ internal object FlyVerusB3869Flat : Mode("VerusB3896Flat"), FlyAutomationProfile
 
     private val timer by float("Timer", 5.0f, 1.0f..20.0f)
 
-    override val parent: ModeValueGroup<*>
-        get() = ModuleFly.modes
 
     override val automationCapabilities = FlyAutomationCapabilities(
         horizontal = true,
@@ -87,13 +84,13 @@ internal object FlyVerusB3869Flat : Mode("VerusB3896Flat"), FlyAutomationProfile
 
     @Suppress("unused")
     private val tickHandler = tickHandler {
-        Timer.requestTimerSpeed(timer, Priority.IMPORTANT_FOR_USAGE_1, ModuleFly)
+        Timer.requestTimerSpeed(timer, Priority.IMPORTANT_FOR_USAGE_1, FlyModuleControl.module)
     }
 
     @Suppress("unused")
     private val fakeLagHandler = handler<BlinkPacketEvent> { event ->
         if (event.origin == TransferOrigin.OUTGOING) {
-            event.action = BlinkManager.Action.QUEUE
+            event.action = net.ccbluex.liquidbounce.event.events.BlinkPacketAction.QUEUE
         }
     }
 

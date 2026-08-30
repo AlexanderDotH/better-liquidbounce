@@ -19,18 +19,20 @@
 
 package net.ccbluex.liquidbounce.features.module.modules.render
 
+import net.ccbluex.liquidbounce.features.module.modules.render.betterinventory.ContainerItemViewLayout
+
 import net.ccbluex.liquidbounce.additions.drawBorder
 import net.ccbluex.liquidbounce.additions.queueContainerItemView
 import net.ccbluex.liquidbounce.config.types.group.ModeValueGroup
 import net.ccbluex.liquidbounce.config.types.group.ToggleableValueGroup
-import net.ccbluex.liquidbounce.config.types.list.Tagged
+import net.ccbluex.liquidbounce.common.Tagged
 import net.ccbluex.liquidbounce.features.module.ClientModule
 import net.ccbluex.liquidbounce.features.module.ModuleCategories
-import net.ccbluex.liquidbounce.injection.mixins.minecraft.gui.MixinHudAccessor
+import net.ccbluex.liquidbounce.render.HudSelectionSpriteBridge
 import net.ccbluex.liquidbounce.render.engine.type.BoundingBox2f
 import net.ccbluex.liquidbounce.render.engine.type.Color4b
 import net.ccbluex.liquidbounce.render.gui.ItemStackListRenderer.drawItemStackList
-import net.ccbluex.liquidbounce.utils.inventory.InventoryManager
+import net.ccbluex.liquidbounce.features.inventory.InventoryManager
 import net.ccbluex.liquidbounce.utils.item.getCooldown
 import net.ccbluex.liquidbounce.utils.math.toFixed
 import net.minecraft.client.gui.GuiGraphicsExtractor
@@ -74,7 +76,7 @@ object ModuleBetterInventory : ClientModule("BetterInventory", ModuleCategories.
                 override fun drawHighlightSlot(context: GuiGraphicsExtractor, slot: Slot) {
                     context.blitSprite(
                         RenderPipelines.GUI_TEXTURED,
-                        MixinHudAccessor.getHotbarSelectionTexture(),
+                        HudSelectionSpriteBridge.texture(),
                         slot.x - 3,
                         slot.y - 3,
                         22,

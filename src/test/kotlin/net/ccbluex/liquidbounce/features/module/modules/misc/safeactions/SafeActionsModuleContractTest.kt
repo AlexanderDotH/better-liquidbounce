@@ -96,7 +96,7 @@ class SafeActionsModuleContractTest {
 
     private companion object {
         const val MODULE_MANAGER_PATH =
-            "src/main/kotlin/net/ccbluex/liquidbounce/features/module/ModuleManager.kt"
+            "src/main/kotlin/net/ccbluex/liquidbounce/bootstrap/module/MiscModuleRegistry.kt"
         const val MIXIN_CONFIGURATION_PATH = "src/main/resources/liquidbounce.mixins.json"
         const val WORLD_MIXIN_PATH =
             "src/main/java/net/ccbluex/liquidbounce/injection/mixins/minecraft/client/" +

@@ -27,8 +27,7 @@ import net.ccbluex.liquidbounce.event.handler
 import net.ccbluex.liquidbounce.event.tickHandler
 import net.ccbluex.liquidbounce.event.waitTicks
 import net.ccbluex.liquidbounce.features.blink.BlinkManager
-import net.ccbluex.liquidbounce.features.module.modules.movement.fly.ModuleFly
-import net.ccbluex.liquidbounce.features.module.modules.movement.fly.ModuleFly.modes
+import net.ccbluex.liquidbounce.features.module.modules.movement.fly.runtime.FlyModuleControl
 import net.ccbluex.liquidbounce.features.module.modules.movement.fly.automation.FlyAutomationCapabilities
 import net.ccbluex.liquidbounce.features.module.modules.movement.fly.automation.FlyAutomationEnd
 import net.ccbluex.liquidbounce.features.module.modules.movement.fly.automation.FlyAutomationKind
@@ -48,9 +47,6 @@ import net.minecraft.network.protocol.game.ClientboundSetEntityMotionPacket
  * @note Tested in Bedwars, Skywars. Pretty much flagless
  */
 internal object FlyHycraftDamage : Mode("HycraftDamage"), FlyAutomationProfile {
-
-    override val parent: ModeValueGroup<*>
-        get() = modes
 
     private var damageTaken = false
     private var release = false
@@ -105,31 +101,31 @@ internal object FlyHycraftDamage : Mode("HycraftDamage"), FlyAutomationProfile {
                 damageTaken = true
                 ticks = 40
                 handlePacket(packet)
-                BlinkManager.Action.QUEUE
+                net.ccbluex.liquidbounce.event.events.BlinkPacketAction.QUEUE
             }
 
             is ClientboundSetEntityMotionPacket if packet.id == player.id && damageTaken -> {
                 damageTaken = false
                 release = true
                 handlePacket(packet)
-                BlinkManager.Action.QUEUE
+                net.ccbluex.liquidbounce.event.events.BlinkPacketAction.QUEUE
             }
 
             is ClientboundPingPacket -> {
                 if (ticks <= 0) {
                     if (release) {
                         automaticEnd.mark("Hycraft damage boost completed")
-                        ModuleFly.enabled = false
+                        FlyModuleControl.disable()
                     }
                     return@handler
                 }
 
                 ticks--
-                BlinkManager.Action.QUEUE
+                net.ccbluex.liquidbounce.event.events.BlinkPacketAction.QUEUE
             }
 
             // Prevent [PacketQueueManager] from flushing queued packets
-            else -> BlinkManager.Action.PASS
+            else -> net.ccbluex.liquidbounce.event.events.BlinkPacketAction.PASS
         }
 
     }

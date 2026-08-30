@@ -18,25 +18,17 @@
  */
 package net.ccbluex.liquidbounce.features.command.commands.ingame
 
-import net.ccbluex.liquidbounce.config.types.list.Tagged
+import net.ccbluex.liquidbounce.common.Tagged
 import net.ccbluex.liquidbounce.event.EventListener
 import net.ccbluex.liquidbounce.features.command.Command
-import net.ccbluex.liquidbounce.features.command.CommandExecutor.suspendHandler
+import net.ccbluex.liquidbounce.features.command.CommandRuntime.suspendHandler
 import net.ccbluex.liquidbounce.features.command.builder.CommandBuilder
 import net.ccbluex.liquidbounce.features.command.builder.ParameterBuilder
 import net.ccbluex.liquidbounce.features.command.builder.enumChoices
-import net.ccbluex.liquidbounce.utils.client.ServerObserver
-import net.ccbluex.liquidbounce.utils.client.chat
-import net.ccbluex.liquidbounce.utils.text.hideSensitiveAddress
-import net.ccbluex.liquidbounce.utils.text.joinToText
-import net.ccbluex.liquidbounce.utils.client.markAsError
-import net.ccbluex.liquidbounce.utils.client.network
-import net.ccbluex.liquidbounce.utils.client.player
-import net.ccbluex.liquidbounce.utils.client.regular
-import net.ccbluex.liquidbounce.utils.math.roundToDecimalPlaces
-import net.ccbluex.liquidbounce.utils.client.variable
-import net.ccbluex.liquidbounce.utils.client.warning
-import net.minecraft.network.chat.HoverEvent
+import net.ccbluex.liquidbounce.features.server.ServerObserver
+import net.ccbluex.liquidbounce.features.chat.chat
+import net.ccbluex.liquidbounce.utils.text.markAsError
+import net.ccbluex.liquidbounce.utils.text.regular
 import kotlin.time.Duration.Companion.seconds
 
 /**
@@ -114,89 +106,11 @@ object CommandServerInfo : Command.Factory, EventListener {
      * @param command The command instance
      * @param detections Optional list of active detections that were run
      */
-    private fun printInformation(command: Command, detections: Collection<DetectionType> = emptyList()) {
-        // Gather basic server information
-        val serverInfo = network.serverData
-        val resolvedServerAddress = ServerObserver.serverAddress?.toString()
-        val tps = ServerObserver.tps
-        val ping = network.getPlayerInfo(player.uuid)?.latency ?: 0
-        val advertisedVersion = "${serverInfo?.version?.string} (${serverInfo?.protocol})"
-        val detectedServerVersion = ServerObserver.serverVersion ?: "<= 1.20.4"
-
-        chat(warning(command.result("header")))
-        command.printStyledText("address", serverInfo?.ip?.hideSensitiveAddress())
-        command.printStyledText("resolvedAddress", resolvedServerAddress?.hideSensitiveAddress())
-        command.printStyledText("serverId", ServerObserver.serverId)
-        command.printStyledText("serverType", ServerObserver.serverType?.tag)
-        command.printStyledText("brand", network.serverBrand())
-        command.printStyledText("advertisedVersion", advertisedVersion)
-        command.printStyledText(
-            "detectedVersion",
-            detectedServerVersion,
-            hover = HoverEvent.ShowText(
-                command.result("detectedVersion.description", variable(detectedServerVersion))
-            )
+    private fun printInformation(command: Command, detections: Collection<DetectionType> = emptyList()) =
+        printServerInformation(
+            command,
+            detectionTags = if (detections.isEmpty()) DetectionType.entries.map(DetectionType::tag) else emptyList(),
         )
-
-        // Performance metrics
-        command.printStyledText(
-            "tps",
-            if (tps.isNaN()) command.result("nan").string else tps.roundToDecimalPlaces(2).toString()
-        )
-        command.printStyledText("ping", ping.toString())
-
-        // Server Channels and transactions
-        val channelsText = ServerObserver.payloadChannels.map { id ->
-            variable(id.toString())
-        }.joinToText(regular(", "))
-        command.printStyledComponent("channels", channelsText)
-        val transactionsText = ServerObserver.transactions.map { variable(it.toString()) }.joinToText(regular(", "))
-        command.printStyledComponent("transactions", transactionsText)
-
-        val transactionDiffText = ServerObserver.transactions
-            .windowed(2) { it[1] - it[0] }
-            .map { variable(it.toString()) }
-            .joinToText(regular(", "))
-        command.printStyledComponent("transactionDifferences", transactionDiffText)
-
-        // Anti-cheat detection
-        val guessedAntiCheat = ServerObserver.guessAntiCheat(serverInfo?.ip ?: "")?.let(::variable)
-            ?: markAsError("N/A")
-        command.printStyledComponent(
-            "guessedAntiCheat",
-            guessedAntiCheat,
-            hover = HoverEvent.ShowText(command.result("guessedAntiCheat.description"))
-        )
-
-        printHostingInformation(command)
-        printPluginInformation(command)
-
-        // Show available detection methods if none were specified
-        if (detections.isEmpty()) {
-            val detectionList = DetectionType.entries.map { variable(it.tag) }.joinToText(regular(", "))
-            command.printStyledComponent("detectParameter", detectionList, formatting = ::warning)
-        }
-    }
-
-    private fun printHostingInformation(command: Command) {
-        val ipData = ServerObserver.hostingInformation ?: return
-
-        command.printStyledText("hostingIp", ipData.ip)
-        command.printStyledText("hostingHostname", ipData.hostname)
-        command.printStyledText("hostingOrganization", ipData.org)
-        command.printStyledText("hostingCountry", ipData.country)
-        command.printStyledText("hostingCity", ipData.city)
-        command.printStyledText("hostingRegion", ipData.region)
-    }
-
-    private fun printPluginInformation(command: Command) {
-        val plugins = ServerObserver.plugins ?: return
-
-        val pluginCount = plugins.size
-        val pluginList = ServerObserver.formattedPluginList?.joinToText(regular(", ")) ?: markAsError("N/A")
-
-        chat(regular(command.result("plugins", variable(pluginCount.toString()), pluginList)))
-    }
 
     /**
      * Detection for further server information

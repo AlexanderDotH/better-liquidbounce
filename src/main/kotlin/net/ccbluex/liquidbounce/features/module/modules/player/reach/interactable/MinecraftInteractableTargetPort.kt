@@ -16,8 +16,11 @@
  * You should have received a copy of the GNU General Public License
  * along with LiquidBounce. If not, see <https://www.gnu.org/licenses/>.
  */
+@file:JvmName("MinecraftInteractableTargetPortKt")
+
 package net.ccbluex.liquidbounce.features.module.modules.player.reach.interactable
 
+import net.ccbluex.liquidbounce.features.module.modules.player.reach.contract.*
 import net.ccbluex.liquidbounce.features.module.modules.player.reach.interactable.target.InteractablePlayerEligibility
 import net.ccbluex.liquidbounce.features.module.modules.player.reach.interactable.target.InteractableResolvedTarget
 import net.ccbluex.liquidbounce.features.module.modules.player.reach.interactable.target.InteractableTargetBlockFilter
@@ -32,10 +35,10 @@ import net.ccbluex.liquidbounce.features.module.modules.render.ModuleFreeCam
 import net.ccbluex.liquidbounce.utils.client.mc
 import net.ccbluex.liquidbounce.utils.collection.Filter
 
-internal class MinecraftInteractableTargetPort : ControllerTargetPort<InteractableResolvedTarget> {
+internal class MinecraftInteractableTargetPort : ControllerTargetPort<InteractableRuntimeTarget> {
     private val resolver = InteractableTargetResolver(MinecraftInteractableTargetWorldAdapter)
 
-    override fun acquire(settings: InteractableSettingsSnapshot): ControllerTargetResult<InteractableResolvedTarget> {
+    override fun acquire(settings: InteractableSettingsSnapshot): ControllerTargetResult<InteractableRuntimeTarget> {
         val player = mc.player ?: return rejected(InteractableTargetRejection.WORLD_UNAVAILABLE)
         val request = InteractableTargetRequest(
             maxRange = settings.maxRange,
@@ -56,14 +59,17 @@ internal class MinecraftInteractableTargetPort : ControllerTargetPort<Interactab
         }
     }
 
-    override fun validate(target: InteractableResolvedTarget): Boolean =
-        resolver.validate(target.lock) === InteractableTargetValidation.Valid
+    override fun validate(target: InteractableRuntimeTarget): Boolean =
+        resolver.validate(target.resolved.lock) === InteractableTargetValidation.Valid
 
-    override fun validateWhileHolding(target: InteractableResolvedTarget): Boolean =
-        resolver.validate(target.lock, allowInteractionStateChange = true) === InteractableTargetValidation.Valid
+    override fun validateWhileHolding(target: InteractableRuntimeTarget): Boolean =
+        resolver.validate(target.resolved.lock, allowInteractionStateChange = true) === InteractableTargetValidation.Valid
 
     private fun rejected(reason: InteractableTargetRejection) = ControllerTargetResult.Rejected(reason.name)
 }
+
+private val InteractableRuntimeTarget.resolved: InteractableResolvedTarget
+    get() = this as InteractableResolvedTarget
 
 private fun InteractableBlockFilter.toTargetFilter(): InteractableTargetBlockFilter {
     val keys = blocks.mapTo(mutableSetOf()) { it.toTargetBlockKey() }

@@ -19,7 +19,7 @@
 
 package net.ccbluex.liquidbounce.config.types.group
 
-import net.ccbluex.liquidbounce.features.misc.Toggleable
+import net.ccbluex.liquidbounce.common.Toggleable
 import kotlin.test.assertEquals
 import kotlin.test.BeforeTest
 import kotlin.test.Test

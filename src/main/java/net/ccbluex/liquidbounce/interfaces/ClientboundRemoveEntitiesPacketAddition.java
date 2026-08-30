@@ -18,12 +18,10 @@
  */
 package net.ccbluex.liquidbounce.interfaces;
 
-import net.ccbluex.liquidbounce.features.module.modules.combat.crystalaura.trigger.CrystalAuraTriggerer;
-
 /**
  * Addition to {@link net.minecraft.network.protocol.game.ClientboundRemoveEntitiesPacket}
  *
- * Exclusively for {@link CrystalAuraTriggerer}.
+ * Stores crystal-removal metadata for packet consumers.
  */
 public interface ClientboundRemoveEntitiesPacketAddition {
 

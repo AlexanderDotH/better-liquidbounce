@@ -31,9 +31,7 @@ import net.ccbluex.liquidbounce.features.module.modules.combat.crystalaura.trigg
 import net.ccbluex.liquidbounce.features.module.modules.combat.crystalaura.trigger.triggers.ExplodeSoundTrigger
 import net.ccbluex.liquidbounce.features.module.modules.combat.crystalaura.trigger.triggers.SelfMoveTrigger
 import net.ccbluex.liquidbounce.features.module.modules.combat.crystalaura.trigger.triggers.TickTrigger
-import net.ccbluex.liquidbounce.injection.mixins.minecraft.network.MixinClientPacketListener
-import net.ccbluex.liquidbounce.injection.mixins.minecraft.network.MixinMultiPlayerGameMode
-import net.ccbluex.liquidbounce.utils.combat.CombatManager
+import net.ccbluex.liquidbounce.features.combat.runtime.CombatManager
 import java.util.concurrent.Executors
 import java.util.concurrent.Future
 import java.util.function.BooleanSupplier
@@ -44,7 +42,7 @@ import java.util.function.BooleanSupplier
  *
  * This is basically the managing class of the crystal aura.
  *
- * Mixins: [MixinClientPacketListener], [MixinMultiPlayerGameMode]
+ * Injection callbacks reach their concrete triggers through stable hook boundaries.
  */
 object CrystalAuraTriggerer : ValueGroup("Triggers"), EventListener, MinecraftShortcuts {
 

@@ -30,8 +30,8 @@ import net.ccbluex.liquidbounce.features.module.ModuleCategories
 import net.ccbluex.liquidbounce.render.FontManager
 import net.ccbluex.liquidbounce.render.engine.esp.EspGlowStyleConfig
 import net.ccbluex.liquidbounce.render.engine.type.Color4b
-import net.ccbluex.liquidbounce.utils.combat.shouldBeShown
-import net.ccbluex.liquidbounce.utils.entity.RenderedEntities
+import net.ccbluex.liquidbounce.features.combat.runtime.shouldBeShown
+import net.ccbluex.liquidbounce.features.render.RenderedEntities
 import net.ccbluex.liquidbounce.utils.entity.cameraDistance
 import net.ccbluex.liquidbounce.utils.entity.cameraDistanceSq
 import net.ccbluex.liquidbounce.utils.kotlin.EventPriorityConvention.FIRST_PRIORITY
@@ -49,6 +49,7 @@ import org.joml.Vector2f
 object ModuleNametags : ClientModule("Nametags", ModuleCategories.RENDER) {
 
     init {
+        NametagPlayerModelAdapter.install()
         tree(NametagTextFormatter)
         tree(NametagEquipment)
     }

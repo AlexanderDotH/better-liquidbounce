@@ -21,59 +21,22 @@ package net.ccbluex.liquidbounce.features.module.modules.movement.speed
 import net.ccbluex.liquidbounce.config.types.group.Mode
 import net.ccbluex.liquidbounce.config.types.group.ModeValueGroup
 import net.ccbluex.liquidbounce.config.types.group.ToggleableValueGroup
-import net.ccbluex.liquidbounce.config.types.list.Tagged
+import net.ccbluex.liquidbounce.common.Tagged
 import net.ccbluex.liquidbounce.features.misc.HideAppearance.isDestructed
 import net.ccbluex.liquidbounce.features.module.ClientModule
 import net.ccbluex.liquidbounce.features.module.ModuleCategories
 import net.ccbluex.liquidbounce.features.module.modules.combat.criticals.modes.CriticalsJump
-import net.ccbluex.liquidbounce.features.module.modules.movement.fly.ModuleFly
+import net.ccbluex.liquidbounce.features.module.modules.movement.fly.contract.FlyState
+import net.ccbluex.liquidbounce.features.module.modules.movement.speed.contract.SpeedModulePort
+import net.ccbluex.liquidbounce.features.module.modules.movement.speed.contract.SpeedState
+import net.ccbluex.liquidbounce.features.module.modules.movement.speed.runtime.SpeedModuleControl
+import net.ccbluex.liquidbounce.features.module.modules.movement.targetstrafe.contract.TargetStrafeEnvironment
 import net.ccbluex.liquidbounce.features.module.modules.movement.speed.ModuleSpeed.OnlyInCombat.modes
 import net.ccbluex.liquidbounce.features.module.modules.movement.speed.ModuleSpeed.OnlyOnPotionEffect.modes
 import net.ccbluex.liquidbounce.features.module.modules.movement.speed.ModuleSpeed.OnlyOnPotionEffect.potionEffects
-import net.ccbluex.liquidbounce.features.module.modules.movement.speed.modes.SpeedCustom
-import net.ccbluex.liquidbounce.features.module.modules.movement.speed.modes.SpeedLegitHop
-import net.ccbluex.liquidbounce.features.module.modules.movement.speed.modes.SpeedPiercingAttack
-import net.ccbluex.liquidbounce.features.module.modules.movement.speed.modes.SpeedPulse
-import net.ccbluex.liquidbounce.features.module.modules.movement.speed.modes.SpeedSpeedYPort
-import net.ccbluex.liquidbounce.features.module.modules.movement.speed.modes.SpeedStrafe
-import net.ccbluex.liquidbounce.features.module.modules.movement.speed.modes.aac.SpeedAAC332
-import net.ccbluex.liquidbounce.features.module.modules.movement.speed.modes.aac.SpeedAAC4310FastHop
-import net.ccbluex.liquidbounce.features.module.modules.movement.speed.modes.detector.SpeedDetectorBypass
-import net.ccbluex.liquidbounce.features.module.modules.movement.speed.modes.aac.SpeedAAC4312LowHop
-import net.ccbluex.liquidbounce.features.module.modules.movement.speed.modes.blockdrop.SpeedBlockdrop
-import net.ccbluex.liquidbounce.features.module.modules.movement.speed.modes.blockdrop.SpeedBlockdropHop
-import net.ccbluex.liquidbounce.features.module.modules.movement.speed.modes.blocksmc.SpeedBlocksMC
-import net.ccbluex.liquidbounce.features.module.modules.movement.speed.modes.grim.SpeedGrimCollide
-import net.ccbluex.liquidbounce.features.module.modules.movement.speed.modes.gwen.SpeedGWENBHop
-import net.ccbluex.liquidbounce.features.module.modules.movement.speed.modes.gwen.SpeedGWENHighHop
-import net.ccbluex.liquidbounce.features.module.modules.movement.speed.modes.hylex.SpeedHylexGround
-import net.ccbluex.liquidbounce.features.module.modules.movement.speed.modes.hylex.SpeedHylexLowHop
-import net.ccbluex.liquidbounce.features.module.modules.movement.speed.modes.intave.SpeedIntave
-import net.ccbluex.liquidbounce.features.module.modules.movement.speed.modes.intave.SpeedIntave14
-import net.ccbluex.liquidbounce.features.module.modules.movement.speed.modes.intave.SpeedIntave14Fast
-import net.ccbluex.liquidbounce.features.module.modules.movement.speed.modes.intave.SpeedIntaveInBlock
-import net.ccbluex.liquidbounce.features.module.modules.movement.speed.modes.intave.SpeedIntaveInstant
-import net.ccbluex.liquidbounce.features.module.modules.movement.speed.modes.matrix.SpeedMatrix7
-import net.ccbluex.liquidbounce.features.module.modules.movement.speed.modes.ncp.SpeedNCP
-import net.ccbluex.liquidbounce.features.module.modules.movement.speed.modes.sentinel.SpeedSentinelDamage
-import net.ccbluex.liquidbounce.features.module.modules.movement.speed.modes.sentinel.SpeedSentinelFastHop
-import net.ccbluex.liquidbounce.features.module.modules.movement.speed.modes.sentinel.SpeedSentinelLowHop
-import net.ccbluex.liquidbounce.features.module.modules.movement.speed.modes.sentinel.SpeedSentinelOnGround
-import net.ccbluex.liquidbounce.features.module.modules.movement.speed.modes.sentinel.SpeedSentinelStrafeHop
-import net.ccbluex.liquidbounce.features.module.modules.movement.speed.modes.spartan.SpeedSpartanV4043
-import net.ccbluex.liquidbounce.features.module.modules.movement.speed.modes.spartan.SpeedSpartanV4043FastFall
-import net.ccbluex.liquidbounce.features.module.modules.movement.speed.modes.vanilla.SpeedGround
-import net.ccbluex.liquidbounce.features.module.modules.movement.speed.modes.verus.SpeedVerusB3882
-import net.ccbluex.liquidbounce.features.module.modules.movement.speed.modes.venom.SpeedVenomGround
-import net.ccbluex.liquidbounce.features.module.modules.movement.speed.modes.vulcan.SpeedVulcan286
-import net.ccbluex.liquidbounce.features.module.modules.movement.speed.modes.vulcan.SpeedVulcan288
-import net.ccbluex.liquidbounce.features.module.modules.movement.speed.modes.vulcan.SpeedVulcanGround286
-import net.ccbluex.liquidbounce.features.module.modules.movement.speed.modes.watchdog.SpeedHypixelBHop
-import net.ccbluex.liquidbounce.features.module.modules.movement.speed.modes.watchdog.SpeedHypixelLowHop
-import net.ccbluex.liquidbounce.features.module.modules.movement.speed.modes.watchdog.SpeedWatchdog
 import net.ccbluex.liquidbounce.features.module.modules.world.scaffold.ModuleScaffold
 import net.ccbluex.liquidbounce.utils.client.inGame
-import net.ccbluex.liquidbounce.utils.combat.CombatManager
+import net.ccbluex.liquidbounce.features.combat.runtime.CombatManager
 import java.util.function.BooleanSupplier
 
 /**
@@ -83,72 +46,28 @@ import java.util.function.BooleanSupplier
  */
 object ModuleSpeed : ClientModule("Speed", ModuleCategories.MOVEMENT) {
 
-    private const val SPEED_MODES_PACKAGE =
-        "net.ccbluex.liquidbounce.features.module.modules.movement.speed.modes"
+    init {
+        SpeedModuleControl.bind(ModuleSpeedPort)
+        SpeedState.bind(enabledProvider = { enabled }, enabledUpdater = { enabled = it })
+        TargetStrafeEnvironment.bindSpeedRunning { running }
+    }
 
-    /**
-     * Initialize speeds choices independently
-     *
-     * This is useful for the `OnlyOnPotionEffect` choice, which has its own set of modes
-     */
-    private fun initializeSpeeds(modeValueGroup: ModeValueGroup<*>) = arrayOf(
-        SpeedLegitHop(modeValueGroup),
-        SpeedCustom(modeValueGroup),
-        SpeedStrafe(modeValueGroup),
-        SpeedPulse(modeValueGroup),
-        SpeedSpeedYPort(modeValueGroup),
-        SpeedPiercingAttack(modeValueGroup),
+    private object ModuleSpeedPort : SpeedModulePort {
+        override val enabled: Boolean
+            get() = ModuleSpeed.enabled
 
-        // Bypass our own PlayerCheatDetector observer checks
-        SpeedDetectorBypass(modeValueGroup),
+        override val timerOwner: Any
+            get() = ModuleSpeed
 
-        SpeedVerusB3882(modeValueGroup),
+        override fun disable() {
+            ModuleSpeed.enabled = false
+        }
 
-        SpeedHypixelBHop(modeValueGroup),
-        SpeedHypixelLowHop(modeValueGroup),
+        override fun doOptimizationsPreventJump(): Boolean = ModuleSpeed.doOptimizationsPreventJump()
+    }
 
-        SpeedSpartanV4043(modeValueGroup),
-        SpeedSpartanV4043FastFall(modeValueGroup),
-
-        SpeedSentinelDamage(modeValueGroup),
-
-        SpeedVulcan286(modeValueGroup),
-        SpeedVulcan288(modeValueGroup),
-        SpeedVulcanGround286(modeValueGroup),
-        SpeedGrimCollide(modeValueGroup),
-
-        SpeedNCP(modeValueGroup),
-
-        SpeedIntave14(modeValueGroup),
-        SpeedIntave14Fast(modeValueGroup),
-        SpeedIntaveInBlock(modeValueGroup),
-        SpeedIntave(modeValueGroup),
-        SpeedIntaveInstant(modeValueGroup),
-        SpeedAAC332(modeValueGroup),
-        SpeedAAC4310FastHop(modeValueGroup),
-        SpeedAAC4312LowHop(modeValueGroup),
-        SpeedBlockdrop(modeValueGroup),
-        SpeedBlockdropHop(modeValueGroup),
-        SpeedGWENBHop(modeValueGroup),
-        SpeedGWENHighHop(modeValueGroup),
-        SpeedGround(modeValueGroup),
-        SpeedSentinelFastHop(modeValueGroup),
-        SpeedSentinelLowHop(modeValueGroup),
-        SpeedSentinelStrafeHop(modeValueGroup),
-        SpeedSentinelOnGround(modeValueGroup),
-        SpeedVenomGround(modeValueGroup),
-        SpeedWatchdog(modeValueGroup),
-
-        SpeedHylexLowHop(modeValueGroup),
-        SpeedHylexGround(modeValueGroup),
-
-        SpeedBlocksMC(modeValueGroup),
-
-        SpeedMatrix7(modeValueGroup)
-    )
-
-    val modes = choices("Mode", 0, this::initializeSpeeds)
-        .categorizedBy(::speedCategory)
+    val modes = choices("Mode", 0, ::initializeSpeedModes)
+        .categorizedBy(::speedModeCategory)
         .apply(::tagBy)
 
     private val notCondition by multiEnumChoice("Not", NotCondition.SCAFFOLD)
@@ -181,27 +100,10 @@ object ModuleSpeed : ClientModule("Speed", ModuleCategories.MOVEMENT) {
         else -> !notCondition.any { it.condition.asBoolean }
     }
 
-    private fun speedCategory(mode: Mode): String {
-        val category = mode.javaClass.packageName
-            .removePrefix(SPEED_MODES_PACKAGE)
-            .removePrefix(".")
-            .substringBefore('.')
-
-        return when (category) {
-            "" -> "General"
-            "aac" -> "AAC"
-            "blocksmc" -> "BlocksMC"
-            "gwen" -> "GWEN"
-            "ncp" -> "NCP"
-            "watchdog" -> "Hypixel"
-            else -> category.replaceFirstChar { it.uppercase() }
-        }
-    }
-
     private object OnlyInCombat : ToggleableValueGroup(this, "OnlyInCombat", false) {
 
-        val modes = modes(this, "Mode", activeIndex = 0, ModuleSpeed::initializeSpeeds)
-            .categorizedBy(ModuleSpeed::speedCategory)
+        val modes = modes(this, "Mode", activeIndex = 0, ::initializeSpeedModes)
+            .categorizedBy(::speedModeCategory)
 
         /**
          * Controls [modes] activation state.
@@ -224,8 +126,8 @@ object ModuleSpeed : ClientModule("Speed", ModuleCategories.MOVEMENT) {
             arrayOf(SpeedPotionEffectMode, SlownessPotionEffectMode, BothEffectsMode)
         )
 
-        val modes = modes(this, "Mode", activeIndex = 0, ModuleSpeed::initializeSpeeds)
-            .categorizedBy(ModuleSpeed::speedCategory)
+        val modes = modes(this, "Mode", activeIndex = 0, ::initializeSpeedModes)
+            .categorizedBy(::speedModeCategory)
 
         /**
          * Controls [modes] activation state.
@@ -265,7 +167,7 @@ object ModuleSpeed : ClientModule("Speed", ModuleCategories.MOVEMENT) {
         val condition: BooleanSupplier
     ) : Tagged {
         USING_ITEM("WhileUsingItem", { player.isUsingItem }),
-        SCAFFOLD("DuringScaffold", { ModuleScaffold.running || ModuleFly.running }),
+        SCAFFOLD("DuringScaffold", { ModuleScaffold.running || FlyState.running }),
         SNEAKING("WhileSneaking", { player.isShiftKeyDown }),
         FALL_FLYING("IsFallFlying", { player.isFallFlying }),
         IN_LIQUID("IsInLiquid", { player.isInLiquid }),

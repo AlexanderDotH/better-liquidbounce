@@ -19,7 +19,6 @@
 
 package net.ccbluex.liquidbounce.features.module.modules.movement.noweb.modes
 
-import net.ccbluex.liquidbounce.features.module.modules.movement.noweb.NoWebMode
 import net.ccbluex.liquidbounce.utils.entity.moving
 import net.ccbluex.liquidbounce.utils.entity.withStrafe
 import net.minecraft.core.BlockPos

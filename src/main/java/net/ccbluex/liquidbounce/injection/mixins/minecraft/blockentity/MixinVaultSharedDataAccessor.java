@@ -18,6 +18,7 @@
  */
 package net.ccbluex.liquidbounce.injection.mixins.minecraft.blockentity;
 
+import net.ccbluex.liquidbounce.interfaces.VaultSharedDataAccess;
 import net.minecraft.world.level.block.entity.vault.VaultSharedData;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.gen.Accessor;
@@ -27,9 +28,10 @@ import java.util.UUID;
 
 /** Exposes only the server-synchronized vault availability evidence needed by the tracker. */
 @Mixin(VaultSharedData.class)
-public interface MixinVaultSharedDataAccessor {
+public interface MixinVaultSharedDataAccessor extends VaultSharedDataAccess {
 
+    @Override
     @Accessor("connectedPlayers")
-    Set<UUID> liquid_bounce$getConnectedPlayers();
+    Set<UUID> connectedPlayers();
 
 }

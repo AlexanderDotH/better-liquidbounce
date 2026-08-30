@@ -18,7 +18,6 @@
  */
 package net.ccbluex.liquidbounce.features.module.modules.world.autofarm
 
-import net.ccbluex.fastutil.enumSetOf
 import net.ccbluex.liquidbounce.config.types.group.ToggleableValueGroup
 import net.ccbluex.liquidbounce.config.utils.asRefreshable
 import net.ccbluex.liquidbounce.event.events.NotificationEvent
@@ -31,39 +30,30 @@ import net.ccbluex.liquidbounce.features.module.ModuleCategories
 import net.ccbluex.liquidbounce.features.module.modules.player.ModuleBlink
 import net.ccbluex.liquidbounce.features.module.modules.render.ModuleDebug
 import net.ccbluex.liquidbounce.features.module.modules.render.ModuleDebug.debugGeometry
+import net.ccbluex.liquidbounce.features.module.modules.world.autofarm.planner.TargetSelector
+import net.ccbluex.liquidbounce.features.module.modules.world.autofarm.planner.TargetingContext
 import net.ccbluex.liquidbounce.render.engine.type.Color4b
 import net.ccbluex.liquidbounce.utils.aiming.RotationManager
-import net.ccbluex.liquidbounce.utils.aiming.RotationsValueGroup
-import net.ccbluex.liquidbounce.utils.aiming.utils.raytraceBlockRotation
-import net.ccbluex.liquidbounce.utils.aiming.utils.raytraceBlockSide
-import net.ccbluex.liquidbounce.utils.block.ChunkScanner
-import net.ccbluex.liquidbounce.utils.block.doBreak
-import net.ccbluex.liquidbounce.utils.block.doPlacement
-import net.ccbluex.liquidbounce.utils.block.getCenterDistanceSquared
-import net.ccbluex.liquidbounce.utils.block.searchBlocksInRangeSorted
-import net.ccbluex.liquidbounce.utils.block.searchBlocksInCuboid
+import net.ccbluex.liquidbounce.features.rotation.RotationsValueGroup
+import net.ccbluex.liquidbounce.features.block.runtime.ChunkScanner
+import net.ccbluex.liquidbounce.features.block.runtime.doBreak
+import net.ccbluex.liquidbounce.features.block.runtime.doPlacement
 import net.ccbluex.liquidbounce.utils.block.state
-import net.ccbluex.liquidbounce.utils.block.targetfinding.BlockTargetPlan
 import net.ccbluex.liquidbounce.utils.client.Chronometer
 import net.ccbluex.liquidbounce.utils.client.SilentHotbar
-import net.ccbluex.liquidbounce.utils.client.notification
+import net.ccbluex.liquidbounce.features.chat.notification
 import net.ccbluex.liquidbounce.utils.inventory.Slots
 import net.ccbluex.liquidbounce.utils.inventory.findClosestSlot
 import net.ccbluex.liquidbounce.utils.inventory.hasInventorySpace
 import net.ccbluex.liquidbounce.utils.item.getEnchantment
 import net.ccbluex.liquidbounce.utils.kotlin.Priority
-import net.ccbluex.liquidbounce.utils.math.getNearestPointOnSide
-import net.ccbluex.liquidbounce.utils.math.sq
 import net.ccbluex.liquidbounce.utils.raytracing.traceFromPoint
 import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen
 import net.minecraft.core.BlockPos
 import net.minecraft.world.item.BoneMealItem
 import net.minecraft.world.item.enchantment.Enchantments
-import net.minecraft.world.level.block.state.BlockState
 import net.minecraft.world.phys.AABB
 import net.minecraft.world.phys.HitResult
-import net.minecraft.world.phys.Vec3
-import net.minecraft.world.phys.shapes.CollisionContext
 
 /**
  * AutoFarm module
@@ -232,142 +222,20 @@ object ModuleAutoFarm : ClientModule("AutoFarm", ModuleCategories.WORLD) {
         }
     }
 
-    private fun updateTarget(possible: Iterable<Pair<BlockPos, BlockState>>): Boolean {
-        for ((pos, state) in possible) {
-            val (rotation, _) = raytraceBlockRotation(
-                player.eyePosition,
-                pos,
-                state,
-                range = range.toDouble() - 0.1,
-                wallsRange = wallRange.toDouble() - 0.1
-            ) ?: continue // We don't have a free angle at the block? Well, let me see the next.
-
-            // set currentTarget to the new target
-            currentTarget = pos
-            // aim at target
-            RotationManager.setRotationTarget(
-                rotation,
-                valueGroup = rotations,
-                priority = Priority.IMPORTANT_FOR_USAGE_1,
-                provider = this@ModuleAutoFarm
-            )
-
-            return true // We got a free angle at the block? No need to see more of them.
-        }
-        return false
-    }
-
-    /** Searches for any blocks within the radius that need to be destroyed, such as crops. */
-    private fun updateTargetToHarvest(radius: Float, eyesPos: Vec3): Boolean {
-        val blocksToBreak = eyesPos.searchBlocksInRangeSorted(radius) { pos, state ->
-            !state.isAir && pos.readyForHarvest(state)
-        }
-
-        return updateTarget(blocksToBreak)
-    }
-
-    // Searches for any blocks suitable for placing crops or nether wart on
-    // returns ture if it found a target
-    private fun updateTargetToPlantable(radius: Float, eyesPos: Vec3): Boolean {
-        val hotbarItems = Slots.OffhandWithHotbar.items
-        val radiusSquared = radius * radius
-
-        val allowedTypes = AutoFarmTrackedState.Plantable.entries.filter { type ->
-            hotbarItems.any { it in type.items }
-        }
-
-        if (allowedTypes.isEmpty()) return false
-
-        val blocksToPlace =
-            eyesPos.searchBlocksInCuboid(radius) { _, state ->
-                !state.isAir && allowedTypes.any { it.isBlockMatches(state) }
-            }.mapNotNullTo(mutableListOf()) { (pos, state) ->
-                val sides = allowedTypes.findPlantableSides(pos, state).ifEmpty { return@mapNotNullTo null }
-                val outlineShape = state.getShape(world, pos)
-
-                if (outlineShape.isEmpty) return@mapNotNullTo null
-                // getShape is block-local, move it to world space before measuring distance to the eyes
-                val box = outlineShape.bounds().move(pos)
-                // Keep only sides that are within reach and whose face points towards the eyes
-                sides.removeIf { side ->
-                    box.getNearestPointOnSide(eyesPos, side).distanceToSqr(eyesPos) > radiusSquared ||
-                        BlockTargetPlan(pos, side).calculateAngleToPlayerEyeCosine(eyesPos) < 0.0
-                }
-
-                pos to sides.ifEmpty { return@mapNotNullTo null }
-            }.sortedBy { it.first.getCenterDistanceSquared() }
-
-        val collisionContext = CollisionContext.of(player)
-        for ((pos, sides) in blocksToPlace) {
-            val (rotation, _) = sides.firstNotNullOfOrNull { side ->
-                raytraceBlockSide(
-                    side,
-                    pos,
-                    player.eyePosition,
-                    rangeSquared = range.sq().toDouble() - 0.1,
-                    wallsRangeSquared = wallRange.sq().toDouble() - 0.1,
-                    collisionContext,
-                )
-            } ?: continue // We don't have a free angle at the block? Well, let me see the next.
-
-            // set currentTarget to the new target
-            currentTarget = pos
-            // aim at target
-            RotationManager.setRotationTarget(
-                rotation,
-                valueGroup = rotations,
-                priority = Priority.IMPORTANT_FOR_USAGE_1,
-                provider = this@ModuleAutoFarm
-            )
-
-            return true // We got a free angle at the block? No need to see more of them.
-        }
-        return false
-    }
-
-    private fun updateTargetToFertilizable(radius: Float, eyesPos: Vec3): Boolean {
-        if (Slots.OffhandWithHotbar.none { it.itemStack.item is BoneMealItem }) {
-            return false
-        }
-
-        val blocksToFertile = eyesPos.searchBlocksInRangeSorted(radius) { pos, state ->
-            !state.isAir && pos.canUseBoneMeal(state)
-        }
-
-        return updateTarget(blocksToFertile)
-    }
-
-    // Finds either a breakable target (such as crops, cactus, etc.)
-    // or a placeable target (such as a farmblock or soulsand with air above).
-    // It will prefer a breakable target
+    /** Prefers harvestable blocks, then plantable blocks, then fertilizable blocks. */
     private fun updateTarget() {
         currentTarget = null
-
-        val radius = range
-        val eyesPos = player.eyePosition
-
-        // Can we find a breakable target?
-        if (updateTargetToHarvest(radius, eyesPos)) {
-            return
-        }
-
-        // Can we find a placeable target?
-        if (AutoPlaceCrops.enabled && updateTargetToPlantable(radius, eyesPos)) {
-            return
-        }
-
-        if (AutoUseBoneMeal.enabled && updateTargetToFertilizable(radius, eyesPos)) {
-            return
-        }
+        val context = TargetingContext(player, world, range, wallRange, AutoPlaceCrops.enabled, AutoUseBoneMeal.enabled)
+        val target = TargetSelector.select(context, AutoFarmTargetSelectionPolicy)
+        currentTarget = target?.blockPos
+        target ?: return
+        RotationManager.setRotationTarget(
+            target.rotation,
+            valueGroup = rotations,
+            priority = Priority.IMPORTANT_FOR_USAGE_1,
+            provider = this@ModuleAutoFarm,
+        )
     }
-
-    /**
-     * Find plantable sides of the block for all types in the iterable
-     */
-    private fun Iterable<AutoFarmTrackedState.Plantable>.findPlantableSides(
-        pos: BlockPos,
-        state: BlockState,
-    ) = flatMapTo(enumSetOf()) { it.findPlantableSides(pos, state) }
 
     override fun onEnabled() {
         ChunkScanner.subscribe(AutoFarmBlockTracker)

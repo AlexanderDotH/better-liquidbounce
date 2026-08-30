@@ -24,7 +24,7 @@ import net.ccbluex.liquidbounce.config.types.group.Mode
 import net.ccbluex.liquidbounce.config.types.group.ModeValueGroup
 import net.ccbluex.liquidbounce.config.types.group.ToggleableValueGroup
 import net.ccbluex.liquidbounce.event.events.GameTickEvent
-import net.ccbluex.liquidbounce.event.events.WorldRenderEvent
+import net.ccbluex.liquidbounce.render.events.WorldRenderEvent
 import net.ccbluex.liquidbounce.event.handler
 import net.ccbluex.liquidbounce.features.module.ClientModule
 import net.ccbluex.liquidbounce.features.module.ModuleCategories
@@ -37,7 +37,7 @@ import net.ccbluex.liquidbounce.render.engine.esp.EspGlowStyleConfig
 import net.ccbluex.liquidbounce.render.engine.type.Color4b
 import net.ccbluex.liquidbounce.render.engine.type.Vec3f
 import net.ccbluex.liquidbounce.render.renderEnvironment
-import net.ccbluex.liquidbounce.utils.render.drawLegacy2DMarker
+import net.ccbluex.liquidbounce.render.marker.drawLegacy2DMarker
 import net.ccbluex.liquidbounce.render.withPositionRelativeToCamera
 import net.ccbluex.liquidbounce.utils.collection.Filter
 import net.ccbluex.liquidbounce.utils.collection.itemSortedSetOf
@@ -46,7 +46,7 @@ import net.ccbluex.liquidbounce.utils.entity.interpolateCurrentPosition
 import net.ccbluex.liquidbounce.utils.math.sq
 import net.ccbluex.liquidbounce.utils.math.KeyedAabb
 import net.ccbluex.liquidbounce.utils.math.mergeIntersectingAabbsSweep
-import net.ccbluex.liquidbounce.utils.math.toVec3f
+import net.ccbluex.liquidbounce.render.engine.type.toVec3f
 import net.ccbluex.liquidbounce.utils.math.worldToLocal
 import net.minecraft.world.entity.Entity
 import net.minecraft.world.entity.item.ItemEntity
@@ -88,7 +88,6 @@ object ModuleItemESP : ClientModule("ItemESP", ModuleCategories.RENDER) {
     private val modes = choices("Mode", 0) {
         arrayOf(
             GlowMode,
-//            OutlineMode,
             BoxMode,
             Legacy2DMode,
             ShaderEspMode,
@@ -101,10 +100,8 @@ object ModuleItemESP : ClientModule("ItemESP", ModuleCategories.RENDER) {
         )
     }
 
-    // showTracers
     @Suppress("unused")
     private val tracerRenderHandler = handler<WorldRenderEvent> { event ->
-        // Check if the tracer option is enabled
         if (!showTracers) return@handler
 
         event.renderEnvironment {
@@ -116,7 +113,6 @@ object ModuleItemESP : ClientModule("ItemESP", ModuleCategories.RENDER) {
 
                 val color = getColor()
 
-                // Interpolating the position (motion smoothing)
                 val pos = entity.interpolateCurrentPosition(event.partialTicks).subtract(camera.position()).toVec3f()
 
                 drawLine(
@@ -219,7 +215,7 @@ object ModuleItemESP : ClientModule("ItemESP", ModuleCategories.RENDER) {
                     val pos = entity.interpolateCurrentPosition(event.partialTicks).add(0.0, yOffset.toDouble(), 0.0)
 
                     drawLegacy2DMarker(
-                        pos = pos,
+                        position = pos,
                         entityHeight = entity.boundingBox.ysize,
                         scale = scale,
                         foregroundArgb = color,
@@ -231,13 +227,11 @@ object ModuleItemESP : ClientModule("ItemESP", ModuleCategories.RENDER) {
     }
 
     object GlowMode : Mode("Glow") {
-        override val parent: ModeValueGroup<Mode>
-            get() = modes
+        override val parent: ModeValueGroup<Mode> get() = modes
     }
 
     object ShaderEspMode : Mode("ShaderESP") {
-        override val parent: ModeValueGroup<Mode>
-            get() = modes
+        override val parent: ModeValueGroup<Mode> get() = modes
 
         private val styleConfig = EspGlowStyleConfig(this)
 
@@ -246,8 +240,7 @@ object ModuleItemESP : ClientModule("ItemESP", ModuleCategories.RENDER) {
     }
 
     object OutlineMode : Mode("Outline") {
-        override val parent: ModeValueGroup<Mode>
-            get() = modes
+        override val parent: ModeValueGroup<Mode> get() = modes
     }
 
     fun shouldRender(entity: Entity?) : Boolean {
@@ -261,14 +254,6 @@ object ModuleItemESP : ClientModule("ItemESP", ModuleCategories.RENDER) {
 
             is ThrownTrident -> showTridents
 
-            // arrow checks
-            // The server never sends the actual pickupType of arrows fired
-            // from Infinity-enchanted bows to clients. :(
-            // Therefore, those arrows are still rendered as collectible, even though they shouldn't be.
-            // The same applies to tridents thrown and arrows fired by players in Creative mode.
-
-            // However, it's not completely useless:
-            // arrows shot by mobs such as skeletons and pillagers are not rendered.
             is Arrow if ShowArrows.running && entity.pickup == Pickup.ALLOWED ->
                 if (entity.color == -1) ShowArrows.regularArrows else ShowArrows.arrowsWithEffects
 

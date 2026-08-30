@@ -11,7 +11,7 @@
     import {onMount} from "svelte";
     import type {Account} from "../../../integration/types";
     import {restoreSession} from "../../../integration/rest.js";
-    import {isLoggingIn} from "../altmanager/altmanager_store";
+    import {isLoggingIn} from "../../../integration/accountLoginState";
 
     const premiumAccounts: Account[] = $state([]);
 

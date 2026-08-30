@@ -28,8 +28,8 @@ import com.mojang.blaze3d.systems.RenderPass
 import com.mojang.blaze3d.systems.RenderSystem
 import com.mojang.blaze3d.vertex.MeshData
 import com.mojang.blaze3d.vertex.VertexFormat
-import net.ccbluex.liquidbounce.LiquidBounce
 import net.ccbluex.liquidbounce.render.ClientTesselator
+import net.ccbluex.liquidbounce.render.RENDER_CLIENT_NAME
 import net.ccbluex.liquidbounce.render.buffers.DynamicGpuBufferWriter
 import java.nio.ByteBuffer
 
@@ -101,7 +101,7 @@ data class MeshDraw(
          * Vertex uploads are aligned to their respective [VertexFormat.vertexSize].
          */
         private val sharedVbo = DynamicGpuBufferWriter(
-            "${LiquidBounce.CLIENT_NAME} Shared VBO",
+            "$RENDER_CLIENT_NAME Shared VBO",
             GpuBuffer.USAGE_VERTEX,
             DynamicGpuBufferWriter.GrowPolicy.of(paddingScale = 8, min = 1 shl 13),
         )
@@ -112,7 +112,7 @@ data class MeshDraw(
          * Index uploads are aligned to their respective [IndexType.bytes].
          */
         private val sharedIbo = DynamicGpuBufferWriter(
-            "${LiquidBounce.CLIENT_NAME} Shared IBO",
+            "$RENDER_CLIENT_NAME Shared IBO",
             GpuBuffer.USAGE_INDEX,
             DynamicGpuBufferWriter.GrowPolicy.of(paddingScale = 7, min = 1 shl 11),
         )

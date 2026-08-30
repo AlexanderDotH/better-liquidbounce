@@ -22,10 +22,10 @@ package net.ccbluex.liquidbounce.event.events
 import com.mojang.blaze3d.platform.InputConstants
 import net.ccbluex.liquidbounce.annotations.Tag
 import net.ccbluex.liquidbounce.config.gson.stategies.ProtocolExclude
-import net.ccbluex.liquidbounce.config.types.list.Tagged
+import net.ccbluex.liquidbounce.common.Tagged
 import net.ccbluex.liquidbounce.event.CancellableEvent
 import net.ccbluex.liquidbounce.event.Event
-import net.ccbluex.liquidbounce.integration.interop.protocol.event.WebSocketEvent
+import net.ccbluex.liquidbounce.event.WebSocketEvent
 import net.ccbluex.liquidbounce.utils.entity.cameraDistance
 import net.ccbluex.liquidbounce.utils.movement.DirectionalInput
 import net.minecraft.client.CameraType

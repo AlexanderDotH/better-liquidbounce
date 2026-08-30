@@ -20,7 +20,7 @@ package net.ccbluex.liquidbounce.injection.mixins.minecraft.server;
 
 import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
-import net.ccbluex.liquidbounce.features.module.modules.world.basefinder.BaseFinderSilentMinecraftServer;
+import net.ccbluex.liquidbounce.features.module.modules.world.basefinder.BaseFinderServerHook;
 import net.minecraft.server.MinecraftServer;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
@@ -55,7 +55,7 @@ public abstract class MixinMinecraftServerBaseFinderSilent {
         V value,
         Operation<V> original
     ) {
-        if ((Object) this instanceof BaseFinderSilentMinecraftServer) {
+        if (BaseFinderServerHook.isSilentServer(this)) {
             return levels.put(key, value);
         }
         return original.call(levels, key, value);
@@ -63,7 +63,7 @@ public abstract class MixinMinecraftServerBaseFinderSilent {
 
     @Inject(method = "tickServer", at = @At("HEAD"), cancellable = true)
     private void liquidbounce$skipSilentServerTick(BooleanSupplier haveTime, CallbackInfo ci) {
-        if ((Object) this instanceof BaseFinderSilentMinecraftServer) {
+        if (BaseFinderServerHook.isSilentServer(this)) {
             ci.cancel();
         }
     }

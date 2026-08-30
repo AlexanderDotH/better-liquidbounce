@@ -18,6 +18,7 @@
  */
 package net.ccbluex.liquidbounce.features.module.modules.movement.vclip
 
+import net.ccbluex.liquidbounce.event.events.PacketEvent
 import net.minecraft.network.protocol.game.ServerboundMovePlayerPacket
 import java.util.Collections
 import java.util.IdentityHashMap
@@ -63,6 +64,12 @@ internal class VClipPacketDeliveryTracker {
         return VClipPacketDelivery(requiredOnGround).also { delivery ->
             deliveredPackets[packet] = delivery
         }
+    }
+
+    fun finalizeProtectedMovement(event: PacketEvent) {
+        val packet = event.packet as? ServerboundMovePlayerPacket ?: return
+        if (!reassertRequiredState(packet)) return
+        confirmFinalState(packet, event.isCancelled)
     }
 
     fun takeDelivery(packet: ServerboundMovePlayerPacket): VClipPacketDelivery? {

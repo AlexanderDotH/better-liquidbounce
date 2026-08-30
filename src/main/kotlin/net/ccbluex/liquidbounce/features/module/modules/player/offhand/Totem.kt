@@ -19,30 +19,20 @@
 package net.ccbluex.liquidbounce.features.module.modules.player.offhand
 
 import net.ccbluex.liquidbounce.config.types.group.ToggleableValueGroup
+import net.ccbluex.liquidbounce.features.inventory.InventoryManager
 import net.ccbluex.liquidbounce.features.module.modules.player.nofall.ModuleNoFall
-import net.ccbluex.liquidbounce.utils.block.getBlock
-import net.ccbluex.liquidbounce.utils.block.getPotentialSecondBedBlock
 import net.ccbluex.liquidbounce.utils.block.getSortedSphere
-import net.ccbluex.liquidbounce.utils.block.isCharged
 import net.ccbluex.liquidbounce.utils.block.fallDamageMultiplier
-import net.ccbluex.liquidbounce.utils.block.stateOrEmpty
 import net.ccbluex.liquidbounce.utils.client.Chronometer
 import net.ccbluex.liquidbounce.utils.entity.FallingPlayer
-import net.ccbluex.liquidbounce.utils.entity.getDamageFromExplosion
 import net.ccbluex.liquidbounce.utils.entity.getEffectiveDamage
 import net.ccbluex.liquidbounce.utils.entity.getExplosionDamageFromEntity
 import net.ccbluex.liquidbounce.utils.entity.isBurrowed
 import net.ccbluex.liquidbounce.utils.entity.isInHole
 import net.ccbluex.liquidbounce.utils.inventory.ArmorItemSlot
 import net.ccbluex.liquidbounce.utils.inventory.InventoryAction
-import net.ccbluex.liquidbounce.utils.inventory.InventoryManager
-import net.ccbluex.liquidbounce.utils.math.center
-import net.ccbluex.liquidbounce.utils.world.bedRule
-import net.ccbluex.liquidbounce.utils.world.respawnAnchorWorks
 import net.minecraft.core.BlockPos
 import net.minecraft.world.entity.Pose
-import net.minecraft.world.level.block.BedBlock
-import net.minecraft.world.level.block.RespawnAnchorBlock
 
 internal object Totem : ToggleableValueGroup(ModuleOffhand, "Totem", true) {
 
@@ -209,54 +199,8 @@ internal object Totem : ToggleableValueGroup(ModuleOffhand, "Totem", true) {
             return maxDamage
         }
 
-        private fun getDamageFromBlocks(allowedDamage: Float): Float {
-            if (!explosionDamageBlocks || sphere == null) {
-                return 0f
-            }
-
-            val overworld = !world.bedRule.explodes
-            val nether = world.respawnAnchorWorks
-            val playerPos = player.blockPosition()
-            var maxDamage = 0f
-
-            sphere!!.forEach {
-                val pos = it.offset(playerPos)
-                val block = pos.getBlock()
-                val state = pos.stateOrEmpty
-
-                val noBedExplosion = overworld || block !is BedBlock
-                val noAnchorExplosion = nether || block !is RespawnAnchorBlock || !block.isCharged(state)
-                if (noBedExplosion && noAnchorExplosion) {
-                    return@forEach
-                }
-
-                // exclude the block as it gets removed before the explosion happens
-                val exclude = if (noBedExplosion) {
-                    // the anchor is just the block itself
-                    listOf(pos)
-                } else {
-                    // a bed consists of two blocks
-                    listOf(pos, block.getPotentialSecondBedBlock(state, pos))
-                }
-
-                maxDamage = maxDamage.coerceAtLeast(
-                    player.getDamageFromExplosion(
-                        pos = pos.center,
-                        power = 5f,
-                        explosionRange = 10f,
-                        damageDistance = 100f,
-                        exclude = exclude,
-                        damageSource = player.damageSources().badRespawnPointExplosion(pos.center)
-                    )
-                )
-
-                if (maxDamage >= allowedDamage) {
-                    return maxDamage
-                }
-            }
-
-            return maxDamage
-        }
+        private fun getDamageFromBlocks(allowedDamage: Float): Float =
+            ExplosiveBlockDamage.maximum(allowedDamage, explosionDamageBlocks, sphere)
 
     }
 

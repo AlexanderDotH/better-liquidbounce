@@ -10,24 +10,31 @@
  */
 package net.ccbluex.liquidbounce.features.module.modules.movement.fly.automation
 
-import net.ccbluex.liquidbounce.features.module.modules.movement.fly.ModuleFly
+import net.ccbluex.liquidbounce.features.module.modules.movement.fly.automation.FlyAutomationAcquireResult
+import net.ccbluex.liquidbounce.features.module.modules.movement.fly.automation.FlyAutomationController
+import net.ccbluex.liquidbounce.features.module.modules.movement.fly.automation.FlyAutomationEnd
+import net.ccbluex.liquidbounce.features.module.modules.movement.fly.automation.FlyAutomationInputResolver
+import net.ccbluex.liquidbounce.features.module.modules.movement.fly.automation.FlyAutomationLease
+import net.ccbluex.liquidbounce.features.module.modules.movement.fly.automation.FlyAutomationLeaseValidation
+import net.ccbluex.liquidbounce.features.module.modules.movement.fly.automation.FlyAutomationModulePort
+import net.ccbluex.liquidbounce.features.module.modules.movement.fly.automation.FlyAutomationProfile
+import net.ccbluex.liquidbounce.features.module.modules.movement.fly.automation.FlySteeringIntent
 import net.ccbluex.liquidbounce.utils.movement.DirectionalInput
 import net.minecraft.client.Minecraft
 
 /** Narrow Fly-facing facade used by Baritone without exposing Fly mode internals. */
-@Suppress("TooManyFunctions")
 internal object FlyAutomation {
 
-    private val controller = FlyAutomationController(ModuleFlyRuntime)
+    private val controller = FlyAutomationController(BoundModulePort)
 
     val selectedModeName: String
-        get() = ModuleFlyRuntime.selectedModeName
+        get() = BoundModulePort.selectedModeName
 
     val enabled: Boolean
-        get() = ModuleFlyRuntime.enabled
+        get() = BoundModulePort.enabled
 
     val running: Boolean
-        get() = ModuleFly.running
+        get() = BoundModulePort.running
 
     internal val runtimeSuspended: Boolean
         get() = controller.runtimeSuspended
@@ -62,26 +69,37 @@ internal object FlyAutomation {
 
     internal fun onSelectedModeChanged(modeName: String) = controller.onSelectedModeChanged(modeName)
 
-    private object ModuleFlyRuntime : FlyAutomationRuntime {
+    internal fun bind(modulePort: FlyAutomationModulePort) = BoundModulePort.bind(modulePort)
+
+    private object BoundModulePort : FlyAutomationModulePort {
+        private lateinit var delegate: FlyAutomationModulePort
+
         override val enabled: Boolean
-            get() = ModuleFly.enabled
+            get() = delegate.enabled
+
+        override val running: Boolean
+            get() = delegate.running
 
         override val selectedModeName: String
-            get() = ModuleFly.modes.activeMode.name
+            get() = delegate.selectedModeName
 
         override val selectedProfile: FlyAutomationProfile?
-            get() = ModuleFly.modes.activeMode as? FlyAutomationProfile
+            get() = delegate.selectedProfile
 
         override fun setModuleEnabled(enabled: Boolean) {
-            ModuleFly.enabled = enabled
+            delegate.setModuleEnabled(enabled)
         }
 
         override fun enableSelectedMode() {
-            ModuleFly.modes.activeMode.enable()
+            delegate.enableSelectedMode()
         }
 
         override fun disableSelectedMode() {
-            ModuleFly.modes.activeMode.disable()
+            delegate.disableSelectedMode()
+        }
+
+        fun bind(modulePort: FlyAutomationModulePort) {
+            delegate = modulePort
         }
     }
 }

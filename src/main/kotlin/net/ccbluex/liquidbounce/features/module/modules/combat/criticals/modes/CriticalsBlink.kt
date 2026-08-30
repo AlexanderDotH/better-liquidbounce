@@ -27,7 +27,7 @@ import net.ccbluex.liquidbounce.event.handler
 import net.ccbluex.liquidbounce.features.blink.BlinkManager
 import net.ccbluex.liquidbounce.features.module.modules.combat.criticals.ModuleCriticals
 import net.ccbluex.liquidbounce.features.module.modules.combat.criticals.ModuleCriticals.wouldDoCriticalHit
-import net.ccbluex.liquidbounce.utils.combat.findEnemy
+import net.ccbluex.liquidbounce.features.combat.runtime.findEnemy
 import net.minecraft.network.protocol.common.ServerboundResourcePackPacket
 import net.minecraft.network.protocol.game.ServerboundAttackPacket
 import net.minecraft.network.protocol.game.ServerboundInteractPacket
@@ -70,8 +70,8 @@ object CriticalsBlink : Mode("Blink") {
                 is ServerboundAttackPacket,
                 is ServerboundSpectatorActionPacket,
                 is ServerboundSwingPacket,
-                is ServerboundResourcePackPacket -> BlinkManager.Action.PASS
-                else -> BlinkManager.Action.QUEUE
+                is ServerboundResourcePackPacket -> net.ccbluex.liquidbounce.event.events.BlinkPacketAction.PASS
+                else -> net.ccbluex.liquidbounce.event.events.BlinkPacketAction.QUEUE
             }
             isInState = true
         } else {
@@ -85,5 +85,4 @@ object CriticalsBlink : Mode("Blink") {
     }
 
 }
-
 

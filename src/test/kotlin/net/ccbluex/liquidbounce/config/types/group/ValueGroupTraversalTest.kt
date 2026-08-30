@@ -67,6 +67,19 @@ class ValueGroupTraversalTest {
         )
     }
 
+    @Test
+    fun `value factories retain registration order`() {
+        val root = ValueGroup("Factory")
+        val enabled = root.boolean("Enabled", true)
+        val amount = root.int("Amount", 2, 0..10)
+        val label = root.text("Label", "ready")
+
+        assertEquals(
+            listOf(enabled, amount, label),
+            root.containedValues.toList(),
+        )
+    }
+
     private class TestToggleable(name: String) : ToggleableValueGroup(null, name, enabled = false)
 
     private class TestMode(

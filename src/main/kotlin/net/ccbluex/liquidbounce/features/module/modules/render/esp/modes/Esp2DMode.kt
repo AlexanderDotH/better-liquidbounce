@@ -21,14 +21,14 @@ package net.ccbluex.liquidbounce.features.module.modules.render.esp.modes
 import net.ccbluex.liquidbounce.config.types.group.ToggleableValueGroup
 import net.ccbluex.liquidbounce.event.events.OverlayRenderEvent
 import net.ccbluex.liquidbounce.event.handler
-import net.ccbluex.liquidbounce.features.module.modules.render.esp.ModuleESP.getColor
+import net.ccbluex.liquidbounce.features.module.modules.render.esp.runtime.EspModeRuntime
 import net.ccbluex.liquidbounce.render.drawHorizontalLine
 import net.ccbluex.liquidbounce.render.drawQuad
 import net.ccbluex.liquidbounce.render.drawVerticalLine
 import net.ccbluex.liquidbounce.render.engine.type.Color4b
 import net.ccbluex.liquidbounce.render.withPush
 import net.ccbluex.liquidbounce.utils.entity.getActualHealth
-import net.ccbluex.liquidbounce.utils.render.WorldToScreen
+import net.ccbluex.liquidbounce.render.WorldToScreen
 
 object Esp2DMode : EspMode.BoxBased("2D") {
 
@@ -62,7 +62,7 @@ object Esp2DMode : EspMode.BoxBased("2D") {
         for ((entity, _, _, box) in collectPreparedBoxes(event.tickDelta)) {
             val rect = WorldToScreen.calculateScreenRect(box) ?: continue
 
-            val color = getColor(entity)
+            val color = EspModeRuntime.color(entity)
             val baseColor = color.with(a = 50)
             val outlineColor = color.with(a = 255)
             val black = Color4b.BLACK

@@ -18,6 +18,8 @@
  */
 package net.ccbluex.liquidbounce.features.module.modules.render
 
+import net.ccbluex.liquidbounce.features.module.modules.render.timing.TimeUnit
+
 import net.ccbluex.liquidbounce.config.ConfigSystem
 import net.ccbluex.liquidbounce.config.types.group.ToggleableValueGroup
 import net.ccbluex.liquidbounce.event.events.WorldFeatureSubmitEvent
@@ -30,7 +32,7 @@ import net.ccbluex.liquidbounce.render.engine.type.Color4b
 import net.ccbluex.liquidbounce.utils.text.asPlainText
 import net.ccbluex.liquidbounce.utils.text.plus
 import net.ccbluex.liquidbounce.utils.text.textOf
-import net.ccbluex.liquidbounce.utils.world.EntityLookup.Companion.EntityLookup
+import net.ccbluex.liquidbounce.features.entity.EntityLookup.Companion.EntityLookup
 import net.ccbluex.liquidbounce.utils.world.filterTo
 import net.minecraft.client.gui.Font
 import net.minecraft.client.renderer.entity.EntityRenderer

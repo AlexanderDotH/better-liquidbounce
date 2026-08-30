@@ -32,7 +32,7 @@ import net.ccbluex.liquidbounce.utils.aiming.data.Rotation
 import net.ccbluex.liquidbounce.utils.aiming.utils.withFixedYaw
 import net.ccbluex.liquidbounce.utils.network.MovePacketType
 import net.ccbluex.liquidbounce.utils.client.inGame
-import net.ccbluex.liquidbounce.utils.combat.shouldBeAttacked
+import net.ccbluex.liquidbounce.features.combat.runtime.shouldBeAttacked
 import net.ccbluex.liquidbounce.utils.entity.FallingPlayer
 import net.ccbluex.liquidbounce.utils.entity.rotation
 import net.ccbluex.liquidbounce.utils.inventory.HotbarItemSlot
@@ -86,6 +86,23 @@ internal object Pot : StatusEffectBasedBuff("Pot") {
     private val allowLingering by boolean("AllowLingering", false)
 
     override suspend fun execute(slot: HotbarItemSlot) {
+        val rotation = prepareThrowRotation()
+
+        if (!inGame) return // TODO: I think we should edit the continuation interceptor here
+
+        useHotbarSlotOrOffhand(
+            slot,
+            yRot = rotation.yaw,
+            xRot = rotation.pitch,
+        )
+
+        restoreServerRotationAfterTickSpoof()
+
+        // Wait at least 1 tick to make sure, we do not continue with something else too early
+        waitTicks(1)
+    }
+
+    private suspend fun prepareThrowRotation(): Rotation {
         // TODO: Use movement prediction to splash against walls and away from the player
         //   See https://github.com/CCBlueX/LiquidBounce/issues/2051
         var rotation = Rotation(player.yRot, (85f..90f).random())
@@ -118,28 +135,15 @@ internal object Pot : StatusEffectBasedBuff("Pot") {
                 rotation = rotation.normalize()
             }
         }
+        return rotation
+    }
 
-        if (!inGame) return // TODO: I think we should edit the continuation interceptor here
-
-        useHotbarSlotOrOffhand(
-            slot,
-            yRot = rotation.yaw,
-            xRot = rotation.pitch,
-        )
-
-        when (ModuleAutoBuff.Rotations.rotationTiming) {
-            ON_TICK -> {
-                network.send(MovePacketType.FULL.generatePacket().apply {
-                    yRot = player.withFixedYaw(currentRotation ?: player.rotation)
-                    xRot = currentRotation?.pitch ?: player.xRot
-                })
-            }
-
-            else -> {}
-        }
-
-        // Wait at least 1 tick to make sure, we do not continue with something else too early
-        waitTicks(1)
+    private fun restoreServerRotationAfterTickSpoof() {
+        if (ModuleAutoBuff.Rotations.rotationTiming != ON_TICK) return
+        network.send(MovePacketType.FULL.generatePacket().apply {
+            yRot = player.withFixedYaw(currentRotation ?: player.rotation)
+            xRot = currentRotation?.pitch ?: player.xRot
+        })
     }
 
     override fun isValidPotion(stack: ItemStack) =

@@ -22,7 +22,7 @@ import net.ccbluex.liquidbounce.config.types.group.ModeValueGroup
 import net.ccbluex.liquidbounce.event.events.PlayerJumpEvent
 import net.ccbluex.liquidbounce.event.handler
 import net.ccbluex.liquidbounce.event.tickHandler
-import net.ccbluex.liquidbounce.features.module.modules.movement.speed.ModuleSpeed
+import net.ccbluex.liquidbounce.features.module.modules.movement.speed.runtime.SpeedModuleControl
 import net.ccbluex.liquidbounce.features.module.modules.movement.speed.modes.SpeedBHopBase
 import net.ccbluex.liquidbounce.utils.client.Timer
 import net.ccbluex.liquidbounce.utils.entity.horizontalSpeed
@@ -39,7 +39,7 @@ class SpeedBlockdropHop(parent: ModeValueGroup<*>) : SpeedBHopBase("BlockdropHop
         }
 
         player.deltaMovement = player.deltaMovement.withStrafe(speed = player.horizontalSpeed * 1.001)
-        Timer.requestTimerSpeed(1.1f, Priority.IMPORTANT_FOR_USAGE_1, ModuleSpeed)
+        Timer.requestTimerSpeed(1.1f, Priority.IMPORTANT_FOR_USAGE_1, SpeedModuleControl.module)
     }
 
     @Suppress("unused")

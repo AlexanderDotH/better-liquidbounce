@@ -18,15 +18,13 @@
  */
 package net.ccbluex.liquidbounce.features.module.modules.player.autoqueue
 
-import net.ccbluex.liquidbounce.config.types.list.Tagged
+import net.ccbluex.liquidbounce.common.Tagged
 import net.ccbluex.liquidbounce.features.module.ClientModule
 import net.ccbluex.liquidbounce.features.module.ModuleCategories
 import net.ccbluex.liquidbounce.features.module.modules.player.autoqueue.presets.AutoQueueCustom
 import net.ccbluex.liquidbounce.features.module.modules.player.autoqueue.presets.AutoQueueGommeDuels
 import net.ccbluex.liquidbounce.features.module.modules.player.autoqueue.presets.AutoQueueHypixelSW
-import net.ccbluex.liquidbounce.integration.screen.CustomScreenType
-import net.ccbluex.liquidbounce.integration.screen.impl.CustomSharedMinecraftScreen
-import net.ccbluex.liquidbounce.integration.screen.impl.CustomStandaloneMinecraftScreen
+import net.ccbluex.liquidbounce.features.module.modules.render.clickgui.ClickGuiRuntimeBridge
 import net.minecraft.client.gui.screens.ChatScreen
 import net.minecraft.client.gui.screens.PauseScreen
 import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen
@@ -47,9 +45,7 @@ object ModuleAutoQueue : ClientModule("AutoQueue", ModuleCategories.PLAYER, alia
     private enum class PauseCondition(override val tag: String) : Tagged, BooleanSupplier {
         CLICK_GUI_OPEN("ClickGuiOpen") {
             override fun getAsBoolean(): Boolean {
-                val screen = mc.gui.screen()
-                return screen is CustomSharedMinecraftScreen && screen.screenType == CustomScreenType.CLICK_GUI ||
-                    screen is CustomStandaloneMinecraftScreen && screen.screenType == CustomScreenType.CLICK_GUI
+                return ClickGuiRuntimeBridge.isClickGuiScreen(mc.gui.screen())
             }
         },
         CHAT_SCREEN_OPEN("ChatScreenOpen") {

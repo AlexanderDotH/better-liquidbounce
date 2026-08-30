@@ -10,7 +10,7 @@
  */
 package net.ccbluex.liquidbounce.injection.mixins.litematica;
 
-import net.ccbluex.liquidbounce.features.litematica.integration.api.LitematicaEasyPlaceExecutionGate;
+import net.ccbluex.liquidbounce.features.litematica.integration.api.LitematicaEasyPlaceHook;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Pseudo;
 import org.spongepowered.asm.mixin.injection.At;
@@ -29,7 +29,7 @@ public abstract class MixinLitematicaEasyPlaceUtils {
         require = 0
     )
     private static void liquidbounce$suppressNativeEasyPlace(CallbackInfo callback) {
-        if (LitematicaEasyPlaceExecutionGate.shouldSuppressNativeEasyPlace()) {
+        if (LitematicaEasyPlaceHook.shouldSuppressNativeEasyPlace()) {
             callback.cancel();
         }
     }
@@ -41,7 +41,7 @@ public abstract class MixinLitematicaEasyPlaceUtils {
         require = 0
     )
     private static void liquidbounce$suppressDirectNativeEasyPlace(CallbackInfoReturnable<Boolean> callback) {
-        if (LitematicaEasyPlaceExecutionGate.shouldSuppressNativeEasyPlace()) {
+        if (LitematicaEasyPlaceHook.shouldSuppressNativeEasyPlace()) {
             callback.setReturnValue(true);
         }
     }

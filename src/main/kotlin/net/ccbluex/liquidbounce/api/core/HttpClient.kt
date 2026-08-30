@@ -16,29 +16,20 @@
  * You should have received a copy of the GNU General Public License
  * along with LiquidBounce. If not, see <https://www.gnu.org/licenses/>.
  */
+@file:JvmName("HttpClientKt")
+@file:JvmMultifileClass
+
 package net.ccbluex.liquidbounce.api.core
 
-import com.mojang.blaze3d.platform.NativeImage
-import kotlinx.coroutines.CoroutineExceptionHandler
-import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import net.ccbluex.liquidbounce.LiquidBounce
 import net.ccbluex.liquidbounce.api.interceptors.CacheBlacklistInterceptor
 import net.ccbluex.liquidbounce.api.interceptors.DefaultHeaderInterceptor
 import net.ccbluex.liquidbounce.api.thirdparty.mojang.MojangApiClient
+import net.ccbluex.liquidbounce.common.ClientBuildMetadata
 import net.ccbluex.liquidbounce.config.gson.interopGson
-import net.ccbluex.liquidbounce.config.gson.util.readJson
-import net.ccbluex.liquidbounce.mcef.MCEF
-import net.ccbluex.liquidbounce.mcef.listeners.OkHttpProgressInterceptor
-import net.ccbluex.liquidbounce.utils.client.error.ErrorHandler
 import net.ccbluex.liquidbounce.utils.client.logger
 import net.ccbluex.liquidbounce.utils.client.mc
-import net.ccbluex.liquidbounce.utils.kotlin.Minecraft
-import net.ccbluex.liquidbounce.utils.render.readNativeImage
-import net.minecraft.ReportedException
 import okhttp3.Cache
 import okhttp3.Call
 import okhttp3.Callback
@@ -52,42 +43,20 @@ import okhttp3.RequestBody
 import okhttp3.RequestBody.Companion.toRequestBody
 import okhttp3.Response
 import okhttp3.coroutines.executeAsync
-import okio.BufferedSource
-import okio.sink
 import java.io.File
 import java.io.IOException
-import java.io.InputStream
-import java.io.Reader
 import java.util.Locale
 import java.util.concurrent.CancellationException
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 
-val renderScope = CoroutineScope(
-    Dispatchers.Minecraft + SupervisorJob() + CoroutineExceptionHandler { _, throwable ->
-        if (throwable is ReportedException) {
-            ErrorHandler.fatal(throwable, additionalMessage = "Render scope")
-        }
-    }
-)
-
-val ioScope = CoroutineScope(
-    Dispatchers.IO + SupervisorJob() + CoroutineExceptionHandler { _, throwable ->
-        if (throwable is ReportedException) {
-            ErrorHandler.fatal(throwable, additionalMessage = "IO scope")
-        }
-    }
-)
-
-fun withScope(block: suspend CoroutineScope.() -> Unit) = ioScope.launch { block() }
-
 object HttpClient {
 
     @JvmField
-    val DEFAULT_AGENT = "${LiquidBounce.CLIENT_NAME}/${LiquidBounce.clientVersion}" +
-        " (${LiquidBounce.clientCommit}, ${LiquidBounce.clientBranch}, " +
-        "${if (LiquidBounce.IN_DEVELOPMENT) "dev" else "release"}, ${System.getProperty("os.name")})"
+    val DEFAULT_AGENT = "${ClientBuildMetadata.NAME}/${ClientBuildMetadata.version}" +
+        " (${ClientBuildMetadata.commit}, ${ClientBuildMetadata.branch}, " +
+        "${if (ClientBuildMetadata.IN_DEVELOPMENT) "dev" else "release"}, ${System.getProperty("os.name")})"
 
     /**
      * Unfortunately, Lunar Client uses OkHttp 4.12.0 which does not have [Headers.EMPTY]
@@ -129,7 +98,7 @@ object HttpClient {
             try {
                 val file = File(
                     System.getProperty("java.io.tmpdir"),
-                    "${LiquidBounce.CLIENT_NAME.lowercase(Locale.ROOT)}_http_cache",
+                    "${ClientBuildMetadata.NAME.lowercase(Locale.ROOT)}_http_cache",
                 )
                 file.mkdirs()
                 cache(Cache(file, 128L shl 20))
@@ -140,9 +109,10 @@ object HttpClient {
         .addInterceptor(CacheBlacklistInterceptor(setOf("localhost", "127.0.0.1")))
         .addInterceptor(DefaultHeaderInterceptor("User-Agent", DEFAULT_AGENT, skipIfExists = true))
         .proxy(java.net.Proxy.NO_PROXY)
-        .build().also {
-            MCEF.INSTANCE.settings.okHttpClient = it
-        }
+        .build()
+
+    internal val browserClient: OkHttpClient
+        get() = defaultClient
 
     /**
      * This interceptor rejects all non-2xx responses
@@ -190,7 +160,7 @@ object HttpClient {
         agent: String = DEFAULT_AGENT,
         headers: Headers.Builder.() -> Unit = {},
         body: RequestBody? = null,
-        progressListener: OkHttpProgressInterceptor.ProgressListener? = null
+        progressListener: HttpProgressListener? = null
     ): Response {
         val request = Request.Builder()
             .url(url)
@@ -203,7 +173,7 @@ object HttpClient {
             client.newCall(request).executeAsync()
         } else {
             client.newBuilder()
-                .addNetworkInterceptor(OkHttpProgressInterceptor(progressListener))
+                .addNetworkInterceptor(HttpProgressInterceptor(progressListener))
                 .build()
                 .newCall(request).executeAsync()
         }
@@ -213,7 +183,7 @@ object HttpClient {
         url: String,
         file: File,
         agent: String = DEFAULT_AGENT,
-        progressListener: OkHttpProgressInterceptor.ProgressListener? = null
+        progressListener: HttpProgressListener? = null
     ) = withContext(Dispatchers.IO) {
         request(url, HttpMethod.GET, agent, progressListener = progressListener).toFile(file)
     }
@@ -240,55 +210,3 @@ object HttpClient {
     }
 
 }
-
-enum class HttpMethod {
-    GET, POST, PUT, DELETE, PATCH, HEAD
-}
-
-/**
- * Parse body from [Response].
- *
- * If [T] is one of following types, it should be closed after using:
- * [InputStream] / [BufferedSource] / [Reader]
- */
-inline fun <reified T> Response.parse(): T {
-    return when (T::class.java) {
-        String::class.java -> body.string() as T
-        Unit::class.java -> close() as T
-        InputStream::class.java -> body.byteStream() as T
-        BufferedSource::class.java -> body.source() as T
-        Reader::class.java -> body.charStream() as T
-        NativeImage::class.java -> body.source().readNativeImage() as T
-        else -> body.charStream().readJson<T>()
-    }
-}
-
-/**
- * Read all UTF-8 lines from [BufferedSource] as an [Iterator].
- *
- * When there are no more lines to read, the source is closed automatically.
- */
-fun BufferedSource.utf8Lines(): Iterator<String> =
-    object : AbstractIterator<String>() {
-        override fun computeNext() {
-            val nextLine = readUtf8Line()
-            if (nextLine != null) {
-                setNext(nextLine)
-            } else {
-                close()
-                done()
-            }
-        }
-    }
-
-/**
- * Save response body to file.
- */
-fun Response.toFile(file: File) = use { response ->
-    file.sink().use(response.body.source()::readAll)
-}
-
-fun String.asForm() = toRequestBody(HttpClient.MediaTypes.FORM)
-
-class HttpException(val method: HttpMethod, val url: String, val code: Int, val content: String)
-    : Exception("${method.name} $url failed with code $code: $content")

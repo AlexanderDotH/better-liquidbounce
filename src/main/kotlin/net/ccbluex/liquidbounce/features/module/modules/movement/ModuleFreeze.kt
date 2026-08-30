@@ -19,47 +19,32 @@
 package net.ccbluex.liquidbounce.features.module.modules.movement
 
 import net.ccbluex.fastutil.enumSetOf
-import net.ccbluex.liquidbounce.config.types.group.Mode
-import net.ccbluex.liquidbounce.config.types.group.ModeValueGroup
-import net.ccbluex.liquidbounce.config.types.list.Tagged
-import net.ccbluex.liquidbounce.event.events.BlinkPacketEvent
+import net.ccbluex.liquidbounce.common.Tagged
 import net.ccbluex.liquidbounce.event.events.GameTickEvent
 import net.ccbluex.liquidbounce.event.events.NotificationEvent
 import net.ccbluex.liquidbounce.event.events.PacketEvent
-import net.ccbluex.liquidbounce.event.events.PlayerMovementTickEvent
 import net.ccbluex.liquidbounce.event.events.PlayerTickEvent
-import net.ccbluex.liquidbounce.event.events.TransferOrigin
-import net.ccbluex.liquidbounce.event.events.WorldRenderEvent
+import net.ccbluex.liquidbounce.render.events.WorldRenderEvent
 import net.ccbluex.liquidbounce.event.handler
-import net.ccbluex.liquidbounce.features.blink.BlinkManager.Action
 import net.ccbluex.liquidbounce.features.module.ClientModule
 import net.ccbluex.liquidbounce.features.module.ModuleCategories
-import net.ccbluex.liquidbounce.features.module.modules.misc.ModuleEasyPearl
+import net.ccbluex.liquidbounce.features.module.modules.movement.freeze.FreezeCancel
+import net.ccbluex.liquidbounce.features.module.modules.movement.freeze.FreezeQueue
+import net.ccbluex.liquidbounce.features.module.modules.movement.freeze.FreezeStationary
+import net.ccbluex.liquidbounce.features.module.modules.movement.freeze.FreezeTickMovement
+import net.ccbluex.liquidbounce.features.module.modules.movement.freeze.contract.FreezeStateHook
 import net.ccbluex.liquidbounce.render.drawLineStrip
 import net.ccbluex.liquidbounce.render.engine.type.Color4b
 import net.ccbluex.liquidbounce.render.renderEnvironment
 import net.ccbluex.liquidbounce.render.utils.MutableVertexList
-import net.ccbluex.liquidbounce.utils.aiming.RotationManager
-import net.ccbluex.liquidbounce.utils.client.notification
-import net.ccbluex.liquidbounce.utils.network.UseItemPacketRotation
-import net.ccbluex.liquidbounce.utils.network.sendPacketSilently
+import net.ccbluex.liquidbounce.features.chat.notification
 import net.ccbluex.liquidbounce.utils.entity.SimulatedPlayer
 import net.ccbluex.liquidbounce.utils.entity.SimulatedPlayerCache
 import net.ccbluex.liquidbounce.utils.entity.anyHorizontal
-import net.ccbluex.liquidbounce.utils.input.InputTracker.isPressedOnAny
-import net.ccbluex.liquidbounce.utils.kotlin.EventPriorityConvention
+import net.ccbluex.liquidbounce.features.input.InputTracker.isPressedOnAny
 import net.ccbluex.liquidbounce.utils.movement.DirectionalInput
-import net.minecraft.network.protocol.common.ServerboundPongPacket
 import net.minecraft.network.protocol.game.ClientboundPlayerPositionPacket
-import net.minecraft.network.protocol.game.ServerboundAttackPacket
-import net.minecraft.network.protocol.game.ServerboundInteractPacket
-import net.minecraft.network.protocol.game.ServerboundMovePlayerPacket
-import net.minecraft.network.protocol.game.ServerboundSpectatorActionPacket
-import net.minecraft.network.protocol.game.ServerboundUseItemOnPacket
-import net.minecraft.network.protocol.game.ServerboundUseItemPacket
 import java.util.function.BooleanSupplier
-import kotlin.math.abs
-import kotlin.random.Random
 
 /**
  * Freeze module
@@ -68,7 +53,11 @@ import kotlin.random.Random
  */
 object ModuleFreeze : ClientModule("Freeze", ModuleCategories.MOVEMENT, disableOnQuit = true) {
 
-    private val modes = choices("Mode", Stationary, arrayOf(Queue, Cancel, Stationary, TickMovement))
+    internal val modes = choices(
+        "Mode",
+        FreezeStationary,
+        arrayOf(FreezeQueue, FreezeCancel, FreezeStationary, FreezeTickMovement),
+    )
         .apply { tagBy(this) }
     private val disableOn by multiEnumChoice("DisableOn", enumSetOf(DisableOn.Flag))
     private val notification by boolean("Notification", false)
@@ -89,6 +78,10 @@ object ModuleFreeze : ClientModule("Freeze", ModuleCategories.MOVEMENT, disableO
     // todo: use global balance system
     private var missedOutTick = 0
     private var warpInProgress = false
+
+    init {
+        FreezeStateHook.install { running }
+    }
 
     override fun onEnabled() {
         missedOutTick = 0
@@ -134,7 +127,7 @@ object ModuleFreeze : ClientModule("Freeze", ModuleCategories.MOVEMENT, disableO
      */
     @Suppress("unused")
     private val moveHandler = handler<PlayerTickEvent> { event ->
-        if (warpInProgress || modes.activeMode === TickMovement) return@handler
+        if (warpInProgress || modes.activeMode === FreezeTickMovement) return@handler
 
         event.cancelEvent()
         missedOutTick++
@@ -185,168 +178,6 @@ object ModuleFreeze : ClientModule("Freeze", ModuleCategories.MOVEMENT, disableO
                 notifyAndDisable(DisableOn.Flag)
             }
         }
-    }
-
-    /**
-     * Queue network communication - acts as network lag
-     */
-    private object Queue : Mode("Queue") {
-
-        override val parent: ModeValueGroup<Mode>
-            get() = modes
-
-        private val origins by multiEnumChoice("Origin", TransferOrigin.OUTGOING)
-
-        @Suppress("unused")
-        private val fakeLagHandler = handler<BlinkPacketEvent>(
-            priority = EventPriorityConvention.SAFETY_FEATURE
-        ) { event ->
-            if (event.origin in origins) {
-                event.action = Action.QUEUE
-            }
-        }
-
-    }
-
-    /**
-     * Cancel network communication
-     */
-    private object Cancel : Mode("Cancel") {
-
-        private val origins by multiEnumChoice("Origin", TransferOrigin.OUTGOING)
-
-        override val parent: ModeValueGroup<Mode>
-            get() = modes
-
-        @Suppress("unused")
-        private val packetHandler = handler<PacketEvent> { event ->
-            if (event.origin in origins) {
-                event.cancelEvent()
-            }
-        }
-
-    }
-
-    /**
-     * Stationary freeze - only cancel movement but keeps network communication intact
-     */
-    private object Stationary : Mode("Stationary") {
-        /**
-         * Bypasses Grim's BadPacketsR and Matrix7 Timer Check
-         */
-        private val cancelC0B by boolean("CancelC0B",true)
-        private val yawOffset = FloatOffsetGenerator()
-        private val pitchOffset = FloatOffsetGenerator()
-
-        override val parent: ModeValueGroup<Mode>
-            get() = modes
-
-        /**
-         * Bypasses Grim's duplicate rotation check
-         */
-        private class FloatOffsetGenerator : FloatIterator() {
-            private var prev = 0f
-            override fun hasNext() = true
-            override fun nextFloat(): Float {
-                var offset: Float
-                do {
-                    offset = Random.nextDouble(0.002, 0.01).toFloat()
-                } while (abs(offset - prev) < 1.0E-6F)
-                return offset.also { prev = it }
-            }
-        }
-
-        @Suppress("unused")
-        private val packetEventHandler = handler<PacketEvent> { event ->
-            val yaw = RotationManager.currentRotation?.yaw ?: player.yRot
-            val pitch = RotationManager.currentRotation?.pitch ?: player.xRot
-            val yawOffset = yawOffset.nextFloat()
-            val pitchOffset = pitchOffset.nextFloat()
-
-            when (val packet = event.packet) {
-
-                is ServerboundPongPacket -> {
-                    if (cancelC0B) {
-                        event.cancelEvent()
-                    }
-                }
-
-                is ServerboundUseItemPacket -> {
-                    event.cancelEvent()
-                    sendPacketSilently(
-                        ServerboundMovePlayerPacket.Rot(
-                            ModuleEasyPearl.currentTargetRotation?.yaw ?: (player.yRot + yawOffset),
-                            ModuleEasyPearl.currentTargetRotation?.pitch ?: (player.xRot + pitchOffset),
-                            player.onGround(),
-                            player.horizontalCollision
-                        )
-                    )
-                    sendPacketSilently(
-                        UseItemPacketRotation.createExplicit(
-                            packet.hand,
-                            packet.sequence,
-                            yaw + yawOffset,
-                            pitch + pitchOffset,
-                        )
-                    )
-                }
-
-                is ServerboundInteractPacket, is ServerboundAttackPacket, is ServerboundSpectatorActionPacket -> {
-                    event.cancelEvent()
-                    sendPacketSilently(
-                        ServerboundMovePlayerPacket.Rot(
-                            yaw + yawOffset,
-                            pitch + pitchOffset,
-                            player.onGround(),
-                            player.horizontalCollision
-                        )
-                    )
-                    sendPacketSilently(packet)
-                }
-
-                is ServerboundUseItemOnPacket -> {
-                    event.cancelEvent()
-                    sendPacketSilently(
-                        ServerboundMovePlayerPacket.Rot(
-                            yaw + yawOffset,
-                            pitch + pitchOffset,
-                            player.onGround(),
-                            player.horizontalCollision
-                        )
-                    )
-                    sendPacketSilently(packet)
-                }
-            }
-        }
-
-    }
-
-    private object TickMovement : Mode("TickMovement") {
-
-        private val interval by intRange("Interval", 20..20, 1..200, "ticks")
-        private var ticksUntilMovement = 0
-
-        override val parent: ModeValueGroup<Mode>
-            get() = modes
-
-        override fun enable() {
-            ticksUntilMovement = interval.random()
-        }
-
-        override fun disable() {
-            ticksUntilMovement = 0
-        }
-
-        @Suppress("unused")
-        private val movementTickHandler = handler<PlayerMovementTickEvent> { event ->
-            if (--ticksUntilMovement <= 0) {
-                ticksUntilMovement = interval.random()
-                return@handler
-            }
-
-            event.cancelEvent()
-        }
-
     }
 
 }

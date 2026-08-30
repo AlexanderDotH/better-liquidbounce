@@ -1,7 +1,7 @@
 /*
  * This file is part of LiquidBounce (https://github.com/CCBlueX/LiquidBounce)
  *
- * Copyright (c) 2015 - 2025 CCBlueX
+ * Copyright (c) 2015 - 2026 CCBlueX
  *
  * LiquidBounce is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -17,21 +17,14 @@
  * along with LiquidBounce. If not, see <https://www.gnu.org/licenses/>.
  */
 
-import com.github.gradle.node.npm.task.NpmTask
+import dev.detekt.gradle.Detekt
 import dev.detekt.gradle.DetektCreateBaselineTask
-import groovy.json.JsonOutput
-import org.gradle.api.artifacts.ModuleDependency
-import org.gradle.api.tasks.PathSensitivity
-import org.gradle.api.tasks.testing.Test
-import org.gradle.jvm.tasks.Jar
-import org.gradle.kotlin.dsl.support.listFilesOrdered
 
 plugins {
     alias(libs.plugins.fabric.loom)
     alias(libs.plugins.kotlin.jvm)
     alias(libs.plugins.gradleGitProperties)
     alias(libs.plugins.detekt)
-    alias(libs.plugins.nodeGradle)
     alias(libs.plugins.dokka)
 }
 
@@ -41,423 +34,9 @@ base {
     group = project.property("maven_group") as String
 }
 
-/** Includes dependency recursively in the JAR file */
-val jij = configurations.create("jij")
-val baritoneApiFabric = "baritone.vendor:baritone-api-fabric:1.15.0-10-g2991d921"
-val seedFindingUnrelocated = configurations.create("seedFindingUnrelocated") {
-    isCanBeConsumed = false
-    isCanBeResolved = true
-    isTransitive = false
-}
-val litematicaIntegrationTestRuntime = configurations.create("litematicaIntegrationTestRuntime") {
-    isCanBeConsumed = false
-    isCanBeResolved = true
-    isTransitive = true
-}
-
-jij.excludeProvidedLibs()
-
-val seedFindingReferenceCoordinates = listOf(
-    "com.seedfinding:mc_math:${libs.versions.seedfinding.math.get()}",
-    "com.seedfinding:mc_seed:${libs.versions.seedfinding.seed.get()}",
-    "com.seedfinding:mc_core:${libs.versions.seedfinding.core.get()}",
-    "com.seedfinding:mc_noise:${libs.versions.seedfinding.noise.get()}",
-    "com.seedfinding:mc_biome:${libs.versions.seedfinding.biome.get()}",
-    "com.seedfinding:mc_terrain:${libs.versions.seedfinding.terrain.get()}",
-    "com.seedfinding:mc_feature:${libs.versions.seedfinding.feature.get()}",
-    "com.seedfinding:mc_reversal:${libs.versions.seedfinding.reversal.get()}",
-    "com.seedfinding:latticg:${libs.versions.latticg.get()}",
-)
-
-allprojects {
-    repositories {
-        // Locally verified Baritone API artifact. A synthetic module coordinate is required because
-        // Loom cannot nest a raw file dependency while preserving Fabric metadata and capabilities.
-        flatDir {
-            dirs(rootProject.file("third_party/baritone"))
-            content {
-                includeGroup("baritone.vendor")
-            }
-        }
-        // Produced by relocateSeedFindingJars before Loom resolves the matching include dependency.
-        flatDir {
-            dirs(layout.buildDirectory.dir("generated/seedcracker"))
-        }
-        mavenCentral()
-        mavenLocal()
-        maven {
-            name = "CCBlueX Releases"
-            url = uri("https://maven.ccbluex.net/releases")
-        }
-        maven {
-            name = "CCBlueX Snapshots"
-            url = uri("https://maven.ccbluex.net/snapshots")
-        }
-        maven {
-            name = "Fabric"
-            url = uri("https://maven.fabricmc.net/")
-        }
-        maven {
-            name = "Jitpack"
-            url = uri("https://jitpack.io")
-        }
-        maven {
-            name = "ViaVersion"
-            url = uri("https://repo.viaversion.com/")
-        }
-        maven {
-            name = "modrinth"
-            url = uri("https://api.modrinth.com/maven")
-        }
-        maven {
-            name = "OpenCollab Snapshots"
-            url = uri("https://repo.opencollab.dev/maven-snapshots/")
-        }
-        maven {
-            name = "Lenni0451"
-            url = uri("https://maven.lenni0451.net/everything")
-        }
-        maven {
-            url = uri("https://maven.shedaniel.me/")
-        }
-        maven {
-            name = "LattiCG"
-            url = uri("https://maven.latticg.com/")
-        }
-        maven {
-            name = "SeedFinding Releases"
-            url = uri("https://maven.seedfinding.com/")
-        }
-        maven {
-            name = "SeedFinding Snapshots"
-            url = uri("https://maven-snapshots.seedfinding.com/")
-        }
-    }
-}
-
 loom {
     accessWidenerPath = file("src/main/resources/liquidbounce.accesswidener")
 }
-
-dependencies {
-    fun addSeedFinding(dependency: Any) {
-        val declared = create(dependency)
-        require(declared is ModuleDependency) { "SeedFinding dependency must be a module: $dependency" }
-        declared.isTransitive = false
-        seedFindingUnrelocated.dependencies.add(declared)
-    }
-
-    // Minecraft
-    minecraft(libs.minecraft)
-
-    // Fabric
-    api(libs.fabric.loader)
-    api(libs.fabric.api)
-    api(libs.fabric.kotlin)
-
-    // Optional Distant Horizons integration. Keep the API off the runtime/JIJ path so DH remains optional.
-    compileOnly("maven.modrinth:DistantHorizonsApi:7.0.0")
-
-    // Optional Litematica integration. These verified 26.2 APIs must never enter the runtime or JIJ artifact.
-    compileOnly(libs.litematica)
-    compileOnly(libs.malilib)
-    add(litematicaIntegrationTestRuntime.name, libs.litematica)
-    add(litematicaIntegrationTestRuntime.name, libs.malilib)
-
-    // Baritone 26.2 API build pinned to upstream commit 2991d9218050707df9c8daca5efd371091a92d36.
-    // Keep it as an intact nested Fabric mod: its metadata, mixins and reflective provider must not be relocated.
-    compileOnly(baritoneApiFabric)
-    include(baritoneApiFabric)
-
-    // Mod menu
-    api(libs.modmenu)
-
-    // Recommended mods (on IDE)
-    api(libs.sodium)
-    api(libs.lithium)
-    runtimeOnly(libs.immediatelyFast)
-    runtimeOnly(libs.iris)
-
-    // ViaFabricPlus
-    api(libs.vfp.api)
-    runtimeOnly(libs.vfp)
-
-    // Exploit Preventer
-    api(libs.exploitPreventer.api)
-    runtimeOnly(libs.exploitPreventer)
-
-    // Minecraft account authentication (Microsoft/Xbox Live/XSTS token chain)
-    jij(libs.minecraftauth)
-
-    // TheAltening alt service
-    jij(libs.thealtening)
-
-    // Mojang REST APIs
-    jij(libs.bundles.retrofit)
-
-    // LWJGL EGL
-    jij(libs.lwjgl.egl)
-
-    // JCEF Support
-    api(libs.mcef)
-    include(libs.mcef)
-
-    // Ktor Server
-    jij(libs.ktor.server.core)
-    jij(libs.ktor.server.netty)
-    jij(libs.ktor.server.websockets)
-    jij(libs.ktor.server.sse)
-    jij(libs.ktor.server.cors)
-    jij(libs.ktor.server.compression)
-    jij(libs.ktor.server.content.negotiation)
-    jij(libs.ktor.server.status.pages)
-    jij(libs.ktor.serialization.gson)
-
-    // ScriptAPI
-    jij(libs.polyglot)
-    jij(libs.polyglot.js)
-    jij(libs.polyglot.tools)
-
-    // Machine Learning
-    jij(libs.djl.api)
-    jij(libs.djl.pytorch)
-
-    // HTTP library
-    jij(libs.bundles.okhttp)
-
-    // SOCKS5 & HTTP Proxy Support
-    jij(libs.netty.handler.proxy)
-
-    // Update Checker
-    jij(libs.semver4j)
-
-    // Name Protect
-    jij(libs.ahocorasick)
-
-    // External utils
-    compileOnlyApi(libs.fastutil4k.extensionsOnly)
-    jij(libs.fastutil4k.moreCollections)
-    jij(libs.discord.ipc)
-
-    // SeedCracker: exact Minecraft 26.2-compatible SeedFinding stack. It is relocated before JIJ packaging so
-    // ViaFabricPlus' own, older com.seedfinding classes cannot alter the solver at runtime.
-    addSeedFinding(libs.seedfinding.mc.math.get())
-    addSeedFinding(libs.seedfinding.mc.seed.get())
-    addSeedFinding(libs.seedfinding.mc.core.get())
-    addSeedFinding(libs.seedfinding.mc.noise.get())
-    addSeedFinding(libs.seedfinding.mc.biome.get())
-    addSeedFinding(libs.seedfinding.mc.terrain.get())
-    addSeedFinding(libs.seedfinding.mc.feature.get())
-    addSeedFinding(libs.seedfinding.mc.reversal.get())
-    addSeedFinding(libs.latticg.get())
-
-    // Test libraries
-    testImplementation(kotlin("test"))
-    testImplementation(libs.fabric.loader.junit)
-    testImplementation(libs.kotlinx.coroutines.test)
-    testImplementation("io.ktor:ktor-server-test-host:${libs.versions.ktor.get()}")
-    testImplementation(baritoneApiFabric)
-}
-
-addResolvedDependencies(jij, "compileOnly", "include", "api")
-
-val relocateSeedFindingJars = tasks.register<RelocateSeedFindingJarsTask>("relocateSeedFindingJars") {
-    sourceJars.from(seedFindingUnrelocated)
-    sourceCoordinates.set(seedFindingReferenceCoordinates)
-    outputJar.set(layout.buildDirectory.file("generated/seedcracker/seedcracker-seedfinding-26.2.jar"))
-}
-val relocatedSeedFindingJar = files(relocateSeedFindingJars.flatMap { it.outputJar })
-
-dependencies {
-    compileOnly(relocatedSeedFindingJar)
-    include("net.ccbluex:seedcracker-seedfinding:26.2")
-    testImplementation(relocatedSeedFindingJar)
-}
-
-tasks.matching { it.name in setOf("compileKotlin", "compileTestKotlin", "processIncludeJars") }.configureEach {
-    dependsOn(relocateSeedFindingJars)
-}
-
-tasks.processResources {
-    dependsOn("buildTheme")
-
-    from("src-theme/dist") {
-        into("resources/liquidbounce/themes/liquidbounce")
-    }
-    from("third_party/baritone/LICENSE") {
-        into("META-INF/licenses/baritone")
-    }
-    from("third_party/baritone/NOTICE.md") {
-        into("META-INF/notices/baritone")
-    }
-    from("third_party/baritone/ORIGIN.md") {
-        into("META-INF/notices/baritone")
-    }
-
-    val modVersion = providers.gradleProperty("mod_version")
-    val minecraftVersion = providers.gradleProperty("mod_mc_version")
-    val fabricVersion = libs.versions.fabric.api
-    val loaderVersion = libs.versions.fabric.loader
-    val minLoaderVersion = libs.versions.fabric.loaderMin
-    val fabricKotlinVersion = libs.versions.fabric.kotlin
-    val viafabricplusVersion = libs.versions.viafabricplus
-    val isGitHubCi = providers.environmentVariable("GITHUB_ACTIONS")
-        .map { it.toBoolean() }
-        .orElse(false)
-
-    val contributorsJson by lazy {
-        if (!isGitHubCi.get()) {
-            logger.lifecycle("Skipping contributor fetch outside GitHub CI")
-            "[]"
-        } else {
-            val contributors = getContributors("CCBlueX", "LiquidBounce")
-            logger.lifecycle("Fetched ${contributors.size} contributors on GitHub CI")
-            JsonOutput.prettyPrint(JsonOutput.toJson(contributors))
-        }
-    }
-    val contributors = provider { contributorsJson }
-
-    inputs.property("version", modVersion)
-    inputs.property("minecraft_version", minecraftVersion)
-    inputs.property("fabric_version", fabricVersion)
-    inputs.property("loader_version", loaderVersion)
-    inputs.property("min_loader_version", minLoaderVersion)
-    inputs.property("fabric_kotlin_version", fabricKotlinVersion)
-    inputs.property("viafabricplus_version", viafabricplusVersion)
-    inputs.property("contributors", contributors)
-
-    filesMatching("fabric.mod.json") {
-        expand(
-            mapOf(
-                "version" to modVersion.get(),
-                "minecraft_version" to minecraftVersion.get(),
-                "fabric_version" to fabricVersion.get(),
-                "loader_version" to loaderVersion.get(),
-                "min_loader_version" to minLoaderVersion.get(),
-                "contributors" to contributors.get(),
-                "fabric_kotlin_version" to fabricKotlinVersion.get(),
-                "viafabricplus_version" to viafabricplusVersion.get()
-            )
-        )
-    }
-}
-
-// The following code will include the theme into the build
-
-// The plugin uses global tools when download=false, so include their actual versions in the cache key.
-val nodeVersion = providers.exec {
-    commandLine("node", "--version")
-}.standardOutput.asText.map(String::trim)
-val npmVersion = providers.exec {
-    // On Windows, CreateProcess cannot launch bare "npm" (a .cmd shim); node-gradle uses npm.cmd as well.
-    val npmExecutable = if (System.getProperty("os.name").lowercase().contains("windows")) "npm.cmd" else "npm"
-    commandLine(npmExecutable, "--version")
-}.standardOutput.asText.map(String::trim)
-
-tasks.register<NpmTask>("npmInstallTheme") {
-    description = "Installs the locked dependencies for the web theme"
-    workingDir = file("src-theme")
-    args.set(listOf("ci"))
-
-    inputs.files("src-theme/package.json", "src-theme/package-lock.json")
-        .withPathSensitivity(PathSensitivity.RELATIVE)
-    outputs.dir("src-theme/node_modules")
-}
-
-tasks.register<NpmTask>("buildTheme") {
-    description = "Builds the distributable web theme assets"
-    dependsOn("npmInstallTheme")
-    workingDir = file("src-theme")
-    args.set(listOf("run", "build"))
-
-    inputs.property("nodeVersion", nodeVersion)
-    inputs.property("npmVersion", npmVersion)
-    inputs.files(
-        "src-theme/package.json",
-        "src-theme/package-lock.json",
-        "src-theme/index.html",
-        "src-theme/svelte.config.js",
-        "src-theme/tsconfig.json",
-        "src-theme/tsconfig.node.json",
-        "src-theme/vite.config.ts",
-    ).withPathSensitivity(PathSensitivity.RELATIVE)
-    inputs.dir("src-theme/src").withPathSensitivity(PathSensitivity.RELATIVE)
-    inputs.dir("src-theme/public").withPathSensitivity(PathSensitivity.RELATIVE)
-    outputs.dir("src-theme/dist")
-    outputs.cacheIf("Theme output is reproducible for locked dependencies and tool versions") { true }
-}
-
-// ensure that the encoding is set to UTF-8, no matter what the system default is
-// this fixes some edge cases with special characters not displaying correctly
-// see http://yodaconditions.net/blog/fix-for-java-file-encoding-problems-with-gradle.html
-tasks.withType<JavaCompile>().configureEach {
-    // ensure that the encoding is set to UTF-8, no matter what the system default is
-    // this fixes some edge cases with special characters not displaying correctly
-    // see http://yodaconditions.net/blog/fix-for-java-file-encoding-problems-with-gradle.html
-    // If Javadoc is generated, this must be specified in that task too.
-    options.encoding = "UTF-8"
-
-    options.release = libs.versions.jdk.get().toInt()
-}
-
-tasks.test {
-    useJUnitPlatform {
-        excludeTags("litematica-integration")
-    }
-    // Prevent macOS AWT from starting a native window session during font tests.
-    systemProperty("java.awt.headless", "true")
-    systemProperty(
-        "fabric.debug.disableModIds",
-        arrayOf(
-            // ImmediatelyFast's platform service requires a fully initialized Fabric game process.
-            "immediatelyfast",
-            // Avoid loading Fabric Language Kotlin's nested Kotlin runtime alongside Gradle's test runtime.
-            "org_jetbrains_kotlin_kotlin-reflect",
-            "org_jetbrains_kotlin_kotlin-stdlib",
-            "org_jetbrains_kotlin_kotlin-stdlib-jdk7",
-            "org_jetbrains_kotlin_kotlin-stdlib-jdk8",
-        ).joinToString(","),
-    )
-    // Let Knot delegate Kotlin Test and the Kotlin runtime to JUnit's parent class loader.
-    jvmArgumentProviders.add(
-        objects.newInstance<FabricSystemLibrariesArgumentProvider>().apply {
-            runtimeClasspath.from(configurations.testRuntimeClasspath)
-        }
-    )
-}
-
-val litematicaIntegrationTest by tasks.registering(Test::class) {
-    group = "verification"
-    description = "Verifies the optional adapter against the exact supported Litematica and MaLiLib artifacts."
-    testClassesDirs = sourceSets.test.get().output.classesDirs
-    classpath = sourceSets.test.get().runtimeClasspath + litematicaIntegrationTestRuntime
-    useJUnitPlatform {
-        includeTags("litematica-integration")
-    }
-    systemProperty("java.awt.headless", "true")
-    systemProperty(
-        "fabric.debug.disableModIds",
-        arrayOf(
-            "immediatelyfast",
-            "org_jetbrains_kotlin_kotlin-reflect",
-            "org_jetbrains_kotlin_kotlin-stdlib",
-            "org_jetbrains_kotlin_kotlin-stdlib-jdk7",
-            "org_jetbrains_kotlin_kotlin-stdlib-jdk8",
-        ).joinToString(","),
-    )
-    jvmArgumentProviders.add(
-        objects.newInstance<FabricSystemLibrariesArgumentProvider>().apply {
-            runtimeClasspath.from(configurations.testRuntimeClasspath)
-        }
-    )
-    shouldRunAfter(tasks.test)
-}
-
-tasks.check {
-    dependsOn(litematicaIntegrationTest)
-}
-
-// Detekt check
 
 detekt {
     config.setFrom(file("${rootProject.projectDir}/config/detekt/detekt.yml"))
@@ -465,8 +44,14 @@ detekt {
     baseline = file("${rootProject.projectDir}/config/detekt/baseline.xml")
 }
 
+tasks.withType<Detekt>().configureEach {
+    reports {
+        sarif.required.set(true)
+    }
+}
+
 tasks.register<DetektCreateBaselineTask>("detektProjectBaseline") {
-    description = "Overrides current baseline."
+    description = "Overrides the current Detekt baseline"
     ignoreFailures.set(true)
     parallel.set(true)
     buildUponDefaultConfig.set(true)
@@ -477,38 +62,8 @@ tasks.register<DetektCreateBaselineTask>("detektProjectBaseline") {
     exclude("**/resources/**", "**/build/**")
 }
 
-// i18n check
-
-tasks.register<CompareJsonKeysTask>("verifyI18nJsonKeys") {
-    val baselineFileName = "en_us.json"
-
-    group = "verification"
-    description = "Compare i18n JSON files with $baselineFileName as the baseline and report missing keys."
-
-    val languageFolder = file("src/main/resources/resources/liquidbounce/lang")
-    baselineFile.set(languageFolder.resolve(baselineFileName))
-    files.from(languageFolder.listFilesOrdered { it.extension.equals("json", ignoreCase = true) })
-    consoleOutputCount.set(5)
-}
-
-tasks.register<JavaExec>("liquidInstruction") {
-    group = "other"
-    description = "Run LiquidInstruction class."
-
-    classpath = sourceSets.main.get().runtimeClasspath
-    mainClass.set("net.ccbluex.liquidbounce.LiquidInstruction")
-}
-
-tasks.runClient {
-    jvmArgs("-XX:+UseZGC")
-}
-
 java {
-    // Loom will automatically attach sourcesJar to a RemapSourcesJar task and to the "build" task
-    // if it is present.
-    // If you remove this line, sources will not be generated.
     withSourcesJar()
-
     toolchain {
         languageVersion.set(JavaLanguageVersion.of(libs.versions.jdk.get().toInt()))
     }
@@ -521,45 +76,16 @@ kotlin {
     }
 }
 
-tasks.jar {
-    val archivesBaseName = providers.gradleProperty("archives_base_name")
-    val modVersion = providers.gradleProperty("mod_version")
-    val mavenGroup = providers.gradleProperty("maven_group")
-
-    inputs.property("archives_base_name", archivesBaseName)
-    inputs.property("mod_version", modVersion)
-    inputs.property("maven_group", mavenGroup)
-
-    manifest {
-        attributes["Main-Class"] = "net.ccbluex.liquidbounce.LiquidInstruction"
-        attributes["Implementation-Title"] = archivesBaseName.get()
-        attributes["Implementation-Version"] = modVersion.get()
-        attributes["Implementation-Vendor"] = mavenGroup.get()
-    }
-
-    // Rename the project's license file to LICENSE_<project_name> to avoid conflicts
-    from("LICENSE") {
-        rename {
-            "${it}_${archivesBaseName.get()}"
-        }
-    }
+tasks.runClient {
+    jvmArgs("-XX:+UseZGC")
 }
 
-tasks.register<Copy>("copyZipInclude") {
-    from("zip_include/")
-    from("third_party/baritone/baritone-1.15.0-10-g2991d921-sources.tar.gz") {
-        into("sources")
-    }
-    into("build/libs/zip")
-}
-
-tasks.named<Jar>("sourcesJar") {
-    dependsOn("buildTheme", "generateGitProperties")
-    from("src-theme/dist") {
-        into("resources/liquidbounce/themes/liquidbounce")
-    }
-}
-
-tasks.named("build") {
-    dependsOn("copyZipInclude")
-}
+apply(from = "gradle/repositories.gradle.kts")
+apply(from = "gradle/game-dependencies.gradle.kts")
+apply(from = "gradle/runtime-dependencies.gradle.kts")
+apply(from = "gradle/theme.gradle.kts")
+apply(from = "gradle/resource-packaging.gradle.kts")
+apply(from = "gradle/testing.gradle.kts")
+apply(from = "gradle/repository-policy.gradle.kts")
+apply(from = "gradle/release-verification.gradle.kts")
+apply(from = "gradle/artifacts.gradle.kts")

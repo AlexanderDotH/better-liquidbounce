@@ -25,8 +25,7 @@ import net.ccbluex.liquidbounce.event.EventState
 import net.ccbluex.liquidbounce.event.events.PlayerNetworkMovementTickEvent
 import net.ccbluex.liquidbounce.event.events.PlayerTickEvent
 import net.ccbluex.liquidbounce.event.handler
-import net.ccbluex.liquidbounce.features.module.modules.movement.fly.ModuleFly
-import net.ccbluex.liquidbounce.features.module.modules.movement.fly.ModuleFly.modes
+import net.ccbluex.liquidbounce.features.module.modules.movement.fly.runtime.FlyModuleControl
 import net.ccbluex.liquidbounce.features.module.modules.movement.fly.automation.FlyAutomationCapabilities
 import net.ccbluex.liquidbounce.features.module.modules.movement.fly.automation.FlyAutomationEnd
 import net.ccbluex.liquidbounce.features.module.modules.movement.fly.automation.FlyAutomationKind
@@ -47,9 +46,6 @@ internal object FlyGrim2859V : Mode("Grim2859-V"), FlyAutomationProfile {
 
     private val toggle by int("Toggle", 0, 0..100)
     private val timer by float("Timer", 0.446f, 0.1f..1f)
-
-    override val parent: ModeValueGroup<*>
-        get() = modes
 
 
     var ticks = 0
@@ -83,11 +79,11 @@ internal object FlyGrim2859V : Mode("Grim2859-V"), FlyAutomationProfile {
             ticks == 0 -> player.jumpFromGround()
             /* For some reason, low timer makes the timer jump (2 tick start)
                a lot more stable. */
-            ticks <= 5 -> Timer.requestTimerSpeed(timer, Priority.IMPORTANT_FOR_USAGE_2, ModuleFly, 1)
+            ticks <= 5 -> Timer.requestTimerSpeed(timer, Priority.IMPORTANT_FOR_USAGE_2, FlyModuleControl.module, 1)
             // If ticks >= toggle limit and toggle isn't 0, disable.
             ticks >= toggle && toggle != 0 -> {
                 automaticEnd.mark("Configured Grim toggle limit reached")
-                ModuleFly.enabled = false
+                FlyModuleControl.disable()
             }
         }
 

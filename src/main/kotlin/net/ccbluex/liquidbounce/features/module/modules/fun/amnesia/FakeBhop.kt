@@ -19,17 +19,21 @@
 
 package net.ccbluex.liquidbounce.features.module.modules.`fun`.amnesia
 
+import net.ccbluex.liquidbounce.features.module.modules.`fun`.amnesia.playermodel.PlayerModelFakeBhopState
+import net.ccbluex.liquidbounce.render.playermodel.PlayerModelActionState
+import net.ccbluex.liquidbounce.render.playermodel.PlayerModelVisualTransform
+
 import net.ccbluex.liquidbounce.config.types.group.ToggleableValueGroup
-import net.ccbluex.liquidbounce.config.types.list.Tagged
 import net.ccbluex.liquidbounce.event.events.GameRenderEvent
 import net.ccbluex.liquidbounce.event.handler
-import net.ccbluex.liquidbounce.features.module.modules.`fun`.ModuleAmnesia
+import net.ccbluex.liquidbounce.features.module.modules.`fun`.amnesia.contract.AmnesiaRuntimeBridge
+import net.ccbluex.liquidbounce.features.module.modules.`fun`.amnesia.model.BhopStyle
 import net.ccbluex.liquidbounce.utils.client.mc
 import net.minecraft.world.entity.LivingEntity
 import net.minecraft.world.phys.Vec3
 
 object FakeBhop : ToggleableValueGroup(
-    ModuleAmnesia,
+    null,
     "FakeBhop",
     false,
     aliases = listOf("Fake Bhop", "Fake BunnyHop"),
@@ -45,12 +49,6 @@ object FakeBhop : ToggleableValueGroup(
     internal val spoofGroundPose by boolean("SpoofGroundPose", true)
     internal val smoothStopDuration by int("SmoothStopDuration", 140, 0..500, "ms")
 
-    enum class BhopStyle(override val tag: String) : Tagged {
-        NORMAL("Normal"),
-        LOW_HOP("LowHop"),
-        STRAFE("Strafe"),
-    }
-
     @Suppress("unused")
     private val renderHandler = handler<GameRenderEvent>(priority = 2) {
         if (!running) {
@@ -58,13 +56,13 @@ object FakeBhop : ToggleableValueGroup(
             return@handler
         }
 
-        val target = ModuleAmnesia.findTarget() ?: run {
+        val target = AmnesiaRuntimeBridge.findTarget() ?: run {
             PlayerModelFakeBhopState.reset()
             return@handler
         }
 
         val partialTicks = mc.deltaTracker.getGameTimeDeltaPartialTick(true)
-        val visualPos = ModuleAmnesia.getAuxiliaryVisualPosition(target, partialTicks) ?: target.position()
+        val visualPos = AmnesiaRuntimeBridge.auxiliaryVisualPosition(target, partialTicks) ?: target.position()
         PlayerModelFakeBhopState.tick(
             target = target,
             partialTicks = partialTicks,

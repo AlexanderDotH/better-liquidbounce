@@ -23,9 +23,9 @@ import net.ccbluex.liquidbounce.features.command.builder.ParameterBuilder
 import net.ccbluex.liquidbounce.features.command.builder.ParameterBuilder.Companion.BOOLEAN_VALIDATOR
 import net.ccbluex.liquidbounce.features.misc.HideAppearance.destructClient
 import net.ccbluex.liquidbounce.features.misc.HideAppearance.wipeClient
-import net.ccbluex.liquidbounce.utils.client.chat
-import net.ccbluex.liquidbounce.utils.client.markAsError
-import net.ccbluex.liquidbounce.utils.client.regular
+import net.ccbluex.liquidbounce.features.chat.chat
+import net.ccbluex.liquidbounce.utils.text.markAsError
+import net.ccbluex.liquidbounce.utils.text.regular
 
 object CommandClientDestructSubcommand {
     fun destructCommand() = CommandBuilder.begin("destruct")

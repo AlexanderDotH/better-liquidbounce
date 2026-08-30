@@ -2,7 +2,7 @@
     import {createEventDispatcher} from "svelte";
     import type {ChoiceSetting, ModuleSetting,} from "../../../integration/types";
     import ExpandArrow from "./common/ExpandArrow.svelte";
-    import GenericSetting from "./common/GenericSetting.svelte";
+    import GenericSetting from "../../../shared/settings/GenericSetting.svelte";
     import {setItem} from "../../../integration/persistent_storage";
     import {convertToSpacedString, spaceSeperatedNames} from "../../../theme/theme_config";
     import Dropdown from "./common/Dropdown.svelte";

@@ -18,8 +18,8 @@
  */
 package net.ccbluex.liquidbounce.features.module.modules.combat
 
-import net.ccbluex.liquidbounce.config.types.list.Tagged
 import net.ccbluex.liquidbounce.event.events.BlinkPacketEvent
+import net.ccbluex.liquidbounce.event.events.BlinkPacketAction
 import net.ccbluex.liquidbounce.event.events.GameTickEvent
 import net.ccbluex.liquidbounce.event.events.NotificationEvent
 import net.ccbluex.liquidbounce.event.events.TransferOrigin
@@ -28,16 +28,17 @@ import net.ccbluex.liquidbounce.features.blink.BlinkManager
 import net.ccbluex.liquidbounce.features.blink.BlinkManager.positions
 import net.ccbluex.liquidbounce.features.module.ClientModule
 import net.ccbluex.liquidbounce.features.module.ModuleCategories
+import net.ccbluex.liquidbounce.features.module.modules.combat.fakelag.FakeLagFlushOn
+import net.ccbluex.liquidbounce.features.module.modules.combat.fakelag.FakeLagMode
 import net.ccbluex.liquidbounce.features.module.modules.movement.autododge.ModuleAutoDodge
 import net.ccbluex.liquidbounce.utils.client.Chronometer
-import net.ccbluex.liquidbounce.utils.client.notification
-import net.ccbluex.liquidbounce.utils.combat.findEnemy
-import net.ccbluex.liquidbounce.utils.combat.getEntitiesBoxInRange
-import net.ccbluex.liquidbounce.utils.combat.shouldBeAttacked
+import net.ccbluex.liquidbounce.features.chat.notification
+import net.ccbluex.liquidbounce.features.combat.runtime.findEnemy
+import net.ccbluex.liquidbounce.features.combat.runtime.getEntitiesBoxInRange
+import net.ccbluex.liquidbounce.features.combat.runtime.shouldBeAttacked
 import net.ccbluex.liquidbounce.utils.entity.box
 import net.ccbluex.liquidbounce.utils.item.isConsumable
 import net.ccbluex.liquidbounce.utils.kotlin.matchesAny
-import net.minecraft.network.protocol.Packet
 import net.minecraft.network.protocol.common.ServerboundResourcePackPacket
 import net.minecraft.network.protocol.game.ClientboundExplodePacket
 import net.minecraft.network.protocol.game.ClientboundPlayerPositionPacket
@@ -45,13 +46,9 @@ import net.minecraft.network.protocol.game.ClientboundSetEntityMotionPacket
 import net.minecraft.network.protocol.game.ClientboundSetHealthPacket
 import net.minecraft.network.protocol.game.ServerboundAttackPacket
 import net.minecraft.network.protocol.game.ServerboundInteractPacket
-import net.minecraft.network.protocol.game.ServerboundPlayerActionPacket
-import net.minecraft.network.protocol.game.ServerboundSignUpdatePacket
 import net.minecraft.network.protocol.game.ServerboundSpectatorActionPacket
 import net.minecraft.network.protocol.game.ServerboundSwingPacket
-import net.minecraft.network.protocol.game.ServerboundUseItemOnPacket
 import net.minecraft.world.phys.Vec3
-import java.util.function.Predicate
 import kotlin.jvm.optionals.getOrNull
 
 /**
@@ -64,31 +61,9 @@ object ModuleFakeLag : ClientModule("FakeLag", ModuleCategories.COMBAT) {
     private val range by floatRange("Range", 2f..5f, 0f..10f)
     private val delay by intRange("Delay", 300..600, 0..1000, "ms")
     private val recoilTime by int("RecoilTime", 250, 0..1000, "ms")
-    private val mode by enumChoice("Mode", Mode.DYNAMIC).apply { tagBy(this) }
+    private val mode by enumChoice("Mode", FakeLagMode.DYNAMIC).apply { tagBy(this) }
 
-    private val flushOn by multiEnumChoice("FlushOn", FlushOn.entries)
-
-    private enum class FlushOn(
-        override val tag: String,
-        private val testPacket: Predicate<Packet<*>?>
-    ) : Tagged, Predicate<Packet<*>?> by testPacket {
-        ENTITY_INTERACT("EntityInteract", {
-            it is ServerboundInteractPacket || it is ServerboundAttackPacket || it is ServerboundSpectatorActionPacket
-            || it is ServerboundSwingPacket
-        }),
-        BLOCK_INTERACT("BlockInteract", {
-            it is ServerboundUseItemOnPacket
-            || it is ServerboundSignUpdatePacket
-        }),
-        ACTION("Action", {
-            it is ServerboundPlayerActionPacket
-        })
-    }
-
-    private enum class Mode(override val tag: String) : Tagged {
-        CONSTANT("Constant"),
-        DYNAMIC("Dynamic")
-    }
+    private val flushOn by multiEnumChoice("FlushOn", FakeLagFlushOn.entries)
 
     private var nextDelay = delay.random()
     private val chronometer = Chronometer()
@@ -160,7 +135,7 @@ object ModuleFakeLag : ClientModule("FakeLag", ModuleCategories.COMBAT) {
             is ServerboundAttackPacket,
             is ServerboundSpectatorActionPacket,
             is ServerboundSwingPacket -> {
-                if (FlushOn.ENTITY_INTERACT in flushOn) {
+                if (FakeLagFlushOn.ENTITY_INTERACT in flushOn) {
                     chronometer.reset()
                     return@handler
                 }
@@ -198,20 +173,20 @@ object ModuleFakeLag : ClientModule("FakeLag", ModuleCategories.COMBAT) {
 
         // Support auto shoot with fake lag
         if (running && ModuleAutoShoot.constantLag && ModuleAutoShoot.targetTracker.target == null) {
-            event.action = BlinkManager.Action.QUEUE
+            event.action = BlinkPacketAction.QUEUE
             return@handler
         }
 
         event.action = when (mode) {
-            Mode.CONSTANT -> BlinkManager.Action.QUEUE
-            Mode.DYNAMIC -> {
+            FakeLagMode.CONSTANT -> BlinkPacketAction.QUEUE
+            FakeLagMode.DYNAMIC -> {
                 // If there is an enemy in range, we want to lag.
                 if (!isEnemyNearby) {
                     return@handler
                 }
 
                 val position = positions.firstOrNull() ?: run {
-                    event.action = BlinkManager.Action.QUEUE
+                    event.action = BlinkPacketAction.QUEUE
                     return@handler
                 }
                 val playerBox = player.dimensions.makeBoundingBox(position)
@@ -243,7 +218,7 @@ object ModuleFakeLag : ClientModule("FakeLag", ModuleCategories.COMBAT) {
                     return@handler
                 }
 
-                BlinkManager.Action.QUEUE
+                BlinkPacketAction.QUEUE
             }
         }
     }

@@ -21,14 +21,14 @@ package net.ccbluex.liquidbounce.features.module.modules.movement.noslow.modes.s
 
 import net.ccbluex.liquidbounce.config.types.group.Mode
 import net.ccbluex.liquidbounce.config.types.group.ModeValueGroup
-import net.ccbluex.liquidbounce.config.types.list.Tagged
+import net.ccbluex.liquidbounce.common.Tagged
 import net.ccbluex.liquidbounce.event.EventState
 import net.ccbluex.liquidbounce.event.events.NotificationEvent
 import net.ccbluex.liquidbounce.event.events.PlayerNetworkMovementTickEvent
 import net.ccbluex.liquidbounce.event.handler
 import net.ccbluex.liquidbounce.utils.client.isNewerThanOrEquals1_21_6
-import net.ccbluex.liquidbounce.utils.client.notification
-import net.ccbluex.liquidbounce.utils.network.send1_21_5StartSneaking
+import net.ccbluex.liquidbounce.features.chat.notification
+import net.ccbluex.liquidbounce.utils.network.sendLegacyStartSneaking
 import net.ccbluex.liquidbounce.utils.client.usesViaFabricPlus
 
 internal class NoSlowSneakingAAC5(override val parent: ModeValueGroup<*>) : Mode("AAC5") {
@@ -50,7 +50,7 @@ internal class NoSlowSneakingAAC5(override val parent: ModeValueGroup<*>) : Mode
         if (timingMode == TimingMode.PRE_POST
             || event.state == EventState.PRE && timingMode == TimingMode.PRE_TICK
             || event.state == EventState.POST && timingMode == TimingMode.POST_TICK) {
-            network.send1_21_5StartSneaking()
+            network.sendLegacyStartSneaking()
         }
     }
 

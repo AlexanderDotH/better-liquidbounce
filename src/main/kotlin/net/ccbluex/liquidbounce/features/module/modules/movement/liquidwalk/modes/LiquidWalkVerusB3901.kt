@@ -20,14 +20,10 @@
 package net.ccbluex.liquidbounce.features.module.modules.movement.liquidwalk.modes
 
 import net.ccbluex.liquidbounce.config.types.group.Mode
-import net.ccbluex.liquidbounce.config.types.group.ModeValueGroup
 import net.ccbluex.liquidbounce.event.events.BlockShapeEvent
 import net.ccbluex.liquidbounce.event.events.PacketEvent
 import net.ccbluex.liquidbounce.event.events.TransferOrigin
 import net.ccbluex.liquidbounce.event.handler
-import net.ccbluex.liquidbounce.features.module.modules.movement.liquidwalk.ModuleLiquidWalk
-import net.ccbluex.liquidbounce.features.module.modules.movement.liquidwalk.ModuleLiquidWalk.collidesWithAnythingElse
-import net.ccbluex.liquidbounce.features.module.modules.movement.liquidwalk.ModuleLiquidWalk.standingOnWater
 import net.ccbluex.liquidbounce.utils.block.isBlockAtPosition
 import net.ccbluex.liquidbounce.utils.entity.box
 import net.minecraft.network.protocol.game.ServerboundMovePlayerPacket
@@ -41,8 +37,6 @@ import net.minecraft.world.phys.shapes.Shapes
  */
 internal object LiquidWalkVerusB3901 : Mode("VerusB3901") {
 
-    override val parent: ModeValueGroup<Mode>
-        get() = ModuleLiquidWalk.modes
 
     private var spoof = true
 
@@ -63,8 +57,8 @@ internal object LiquidWalkVerusB3901 : Mode("VerusB3901") {
         if (event.origin == TransferOrigin.OUTGOING && packet is ServerboundMovePlayerPacket) {
             if (!mc.options.keyShift.isDown &&
                 !player.isInWater &&
-                standingOnWater() &&
-                !collidesWithAnythingElse()
+                standingOnWater(player) &&
+                !collidesWithAnythingElse(player)
                 ) {
                 packet.onGround = spoof
                 spoof = !spoof

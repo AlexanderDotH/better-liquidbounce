@@ -19,11 +19,13 @@
 
 package net.ccbluex.liquidbounce.features.module.modules.`fun`.amnesia
 
+import net.ccbluex.liquidbounce.features.module.modules.`fun`.amnesia.playermodel.PlayerModelHysteriaState
+
 import net.ccbluex.liquidbounce.config.types.group.ToggleableValueGroup
 import net.ccbluex.liquidbounce.event.events.EntityHealthUpdateEvent
 import net.ccbluex.liquidbounce.event.events.GameRenderEvent
 import net.ccbluex.liquidbounce.event.handler
-import net.ccbluex.liquidbounce.features.module.modules.`fun`.ModuleAmnesia
+import net.ccbluex.liquidbounce.features.module.modules.`fun`.amnesia.contract.AmnesiaRuntimeBridge
 import net.ccbluex.liquidbounce.features.module.modules.misc.antibot.ModuleAntiBot
 import net.ccbluex.liquidbounce.utils.client.mc
 import net.ccbluex.liquidbounce.utils.entity.squaredBoxedDistanceTo
@@ -31,7 +33,7 @@ import net.ccbluex.liquidbounce.utils.math.sq
 import net.minecraft.world.entity.player.Player
 
 object FakeKillAura : ToggleableValueGroup(
-    ModuleAmnesia,
+    null,
     "FakeKillAura",
     false,
     aliases = listOf("Fake KillAura"),
@@ -51,7 +53,7 @@ object FakeKillAura : ToggleableValueGroup(
             return@handler
         }
 
-        val target = ModuleAmnesia.findTarget() ?: run {
+        val target = AmnesiaRuntimeBridge.findTarget() ?: run {
             PlayerModelHysteriaState.reset()
             return@handler
         }
@@ -81,7 +83,7 @@ object FakeKillAura : ToggleableValueGroup(
             return@handler
         }
 
-        val amnesiaTarget = ModuleAmnesia.findTarget() ?: return@handler
+        val amnesiaTarget = AmnesiaRuntimeBridge.findTarget() ?: return@handler
         val entity = event.entity
         if (entity !is Player || entity.id == amnesiaTarget.id) {
             return@handler

@@ -19,7 +19,7 @@
 
 package net.ccbluex.liquidbounce.injection.mixins.minecraft.client;
 
-import net.ccbluex.liquidbounce.utils.render.PlayerModelParticleHook;
+import net.ccbluex.liquidbounce.render.playermodel.PlayerModelParticleHook;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.client.particle.ParticleEngine;
 import net.minecraft.core.particles.ParticleOptions;

@@ -21,7 +21,7 @@ package net.ccbluex.liquidbounce.injection.mixins.minecraft.gui;
 
 import com.mojang.brigadier.ParseResults;
 import com.mojang.brigadier.suggestion.Suggestions;
-import net.ccbluex.liquidbounce.features.command.CommandManager;
+import net.ccbluex.liquidbounce.features.command.CommandSuggestionHook;
 import net.minecraft.client.gui.components.CommandSuggestions;
 import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.commands.SharedSuggestionProvider;
@@ -51,8 +51,8 @@ public abstract class MixinCommandSuggestions {
 
     @Inject(method = "updateCommandInfo", at = @At(value = "INVOKE", target = "Lcom/mojang/brigadier/StringReader;canRead()Z", remap = false), cancellable = true)
     private void injectAutoCompletionB(CallbackInfo ci) {
-        if (this.input.getValue().startsWith(CommandManager.GlobalSettings.INSTANCE.getPrefix())) {
-            this.pendingSuggestions = CommandManager.INSTANCE.autoComplete(this.input.getValue(), this.input.getCursorPosition());
+        if (CommandSuggestionHook.isClientCommand(this.input.getValue())) {
+            this.pendingSuggestions = CommandSuggestionHook.autoComplete(this.input.getValue(), this.input.getCursorPosition());
             this.pendingSuggestions.thenRun(() -> {
                 if (suggestions == null) {
                     this.showSuggestions(false);

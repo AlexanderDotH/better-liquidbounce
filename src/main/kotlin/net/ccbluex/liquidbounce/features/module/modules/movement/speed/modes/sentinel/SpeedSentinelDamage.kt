@@ -26,8 +26,8 @@ import net.ccbluex.liquidbounce.event.handler
 import net.ccbluex.liquidbounce.event.tickHandler
 import net.ccbluex.liquidbounce.event.waitTicks
 import net.ccbluex.liquidbounce.features.module.modules.exploit.ModulePingSpoof
-import net.ccbluex.liquidbounce.features.module.modules.movement.fly.ModuleFly
-import net.ccbluex.liquidbounce.features.module.modules.movement.speed.ModuleSpeed
+import net.ccbluex.liquidbounce.features.module.modules.movement.fly.contract.FlyState
+import net.ccbluex.liquidbounce.features.module.modules.movement.speed.runtime.SpeedModuleControl
 import net.ccbluex.liquidbounce.utils.entity.moving
 import net.ccbluex.liquidbounce.utils.entity.withStrafe
 import net.ccbluex.liquidbounce.utils.movement.stopXZVelocity
@@ -86,8 +86,8 @@ class SpeedSentinelDamage(override val parent: ModeValueGroup<*>) : Mode("Sentin
 
     @Suppress("unused")
     private val moveHandler = handler<PlayerMoveEvent> { event ->
-        if (ModuleFly.enabled) {
-            ModuleSpeed.enabled = false
+        if (FlyState.enabled) {
+            SpeedModuleControl.disable()
             return@handler
         }
 

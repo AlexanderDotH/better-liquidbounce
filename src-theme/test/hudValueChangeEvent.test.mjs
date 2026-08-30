@@ -1,10 +1,10 @@
 import assert from "node:assert/strict";
 import {readFileSync} from "node:fs";
 import test from "node:test";
+import {readModuleGraph} from "./themeSource.mjs";
 
-const events = readFileSync(
+const events = readModuleGraph(
     new URL("../src/integration/events.ts", import.meta.url),
-    "utf8",
 );
 
 test("frontend event map exposes live HUD settings updates", () => {

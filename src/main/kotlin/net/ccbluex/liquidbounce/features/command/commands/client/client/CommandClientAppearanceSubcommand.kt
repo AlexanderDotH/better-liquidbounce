@@ -20,8 +20,8 @@ package net.ccbluex.liquidbounce.features.command.commands.client.client
 
 import net.ccbluex.liquidbounce.features.command.builder.CommandBuilder
 import net.ccbluex.liquidbounce.features.misc.HideAppearance
-import net.ccbluex.liquidbounce.utils.client.chat
-import net.ccbluex.liquidbounce.utils.client.regular
+import net.ccbluex.liquidbounce.features.chat.chat
+import net.ccbluex.liquidbounce.utils.text.regular
 
 object CommandClientAppearanceSubcommand {
     fun appearanceCommand() = CommandBuilder.begin("appearance")

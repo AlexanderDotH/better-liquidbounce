@@ -18,6 +18,8 @@
  */
 package net.ccbluex.liquidbounce.features.module.modules.movement.autododge
 
+import net.ccbluex.liquidbounce.features.module.modules.movement.autododge.spearteleport.buildSpearTeleportCollisionSamples
+
 import net.ccbluex.liquidbounce.utils.entity.wouldFallIntoVoid
 import net.ccbluex.liquidbounce.utils.math.anyNotEmpty
 import net.minecraft.core.BlockPos

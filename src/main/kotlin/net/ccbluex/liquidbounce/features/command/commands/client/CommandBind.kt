@@ -28,18 +28,20 @@ import net.ccbluex.liquidbounce.features.command.dsl.buildCommand
 import net.ccbluex.liquidbounce.features.command.dsl.cast
 import net.ccbluex.liquidbounce.features.command.dsl.castNotRequired
 import net.ccbluex.liquidbounce.features.command.dsl.castVarargNotRequired
+import net.ccbluex.liquidbounce.features.module.ClientModule
 import net.ccbluex.liquidbounce.features.module.modules.render.ModuleClickGui
-import net.ccbluex.liquidbounce.utils.client.MessageMetadata
-import net.ccbluex.liquidbounce.utils.client.chat
-import net.ccbluex.liquidbounce.utils.client.markAsError
-import net.ccbluex.liquidbounce.utils.client.regular
-import net.ccbluex.liquidbounce.utils.client.variable
+import net.ccbluex.liquidbounce.features.chat.MessageMetadata
+import net.ccbluex.liquidbounce.features.chat.chat
+import net.ccbluex.liquidbounce.utils.text.markAsError
+import net.ccbluex.liquidbounce.utils.text.regular
+import net.ccbluex.liquidbounce.utils.text.variable
 import net.ccbluex.liquidbounce.utils.input.InputBind
 import net.ccbluex.liquidbounce.utils.input.availableInputKeys
-import net.ccbluex.liquidbounce.utils.input.bind
+import net.ccbluex.liquidbounce.config.types.bind
 import net.ccbluex.liquidbounce.utils.input.inputByName
 import net.ccbluex.liquidbounce.utils.input.renderText
-import net.ccbluex.liquidbounce.utils.input.unbind
+import net.ccbluex.liquidbounce.config.types.unbind
+import java.util.EnumSet
 
 /**
  * Bind Command
@@ -71,36 +73,47 @@ object CommandBind : Command.Factory {
         }
 
         handler {
-            val module = module.cast()
-            val keyName = key.cast()
-            val action = action.castNotRequired() ?: module.bindValue.get().action
-            val modifiers = modifiers.castVarargNotRequired()?.toEnumSet() ?: module.bindValue.get().modifiers
+            val selectedModule = module.cast()
+            executeBind(
+                command,
+                selectedModule,
+                key.cast(),
+                action.castNotRequired() ?: selectedModule.bindValue.get().action,
+                modifiers.castVarargNotRequired()?.toEnumSet()
+                    ?: selectedModule.bindValue.get().modifiers.toEnumSet(),
+            )
+        }
+    }
 
-            if (keyName.equals("none", true)) {
-                module.bindValue.unbind()
-                ModuleClickGui.sync()
-                chat(
-                    regular(command.result("moduleUnbound", variable(module.name))),
-                    metadata = MessageMetadata(id = "Bind#${module.name}")
-                )
-                return@handler
-            }
-
-            runCatching {
-                module.bindValue.bind(inputByName(keyName), action, modifiers)
-                ModuleClickGui.sync()
-            }.onSuccess {
-                chat(
-                    regular(command.result("moduleBound", variable(module.name), module.bind.renderText())),
-                    metadata = MessageMetadata(id = "Bind#${module.name}")
-                )
-            }.onFailure {
-                chat(
-                    markAsError(command.result("keyNotFound", variable(keyName))),
-                    metadata = MessageMetadata(id = "Bind#${module.name}")
-                )
-            }
-
+    private fun executeBind(
+        command: Command,
+        module: ClientModule,
+        keyName: String,
+        action: InputBind.BindAction,
+        modifiers: EnumSet<InputBind.Modifier>,
+    ) {
+        if (keyName.equals("none", true)) {
+            module.bindValue.unbind()
+            ModuleClickGui.sync()
+            chat(
+                regular(command.result("moduleUnbound", variable(module.name))),
+                metadata = MessageMetadata(id = "Bind#${module.name}"),
+            )
+            return
+        }
+        runCatching {
+            module.bindValue.bind(inputByName(keyName), action, modifiers)
+            ModuleClickGui.sync()
+        }.onSuccess {
+            chat(
+                regular(command.result("moduleBound", variable(module.name), module.bind.renderText())),
+                metadata = MessageMetadata(id = "Bind#${module.name}"),
+            )
+        }.onFailure {
+            chat(
+                markAsError(command.result("keyNotFound", variable(keyName))),
+                metadata = MessageMetadata(id = "Bind#${module.name}"),
+            )
         }
     }
 

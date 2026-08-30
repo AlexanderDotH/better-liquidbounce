@@ -16,10 +16,10 @@
  * You should have received a copy of the GNU General Public License
  * along with LiquidBounce. If not, see <https://www.gnu.org/licenses/>.
  */
-@file:Suppress("TooManyFunctions")
-
 package net.ccbluex.liquidbounce.render.engine.type
 
+import net.ccbluex.liquidbounce.common.interop.ThemeColorPayload
+import net.ccbluex.liquidbounce.common.interop.parseHexArgb
 import net.ccbluex.liquidbounce.utils.math.sq
 import net.minecraft.network.chat.TextColor
 import net.minecraft.util.ARGB
@@ -27,11 +27,12 @@ import net.minecraft.world.item.DyeColor
 import org.joml.Vector3f
 import org.joml.Vector4f
 import java.awt.Color
-import java.lang.Math.fma
 import java.util.function.ToIntFunction
 
 @JvmRecord
-data class Color4b(val argb: Int) {
+data class Color4b(override val argb: Int) : ThemeColorPayload, Color4bTransformations {
+
+    override fun withArgb(argb: Int) = Color4b(argb)
 
     @JvmOverloads
     constructor(r: Int, g: Int, b: Int, a: Int = 255) : this(ARGB.color(a, r, g, b))
@@ -97,20 +98,7 @@ data class Color4b(val argb: Int) {
          */
         @JvmStatic
         @Throws(IllegalArgumentException::class)
-        fun fromHex(hex: String): Color4b {
-            val cleanHex = hex.removePrefix("#")
-            val hasAlpha = cleanHex.length == 8
-
-            require(cleanHex.length == 6 || hasAlpha)
-
-            return if (hasAlpha) {
-                val rgba = cleanHex.toLong(16)
-                Color4b(rgba.toInt())
-            } else {
-                val rgb = cleanHex.toInt(16)
-                fullAlpha(rgb)
-            }
-        }
+        fun fromHex(hex: String): Color4b = Color4b(parseHexArgb(hex))
 
         /**
          * Create a color from HSB values.
@@ -166,51 +154,6 @@ data class Color4b(val argb: Int) {
         level = DeprecationLevel.ERROR, // For script compatibility only
     )
     fun toARGB() = this.argb
-
-    fun fade(fade: Float): Color4b {
-        return if (fade >= 1.0f) {
-            this
-        } else {
-            alpha((a * fade).toInt())
-        }
-    }
-
-    fun darker() = Color4b(darkerChannel(r), darkerChannel(g), darkerChannel(b), a)
-
-    private fun darkerChannel(value: Int) = (value * 0.7f).toInt().coerceAtLeast(0)
-
-    /**
-     * Interpolates this color with another color using the given percentage.
-     *
-     * @param other The color to interpolate to
-     * @param percentage The percentage of interpolation (0.0 to 1.0)
-     * @return The interpolated color
-     */
-    fun interpolateTo(other: Color4b, percentage: Double): Color4b =
-        interpolateTo(other, percentage, percentage, percentage, percentage)
-
-    /**
-     * Interpolates this color with another color using separate factors for each component.
-     *
-     * @param other The color to interpolate to
-     * @param tR The factor to interpolate the red value (0.0 to 1.0)
-     * @param tG The factor to interpolate the green value (0.0 to 1.0)
-     * @param tB The factor to interpolate the blue value (0.0 to 1.0)
-     * @param tA The factor to interpolate the alpha value (0.0 to 1.0)
-     * @return The interpolated color
-     */
-    fun interpolateTo(
-        other: Color4b,
-        tR: Double,
-        tG: Double,
-        tB: Double,
-        tA: Double
-    ): Color4b = Color4b(
-        fma(tR, (other.r - r).toDouble(), r.toDouble()).toInt().coerceIn(0, 255),
-        fma(tG, (other.g - g).toDouble(), g.toDouble()).toInt().coerceIn(0, 255),
-        fma(tB, (other.b - b).toDouble(), b.toDouble()).toInt().coerceIn(0, 255),
-        fma(tA, (other.a - a).toDouble(), a.toDouble()).toInt().coerceIn(0, 255),
-    )
 
     /**
      * Converts this [Color4b] to a Java AWT Color

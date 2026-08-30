@@ -19,7 +19,6 @@
 package net.ccbluex.liquidbounce.features.module.modules.movement.fly.modes.intave
 
 import net.ccbluex.liquidbounce.config.types.group.Mode
-import net.ccbluex.liquidbounce.config.types.group.ModeValueGroup
 import net.ccbluex.liquidbounce.event.events.BlockShapeEvent
 import net.ccbluex.liquidbounce.event.events.PacketEvent
 import net.ccbluex.liquidbounce.event.events.PlayerPushOutEvent
@@ -27,7 +26,6 @@ import net.ccbluex.liquidbounce.event.events.TransferOrigin
 import net.ccbluex.liquidbounce.event.handler
 import net.ccbluex.liquidbounce.event.tickHandler
 import net.ccbluex.liquidbounce.features.module.modules.exploit.phase.modes.IntaveBlockPlacementSupport
-import net.ccbluex.liquidbounce.features.module.modules.movement.fly.ModuleFly
 import net.ccbluex.liquidbounce.features.module.modules.movement.fly.automation.FlyAutomationCapabilities
 import net.ccbluex.liquidbounce.features.module.modules.movement.fly.automation.FlyAutomationKind
 import net.ccbluex.liquidbounce.features.module.modules.movement.fly.automation.FlyAutomationProfile
@@ -51,8 +49,6 @@ internal object FlyIntave : Mode("Intave"), FlyAutomationProfile {
     private val upwardSneakMotion by float("UpwardSneakMotion", 0.01f, 0f..0.2f)
     private val collisionDrop by float("CollisionDrop", 1f, 0f..1f, "blocks")
 
-    override val parent: ModeValueGroup<*>
-        get() = ModuleFly.modes
 
     private var startY = 0
 

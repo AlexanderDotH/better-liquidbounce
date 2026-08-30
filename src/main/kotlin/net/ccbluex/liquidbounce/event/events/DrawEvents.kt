@@ -23,13 +23,9 @@ import com.mojang.blaze3d.pipeline.RenderTarget
 import com.mojang.blaze3d.vertex.PoseStack
 import net.ccbluex.liquidbounce.annotations.Tag
 import net.ccbluex.liquidbounce.event.Event
-import net.ccbluex.liquidbounce.render.WorldRenderEnvironment
-import net.ccbluex.liquidbounce.render.getDynamicTransformsUniform
-import net.ccbluex.liquidbounce.render.mesh.BatchCollector
 import net.minecraft.client.Camera
 import net.minecraft.client.gui.GuiGraphicsExtractor
 import net.minecraft.client.renderer.SubmitNodeStorage
-import org.joml.Matrix4f
 import org.joml.Matrix4fc
 
 @Tag("gameRender")
@@ -37,40 +33,6 @@ object GameRenderEvent : Event()
 
 @Tag("screenRender")
 class ScreenRenderEvent(val context: GuiGraphicsExtractor, val partialTicks: Float) : Event()
-
-@Tag("worldRender")
-class WorldRenderEvent(
-    /**
-     * Starts as identity. Modules push camera-relative translations here
-     * ([net.ccbluex.liquidbounce.render.withPositionRelativeToCamera]); do not bake the view
-     * rotation into this stack — that lives in [modelViewMatrix] for the shader.
-     */
-    val poseStack: PoseStack,
-    /** Camera view-rotation matrix (no translation). Bound as shader `ModelViewMat` on flush. */
-    val modelViewMatrix: Matrix4fc,
-    val camera: Camera,
-    val partialTicks: Float,
-    val renderTarget: RenderTarget,
-) : Event(), AutoCloseable {
-
-    @Deprecated("For scripts only", ReplaceWith("poseStack"))
-    val matrixStack get() = poseStack
-
-    private val batchCollector = BatchCollector()
-
-    val environment = WorldRenderEnvironment(
-        renderTarget = renderTarget,
-        poseStack = poseStack,
-        camera = camera,
-        batchCollector = batchCollector,
-    )
-
-    override fun close() {
-        // Vertices are camera-relative world axes; apply view rotation once in the shader.
-        batchCollector.flush(renderTarget, getDynamicTransformsUniform(Matrix4f(modelViewMatrix)))
-    }
-
-}
 
 /**
  * Fired before vanilla collects level features into its [SubmitNodeStorage].

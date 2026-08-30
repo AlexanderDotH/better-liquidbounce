@@ -23,7 +23,7 @@ import net.ccbluex.liquidbounce.config.ConfigSystem
 import net.ccbluex.liquidbounce.config.types.group.Mode
 import net.ccbluex.liquidbounce.config.types.group.ModeValueGroup
 import net.ccbluex.liquidbounce.event.events.GameTickEvent
-import net.ccbluex.liquidbounce.event.events.WorldRenderEvent
+import net.ccbluex.liquidbounce.render.events.WorldRenderEvent
 import net.ccbluex.liquidbounce.event.handler
 import net.ccbluex.liquidbounce.features.module.ClientModule
 import net.ccbluex.liquidbounce.features.module.ModuleCategories
@@ -42,9 +42,9 @@ import net.ccbluex.liquidbounce.utils.entity.interpolateCurrentPosition
 import net.ccbluex.liquidbounce.utils.math.KeyedAabb
 import net.ccbluex.liquidbounce.utils.math.mergeIntersectingAabbsSweep
 import net.ccbluex.liquidbounce.utils.math.sq
-import net.ccbluex.liquidbounce.utils.math.toVec3f
+import net.ccbluex.liquidbounce.render.engine.type.toVec3f
 import net.ccbluex.liquidbounce.utils.math.worldToLocal
-import net.ccbluex.liquidbounce.utils.render.drawLegacy2DMarker
+import net.ccbluex.liquidbounce.render.marker.drawLegacy2DMarker
 import net.minecraft.world.entity.Entity
 import net.minecraft.world.entity.ExperienceOrb
 import net.minecraft.world.phys.AABB
@@ -210,7 +210,7 @@ object ModuleOrbESP : ClientModule("OrbESP", ModuleCategories.RENDER) {
                         .add(0.0, yOffset.toDouble(), 0.0)
 
                     drawLegacy2DMarker(
-                        pos = position,
+                        position = position,
                         entityHeight = entity.boundingBox.ysize,
                         scale = scale,
                         foregroundArgb = foregroundColor,

@@ -30,7 +30,7 @@ import net.ccbluex.liquidbounce.utils.aiming.data.Rotation
 import net.ccbluex.liquidbounce.utils.aiming.utils.raytraceBox
 import net.ccbluex.liquidbounce.utils.block.SwingMode
 import net.ccbluex.liquidbounce.utils.client.Chronometer
-import net.ccbluex.liquidbounce.utils.combat.attackEntity
+import net.ccbluex.liquidbounce.features.combat.runtime.attackEntity
 import net.ccbluex.liquidbounce.utils.math.isHitByLine
 import net.ccbluex.liquidbounce.utils.raytracing.isLookingAtEntity
 import net.minecraft.world.entity.boss.enderdragon.EndCrystal

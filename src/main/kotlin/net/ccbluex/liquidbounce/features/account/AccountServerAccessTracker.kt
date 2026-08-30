@@ -22,11 +22,12 @@ import net.ccbluex.liquidbounce.event.EventListener
 import net.ccbluex.liquidbounce.event.events.PacketEvent
 import net.ccbluex.liquidbounce.event.events.TransferOrigin
 import net.ccbluex.liquidbounce.event.handler
-import net.ccbluex.liquidbounce.utils.client.ServerObserver
 import net.ccbluex.liquidbounce.utils.client.mc
 import net.minecraft.network.protocol.game.ClientboundLoginPacket
 
 object AccountServerAccessTracker : EventListener {
+
+    private val serverEndpoint = AccountServerEndpoint
 
     @Suppress("unused")
     private val packetHandler = handler<PacketEvent> { event ->
@@ -34,7 +35,7 @@ object AccountServerAccessTracker : EventListener {
             return@handler
         }
 
-        val serverName = ServerObserver.serverAddress?.host ?: return@handler
+        val serverName = serverEndpoint.serverName ?: return@handler
         mc.execute {
             AccountManager.trackCurrentAccountServerAccess(serverName)
         }

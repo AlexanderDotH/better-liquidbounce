@@ -20,10 +20,18 @@ package net.ccbluex.liquidbounce.features.module.modules.world.scaffold
 
 import net.ccbluex.liquidbounce.config.types.group.ValueGroup
 import net.ccbluex.liquidbounce.features.module.modules.player.invcleaner.ModuleInventoryCleaner
+import net.ccbluex.liquidbounce.features.module.modules.world.scaffold.features.ScaffoldAutoBlockFeature
+import net.ccbluex.liquidbounce.utils.client.SilentHotbar
 import net.ccbluex.liquidbounce.utils.client.player
 import net.ccbluex.liquidbounce.utils.client.world
 import net.ccbluex.liquidbounce.utils.collection.blockSortedSetOf
+import net.ccbluex.liquidbounce.utils.item.PreferAverageHardBlocks
+import net.ccbluex.liquidbounce.utils.item.PreferFullCubeBlocks
+import net.ccbluex.liquidbounce.utils.item.PreferSolidBlocks
+import net.ccbluex.liquidbounce.utils.item.PreferStackSize
+import net.ccbluex.liquidbounce.utils.item.PreferWalkableBlocks
 import net.ccbluex.liquidbounce.utils.item.getBlock
+import net.ccbluex.liquidbounce.utils.sorting.ComparatorChain
 import net.minecraft.core.BlockPos
 import net.minecraft.core.Direction
 import net.minecraft.world.item.ItemStack
@@ -61,6 +69,41 @@ object ScaffoldBlockItemSelection : ValueGroup("BlockItemSelection") {
             Blocks.MAGMA_BLOCK,
         )
     )
+
+    /**
+     * Estimates the value of a block for Scaffold. The chain prefers solid, full, walkable, and suitably hard blocks,
+     * then uses stack size as the context-specific tie breaker.
+     */
+    private val hotbarComparator = ComparatorChain(
+        PreferFavourableBlocks,
+        PreferSolidBlocks,
+        PreferFullCubeBlocks,
+        PreferWalkableBlocks,
+        PreferAverageHardBlocks(neutralRange = true),
+        PreferStackSize.PREFER_MORE,
+        PreferAverageHardBlocks(neutralRange = false),
+    )
+
+    internal val inventoryComparator = ComparatorChain(
+        PreferFavourableBlocks,
+        PreferSolidBlocks,
+        PreferFullCubeBlocks,
+        PreferWalkableBlocks,
+        PreferAverageHardBlocks(neutralRange = true),
+        PreferStackSize.PREFER_FEWER,
+        PreferAverageHardBlocks(neutralRange = false),
+    )
+
+    internal val blockCount: Int
+        get() {
+            fun ItemStack.blockCount() = if (isValidBlock(this)) count else 0
+
+            return player.offhandItem.blockCount() + if (ScaffoldAutoBlockFeature.enabled) {
+                findPlaceableSlots().sumOf { it.value.blockCount() }
+            } else {
+                player.inventory.getItem(player.inventory.selectedSlot).blockCount()
+            }
+        }
 
     fun isValidBlock(stack: ItemStack?): Boolean {
         if (stack == null) {
@@ -101,6 +144,56 @@ object ScaffoldBlockItemSelection : ValueGroup("BlockItemSelection") {
             // Is there a hard coded answer?
             else -> block in unfavorableBlocksToPlace
         }
+    }
+
+    private fun findPlaceableSlots() = buildList(9) {
+        for (slot in 0..8) {
+            val stack = player.inventory.getItem(slot)
+
+            if (isValidBlock(stack)) {
+                add(IndexedValue(slot, stack))
+            }
+        }
+    }
+
+    internal fun findBestValidHotbarSlotForTarget(): Int? {
+        val placeableSlots = findPlaceableSlots()
+        val doNotUseBelowCount = ScaffoldAutoBlockFeature.doNotUseBelowCount
+
+        val (slot, _) = placeableSlots
+            .filter { (_, stack) -> stack.count > doNotUseBelowCount }
+            .maxWithOrNull { first, second -> hotbarComparator.compare(first.value, second.value) }
+            ?: placeableSlots.maxWithOrNull { first, second ->
+                hotbarComparator.compare(first.value, second.value)
+            }
+            ?: return null
+
+        return slot
+    }
+
+    internal fun ensureBlockInMainHand(
+        requester: Any?,
+        hasBlockInMainHand: Boolean,
+        hasBlockInOffHand: Boolean,
+    ): Boolean {
+        if (ScaffoldAutoBlockFeature.enabled && !hasBlockInMainHand && !hasBlockInOffHand) {
+            val bestMainHandSlot = findBestValidHotbarSlotForTarget()
+
+            if (bestMainHandSlot != null) {
+                SilentHotbar.selectSlotSilently(
+                    requester,
+                    bestMainHandSlot,
+                    ScaffoldAutoBlockFeature.slotResetDelay,
+                )
+                return true
+            } else {
+                SilentHotbar.resetSlot(requester)
+            }
+        } else {
+            SilentHotbar.resetSlot(requester)
+        }
+
+        return hasBlockInMainHand
     }
 
 }

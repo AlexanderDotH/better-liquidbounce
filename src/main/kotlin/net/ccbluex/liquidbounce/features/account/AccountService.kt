@@ -19,7 +19,7 @@
 
 package net.ccbluex.liquidbounce.features.account
 
-import net.ccbluex.liquidbounce.config.types.list.Tagged
+import net.ccbluex.liquidbounce.common.Tagged
 
 enum class AccountService(
     override val tag: String,

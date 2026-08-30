@@ -18,7 +18,7 @@
  */
 package net.ccbluex.liquidbounce.injection.mixins.minecraft.block;
 
-import net.ccbluex.liquidbounce.features.module.modules.movement.noslow.modes.powdersnow.NoSlowPowderSnow;
+import net.ccbluex.liquidbounce.features.module.modules.movement.noslow.NoSlowInjectionHook;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.InsideBlockEffectApplier;
@@ -35,12 +35,8 @@ public abstract class MixinPowderSnowBlock {
 
     @Inject(method = "entityInside", at = @At("HEAD"), cancellable = true)
     private void hookEntityCollision(BlockState state, Level world, BlockPos pos, Entity entity, InsideBlockEffectApplier handler, boolean bl, CallbackInfo ci) {
-        if (NoSlowPowderSnow.INSTANCE.getRunning()) {
+        if (NoSlowInjectionHook.applyPowderSnowVelocity(entity)) {
             ci.cancel();
-
-            var multiplier = NoSlowPowderSnow.INSTANCE.getMultiplier();
-            var velocity = entity.getDeltaMovement();
-            entity.setDeltaMovement(velocity.x * multiplier, velocity.y, velocity.z * multiplier);
         }
     }
 

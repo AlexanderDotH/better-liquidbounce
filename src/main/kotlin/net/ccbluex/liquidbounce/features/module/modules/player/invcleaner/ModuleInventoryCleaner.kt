@@ -18,26 +18,21 @@
  */
 package net.ccbluex.liquidbounce.features.module.modules.player.invcleaner
 
-import it.unimi.dsi.fastutil.objects.Object2IntMap
-import it.unimi.dsi.fastutil.objects.Reference2IntMap
-import net.ccbluex.fastutil.component1
-import net.ccbluex.fastutil.component2
 import net.ccbluex.fastutil.enumMapOf
 import net.ccbluex.fastutil.objectIntArrayMapOf
 import net.ccbluex.fastutil.referenceIntArrayMapOf
 import net.ccbluex.liquidbounce.event.events.ScheduleInventoryActionEvent
 import net.ccbluex.liquidbounce.event.handler
+import net.ccbluex.liquidbounce.features.inventory.OffhandReservationManager
+import net.ccbluex.liquidbounce.features.inventory.PlayerInventoryConstraints
 import net.ccbluex.liquidbounce.features.module.ClientModule
 import net.ccbluex.liquidbounce.features.module.ModuleCategories
-import net.ccbluex.liquidbounce.features.module.modules.player.invcleaner.items.ItemFacet
 import net.ccbluex.liquidbounce.features.module.modules.player.offhand.ModuleOffhand
 import net.ccbluex.liquidbounce.utils.collection.itemSortedSetOf
 import net.ccbluex.liquidbounce.utils.inventory.ArmorItemSlot
 import net.ccbluex.liquidbounce.utils.inventory.HotbarItemSlot
 import net.ccbluex.liquidbounce.utils.inventory.InventoryAction
 import net.ccbluex.liquidbounce.utils.inventory.ItemSlot
-import net.ccbluex.liquidbounce.utils.inventory.OffhandReservationManager
-import net.ccbluex.liquidbounce.utils.inventory.PlayerInventoryConstraints
 import net.ccbluex.liquidbounce.utils.inventory.findNonEmptySlotsInInventory
 import net.ccbluex.liquidbounce.utils.kotlin.Priority
 
@@ -117,7 +112,7 @@ object ModuleInventoryCleaner : ClientModule(
                 if (isOffhandProtected) HotbarItemSlot.OFFHAND else null
             )
 
-            val constraintProvider = AmountConstraintProvider(
+            val constraintProvider = InventoryCleanerAmountConstraints(
                 desiredItemsPerCategory = objectIntArrayMapOf(
                     ItemType.BLOCK.defaultCategory, maxBlocks,
                     ItemType.THROWABLE.defaultCategory, maxThrowables,
@@ -134,7 +129,7 @@ object ModuleInventoryCleaner : ClientModule(
 
             return CleanupPlanPlacementTemplate(
                 slotTargets,
-                itemAmountConstraintProvider = constraintProvider::getConstraints,
+                itemAmountConstraintProvider = constraintProvider::constraintsFor,
                 itemBlacklist = itemsBlackList,
                 forbiddenSlots = forbiddenSlots,
                 forbiddenSlotsToFill = forbiddenSlotsToFill,
@@ -214,46 +209,6 @@ object ModuleInventoryCleaner : ClientModule(
         )
 
         return true
-    }
-
-    private class AmountConstraintProvider(
-        val desiredItemsPerCategory: Object2IntMap<ItemCategory>,
-        val desiredValuePerFunction: Reference2IntMap<ItemFunction>,
-    ) {
-        fun getConstraints(facet: ItemFacet): MutableList<ItemConstraintInfo> {
-            val constraints = mutableListOf<ItemConstraintInfo>()
-
-            if (facet.providedItemFunctions.isEmpty()) {
-                val defaultDesiredAmount = if (facet.category.type.oneIsSufficient) 1 else Integer.MAX_VALUE
-                val desiredAmount = this.desiredItemsPerCategory.getOrDefault(facet.category, defaultDesiredAmount)
-
-                val info = ItemConstraintInfo(
-                    group = ItemCategoryConstraintGroup(
-                        desiredAmount..Integer.MAX_VALUE,
-                        10,
-                        facet.category
-                    ),
-                    amountAddedByItem = facet.itemStack.count
-                )
-
-                constraints.add(info)
-            } else {
-                for ((function, amountAdded) in facet.providedItemFunctions) {
-                    val info = ItemConstraintInfo(
-                        group = ItemFunctionCategoryConstraintGroup(
-                            desiredValuePerFunction.getOrDefault(function, 1)..Integer.MAX_VALUE,
-                            10,
-                            function
-                        ),
-                        amountAddedByItem = amountAdded
-                    )
-
-                    constraints.add(info)
-                }
-            }
-
-            return constraints
-        }
     }
 
 }

@@ -23,8 +23,8 @@ import com.mojang.blaze3d.GpuFormat
 import com.mojang.blaze3d.pipeline.RenderTarget
 import com.mojang.blaze3d.pipeline.TextureTarget
 import net.ccbluex.liquidbounce.utils.client.mc
-import net.ccbluex.liquidbounce.utils.render.clearColor
-import net.ccbluex.liquidbounce.utils.render.clearColorAndDepth
+import net.ccbluex.liquidbounce.render.buffer.clearColor
+import net.ccbluex.liquidbounce.render.buffer.clearColorAndDepth
 import java.util.function.Supplier
 
 /**

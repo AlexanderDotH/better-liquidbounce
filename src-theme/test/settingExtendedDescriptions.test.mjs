@@ -54,11 +54,11 @@ test("nested groups expose their description only from their own header", () => 
 
 test("the shared setting renderer wires shift hover once for every setting family", () => {
     const source = readFileSync(
-        new URL("../src/routes/clickgui/setting/common/GenericSetting.svelte", import.meta.url),
+        new URL("../src/shared/settings/GenericSetting.svelte", import.meta.url),
         "utf8",
     );
 
-    assert.match(source, /import\s+\{shiftDescription\}\s+from\s+"\.\/shiftDescription"/);
+    assert.match(source, /import\s+\{shiftDescription\}\s+from\s+"\.\.\/\.\.\/routes\/clickgui\/setting\/common\/shiftDescription"/);
     assert.match(source, /use:shiftDescription=\{\{\s*getText:\s*\(\)\s*=>\s*settingShiftDescription\(setting\)/);
 
     for (const component of ["ConfigurableSetting.svelte", "TogglableSetting.svelte"]) {
