@@ -11,17 +11,15 @@
 package net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.runtime.policy
 
 import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.debug.SPEAR_KILL_DAMAGE_EVIDENCE_WINDOW_TICKS
-import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.runtime.control.*
 import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.*
 import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.contract.*
 import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.planner.instant.*
-import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.session.attempt.*
 import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.session.movement.*
 import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.config.*
 import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.contract.SpearKillAStarSessionSettings
 import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.planner.instant.SpearKillNetworkBudget
 import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.contract.SpearKillPacketSessionSettings
-import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.planner.instant.SpearKillPrimedInstantPacketType
+import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.config.SpearKillPrimedInstantPacketType
 import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.planner.instant.SpearKillPrimedInstantPriming
 import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.config.SpearKillRoutingMode
 import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.session.movement.resolveSpearKillMovementTransport

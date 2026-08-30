@@ -10,7 +10,7 @@
  */
 package net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.session.recovery
 
-import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.SpearKillModuleState
+import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.orchestration.session.SpearKillModuleState
 import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.session.cleanup.abortSpearKillAttempt
 import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.session.cleanup.releaseStandaloneRemoteMovementOwnership
 import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.session.cleanup.resetSpearKillSpeedSession

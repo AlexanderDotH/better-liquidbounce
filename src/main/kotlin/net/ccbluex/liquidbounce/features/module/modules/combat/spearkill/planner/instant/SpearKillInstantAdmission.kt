@@ -19,18 +19,10 @@
 
 package net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.planner.instant
 
-
-import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.session.packet.*
 import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.config.*
 import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.planner.astar.SpearKillAStarPacketRoute
 
 import net.minecraft.world.phys.Vec3
-
-internal const val SPEAR_KILL_INSTANT_DEFAULT_MAX_PACKETS = 128
-internal const val SPEAR_KILL_INSTANT_MIN_MAX_PACKETS = 2
-internal const val SPEAR_KILL_INSTANT_MAX_MAX_PACKETS = 512
-internal const val SPEAR_KILL_INSTANT_SERVER_EVALUATION_TICKS = SPEAR_KILL_PACKET_STRIKE_HOLD_TICKS
-internal const val SPEAR_KILL_INSTANT_DAMAGE_SAMPLE_TICKS = 1
 
 internal enum class SpearKillInstantRejectedStepAction {
     TERMINATE_OUTBOUND,
@@ -197,3 +189,6 @@ internal fun isSpearKillPrimedInstantStepAdmissible(
 )
 
 /** All-or-nothing admission for outbound, exact inverse, NoFall extras, and final grounding. */
+internal fun Vec3.hasFiniteInstantCoordinates(): Boolean = x.isFinite() && y.isFinite() && z.isFinite()
+
+internal const val SPEAR_KILL_INSTANT_EPSILON = 1.0E-12

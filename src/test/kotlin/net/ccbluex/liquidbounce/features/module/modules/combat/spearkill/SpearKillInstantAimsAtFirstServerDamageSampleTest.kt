@@ -37,6 +37,7 @@ import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.session
 import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.planner.astar.*
 import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.research.highspeed.*
 import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.session.packet.*
+import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.orchestration.planning.startSpearKillInstantPacketSession
 
 import net.ccbluex.liquidbounce.features.module.modules.combat.*
 import net.ccbluex.liquidbounce.features.module.modules.combat.fightbot.*

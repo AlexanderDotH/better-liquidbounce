@@ -10,20 +10,19 @@
  */
 package net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.runtime.control
 
-import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.runtime.planning.*
 import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.*
 import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.session.attempt.*
 import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.session.movement.*
 import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.config.*
 import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.session.movement.SpearKillMovementAssistMode
-import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.SpearKillModuleState
+import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.orchestration.session.SpearKillModuleState
 import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.config.canStartSpearKillElytraFlight
-import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.session.movement.holdingSpear
-import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.session.movement.isUseInputHeld
-import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.session.movement.isUsingSpear
+import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.orchestration.session.holdingSpear
+import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.orchestration.session.isUseInputHeld
+import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.orchestration.session.isUsingSpear
 import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.session.attempt.nextSpearKillHoldUseLaunchTarget
 import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.config.nextSpearKillManualAttackRequestLatch
-import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.session.movement.physicalAttackRequest
+import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.orchestration.session.physicalAttackRequest
 import net.ccbluex.liquidbounce.utils.client.network
 import net.ccbluex.liquidbounce.utils.client.player
 import net.minecraft.network.protocol.game.ServerboundPlayerCommandPacket

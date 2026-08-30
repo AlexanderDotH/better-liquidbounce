@@ -19,9 +19,9 @@
 
 package net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.planner.instant
 
+import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.config.SpearKillPrimedInstantPacketType
 
-import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.session.packet.*
-import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.config.*
+
 import net.minecraft.world.phys.Vec3
 
 /** One-hop Instant explicitly permits the aggressive attempt; paced callers remain conservative. */

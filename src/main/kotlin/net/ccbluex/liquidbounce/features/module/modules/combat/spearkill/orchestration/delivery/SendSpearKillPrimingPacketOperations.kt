@@ -8,23 +8,21 @@
  * the Free Software Foundation, either version 3 of the License, or
  * (at your option) any later version.
  */
-package net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.session.packet
+package net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.orchestration.delivery
 
 
 
 import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.*
 import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.contract.*
 import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.planner.instant.*
-import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.planner.schedule.*
 import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.session.movement.*
 import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.config.*
-import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.SpearKillModuleState
+import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.orchestration.session.SpearKillModuleState
 import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.contract.SpearKillOwnedPacketDelivery
-import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.planner.instant.SpearKillPrimedInstantPacketType
-import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.session.movement.activePacketRoutingMode
+import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.config.SpearKillPrimedInstantPacketType
+import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.orchestration.session.activePacketRoutingMode
 import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.planner.instant.createSpearKillPrimingPacket
 import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.planner.instant.resolveSpearKillOwnedPacketGrounded
-import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.runtime.delivery.packetPositionOrigin
 import net.ccbluex.liquidbounce.utils.client.network
 import net.ccbluex.liquidbounce.utils.client.player
 

@@ -17,37 +17,10 @@ package net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.sessio
 
 
 
-import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.*
-import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.contract.*
-import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.planner.instant.*
-import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.planner.profiled.*
-import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.session.attempt.*
-import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.session.packet.*
-import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.session.safety.*
-import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.config.*
-import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.preview.*
-/** Immutable speed policy used both for route projection and one confirmed outbound step. */
-internal data class SpearKillSpeedLimits(
-    val targetSpeed: Double,
-    val acceleration: Double,
-    val deceleration: Double,
-    val stepDistance: Double,
-    val vanillaBudget: Double,
-) {
-    init {
-        require(targetSpeed.isPositiveSpearKillSpeed()) { "Target speed must be finite and positive" }
-        require(acceleration.isPositiveSpearKillSpeed()) { "Acceleration must be finite and positive" }
-        require(deceleration.isPositiveSpearKillSpeed()) { "Deceleration must be finite and positive" }
-        require(stepDistance.isPositiveSpearKillSpeed()) { "Step distance must be finite and positive" }
-        require(vanillaBudget.isPositiveSpearKillSpeed()) { "Vanilla budget must be finite and positive" }
-    }
-}
-
-/** Requested speed and the independently bounded route step for one outbound movement tick. */
-internal data class SpearKillSpeedStep(
-    val requestedSpeed: Double,
-    val stepLimit: Double,
-)
+import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.planner.profiled.SpearKillSpeedLimits
+import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.planner.profiled.SpearKillSpeedProfile
+import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.planner.profiled.SpearKillSpeedStep
+import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.planner.profiled.isPositiveSpearKillSpeed
 
 /**
  * SpearKill-owned transient speed. Previewing never mutates state; only a delivered outbound

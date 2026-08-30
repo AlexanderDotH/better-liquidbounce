@@ -19,11 +19,6 @@
 package net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.contract
 
 
-import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.planner.instant.*
-import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.planner.schedule.*
-import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.session.movement.*
-import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.config.*
-import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.target.*
 import net.minecraft.world.entity.LivingEntity
 import net.minecraft.world.phys.Vec3
 

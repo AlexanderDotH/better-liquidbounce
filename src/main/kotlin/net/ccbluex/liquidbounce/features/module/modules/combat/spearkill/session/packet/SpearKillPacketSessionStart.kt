@@ -10,14 +10,10 @@
  */
 package net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.session.packet
 
+import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.planner.schedule.SPEAR_KILL_PACKET_MAX_PRE_STRIKE_HOLD_TICKS
 
 
-import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.*
-import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.contract.*
-import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.planner.instant.*
-import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.planner.schedule.*
-import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.session.movement.*
-import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.config.*
+
 import net.ccbluex.liquidbounce.features.module.modules.combat.remotekill.REMOTE_KILL_ROUTE_MAX_STEP_WAIT_TICKS
 import net.ccbluex.liquidbounce.features.module.modules.combat.remotekill.RemoteKillRouteRequest
 import net.minecraft.world.phys.Vec3

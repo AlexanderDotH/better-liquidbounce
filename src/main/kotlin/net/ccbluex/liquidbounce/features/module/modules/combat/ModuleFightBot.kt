@@ -23,7 +23,7 @@ import net.ccbluex.liquidbounce.features.module.modules.combat.fightbot.*
 import net.ccbluex.liquidbounce.features.module.modules.combat.killaura.ModuleKillAura
 import net.ccbluex.liquidbounce.features.module.modules.combat.macekill.fightbot.MaceKillFightBotState
 import net.ccbluex.liquidbounce.features.module.modules.combat.macekill.fightbot.MaceKillFightBotTerminal
-import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.session.attempt.fightBotRouteTarget
+import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.orchestration.session.fightBotRouteTarget
 import net.ccbluex.liquidbounce.features.module.modules.render.ModuleDebug
 import net.ccbluex.liquidbounce.render.engine.type.Color4b
 import net.ccbluex.liquidbounce.utils.aiming.data.Rotation

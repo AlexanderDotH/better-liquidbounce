@@ -8,7 +8,7 @@
  * the Free Software Foundation, either version 3 of the License, or
  * (at your option) any later version.
  */
-package net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.session.attempt
+package net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.orchestration.session
 
 import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.contract.KILL_AURA_INHERITED_TARGET_SOURCE
 

@@ -19,7 +19,7 @@
 package net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.planner.schedule
 
 
-import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.session.packet.*
+import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.planner.astar.spearKillPacketTravelTicks
 import net.minecraft.world.phys.Vec3
 import kotlin.math.ceil
 

@@ -10,9 +10,6 @@
  */
 package net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.damage
 
-import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.session.movement.SPEAR_KILL_PROFILE_EPSILON_SQUARED
-
-import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.planner.schedule.*
 import net.minecraft.world.phys.Vec3
 import kotlin.math.floor
 import kotlin.math.max
@@ -54,7 +51,7 @@ internal fun estimateSpearKillKineticSpeed(
     lookDirection: Vec3,
 ): SpearKillKineticSpeedEstimate {
     if (!deliveredMovement.hasFiniteCoordinates() || !targetMovement.hasFiniteCoordinates() ||
-        !lookDirection.hasFiniteCoordinates() || lookDirection.lengthSqr() <= SPEAR_KILL_PROFILE_EPSILON_SQUARED
+        !lookDirection.hasFiniteCoordinates() || lookDirection.lengthSqr() <= SPEAR_KILL_KINETIC_EPSILON_SQUARED
     ) {
         return SpearKillKineticSpeedEstimate(0.0, 0.0, 0.0)
     }
@@ -72,7 +69,7 @@ internal fun estimateSpearKillKineticDamage(
 ): SpearKillKineticDamageEstimate {
     val validInputs = deliveredMovement.hasFiniteCoordinates() && targetMovement.hasFiniteCoordinates() &&
         lookDirection.hasFiniteCoordinates() &&
-        lookDirection.lengthSqr() > SPEAR_KILL_PROFILE_EPSILON_SQUARED
+        lookDirection.lengthSqr() > SPEAR_KILL_KINETIC_EPSILON_SQUARED
     val speed = estimateSpearKillKineticSpeed(deliveredMovement, targetMovement, lookDirection)
     val meetsRequirements = validInputs &&
         speed.attackerSpeed >= requirements.minimumAttackerSpeed &&
@@ -86,6 +83,8 @@ internal fun estimateSpearKillKineticDamage(
 }
 
 private fun Vec3.hasFiniteCoordinates(): Boolean = x.isFinite() && y.isFinite() && z.isFinite()
+
+private const val SPEAR_KILL_KINETIC_EPSILON_SQUARED = 1.0E-12
 
 private fun Double.isNonNegativeFinite(): Boolean = isFinite() && this >= 0.0
 

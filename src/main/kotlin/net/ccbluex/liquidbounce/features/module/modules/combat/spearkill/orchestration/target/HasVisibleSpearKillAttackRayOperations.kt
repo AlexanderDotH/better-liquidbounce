@@ -8,13 +8,12 @@
  * the Free Software Foundation, either version 3 of the License, or
  * (at your option) any later version.
  */
-package net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.target
+package net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.orchestration.target
 
 
 import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.*
 import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.contract.*
-import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.config.*
-import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.SpearKillModuleState
+import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.orchestration.session.SpearKillModuleState
 import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.contract.findSpearKillAttackHitPoint
 import net.ccbluex.liquidbounce.utils.raytracing.hasLineOfSight
 import net.minecraft.world.phys.AABB

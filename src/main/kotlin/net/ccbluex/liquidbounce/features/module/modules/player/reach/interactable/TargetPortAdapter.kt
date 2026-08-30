@@ -35,7 +35,7 @@ import net.ccbluex.liquidbounce.features.module.modules.render.ModuleFreeCam
 import net.ccbluex.liquidbounce.utils.client.mc
 import net.ccbluex.liquidbounce.utils.collection.Filter
 
-internal class MinecraftInteractableTargetPort : ControllerTargetPort<InteractableRuntimeTarget> {
+internal class TargetPortAdapter : ControllerTargetPort<InteractableRuntimeTarget> {
     private val resolver = InteractableTargetResolver(MinecraftInteractableTargetWorldAdapter)
 
     override fun acquire(settings: InteractableSettingsSnapshot): ControllerTargetResult<InteractableRuntimeTarget> {

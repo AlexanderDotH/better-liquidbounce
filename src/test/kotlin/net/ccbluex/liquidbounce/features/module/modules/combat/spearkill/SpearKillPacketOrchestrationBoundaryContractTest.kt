@@ -97,7 +97,8 @@ class SpearKillPacketOrchestrationBoundaryContractTest {
         const val INTEGRATION_PACKAGE = "package $SPEAR_KILL_PACKAGE.integration"
         val FORBIDDEN_DEPENDENCY_PACKAGES = listOf(
             "$SPEAR_KILL_PACKAGE.integration",
-            "$SPEAR_KILL_PACKAGE.planner",
+            "$SPEAR_KILL_PACKAGE.orchestration",
+            "$SPEAR_KILL_PACKAGE.runtime",
             "$SPEAR_KILL_PACKAGE.target",
         )
         val ORCHESTRATION_FILES = mapOf(
@@ -111,8 +112,6 @@ class SpearKillPacketOrchestrationBoundaryContractTest {
             "ValidatePendingSpearKillTerminalBurstOperations.kt" to "delivery/terminal",
         )
         val REQUIRED_PACKET_PRIMITIVE_FILES = setOf(
-            "SendSpearKillPrimingPacketOperations.kt",
-            "SpearKillPacketSessionApi.kt",
             "SpearKillPacketSessionDelivery.kt",
             "SpearKillPacketSessionPortAdapter.kt",
             "SpearKillPacketSessionRecovery.kt",

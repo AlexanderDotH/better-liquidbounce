@@ -22,19 +22,9 @@
 package net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.planner.instant
 
 
-import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.session.packet.*
-import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.config.*
-import net.ccbluex.liquidbounce.common.Tagged
+import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.config.SpearKillPrimedInstantPacketType
 import kotlin.math.ceil
 import kotlin.math.max
-
-/** PlayerMove packet shape used to advance the same-tick server packet counter. */
-internal enum class SpearKillPrimedInstantPacketType(override val tag: String) : Tagged {
-    Position("Position"),
-    PositionRotation("PositionRotation"),
-    Rotation("Rotation"),
-    StatusOnly("StatusOnly"),
-}
 
 /** Squared-distance multiplier used by the Minecraft 26.2 move-too-quickly check. */
 internal enum class SpearKillPrimedInstantMovementProfile(

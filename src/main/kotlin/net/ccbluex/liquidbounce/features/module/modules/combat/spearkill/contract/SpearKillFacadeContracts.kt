@@ -11,11 +11,6 @@
 package net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.contract
 
 
-import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.planner.instant.*
-import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.planner.schedule.*
-import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.session.movement.*
-import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.config.*
-import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.target.*
 import com.google.gson.JsonArray
 import com.google.gson.JsonObject
 import net.ccbluex.liquidbounce.utils.math.geometry.LineSegment

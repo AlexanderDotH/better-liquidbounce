@@ -39,7 +39,7 @@ class CombatModuleFacadeContractTest {
         private const val MACE_FACADE =
             "src/main/kotlin/net/ccbluex/liquidbounce/features/module/modules/combat/ModuleMaceKill.kt"
         private const val MACE_OPERATIONS =
-            "src/main/kotlin/net/ccbluex/liquidbounce/features/module/modules/combat/macekill/MaceKillFacadeOperations.kt"
+            "src/main/kotlin/net/ccbluex/liquidbounce/features/module/modules/combat/macekill/orchestration/MaceKillFacadeOperations.kt"
         private const val AUTO_ROD =
             "src/main/kotlin/net/ccbluex/liquidbounce/features/module/modules/combat/ModuleAutoRod.kt"
         private const val PROJECTILE_AIM =

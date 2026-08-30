@@ -59,9 +59,9 @@ class ReachInteractableFeature(parent: EventListener) : ToggleableValueGroup(
 
     internal val runtimeDelegate = lazy {
         MinecraftReachInteractableRuntime(
-            packetRateLimitDispositionPort = MinecraftInteractablePacketRateLimitAdapter,
-            targetPort = MinecraftInteractableTargetPort(),
-            routePort = MinecraftInteractableRoutePort(),
+            packetRateLimitDispositionPort = PacketRateLimitAdapter,
+            targetPort = TargetPortAdapter(),
+            routePort = RoutePortAdapter(),
             interactionPort = MinecraftInteractableInteractionPort,
         )
     }

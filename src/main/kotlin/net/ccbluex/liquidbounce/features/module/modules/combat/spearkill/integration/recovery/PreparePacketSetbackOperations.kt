@@ -20,15 +20,12 @@ import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.session
 import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.session.movement.*
 import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.session.packet.*
 import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.session.safety.*
-import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.config.*
-import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.debug.*
-import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.target.*
 import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.session.safety.SpearKillLocalPlayerState
-import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.SpearKillModuleState
+import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.orchestration.session.SpearKillModuleState
 import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.session.cleanup.clearVirtualMovementState
 import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.session.recovery.createCollisionSafeSetbackRecovery
 import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.session.server.synchronizeSpearKillServerSneak
-import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.session.packet.physicalReturnConfigured
+import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.physicalReturnConfigured
 import net.minecraft.network.protocol.game.ClientboundPlayerPositionPacket
 import net.minecraft.world.entity.LivingEntity
 import net.minecraft.world.entity.player.Player

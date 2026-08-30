@@ -8,18 +8,9 @@
  * the Free Software Foundation, either version 3 of the License, or
  * (at your option) any later version.
  */
-package net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.planner.direct
+package net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.planner.profiled
 
 
-import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.*
-import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.contract.*
-import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.damage.*
-import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.planner.profiled.*
-import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.planner.schedule.*
-import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.session.movement.*
-import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.session.packet.*
-import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.config.*
-import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.target.*
 import net.minecraft.world.phys.Vec3
 import kotlin.math.abs
 import kotlin.math.min

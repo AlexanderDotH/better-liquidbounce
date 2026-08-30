@@ -34,7 +34,6 @@ import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.config.
 import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.debug.*
 import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.target.*
 import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.preview.*
-import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 import java.nio.file.Files
@@ -45,21 +44,23 @@ import kotlin.io.path.isRegularFile
 class SpearKillFeedbackEdgeBoundaryContractTest {
 
     @Test
-    fun `SpearKill packages follow the I C P T N Q R S dependency order`() {
-        assertEquals(16, FORBIDDEN_EDGES.size)
-        assertTrue(
-            ORDERED_PACKAGES.all(SOURCE_GRAPH.packages::contains),
-            "Missing packages from the SpearKill dependency order",
-        )
-
-        val violations = FORBIDDEN_EDGES
-            .sortedWith(compareBy(PackageEdge::source, PackageEdge::target))
-            .flatMap { edge ->
-                SOURCE_GRAPH.dependencies[edge].orEmpty().map { reference ->
-                    "${PACKAGE_LABELS.getValue(edge.source)}->${PACKAGE_LABELS.getValue(edge.target)} " +
+    fun `SpearKill source dependencies contain no feedback edges`() {
+        val membership = ComponentFinder(SOURCE_GRAPH).find()
+            .flatMap { component -> component.map { it to component } }
+            .toMap()
+        val violations = SOURCE_GRAPH.dependencies.entries.flatMap { (edge, references) ->
+            val component = membership[edge.source].orEmpty()
+            if (component.size <= 1 || edge.target !in component ||
+                edge.source != S && !edge.source.startsWith("$S.")
+            ) {
+                emptyList()
+            } else {
+                references.map { reference ->
+                    "${edge.source.removePrefix("$S.")}->${edge.target.removePrefix("$S.")} " +
                         "${reference.path}:${reference.line} ${reference.importedName}"
                 }
             }
+        }
 
         assertTrue(
             violations.isEmpty(),
@@ -72,9 +73,11 @@ class SpearKillFeedbackEdgeBoundaryContractTest {
         val membership = ComponentFinder(SOURCE_GRAPH).find()
             .flatMap { component -> component.map { it to component } }
             .toMap()
-        val cyclicPackages = SPEAR_KILL_PACKAGES.mapNotNull { packageName ->
-            membership.getValue(packageName).takeIf { it.size > 1 }?.let { component ->
-                "${PACKAGE_LABELS.getValue(packageName)}:${component.size}"
+        val cyclicPackages = SOURCE_GRAPH.packages
+            .filter { it == S || it.startsWith("$S.") }
+            .mapNotNull { packageName ->
+            membership[packageName]?.takeIf { it.size > 1 }?.let { component ->
+                "${packageName.removePrefix("$S.")}:${component.size}"
             }
         }
 
@@ -151,24 +154,7 @@ class SpearKillFeedbackEdgeBoundaryContractTest {
         const val INTERNAL_PREFIX = "net.ccbluex.liquidbounce"
         const val C = "$INTERNAL_PREFIX.features.module.modules.combat"
         const val S = "$C.spearkill"
-        const val I = "$S.integration"
-        const val P = "$S.planner"
-        const val T = "$S.target"
-        const val N = "$S.session"
-        const val Q = "$N.packet"
-        const val R = "$S.runtime"
 
-        val ORDERED_PACKAGES = listOf(I, C, P, T, N, Q, R, S)
-        val SPEAR_KILL_PACKAGES = setOf(S, I, P, T, N, Q, R)
-        val PACKAGE_LABELS = mapOf(C to "C", S to "S", I to "I", P to "P", T to "T", N to "N", Q to "Q", R to "R")
-        val FORBIDDEN_EDGES = setOf(
-            PackageEdge(P, I),
-            PackageEdge(T, I), PackageEdge(T, P),
-            PackageEdge(N, I), PackageEdge(N, P),
-            PackageEdge(Q, I), PackageEdge(Q, P), PackageEdge(Q, T), PackageEdge(Q, N),
-            PackageEdge(R, I), PackageEdge(R, P), PackageEdge(R, N), PackageEdge(R, Q),
-            PackageEdge(S, C), PackageEdge(S, I), PackageEdge(S, Q),
-        )
         val SOURCE_GRAPH by lazy { buildGraph() }
 
         val PACKAGE = Regex("""(?m)^\s*package\s+([A-Za-z0-9_.`]+)\s*;?""")

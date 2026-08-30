@@ -12,20 +12,13 @@ package net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.integr
 
 import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.*
 import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.contract.*
-import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.planner.collision.*
-import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.planner.direct.*
-import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.planner.instant.*
 import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.planner.schedule.*
-import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.session.attempt.*
-import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.session.movement.*
 import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.session.packet.*
 import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.session.safety.*
-import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.config.*
-import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.target.*
 import net.ccbluex.liquidbounce.features.module.modules.combat.remotekill.RemoteKillRouteRequest
 import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.contract.AStarAttackPlan
 import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.contract.PacketFollowTermination
-import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.SpearKillModuleState
+import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.orchestration.session.SpearKillModuleState
 import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.contract.SpearKillPacketSessionSettings
 import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.session.packet.SpearKillPacketRouteReplanResult
 import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.session.safety.SpearKillServerFallSafetyPlan
@@ -35,8 +28,8 @@ import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.runtime
 import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.session.cleanup.createReplacementFallSafetyPlan
 import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.session.cleanup.replanVirtualFallSafety
 import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.session.recovery.terminatePacketFollow
-import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.session.packet.physicalReturnConfigured
-import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.session.packet.replaceRemainingOutbound
+import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.physicalReturnConfigured
+import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.replaceRemainingOutbound
 import net.minecraft.core.component.DataComponents
 import net.minecraft.world.entity.LivingEntity
 import net.minecraft.world.phys.Vec3

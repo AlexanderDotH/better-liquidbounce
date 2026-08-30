@@ -17,15 +17,25 @@
  * along with LiquidBounce. If not, see <https://www.gnu.org/licenses/>.
  */
 
-package net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.planner.instant
+package net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.orchestration.planning
+
+import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.config.SpearKillPrimedInstantPacketType
+import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.config.SPEAR_KILL_INSTANT_SERVER_EVALUATION_TICKS
 
 
 import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.SpearKillPacketBootSession
-import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.session.packet.*
-import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.config.*
 import net.ccbluex.liquidbounce.features.module.modules.combat.remotekill.RemoteKillRouteEngine
 import net.ccbluex.liquidbounce.features.module.modules.combat.remotekill.RemoteKillRouteRequest
 import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.planner.astar.SpearKillAStarPacketRoute
+import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.planner.instant.SpearKillInstantPacketBurst
+import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.planner.instant.SpearKillPrimedInstantMovementProfile
+import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.planner.instant.SpearKillPrimedInstantPacketAccounting
+import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.planner.instant.SpearKillPrimedInstantPlanRequest
+import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.planner.instant.SpearKillPrimedInstantPlanResult
+import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.planner.instant.SpearKillPrimedInstantPlanner
+import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.planner.instant.SpearKillPrimedInstantPriming
+import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.planner.instant.SpearKillPrimedInstantSessionBudget
+import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.planner.instant.SPEAR_KILL_INSTANT_EPSILON
 
 import net.minecraft.world.entity.LivingEntity
 import net.minecraft.world.phys.Vec3
@@ -131,7 +141,3 @@ internal fun remoteSpearKillInstantRouteRequest(
         }
     }
 }
-
-internal fun Vec3.hasFiniteInstantCoordinates(): Boolean = x.isFinite() && y.isFinite() && z.isFinite()
-
-internal const val SPEAR_KILL_INSTANT_EPSILON = 1.0E-12

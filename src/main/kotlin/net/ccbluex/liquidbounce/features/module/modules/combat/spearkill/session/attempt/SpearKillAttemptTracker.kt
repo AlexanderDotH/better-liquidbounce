@@ -21,12 +21,6 @@ package net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.sessio
 
 
 
-import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.*
-import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.session.movement.*
-import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.session.packet.*
-import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.session.safety.*
-import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.config.*
-import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.preview.*
 /** Immutable launch metadata supplied by the SpearKill integration boundary. */
 internal data class SpearKillAttemptPlan(
     val targetIdentity: String,

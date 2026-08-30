@@ -12,10 +12,10 @@ package net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.contra
 
 
 import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.planner.instant.*
+import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.planner.profiled.SpearKillSpeedProfile
 import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.planner.schedule.*
 import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.session.movement.*
 import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.config.*
-import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.target.*
 import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.planner.astar.SpearKillAStarAttackApproach
 import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.planner.astar.SpearKillAStarPacketRoute
 import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.research.highspeed.SpearKillHighSpeedResearchFinalPacketType
@@ -42,11 +42,6 @@ internal data class AStarSpatialPlan(
     val packetRoute: SpearKillAStarPacketRoute,
     val renderPath: List<Vec3>,
     val terminalSuffixCount: Int,
-)
-
-internal data class DirectPacketRoutePlan(
-    val route: SpearKillAStarPacketRoute,
-    val targetSnapshot: SpearKillRouteTargetSnapshot,
 )
 
 internal data class InstantDirectRouteCandidate(

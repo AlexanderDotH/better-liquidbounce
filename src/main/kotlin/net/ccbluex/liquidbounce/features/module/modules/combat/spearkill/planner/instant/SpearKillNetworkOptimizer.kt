@@ -10,10 +10,13 @@
  */
 package net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.planner.instant
 
+import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.config.SPEAR_KILL_ELYTRA_MAX_SPEED
+import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.config.SPEAR_KILL_MAX_WAIT_TICKS
+import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.config.SPEAR_KILL_MIN_SPEED
+import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.config.SPEAR_KILL_NORMAL_MAX_SPEED
+
 import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.debug.SPEAR_KILL_DAMAGE_EVIDENCE_WINDOW_TICKS
 
-import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.session.packet.*
-import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.config.*
 import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.planner.astar.SpearKillAStarPacketRoute
 
 import kotlin.math.ceil

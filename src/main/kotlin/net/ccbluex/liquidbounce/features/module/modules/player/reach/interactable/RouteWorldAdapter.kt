@@ -21,7 +21,7 @@ import net.minecraft.world.level.block.Blocks
 import net.minecraft.world.phys.Vec3
 import kotlin.math.ceil
 
-internal class MinecraftInteractableRouteWorld(
+internal class RouteWorldAdapter(
     private val level: net.minecraft.client.multiplayer.ClientLevel,
     private val player: Entity,
 ) : InteractableRouteWorld {

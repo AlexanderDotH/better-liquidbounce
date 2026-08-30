@@ -58,6 +58,10 @@ import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.config.
 import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.debug.*
 import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.target.*
 import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.preview.*
+import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.orchestration.session.isKillAuraIntegrationArmed
+import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.orchestration.session.isKillAuraIntegrationAvailable
+import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.orchestration.session.maximumTargetRange
+import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.orchestration.session.ownsKillAuraRoute
 import net.ccbluex.liquidbounce.features.module.modules.combat.ModuleAutoWeapon
 import net.ccbluex.liquidbounce.features.module.modules.combat.ModuleFightBot
 import net.ccbluex.liquidbounce.features.module.modules.combat.ModuleMaceKill

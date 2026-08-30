@@ -21,7 +21,7 @@ package net.ccbluex.liquidbounce.features.module.modules.movement.fly.modes
 import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.planner.instant.SpearKillPrimedInstantBlockReason
 import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.planner.instant.SpearKillPrimedInstantPlan
 import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.planner.instant.SpearKillPrimedInstantPlanResult
-import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.session.movement.boundedSpearKillProfileStep
+import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.planner.profiled.boundedSpearKillProfileStep
 import net.minecraft.world.phys.Vec3
 
 internal fun planPrimedPacketFly(

@@ -102,12 +102,12 @@ class SpearKillHighSpeedBoundaryContractTest {
         val SPEAR_KILL_ROOT: Path = HIGH_SPEED_ROOT.resolve("../..").normalize()
         val INTEGRATION_ROOT: Path = SPEAR_KILL_ROOT.resolve("integration")
         val RUNTIME_ROOT: Path = SPEAR_KILL_ROOT.resolve("runtime")
-        val ATTEMPT_EVIDENCE_SOURCE: Path = HIGH_SPEED_ROOT.resolve("../../runtime").normalize()
-            .resolve("UpdateSpearKillAttemptEvidenceOperations.kt")
+        val ATTEMPT_EVIDENCE_SOURCE: Path = SPEAR_KILL_ROOT
+            .resolve("runtime/lifecycle/UpdateSpearKillAttemptEvidenceOperations.kt")
         const val HIGH_SPEED_PACKAGE =
             "package net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.research.highspeed"
         const val DEBUG_PACKAGE =
-            "package net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.debug"
+            "package net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.orchestration.debug"
         const val TERMINAL_INTEGRATION_PACKAGE =
             "package net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.integration.delivery.terminal"
         const val STARTUP_INTEGRATION_PACKAGE =
@@ -118,7 +118,7 @@ class SpearKillHighSpeedBoundaryContractTest {
         val MODULE_AWARE_OPERATIONS = listOf(
             INTEGRATION_ROOT.resolve("delivery/terminal/BeginHighSpeedResearchBurstOperations.kt") to
                 TERMINAL_INTEGRATION_PACKAGE,
-            SPEAR_KILL_ROOT.resolve("debug/DebugSpearKillOperations.kt") to DEBUG_PACKAGE,
+            SPEAR_KILL_ROOT.resolve("orchestration/debug/DebugSpearKillOperations.kt") to DEBUG_PACKAGE,
             RUNTIME_ROOT.resolve("lifecycle/LogCompletedSpearKillAttemptOperations.kt") to
                 RUNTIME_LIFECYCLE_PACKAGE,
             INTEGRATION_ROOT.resolve("delivery/terminal/LogSpearKillPrimedBurstDecisionOperations.kt") to

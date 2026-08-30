@@ -8,7 +8,7 @@
  * the Free Software Foundation, either version 3 of the License, or
  * (at your option) any later version.
  */
-package net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.session.safety
+package net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.orchestration.session
 
 import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.contract.SPEAR_KILL_NEAR_GROUND_HORIZONTAL_INSET
 import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.contract.SPEAR_KILL_NEAR_GROUND_PROBE_DEPTH
@@ -17,6 +17,8 @@ import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.planner
 
 import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.*
 import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.session.movement.*
+import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.session.safety.SpearKillServerFallSafetyPlan
+import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.session.safety.SpearKillServerFallSafetyPlanResult
 import net.minecraft.world.entity.Pose
 import net.minecraft.world.entity.ai.attributes.Attributes
 import net.minecraft.world.phys.AABB

@@ -10,11 +10,9 @@
  */
 package net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.runtime.lifecycle
 
-import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.runtime.planning.*
 import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.runtime.policy.*
 import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.*
 import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.contract.*
-import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.damage.*
 import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.session.attempt.*
 import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.session.movement.*
 import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.config.*
@@ -23,11 +21,11 @@ import net.ccbluex.liquidbounce.features.module.modules.combat.fightbot.SpearKil
 import net.ccbluex.liquidbounce.features.module.modules.combat.fightbot.SpearKillFightBotTerminal
 import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.debug.SPEAR_KILL_DAMAGE_EVIDENCE_WINDOW_TICKS
 import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.session.attempt.SpearKillAttemptSnapshot
-import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.SpearKillModuleState
-import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.debug.debugSpearKill
-import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.session.attempt.hasActiveAttackPath
-import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.debug.spearKillDebugSessionFields
-import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.debug.spearKillDebugTargetFields
+import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.orchestration.session.SpearKillModuleState
+import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.orchestration.debug.debugSpearKill
+import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.orchestration.session.hasActiveAttackPath
+import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.orchestration.debug.spearKillDebugSessionFields
+import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.orchestration.debug.spearKillDebugTargetFields
 import net.ccbluex.liquidbounce.utils.client.player
 import net.minecraft.world.entity.LivingEntity
 

@@ -29,7 +29,7 @@ import net.ccbluex.liquidbounce.utils.client.mc
 import net.minecraft.world.entity.ai.attributes.Attributes
 import net.minecraft.world.phys.Vec3
 
-internal class MinecraftInteractableRoutePort : ControllerRoutePort<
+internal class RoutePortAdapter : ControllerRoutePort<
     InteractableRuntimeTarget,
     InteractableSessionRoute<InteractablePacketInstruction>,
     InteractableRenderSnapshot,
@@ -42,7 +42,7 @@ internal class MinecraftInteractableRoutePort : ControllerRoutePort<
         val resolvedTarget = target as InteractableResolvedTarget
         val level = requireNotNull(mc.level) { "Interactable route requires a world" }
         val player = requireNotNull(mc.player) { "Interactable route requires a player" }
-        val routeWorld = MinecraftInteractableRouteWorld(level, player)
+        val routeWorld = RouteWorldAdapter(level, player)
         val goalWorld = MinecraftInteractableGoalWorld(level, player, resolvedTarget, settings.interactionRange)
         val targetNode = goalWorld.targetNode ?: return FailedControllerRouteTask("TARGET_MISSING")
         val goals = resolveInteractableGoalStances(

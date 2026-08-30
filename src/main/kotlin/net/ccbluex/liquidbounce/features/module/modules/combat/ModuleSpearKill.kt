@@ -25,7 +25,7 @@ import net.ccbluex.liquidbounce.features.module.modules.combat.fightbot.SpearKil
 import net.ccbluex.liquidbounce.features.module.modules.combat.killaura.ModuleKillAura
 import net.ccbluex.liquidbounce.features.module.modules.combat.killaura.features.KillAuraAutoBlock
 import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.contract.PacketChainStartResult
-import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.SpearKillModuleState
+import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.orchestration.session.SpearKillModuleState
 import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.facade.SpearKillFacadeBridge
 import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.facade.onKillAuraDisabled as facadeOnKillAuraDisabled
 import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.config.migrateLegacySpearKillConfig

@@ -10,8 +10,6 @@
  */
 package net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.target
 
-import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.contract.*
-import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.*
 import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.config.*
 
 

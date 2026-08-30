@@ -13,16 +13,34 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
  * GNU General Public License for more details.
  */
-package net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.config
-
-import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.contract.*
-import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.planner.instant.*
-import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.planner.schedule.*
-import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.session.movement.*
+package net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.planner.profiled
 
 import net.minecraft.world.phys.Vec3
 import kotlin.math.max
 import kotlin.math.min
+
+/** Immutable constraints shared by route projection and confirmed outbound movement. */
+internal data class SpearKillSpeedLimits(
+    val targetSpeed: Double,
+    val acceleration: Double,
+    val deceleration: Double,
+    val stepDistance: Double,
+    val vanillaBudget: Double,
+) {
+    init {
+        require(targetSpeed.isPositiveSpearKillSpeed()) { "Target speed must be finite and positive" }
+        require(acceleration.isPositiveSpearKillSpeed()) { "Acceleration must be finite and positive" }
+        require(deceleration.isPositiveSpearKillSpeed()) { "Deceleration must be finite and positive" }
+        require(stepDistance.isPositiveSpearKillSpeed()) { "Step distance must be finite and positive" }
+        require(vanillaBudget.isPositiveSpearKillSpeed()) { "Vanilla budget must be finite and positive" }
+    }
+}
+
+/** Requested speed and the independently bounded route step for one outbound movement tick. */
+internal data class SpearKillSpeedStep(
+    val requestedSpeed: Double,
+    val stepLimit: Double,
+)
 
 /** Immutable speed policy used both for route projection and one confirmed outbound step. */
 internal data class SpearKillSpeedProfile(
@@ -122,3 +140,18 @@ internal fun buildSpearKillProfiledAttackMovements(
         add(Vec3.ZERO)
     }
 }
+
+internal fun boundedSpearKillProfileStep(remaining: Vec3, cap: Double): Vec3 {
+    var step = remaining.scale(cap / remaining.length())
+    if (step.length() > cap) {
+        step = step.scale(Math.nextDown(cap) / step.length())
+    }
+    return step
+}
+
+internal fun Vec3.hasFiniteSpearKillSpeedCoordinates(): Boolean = x.isFinite() && y.isFinite() && z.isFinite()
+
+internal fun Double.isPositiveSpearKillSpeed(): Boolean = isFinite() && this > 0.0
+
+internal const val SPEAR_KILL_MAX_PROFILE_STEPS = 100_000
+internal const val SPEAR_KILL_PROFILE_EPSILON_SQUARED = 1.0E-12

@@ -17,11 +17,11 @@
  * along with LiquidBounce. If not, see <https://www.gnu.org/licenses/>.
  */
 
-package net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.target
+package net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.orchestration.target
 
-import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.contract.*
+import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.orchestration.session.SpearKillModuleState
+
 import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.*
-import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.config.*
 
 import net.ccbluex.liquidbounce.features.combat.runtime.shouldBeAttacked
 import net.minecraft.world.entity.LivingEntity

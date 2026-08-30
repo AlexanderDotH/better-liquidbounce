@@ -17,15 +17,7 @@ package net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.sessio
 
 
 
-import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.*
-import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.contract.*
-import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.planner.instant.*
 import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.planner.profiled.*
-import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.session.attempt.*
-import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.session.packet.*
-import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.session.safety.*
-import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.config.*
-import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.preview.*
 import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.planner.astar.SpearKillAStarSegmentValidator
 import net.minecraft.world.phys.Vec3
 import kotlin.math.sqrt
@@ -162,19 +154,5 @@ internal fun isSpearKillWithinVanillaMovementBudget(
 ): Boolean = movementFromFirstGood.hasFiniteSpearKillSpeedCoordinates() &&
     movementFromFirstGood.length() <= calculateSpearKillVanillaMovementBudget(serverPhysicsVelocity, fallFlying)
 
-internal fun boundedSpearKillProfileStep(remaining: Vec3, cap: Double): Vec3 {
-    var step = remaining.scale(cap / remaining.length())
-    if (step.length() > cap) {
-        step = step.scale(Math.nextDown(cap) / step.length())
-    }
-    return step
-}
-
-internal fun Vec3.hasFiniteSpearKillSpeedCoordinates(): Boolean = x.isFinite() && y.isFinite() && z.isFinite()
-
-internal fun Double.isPositiveSpearKillSpeed(): Boolean = isFinite() && this > 0.0
-
 private const val SPEAR_KILL_NORMAL_MOVEMENT_THRESHOLD = 100.0
 private const val SPEAR_KILL_ELYTRA_MOVEMENT_THRESHOLD = 300.0
-internal const val SPEAR_KILL_MAX_PROFILE_STEPS = 100_000
-internal const val SPEAR_KILL_PROFILE_EPSILON_SQUARED = 1.0E-12

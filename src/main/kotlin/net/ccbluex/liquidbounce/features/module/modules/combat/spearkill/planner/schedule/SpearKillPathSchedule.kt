@@ -18,9 +18,8 @@
  */
 package net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.planner.schedule
 
-import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.config.SPEAR_KILL_MAX_WAIT_TICKS
+import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.planner.astar.SPEAR_KILL_PACKET_MAX_WAIT_TICKS
 
-import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.session.packet.*
 import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.planner.astar.SpearKillAStarAttackApproach
 
 import net.minecraft.world.phys.Vec3
@@ -48,7 +47,7 @@ internal fun buildSpearKillPathSchedule(
 ): SpearKillPathSchedule? {
     if (outboundStepCount <= 0 ||
         terminalSuffixCount !in 1..outboundStepCount ||
-        stepWaitTicks !in 0..SPEAR_KILL_MAX_WAIT_TICKS ||
+        stepWaitTicks !in 0..SPEAR_KILL_PACKET_MAX_WAIT_TICKS ||
         preStrikeHoldTicks !in 0..SPEAR_KILL_PACKET_MAX_PRE_STRIKE_HOLD_TICKS ||
         strikeHoldTicks < 0
     ) {
@@ -133,3 +132,6 @@ private fun Vec3.hasPassedSpearKillTerminal(expectedMovement: Vec3): Boolean =
     length() > expectedMovement.length() + SPEAR_KILL_PATH_SCHEDULE_EPSILON
 
 private fun Vec3.isFinite(): Boolean = x.isFinite() && y.isFinite() && z.isFinite()
+
+internal const val SPEAR_KILL_PACKET_STRIKE_HOLD_TICKS = 2
+internal const val SPEAR_KILL_PACKET_MAX_PRE_STRIKE_HOLD_TICKS = 1

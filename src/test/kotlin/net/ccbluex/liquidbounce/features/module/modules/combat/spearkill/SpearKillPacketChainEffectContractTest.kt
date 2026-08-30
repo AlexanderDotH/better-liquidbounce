@@ -10,6 +10,8 @@
  */
 package net.ccbluex.liquidbounce.features.module.modules.combat.spearkill
 
+import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.orchestration.session.SpearKillModuleState
+
 import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.contract.*
 import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.planner.collision.*
 import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.damage.*
@@ -74,9 +76,9 @@ class SpearKillPacketChainEffectContractTest {
         val ROOT: Path = Path.of(
             "src/main/kotlin/net/ccbluex/liquidbounce/features/module/modules/combat/spearkill",
         )
-        val STATE: Path = ROOT.resolve("SpearKillModuleState.kt")
+        val STATE: Path = ROOT.resolve("orchestration/session/SpearKillModuleState.kt")
         val MODULE: Path = ROOT.parent.resolve("ModuleSpearKill.kt")
         val FACADE: Path = ROOT.resolve("facade/SpearKillFacadeBridge.kt")
-        val TERMINATION: Path = ROOT.resolve("session/TerminatePacketFollowOperations.kt")
+        val TERMINATION: Path = ROOT.resolve("session/recovery/TerminatePacketFollowOperations.kt")
     }
 }

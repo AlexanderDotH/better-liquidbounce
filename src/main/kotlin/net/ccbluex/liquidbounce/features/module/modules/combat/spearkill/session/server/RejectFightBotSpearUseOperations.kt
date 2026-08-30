@@ -12,10 +12,9 @@ package net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.sessio
 
 import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.session.cleanup.*
 import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.*
-import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.session.movement.*
 import net.ccbluex.liquidbounce.features.module.modules.combat.fightbot.SpearKillFightBotState
 import net.ccbluex.liquidbounce.features.module.modules.combat.fightbot.SpearKillFightBotTerminal
-import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.SpearKillModuleState
+import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.orchestration.session.SpearKillModuleState
 import net.minecraft.world.entity.LivingEntity
 
 internal fun SpearKillModuleState.rejectFightBotSpearUse(target: LivingEntity): SpearKillFightBotState {

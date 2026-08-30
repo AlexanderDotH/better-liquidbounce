@@ -10,6 +10,8 @@
  */
 package net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.facade
 
+import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.orchestration.session.SpearKillModuleState
+
 
 import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.*
 import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.contract.*

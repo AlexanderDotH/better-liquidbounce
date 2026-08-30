@@ -10,17 +10,12 @@
  */
 package net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.session.movement
 
+import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.config.SPEAR_KILL_EXPERIMENTAL_MAX_SPEED
+import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.config.SPEAR_KILL_MIN_SPEED
+import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.config.SPEAR_KILL_MIN_TARGET_SPEED
 
 
-import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.*
-import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.contract.*
-import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.planner.instant.*
-import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.planner.profiled.*
-import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.session.attempt.*
-import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.session.packet.*
-import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.session.safety.*
-import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.config.*
-import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.preview.*
+
 import net.ccbluex.liquidbounce.common.Tagged
 
 /** Selects how SpearKill owns a temporary movement assist. */

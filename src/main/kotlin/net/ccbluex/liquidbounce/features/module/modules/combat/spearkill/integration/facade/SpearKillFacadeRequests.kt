@@ -21,10 +21,10 @@ import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.target.
 import net.ccbluex.liquidbounce.features.module.modules.combat.fightbot.SpearKillFightBotState
 import net.ccbluex.liquidbounce.features.module.modules.combat.fightbot.SpearKillFightBotTerminal
 import net.ccbluex.liquidbounce.features.module.modules.combat.fightbot.reservesKillAuraSubsystems
-import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.SpearKillModuleState
-import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.session.attempt.hasActiveAttackPath
-import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.session.attempt.isKillAuraIntegrationAvailable
-import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.target.isSafeSpearKillCombatTarget
+import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.orchestration.session.SpearKillModuleState
+import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.orchestration.session.hasActiveAttackPath
+import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.orchestration.session.isKillAuraIntegrationAvailable
+import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.orchestration.target.isSafeSpearKillCombatTarget
 import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.config.isSpearKillTargetCandidateEligible
 import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.session.cleanup.clearFightBotSpearUse
 import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.session.server.rejectFightBotSpearUse

@@ -27,7 +27,7 @@ import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.config.
 import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.debug.*
 import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.target.*
 import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.preview.*
-import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.contract.DirectPacketRoutePlan
+import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.target.DirectPacketRoutePlan
 import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.contract.SpearKillAttackStartResult
 import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.target.SpearKillRouteTargetSnapshot
 import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.integration.startup.SpearKillDirectAttackPreparation

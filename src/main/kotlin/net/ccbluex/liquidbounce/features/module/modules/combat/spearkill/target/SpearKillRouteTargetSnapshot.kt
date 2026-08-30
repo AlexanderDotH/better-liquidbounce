@@ -18,9 +18,7 @@
  */
 package net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.target
 
-import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.contract.*
-import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.*
-import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.config.*
+import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.planner.astar.SpearKillAStarPacketRoute
 
 import net.ccbluex.liquidbounce.utils.entity.PositionExtrapolation
 import net.ccbluex.liquidbounce.utils.entity.lastPos
@@ -73,6 +71,11 @@ internal data class SpearKillRouteTargetSnapshot(
         }
     }
 }
+
+internal data class DirectPacketRoutePlan(
+    val route: SpearKillAStarPacketRoute,
+    val targetSnapshot: SpearKillRouteTargetSnapshot,
+)
 
 /** Must be invoked on the Minecraft thread; the returned value has no live-entity references. */
 internal fun captureSpearKillRouteTargetSnapshot(

@@ -10,6 +10,8 @@
  */
 package net.ccbluex.liquidbounce.features.module.modules.combat.spearkill
 
+import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.orchestration.session.SpearKillModuleState
+
 import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.contract.*
 import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.planner.collision.*
 import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.damage.*
@@ -69,7 +71,7 @@ class SpearKillPreviewStateBindingContractTest {
 
     private companion object {
         val PREVIEW_SOURCE: Path = Path.of(
-            "src/main/kotlin/net/ccbluex/liquidbounce/features/module/modules/combat/spearkill/SpearKillPreview.kt",
+            "src/main/kotlin/net/ccbluex/liquidbounce/features/module/modules/combat/spearkill/orchestration/preview/SpearKillPreview.kt",
         )
     }
 }

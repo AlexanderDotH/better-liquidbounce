@@ -8,11 +8,13 @@
  * the Free Software Foundation, either version 3 of the License, or
  * (at your option) any later version.
  */
-package net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.preview
+package net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.orchestration.preview
 
-import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.contract.*
+import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.orchestration.session.SpearKillModuleState
+
 import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.session.movement.*
 import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.*
+import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.orchestration.session.isUsingSpear
 
 import net.ccbluex.liquidbounce.render.engine.esp.TargetGlowSelection
 

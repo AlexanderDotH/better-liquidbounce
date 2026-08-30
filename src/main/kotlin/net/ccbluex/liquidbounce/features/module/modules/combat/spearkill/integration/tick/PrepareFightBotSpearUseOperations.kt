@@ -12,15 +12,10 @@ package net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.integr
 
 import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.*
 import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.contract.*
-import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.planner.instant.*
 import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.session.attempt.*
 import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.session.movement.*
-import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.session.packet.*
 import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.session.safety.*
 import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.config.*
-import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.debug.*
-import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.target.*
-import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.preview.*
 import net.minecraft.world.InteractionHand
 import net.minecraft.world.InteractionResult
 import net.minecraft.world.entity.LivingEntity
@@ -31,11 +26,11 @@ import net.ccbluex.liquidbounce.features.module.modules.combat.fightbot.SpearKil
 import net.ccbluex.liquidbounce.features.module.modules.combat.fightbot.SpearKillFightBotTerminal
 import net.ccbluex.liquidbounce.features.module.modules.combat.fightbot.selectFightBotSpearUseSource
 import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.contract.FightBotSpearUseRequester
-import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.SpearKillModuleState
-import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.session.attempt.acceptsKillAuraDelegation
-import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.session.attempt.hasActiveAttackPath
+import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.orchestration.session.SpearKillModuleState
+import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.orchestration.session.acceptsKillAuraDelegation
+import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.orchestration.session.hasActiveAttackPath
 import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.config.isSpearKillTargetCandidateEligible
-import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.session.movement.isUsingSpear
+import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.orchestration.session.isUsingSpear
 import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.session.cleanup.clearFightBotSpearUse
 import net.ccbluex.liquidbounce.utils.client.SilentHotbar
 import net.ccbluex.liquidbounce.utils.client.player

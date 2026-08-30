@@ -16,7 +16,7 @@ import net.ccbluex.liquidbounce.features.module.modules.player.reach.contract.Pa
 import net.ccbluex.liquidbounce.features.module.modules.player.reach.contract.PacketRateLimitDispositionPort
 import net.minecraft.network.protocol.Packet
 
-internal object MinecraftInteractablePacketRateLimitAdapter : PacketRateLimitDispositionPort {
+internal object PacketRateLimitAdapter : PacketRateLimitDispositionPort {
     override fun takeDisposition(packet: Packet<*>): PacketRateLimitDisposition? =
         DisablerRateLimiting.takeDisposition(packet)?.toReachPacketDisposition()
 }

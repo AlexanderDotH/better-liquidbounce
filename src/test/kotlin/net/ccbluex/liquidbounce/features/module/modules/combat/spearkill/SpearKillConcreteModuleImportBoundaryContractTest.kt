@@ -45,23 +45,20 @@ class SpearKillConcreteModuleImportBoundaryContractTest {
 
     @Test
     fun `SpearKill implementation packages do not import the concrete module facade`() {
-        val packageSources = EXACT_PACKAGES.mapValues { (_, sourceDirectory) ->
-            Files.list(sourceDirectory).use { paths ->
-                paths.filter { it.isRegularFile() && it.extension == "kt" }.sorted().toList()
-            }
+        val sourcePaths = Files.walk(SPEAR_KILL_ROOT).use { paths ->
+            paths.filter {
+                it.isRegularFile() && it.extension == "kt" &&
+                    !it.startsWith(SPEAR_KILL_ROOT.resolve("command"))
+            }.sorted().toList()
         }
-        val emptyPackages = packageSources.filterValues { it.isEmpty() }.keys
+        assertTrue(sourcePaths.isNotEmpty(), "Expected SpearKill Kotlin sources")
 
-        assertTrue(emptyPackages.isEmpty(), "Expected Kotlin sources in packages: $emptyPackages")
-
-        val violations = packageSources.flatMap { (packageName, sourcePaths) ->
-            sourcePaths.flatMap { sourcePath ->
+        val violations = sourcePaths.flatMap { sourcePath ->
                 Files.readAllLines(sourcePath).mapIndexedNotNull { index, line ->
                     line.takeIf { it.isConcreteModuleImport() }?.let {
-                        "$packageName/${sourcePath.fileName}:${index + 1}: ${it.trim()}"
+                        "${SPEAR_KILL_ROOT.relativize(sourcePath)}:${index + 1}: ${it.trim()}"
                     }
                 }
-            }
         }
 
         assertTrue(
@@ -81,16 +78,6 @@ class SpearKillConcreteModuleImportBoundaryContractTest {
     private companion object {
         val SPEAR_KILL_ROOT: Path = Path.of(
             "src/main/kotlin/net/ccbluex/liquidbounce/features/module/modules/combat/spearkill",
-        )
-        val EXACT_PACKAGES = linkedMapOf(
-            "root" to SPEAR_KILL_ROOT,
-            "facade" to SPEAR_KILL_ROOT.resolve("facade"),
-            "integration" to SPEAR_KILL_ROOT.resolve("integration"),
-            "planner" to SPEAR_KILL_ROOT.resolve("planner"),
-            "runtime" to SPEAR_KILL_ROOT.resolve("runtime"),
-            "session" to SPEAR_KILL_ROOT.resolve("session"),
-            "session.packet" to SPEAR_KILL_ROOT.resolve("session/packet"),
-            "target" to SPEAR_KILL_ROOT.resolve("target"),
         )
         const val FORBIDDEN_IMPORT =
             "import net.ccbluex.liquidbounce.features.module.modules.combat.ModuleSpearKill"

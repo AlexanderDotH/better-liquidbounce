@@ -19,12 +19,9 @@
 package net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.config
 
 import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.planner.astar.SPEAR_KILL_PACKET_MAX_WAIT_TICKS
+import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.planner.schedule.SPEAR_KILL_PACKET_STRIKE_HOLD_TICKS
 
-import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.contract.*
-import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.planner.instant.*
-import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.planner.schedule.*
-import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.session.movement.*
-
+import net.ccbluex.liquidbounce.common.Tagged
 import net.ccbluex.liquidbounce.config.types.group.Mode
 import net.ccbluex.liquidbounce.config.types.group.ModeValueGroup
 
@@ -40,6 +37,14 @@ internal class SpearKillInstantSafe(
     name = "Safe",
     parent = parent,
 )
+
+/** PlayerMove packet shape used to advance the same-tick server packet counter. */
+internal enum class SpearKillPrimedInstantPacketType(override val tag: String) : Tagged {
+    Position("Position"),
+    PositionRotation("PositionRotation"),
+    Rotation("Rotation"),
+    StatusOnly("StatusOnly"),
+}
 
 /** Matches vanilla's basic preconditions before SpearKill asks the server to start fall flying. */
 internal fun canStartSpearKillElytraFlight(
@@ -61,3 +66,8 @@ internal const val SPEAR_KILL_NORMAL_MAX_SPEED = 10f
 internal const val SPEAR_KILL_ELYTRA_MAX_SPEED = 17.32f
 internal const val SPEAR_KILL_EXPERIMENTAL_MAX_SPEED = 500f
 internal const val SPEAR_KILL_MAX_WAIT_TICKS = SPEAR_KILL_PACKET_MAX_WAIT_TICKS
+internal const val SPEAR_KILL_INSTANT_DEFAULT_MAX_PACKETS = 128
+internal const val SPEAR_KILL_INSTANT_MIN_MAX_PACKETS = 2
+internal const val SPEAR_KILL_INSTANT_MAX_MAX_PACKETS = 512
+internal const val SPEAR_KILL_INSTANT_SERVER_EVALUATION_TICKS = SPEAR_KILL_PACKET_STRIKE_HOLD_TICKS
+internal const val SPEAR_KILL_INSTANT_DAMAGE_SAMPLE_TICKS = 1

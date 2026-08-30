@@ -19,6 +19,8 @@
 
 package net.ccbluex.liquidbounce.features.module.modules.combat.spearkill
 
+import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.orchestration.session.SpearKillModuleState
+
 import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.contract.*
 import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.planner.collision.*
 import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.damage.*
@@ -70,20 +72,26 @@ class SpearKillModuleBoundaryContractTest {
     }
 
     private fun assertModuleStateFacadeContract() {
-        val stateSource = Files.readString(SPEAR_KILL_ROOT.resolve("SpearKillModuleState.kt"))
+        val stateSource = Files.readString(
+            SPEAR_KILL_ROOT.resolve("orchestration/session/SpearKillModuleState.kt"),
+        )
         assertTrue("internal abstract val killAuraRunning: Boolean" in stateSource)
         assertTrue("internal abstract val debugEnabled: Boolean" in stateSource)
         assertTrue("enabled = { debugEnabled }" in stateSource)
 
-        val ownershipSource = Files.readString(SPEAR_KILL_ROOT.resolve("SpearKillAttemptOwnership.kt"))
+        val ownershipSource = Files.readString(
+            SPEAR_KILL_ROOT.resolve("orchestration/session/SpearKillAttemptOwnership.kt"),
+        )
         assertTrue("GlobalSettingsCombat.delegateKillAuraAttacks && killAuraRunning" in ownershipSource)
         assertFalse("ModuleKillAura" in ownershipSource)
 
-        val movementStateSource = Files.readString(SPEAR_KILL_ROOT.resolve("SpearKillMovementState.kt"))
+        val movementStateSource = Files.readString(
+            SPEAR_KILL_ROOT.resolve("orchestration/session/SpearKillMovementState.kt"),
+        )
         assertFalse("planner.currentSpeedProfile" in movementStateSource)
 
         val recoverySource = Files.readString(
-            SPEAR_KILL_ROOT.resolve("session/CreateCollisionSafeSetbackRecoveryOperations.kt"),
+            SPEAR_KILL_ROOT.resolve("session/recovery/CreateCollisionSafeSetbackRecoveryOperations.kt"),
         )
         assertTrue("internal val SpearKillModuleState.recoveryPlanningStepLimit" in recoverySource)
         assertTrue("currentSpeedProfile(activeSpeedStepDistance).maximumStepLimit" in recoverySource)
@@ -146,20 +154,24 @@ class SpearKillModuleBoundaryContractTest {
                 }
         }
 
-        val targetStateSource = Files.readString(SPEAR_KILL_ROOT.resolve("SpearKillTargetStateOperations.kt"))
+        val targetStateSource = Files.readString(
+            SPEAR_KILL_ROOT.resolve("orchestration/target/SpearKillTargetStateOperations.kt"),
+        )
         assertTrue("isSafeSpearKillCombatTarget" in targetStateSource)
         assertTrue("shouldBeAttacked()" in targetStateSource)
         assertTrue("killAuraDelegatedTarget" in targetStateSource)
         assertTrue("delegatedKillAuraTarget()" in targetStateSource)
 
-        val adapterSource = Files.readString(SPEAR_KILL_ROOT.resolve("integration/SpearKillFacadeRequests.kt"))
+        val adapterSource = Files.readString(
+            SPEAR_KILL_ROOT.resolve("integration/facade/SpearKillFacadeRequests.kt"),
+        )
         assertTrue("acceptsKillAuraTarget" in adapterSource)
         assertTrue("isSafeSpearKillCombatTarget" in adapterSource)
     }
 
     @Test
     fun `integration consumes KillAura through the module state port`() {
-        val integrationSources = Files.list(SPEAR_KILL_ROOT.resolve("integration")).use { paths ->
+        val integrationSources = Files.walk(SPEAR_KILL_ROOT.resolve("integration")).use { paths ->
             paths.filter { it.isRegularFile() && it.extension == "kt" }.sorted().toList()
         }
 
@@ -174,7 +186,9 @@ class SpearKillModuleBoundaryContractTest {
                 }
         }
 
-        val stateSource = Files.readString(SPEAR_KILL_ROOT.resolve("SpearKillModuleState.kt"))
+        val stateSource = Files.readString(
+            SPEAR_KILL_ROOT.resolve("orchestration/session/SpearKillModuleState.kt"),
+        )
         assertTrue("abstract fun delegatedKillAuraTarget" in stateSource)
         assertTrue("abstract fun shouldPrechargeDelegatedKillAura" in stateSource)
         assertTrue("abstract fun stopDelegatedKillAuraBlocking" in stateSource)
@@ -187,7 +201,7 @@ class SpearKillModuleBoundaryContractTest {
         assertTrue("get() = ModuleFightBot.configuredSpearAutomation" in facadeSource)
 
         val fightBotAdapterSource = Files.readString(
-            SPEAR_KILL_ROOT.resolve("integration/PrepareFightBotSpearUseOperations.kt"),
+            SPEAR_KILL_ROOT.resolve("integration/tick/PrepareFightBotSpearUseOperations.kt"),
         )
         assertFalse("ModuleFightBot" in fightBotAdapterSource)
         assertTrue("fightBotSpearAutomation" in fightBotAdapterSource)
@@ -195,23 +209,27 @@ class SpearKillModuleBoundaryContractTest {
 
     @Test
     fun `runtime and session consume target ownership through module state`() {
-        val stateSource = Files.readString(SPEAR_KILL_ROOT.resolve("SpearKillModuleState.kt"))
+        val stateSource = Files.readString(
+            SPEAR_KILL_ROOT.resolve("orchestration/session/SpearKillModuleState.kt"),
+        )
         assertTrue("internal fun clearAStarTargetLock()" in stateSource)
         assertTrue("internal fun rejectSpearKillTarget(target: LivingEntity)" in stateSource)
         assertTrue("internal fun isSpearKillTargetRejected(target: LivingEntity)" in stateSource)
 
-        val contractSource = Files.readString(SPEAR_KILL_ROOT.resolve("SpearKillTargetStateContracts.kt"))
+        val contractSource = Files.readString(
+            SPEAR_KILL_ROOT.resolve("target/SpearKillTargetStateContracts.kt"),
+        )
         assertTrue("internal typealias SpearKillTargetCandidate" in contractSource)
         assertTrue("internal data class SpearKillTickTargetContext" in contractSource)
 
         listOf("runtime", "session").forEach { packageName ->
-            Files.list(SPEAR_KILL_ROOT.resolve(packageName)).use { paths ->
+            Files.walk(SPEAR_KILL_ROOT.resolve(packageName)).use { paths ->
                 paths.filter { it.isRegularFile() && it.extension == "kt" }.forEach { sourcePath ->
                     Files.readAllLines(sourcePath)
                         .filter { it.startsWith("import ") }
                         .forEach { importLine ->
                             assertFalse(
-                                importLine.startsWith(TARGET_IMPORT),
+                                importLine.startsWith(TARGET_OPERATIONS_IMPORT),
                                 "${sourcePath.fileName} bypasses module target state via $importLine",
                             )
                         }
@@ -241,8 +259,8 @@ class SpearKillModuleBoundaryContractTest {
         const val SESSION_IMPORT =
             "import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.session."
         const val PACKET_SESSION_IMPORT = "${SESSION_IMPORT}packet."
-        const val TARGET_IMPORT =
-            "import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.target.target."
+        const val TARGET_OPERATIONS_IMPORT =
+            "import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.orchestration.target."
         const val KILL_AURA_IMPORT =
             "import net.ccbluex.liquidbounce.features.module.modules.combat.killaura."
         const val MODULE_FIGHT_BOT_IMPORT =

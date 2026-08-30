@@ -10,12 +10,11 @@
  */
 package net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.session.server
 
-import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.session.cleanup.*
 import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.*
 import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.session.movement.*
-import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.SpearKillModuleState
+import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.orchestration.session.SpearKillModuleState
 import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.session.movement.SpearKillServerSneak
-import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.session.movement.shouldMaintainSpearKillServerSneak
+import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.orchestration.session.shouldMaintainSpearKillServerSneak
 
 import net.ccbluex.liquidbounce.utils.client.isNewerThanOrEquals1_21_6
 import net.ccbluex.liquidbounce.utils.client.mc

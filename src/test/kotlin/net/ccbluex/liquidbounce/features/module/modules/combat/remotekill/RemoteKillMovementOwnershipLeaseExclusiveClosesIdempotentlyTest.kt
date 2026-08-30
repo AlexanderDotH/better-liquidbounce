@@ -47,7 +47,7 @@ import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.config.
 import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.debug.*
 import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.target.*
 import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.preview.*
-import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.session.packet.consumePhysicalPositionOffset
+import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.consumePhysicalPositionOffset
 
 import net.ccbluex.liquidbounce.test.assertVec3Equals
 import net.minecraft.world.phys.Vec3

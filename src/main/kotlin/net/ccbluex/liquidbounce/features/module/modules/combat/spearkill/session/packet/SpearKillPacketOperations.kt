@@ -21,20 +21,12 @@ package net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.sessio
 
 
 
-import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.contract.*
-import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.planner.instant.*
-import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.planner.schedule.*
-import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.session.movement.*
-import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.config.*
 import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.planner.astar.buildSpearKillFixedStepMovements as buildSpearKillAStarFixedStepMovements
 import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.planner.astar.spearKillPacketTravelTicks as spearKillAStarPacketTravelTicks
 
 import net.ccbluex.liquidbounce.utils.aiming.data.Rotation
 import net.minecraft.network.protocol.game.ServerboundMovePlayerPacket
 import net.minecraft.world.phys.Vec3
-
-internal const val SPEAR_KILL_PACKET_STRIKE_HOLD_TICKS = 2
-internal const val SPEAR_KILL_PACKET_MAX_PRE_STRIKE_HOLD_TICKS = 1
 
 internal fun buildSpearKillAttackMovements(
     direction: Vec3,

@@ -10,9 +10,9 @@
  */
 package net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.planner.instant
 
+import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.config.SpearKillPrimedInstantPacketType
 
-import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.session.packet.*
-import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.config.*
+
 import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.research.highspeed.SpearKillHighSpeedResearchFinalPacketType
 
 import net.minecraft.network.protocol.game.ServerboundMovePlayerPacket

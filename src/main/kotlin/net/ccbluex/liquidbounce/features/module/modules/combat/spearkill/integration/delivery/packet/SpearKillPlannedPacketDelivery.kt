@@ -13,30 +13,26 @@ package net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.integr
 import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.integration.delivery.terminal.*
 import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.*
 import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.contract.*
-import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.damage.*
 import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.planner.instant.*
-import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.planner.schedule.*
 import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.session.attempt.*
 import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.session.movement.*
 import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.session.packet.*
 import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.session.safety.*
-import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.config.*
-import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.debug.*
-import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.SpearKillModuleState
+import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.orchestration.session.SpearKillModuleState
 import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.session.movement.nextSpearKillRecoveryStallTicks
 import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.session.safety.resolveSpearKillFallSafetyPacketGrounded
 import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.runtime.control.confirmSpearKillOutboundStep
-import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.runtime.delivery.packetPositionOrigin
+import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.orchestration.delivery.packetPositionOrigin
 import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.runtime.lifecycle.requestSpearKillAttemptCompletion
-import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.runtime.delivery.spearKillPacketPosition
+import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.orchestration.delivery.spearKillPacketPosition
 import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.session.recovery.applyConfirmedPhysicalReturnPosition
 import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.session.cleanup.finishSpearKillFallSafety
 import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.session.cleanup.releaseStandaloneRemoteMovementOwnership
 import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.session.recovery.sendReturnArrivalConfirmations
 import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.session.recovery.stopFailClosedPacketRoute
 import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.session.server.synchronizeSpearKillServerSneak
-import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.session.packet.pendingLogicalOutboundCompletion
-import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.session.packet.pendingTerminalBurstMovement
+import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.pendingLogicalOutboundCompletion
+import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.pendingTerminalBurstMovement
 import net.minecraft.world.phys.Vec3
 
 internal fun SpearKillModuleState.completePlannedSpearKillPacketDelivery(
