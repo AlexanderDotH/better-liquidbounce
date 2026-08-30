@@ -10,8 +10,6 @@
  */
 package net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.session.cleanup
 
-import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.session.recovery.*
-import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.session.server.*
 import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.*
 import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.contract.*
 import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.damage.*
@@ -27,34 +25,6 @@ import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.damage.
 import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.session.packet.physicalReturnConfigured
 import net.minecraft.network.protocol.game.ServerboundMovePlayerPacket
 import net.minecraft.world.phys.Vec3
-
-internal fun SpearKillModuleState.resetAttack() {
-    val motionAttemptActive = attackMovements.isNotEmpty()
-    val retainAStarRenderPath = packetAStarAttackActive && packetBootSession.active
-    previewTarget = null
-    if (!retainAStarRenderPath) {
-        packetAStarAttackActive = false
-        clearAStarRenderPath()
-        clearAStarTargetLock()
-    }
-    if (attackMovements.isNotEmpty()) player.deltaMovement = Vec3.ZERO
-    attackMovements.clear()
-    movementAssistPreparationActive = false
-    if (motionAttemptActive) {
-        abortSpearKillAttempt("motion-reset")
-        resetSpearKillSpeedSession()
-        releaseStandaloneRemoteMovementOwnership()
-    }
-    motionPacketHeading = null
-    fallDamageDeliveryTracker.clear()
-    beginSafeExactReturn()
-    applyConfirmedPhysicalReturnPosition()
-    if (!packetBootSession.active) {
-        packetSessionSettings = null
-        activeMovementTransport = null
-    }
-    synchronizeSpearKillServerSneak()
-}
 
 internal fun SpearKillModuleState.clearVirtualAttack(
     finishFallSafety: Boolean = true,

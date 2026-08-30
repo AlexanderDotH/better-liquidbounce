@@ -21,7 +21,6 @@ package net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.sessio
 
 
 
-import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.*
 import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.contract.*
 import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.planner.instant.*
 import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.planner.schedule.*
@@ -30,13 +29,9 @@ import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.config.
 import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.planner.astar.buildSpearKillFixedStepMovements as buildSpearKillAStarFixedStepMovements
 import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.planner.astar.spearKillPacketTravelTicks as spearKillAStarPacketTravelTicks
 
-import net.ccbluex.liquidbounce.features.module.modules.combat.remotekill.RemoteKillRouteSession
-
 import net.ccbluex.liquidbounce.utils.aiming.data.Rotation
 import net.minecraft.network.protocol.game.ServerboundMovePlayerPacket
 import net.minecraft.world.phys.Vec3
-import java.util.Collections
-import java.util.IdentityHashMap
 
 internal const val SPEAR_KILL_PACKET_STRIKE_HOLD_TICKS = 2
 internal const val SPEAR_KILL_PACKET_MAX_PRE_STRIKE_HOLD_TICKS = 1
@@ -121,44 +116,5 @@ internal fun shouldProtectSpearKillFallDamage(
     safeFallDistance: Double,
     tickCount: Int,
 ): Boolean = tickCount > 20 && fallDistance - verticalVelocity > safeFallDistance
-
-/** Keeps a fall-damage spoof bound to the exact SpearKill movement packet that carries it. */
-internal class SpearKillFallDamagePacketTracker {
-
-    private val protectedPackets = Collections.synchronizedMap(
-        IdentityHashMap<ServerboundMovePlayerPacket, Unit>(),
-    )
-
-    fun protect(packet: ServerboundMovePlayerPacket) {
-        protectedPackets[packet] = Unit
-        packet.onGround = true
-    }
-
-    /** Restores the owned ground bit after lower-priority packet objections changed it. */
-    fun reassertGround(packet: ServerboundMovePlayerPacket): Boolean {
-        if (!protectedPackets.containsKey(packet)) return false
-
-        packet.onGround = true
-        return true
-    }
-
-    fun confirmFinalState(packet: ServerboundMovePlayerPacket, cancelled: Boolean): Boolean {
-        if (protectedPackets.remove(packet) == null) return false
-
-        return !cancelled && packet.onGround
-    }
-
-    fun clear() {
-        protectedPackets.clear()
-    }
-}
-
-/**
- * Tracks SpearKill's packet displacement and confirmed physical return positions.
- * A movement is removed only after the corresponding packet passed the packet pipeline.
- */
-internal class SpearKillPacketBootSession(
-    internal val state: SpearKillPacketSessionPort,
-) : RemoteKillRouteSession by state
 
 private const val SPEAR_KILL_PACKET_EPSILON = 1.0E-12

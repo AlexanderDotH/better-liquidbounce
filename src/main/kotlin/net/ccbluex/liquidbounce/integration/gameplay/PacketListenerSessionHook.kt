@@ -19,7 +19,7 @@
 
 package net.ccbluex.liquidbounce.integration.gameplay
 
-import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.session.safety.SpearKillSetbackHook
+import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.SpearKillSetbackHook
 import net.ccbluex.liquidbounce.features.module.modules.player.ModuleNoCapability
 import net.ccbluex.liquidbounce.features.module.modules.player.ModuleNoRotateSet
 import net.ccbluex.liquidbounce.features.module.modules.player.reach.interactable.ReachInteractableFeature

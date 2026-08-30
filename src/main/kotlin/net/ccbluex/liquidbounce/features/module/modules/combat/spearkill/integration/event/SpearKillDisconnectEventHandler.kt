@@ -10,6 +10,8 @@
  */
 package net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.integration.event
 
+
+import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.session.recovery.clearAttack
 import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.integration.tick.*
 import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.integration.delivery.packet.*
 import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.integration.delivery.terminal.*
@@ -26,7 +28,6 @@ import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.preview
 import net.ccbluex.liquidbounce.event.events.DisconnectEvent
 import net.ccbluex.liquidbounce.event.handler
 import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.SpearKillModuleState
-import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.session.cleanup.clearAttack
 
 
 internal fun SpearKillModuleState.registerDisconnectHandler() {

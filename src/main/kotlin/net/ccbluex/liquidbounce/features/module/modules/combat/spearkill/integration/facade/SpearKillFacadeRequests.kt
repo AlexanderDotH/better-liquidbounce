@@ -10,6 +10,8 @@
  */
 package net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.integration.facade
 
+
+import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.session.recovery.clearAttack
 import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.integration.tick.*
 import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.integration.recovery.*
 import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.*
@@ -24,7 +26,6 @@ import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.session
 import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.session.attempt.isKillAuraIntegrationAvailable
 import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.target.isSafeSpearKillCombatTarget
 import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.config.isSpearKillTargetCandidateEligible
-import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.session.cleanup.clearAttack
 import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.session.cleanup.clearFightBotSpearUse
 import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.session.server.rejectFightBotSpearUse
 import net.minecraft.network.protocol.game.ClientboundPlayerPositionPacket

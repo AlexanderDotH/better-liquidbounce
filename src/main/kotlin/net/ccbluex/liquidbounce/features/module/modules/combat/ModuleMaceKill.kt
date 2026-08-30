@@ -52,7 +52,7 @@ import net.ccbluex.liquidbounce.features.module.modules.combat.macekill.fightbot
 import net.ccbluex.liquidbounce.features.module.modules.combat.macekill.runtime.MaceKillSpeedProfile
 import net.ccbluex.liquidbounce.features.module.modules.combat.macekill.session.MaceKillRouteSessionControl
 import net.ccbluex.liquidbounce.features.module.modules.combat.macekill.session.asMaceKillRouteSession
-import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.session.packet.SpearKillPacketBootSession
+import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.SpearKillPacketBootSession
 import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.session.movement.SpearKillSpeedLimits
 import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.config.SpearKillSpeedProfile
 import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.planner.profiled.buildSpearKillProfiledAStarPacketRoute

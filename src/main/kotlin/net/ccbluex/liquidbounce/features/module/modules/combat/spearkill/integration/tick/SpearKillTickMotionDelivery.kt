@@ -10,6 +10,8 @@
  */
 package net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.integration.tick
 
+
+import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.session.recovery.resetAttack
 import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.integration.planning.*
 import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.integration.delivery.packet.*
 import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.integration.startup.*
@@ -33,7 +35,6 @@ import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.runtime
 import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.runtime.control.previewSpearKillOutboundStep
 import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.session.recovery.beginBlockedMotionRecovery
 import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.session.cleanup.releaseStandaloneRemoteMovementOwnership
-import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.session.cleanup.resetAttack
 import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.session.cleanup.resetSpearKillSpeedSession
 import net.minecraft.world.phys.Vec3
 

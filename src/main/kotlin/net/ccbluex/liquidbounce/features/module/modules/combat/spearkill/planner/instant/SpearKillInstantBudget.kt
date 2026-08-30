@@ -20,6 +20,7 @@
 package net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.planner.instant
 
 
+import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.SpearKillPacketBootSession
 import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.session.packet.*
 import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.config.*
 import net.ccbluex.liquidbounce.features.module.modules.combat.remotekill.RemoteKillRouteEngine

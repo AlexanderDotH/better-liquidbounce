@@ -10,6 +10,8 @@
  */
 package net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.integration.tick
 
+
+import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.session.recovery.resetAttack
 import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.integration.planning.*
 import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.integration.delivery.packet.*
 import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.integration.startup.*
@@ -32,7 +34,6 @@ import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.debug.d
 import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.session.movement.isSpearUseRequested
 import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.session.movement.isUsingSpear
 import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.preview.resolveSpearKillChargeDecision
-import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.session.cleanup.resetAttack
 import net.minecraft.core.component.DataComponents
 import net.minecraft.world.item.component.KineticWeapon
 

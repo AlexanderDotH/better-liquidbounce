@@ -14,12 +14,9 @@ package net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.sessio
 
 import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.*
 import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.session.movement.*
-import net.ccbluex.liquidbounce.features.module.modules.combat.remotekill.RemoteKillSetbackRegistry
 import net.minecraft.network.protocol.game.ClientboundPlayerPositionPacket
 import net.minecraft.world.entity.PositionMoveRotation
-import net.minecraft.world.entity.player.Player
 import net.minecraft.world.phys.Vec3
-import java.util.concurrent.atomic.AtomicReference
 
 internal data class SpearKillPreparedSetback(
     val packet: ClientboundPlayerPositionPacket,
@@ -88,54 +85,5 @@ internal class SpearKillSetbackRollback {
     fun clear() {
         markedPacket = null
         preparedSetback = null
-    }
-}
-
-internal class SpearKillSetbackCallbacks<P : Any, T : Any>(
-    val beforeCorrection: (P, T) -> Unit,
-    val afterCorrection: (P, T) -> Unit,
-)
-
-/** Installs exactly one SpearKill callback owner while leaving the uninstalled boundary neutral. */
-internal class SpearKillSetbackCallbackBinding<P : Any, T : Any> {
-
-    private val callbacks = AtomicReference<SpearKillSetbackCallbacks<P, T>?>(null)
-
-    fun install(callbacks: SpearKillSetbackCallbacks<P, T>) {
-        check(this.callbacks.compareAndSet(null, callbacks)) {
-            "SpearKill setback callbacks are already installed"
-        }
-    }
-
-    fun beforeCorrection(packet: P, player: T) {
-        callbacks.get()?.beforeCorrection?.invoke(packet, player)
-    }
-
-    fun afterCorrection(packet: P, player: T) {
-        callbacks.get()?.afterCorrection?.invoke(packet, player)
-    }
-}
-
-object SpearKillSetbackHook {
-
-    private val callbackBinding =
-        SpearKillSetbackCallbackBinding<ClientboundPlayerPositionPacket, Player>()
-
-    internal fun install(
-        callbacks: SpearKillSetbackCallbacks<ClientboundPlayerPositionPacket, Player>,
-    ) {
-        callbackBinding.install(callbacks)
-    }
-
-    @JvmStatic
-    fun beforeCorrection(packet: ClientboundPlayerPositionPacket, player: Player) {
-        callbackBinding.beforeCorrection(packet, player)
-        RemoteKillSetbackRegistry.beforeCorrection(packet, player)
-    }
-
-    @JvmStatic
-    fun afterCorrection(packet: ClientboundPlayerPositionPacket, player: Player) {
-        callbackBinding.afterCorrection(packet, player)
-        RemoteKillSetbackRegistry.afterCorrection(packet, player)
     }
 }

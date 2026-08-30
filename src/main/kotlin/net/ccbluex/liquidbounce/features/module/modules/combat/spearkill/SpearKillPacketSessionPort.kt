@@ -8,21 +8,13 @@
  * the Free Software Foundation, either version 3 of the License, or
  * (at your option) any later version.
  */
-package net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.session.packet
+package net.ccbluex.liquidbounce.features.module.modules.combat.spearkill
 
-
-
-import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.*
-import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.contract.*
-import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.planner.instant.*
-import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.planner.schedule.*
-import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.session.movement.*
-import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.config.*
 import net.ccbluex.liquidbounce.features.module.modules.combat.remotekill.RemoteKillRouteSession
 import net.ccbluex.liquidbounce.utils.aiming.data.Rotation
 import net.minecraft.world.phys.Vec3
 
-/** Root-owned view of the delivery-confirmed packet session implemented below this package. */
+/** Stable module boundary implemented by the packet-session adapter. */
 internal interface SpearKillPacketSessionPort : RemoteKillRouteSession {
     val pendingFinalOutboundStep: Boolean
     val pendingTerminalBurstStart: Boolean

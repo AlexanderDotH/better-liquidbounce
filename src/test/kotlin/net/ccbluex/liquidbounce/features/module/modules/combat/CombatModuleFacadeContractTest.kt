@@ -11,7 +11,7 @@
 package net.ccbluex.liquidbounce.features.module.modules.combat
 
 import net.ccbluex.liquidbounce.features.module.modules.combat.macekill.event.MaceKillAttackHook
-import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.session.safety.SpearKillSetbackHook
+import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.SpearKillSetbackHook
 import net.ccbluex.liquidbounce.features.module.ModuleCategories
 import net.ccbluex.liquidbounce.test.MinecraftBootstrap
 import net.minecraft.world.InteractionHand

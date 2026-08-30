@@ -10,6 +10,8 @@
  */
 package net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.integration.tick
 
+
+import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.session.recovery.resetAttack
 import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.integration.planning.*
 import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.integration.delivery.packet.*
 import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.integration.startup.*
@@ -42,7 +44,6 @@ import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.session
 import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.session.cleanup.clearFightBotSpearUse
 import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.session.cleanup.clearKillAuraSpearUse
 import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.session.cleanup.releaseStandaloneRemoteMovementOwnership
-import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.session.cleanup.resetAttack
 import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.session.server.synchronizeSpearKillServerSneak
 import net.ccbluex.liquidbounce.utils.client.player
 import net.ccbluex.liquidbounce.utils.entity.useItem

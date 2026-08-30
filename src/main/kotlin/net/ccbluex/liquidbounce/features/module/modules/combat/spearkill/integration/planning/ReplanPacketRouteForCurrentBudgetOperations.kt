@@ -10,6 +10,8 @@
  */
 package net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.integration.planning
 
+
+import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.session.recovery.clearAttack
 import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.integration.delivery.terminal.*
 import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.*
 import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.contract.*
@@ -27,7 +29,6 @@ import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.session
 import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.SpearKillModuleState
 import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.session.recovery.applyConfirmedPhysicalReturnPosition
 import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.session.recovery.beginSafeExactReturn
-import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.session.cleanup.clearAttack
 import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.session.server.synchronizeSpearKillServerSneak
 
 internal fun SpearKillModuleState.replanPacketRouteForCurrentBudget() {
