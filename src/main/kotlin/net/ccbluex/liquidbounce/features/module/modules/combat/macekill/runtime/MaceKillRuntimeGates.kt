@@ -11,8 +11,6 @@
 package net.ccbluex.liquidbounce.features.module.modules.combat.macekill.runtime
 
 
-import net.ccbluex.liquidbounce.features.module.modules.combat.macekill.research.*
-import net.ccbluex.liquidbounce.features.module.modules.combat.macekill.target.*
 import java.util.IdentityHashMap
 
 internal class MaceKillFailureNotificationGate(private val cooldownTicks: Int) {

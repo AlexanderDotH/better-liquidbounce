@@ -10,7 +10,6 @@
  */
 package net.ccbluex.liquidbounce.features.module.modules.combat.macekill.config
 
-import net.ccbluex.liquidbounce.features.module.modules.combat.macekill.config.*
 internal const val MACE_KILL_MIN_TARGET_DISTANCE = 3f
 internal const val MACE_KILL_ATTACK_RANGE_SQUARED = 4.5 * 4.5
 internal const val MACE_KILL_ENDPOINT_MAX_SEARCH_RADIUS = 3.6

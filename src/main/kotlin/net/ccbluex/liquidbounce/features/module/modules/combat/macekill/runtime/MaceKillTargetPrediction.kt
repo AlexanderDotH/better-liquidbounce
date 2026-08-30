@@ -11,10 +11,6 @@
 package net.ccbluex.liquidbounce.features.module.modules.combat.macekill.runtime
 
 
-import net.ccbluex.liquidbounce.features.module.modules.combat.macekill.correction.*
-import net.ccbluex.liquidbounce.features.module.modules.combat.macekill.lifecycle.*
-import net.ccbluex.liquidbounce.features.module.modules.combat.macekill.research.*
-import net.ccbluex.liquidbounce.features.module.modules.combat.macekill.target.*
 import net.ccbluex.liquidbounce.utils.entity.PositionExtrapolation
 import net.ccbluex.liquidbounce.utils.entity.lastPos
 import net.ccbluex.liquidbounce.utils.math.geometry.LineSegment

@@ -11,10 +11,6 @@
 package net.ccbluex.liquidbounce.features.module.modules.combat.macekill.maceclip.reach
 
 
-import net.ccbluex.liquidbounce.features.module.modules.combat.macekill.correction.*
-import net.ccbluex.liquidbounce.features.module.modules.combat.macekill.planner.*
-import net.ccbluex.liquidbounce.features.module.modules.combat.macekill.lifecycle.*
-import net.ccbluex.liquidbounce.features.module.modules.combat.macekill.research.*
 import net.minecraft.world.phys.Vec3
 
 /** Re-enters the retained apex and returns without exposing another strike window. */

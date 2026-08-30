@@ -10,12 +10,15 @@
  */
 package net.ccbluex.liquidbounce.features.module.modules.combat.macekill.config
 
-import net.ccbluex.liquidbounce.features.module.modules.combat.macekill.config.*
-import net.ccbluex.liquidbounce.features.module.modules.combat.macekill.correction.*
+import net.ccbluex.liquidbounce.features.module.modules.combat.macekill.runtime.MACE_KILL_ELYTRA_MAX_SPEED
+import net.ccbluex.liquidbounce.features.module.modules.combat.macekill.runtime.MACE_KILL_EXPERIMENTAL_MAX_SPEED
+import net.ccbluex.liquidbounce.features.module.modules.combat.macekill.runtime.MACE_KILL_MAX_WAIT_TICKS
+import net.ccbluex.liquidbounce.features.module.modules.combat.macekill.runtime.MACE_KILL_MIN_SPEED
+import net.ccbluex.liquidbounce.features.module.modules.combat.macekill.runtime.MACE_KILL_MIN_SPEED_CHANGE
+import net.ccbluex.liquidbounce.features.module.modules.combat.macekill.runtime.MACE_KILL_MIN_TARGET_SPEED
+import net.ccbluex.liquidbounce.features.module.modules.combat.macekill.runtime.MACE_KILL_NORMAL_MAX_SPEED
 import net.ccbluex.liquidbounce.features.module.modules.combat.macekill.planner.*
 import net.ccbluex.liquidbounce.features.module.modules.combat.macekill.lifecycle.*
-import net.ccbluex.liquidbounce.features.module.modules.combat.macekill.target.*
-import net.ccbluex.liquidbounce.features.module.modules.combat.macekill.runtime.*
 
 import net.ccbluex.liquidbounce.features.module.modules.combat.remotekill.*
 

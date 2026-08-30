@@ -13,10 +13,6 @@ package net.ccbluex.liquidbounce.features.module.modules.combat.macekill.macecli
 
 
 
-import net.ccbluex.liquidbounce.features.module.modules.combat.macekill.planner.*
-import net.ccbluex.liquidbounce.features.module.modules.combat.macekill.lifecycle.*
-import net.ccbluex.liquidbounce.features.module.modules.combat.macekill.research.*
-import net.ccbluex.liquidbounce.features.module.modules.combat.macekill.target.*
 /** Small command-facing port installed by MaceKill's route owner. */
 internal interface MaceClipResearchControl {
     fun startProbe(request: MaceClipResearchProbeRequest): MaceClipResearchProbeStartResult

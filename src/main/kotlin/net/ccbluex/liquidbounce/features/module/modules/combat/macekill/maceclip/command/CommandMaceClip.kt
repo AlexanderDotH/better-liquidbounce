@@ -22,8 +22,6 @@
 package net.ccbluex.liquidbounce.features.module.modules.combat.macekill.maceclip.command
 
 
-import net.ccbluex.liquidbounce.features.module.modules.combat.macekill.lifecycle.*
-import net.ccbluex.liquidbounce.features.module.modules.combat.macekill.target.*
 import net.ccbluex.liquidbounce.features.command.Command
 import net.ccbluex.liquidbounce.features.command.Parameter
 import net.ccbluex.liquidbounce.features.command.Parameter.Verificator.Result

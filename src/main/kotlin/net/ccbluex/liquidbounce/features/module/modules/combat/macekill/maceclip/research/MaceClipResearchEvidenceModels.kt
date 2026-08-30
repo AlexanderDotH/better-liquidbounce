@@ -20,11 +20,6 @@ package net.ccbluex.liquidbounce.features.module.modules.combat.macekill.macecli
 
 
 
-import net.ccbluex.liquidbounce.features.module.modules.combat.macekill.correction.*
-import net.ccbluex.liquidbounce.features.module.modules.combat.macekill.planner.*
-import net.ccbluex.liquidbounce.features.module.modules.combat.macekill.lifecycle.*
-import net.ccbluex.liquidbounce.features.module.modules.combat.macekill.research.*
-import net.ccbluex.liquidbounce.features.module.modules.combat.macekill.target.*
 internal data class MaceClipResearchPosition(
     val x: Double,
     val y: Double,

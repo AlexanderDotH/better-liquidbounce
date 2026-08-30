@@ -14,11 +14,8 @@ import net.ccbluex.liquidbounce.config.ConfigSystem
 import net.ccbluex.liquidbounce.event.events.NotificationEvent
 import net.ccbluex.liquidbounce.features.blink.BlinkManager
 import net.ccbluex.liquidbounce.features.module.modules.combat.macekill.*
-import net.ccbluex.liquidbounce.features.module.modules.combat.macekill.config.*
-import net.ccbluex.liquidbounce.features.module.modules.combat.macekill.correction.*
 import net.ccbluex.liquidbounce.features.module.modules.combat.macekill.planner.*
 import net.ccbluex.liquidbounce.features.module.modules.combat.macekill.lifecycle.*
-import net.ccbluex.liquidbounce.features.module.modules.combat.macekill.facade.*
 import net.ccbluex.liquidbounce.features.module.modules.combat.macekill.contract.*
 import net.ccbluex.liquidbounce.features.module.modules.combat.remotekill.*
 import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.planner.astar.*

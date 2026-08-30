@@ -10,9 +10,7 @@
  */
 package net.ccbluex.liquidbounce.features.module.modules.combat.macekill.research
 
-import net.ccbluex.liquidbounce.features.module.modules.combat.macekill.correction.*
 import net.ccbluex.liquidbounce.features.module.modules.combat.macekill.lifecycle.*
-import net.ccbluex.liquidbounce.features.module.modules.combat.macekill.research.*
 import net.ccbluex.liquidbounce.features.module.modules.combat.macekill.target.*
 import net.ccbluex.liquidbounce.features.module.modules.combat.macekill.maceclip.research.*
 import net.minecraft.world.entity.LivingEntity

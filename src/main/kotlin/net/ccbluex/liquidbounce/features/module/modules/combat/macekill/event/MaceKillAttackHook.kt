@@ -19,7 +19,6 @@
 
 package net.ccbluex.liquidbounce.features.module.modules.combat.macekill.event
 
-import net.ccbluex.liquidbounce.features.module.modules.combat.macekill.event.*
 import net.ccbluex.liquidbounce.features.module.modules.combat.macekill.planner.*
 import net.ccbluex.liquidbounce.features.module.modules.combat.macekill.research.*
 import net.ccbluex.liquidbounce.features.module.modules.combat.macekill.target.*

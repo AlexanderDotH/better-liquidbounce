@@ -11,8 +11,6 @@
 package net.ccbluex.liquidbounce.features.module.modules.combat.macekill.runtime
 
 
-import net.ccbluex.liquidbounce.features.module.modules.combat.macekill.planner.*
-import net.ccbluex.liquidbounce.features.module.modules.combat.macekill.lifecycle.*
 import net.minecraft.world.phys.Vec3
 import kotlin.math.max
 

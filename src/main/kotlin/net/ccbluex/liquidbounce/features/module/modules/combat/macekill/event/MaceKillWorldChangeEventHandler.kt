@@ -11,7 +11,6 @@
 package net.ccbluex.liquidbounce.features.module.modules.combat.macekill.event
 
 import net.ccbluex.liquidbounce.features.module.modules.combat.macekill.*
-import net.ccbluex.liquidbounce.features.module.modules.combat.macekill.event.*
 import net.ccbluex.liquidbounce.features.module.modules.combat.macekill.lifecycle.*
 import net.ccbluex.liquidbounce.features.module.modules.combat.macekill.facade.*
 import net.ccbluex.liquidbounce.event.events.WorldChangeEvent

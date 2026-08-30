@@ -10,12 +10,7 @@
  */
 package net.ccbluex.liquidbounce.features.module.modules.combat.macekill.contract
 
-import net.ccbluex.liquidbounce.features.module.modules.combat.macekill.config.*
-import net.ccbluex.liquidbounce.features.module.modules.combat.macekill.correction.*
-import net.ccbluex.liquidbounce.features.module.modules.combat.macekill.planner.*
-import net.ccbluex.liquidbounce.features.module.modules.combat.macekill.research.*
-import net.ccbluex.liquidbounce.features.module.modules.combat.macekill.target.*
-import net.ccbluex.liquidbounce.features.module.modules.combat.macekill.contract.*
+import net.ccbluex.liquidbounce.features.module.modules.combat.macekill.config.MACE_KILL_REMOTE_STRIKE_SERVER_TICK_GUARD
 internal enum class MaceKillRouteOwner {
     NONE,
     MANUAL,

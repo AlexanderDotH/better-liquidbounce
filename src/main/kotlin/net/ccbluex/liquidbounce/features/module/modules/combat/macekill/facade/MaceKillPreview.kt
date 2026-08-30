@@ -12,7 +12,6 @@ package net.ccbluex.liquidbounce.features.module.modules.combat.macekill.facade
 
 import net.ccbluex.liquidbounce.features.module.modules.combat.macekill.*
 import net.ccbluex.liquidbounce.features.module.modules.combat.macekill.lifecycle.*
-import net.ccbluex.liquidbounce.features.module.modules.combat.macekill.facade.*
 import net.ccbluex.liquidbounce.config.types.group.Mode
 import net.ccbluex.liquidbounce.config.types.group.ModeValueGroup
 import net.ccbluex.liquidbounce.config.types.group.ToggleableValueGroup

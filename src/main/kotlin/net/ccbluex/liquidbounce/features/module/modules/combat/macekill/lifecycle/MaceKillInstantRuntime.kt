@@ -13,7 +13,6 @@ package net.ccbluex.liquidbounce.features.module.modules.combat.macekill.lifecyc
 import net.ccbluex.liquidbounce.features.module.modules.combat.macekill.config.*
 import net.ccbluex.liquidbounce.features.module.modules.combat.macekill.correction.*
 import net.ccbluex.liquidbounce.features.module.modules.combat.macekill.planner.*
-import net.ccbluex.liquidbounce.features.module.modules.combat.macekill.lifecycle.*
 import net.ccbluex.liquidbounce.features.module.modules.combat.macekill.research.*
 import net.ccbluex.liquidbounce.features.module.modules.combat.macekill.target.*
 import net.ccbluex.liquidbounce.features.module.modules.combat.macekill.maceclip.reach.*
