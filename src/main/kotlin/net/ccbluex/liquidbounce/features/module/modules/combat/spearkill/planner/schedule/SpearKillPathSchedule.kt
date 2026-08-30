@@ -18,23 +18,9 @@
  */
 package net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.planner.schedule
 
+import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.config.SPEAR_KILL_MAX_WAIT_TICKS
 
-import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.*
-import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.contract.*
-import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.planner.collision.*
-import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.damage.*
-import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.planner.direct.*
-import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.planner.instant.*
-import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.planner.profiled.*
-import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.planner.schedule.*
-import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.session.attempt.*
-import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.session.movement.*
 import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.session.packet.*
-import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.session.safety.*
-import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.config.*
-import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.debug.*
-import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.target.*
-import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.preview.*
 import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.planner.astar.SpearKillAStarAttackApproach
 
 import net.minecraft.world.phys.Vec3
