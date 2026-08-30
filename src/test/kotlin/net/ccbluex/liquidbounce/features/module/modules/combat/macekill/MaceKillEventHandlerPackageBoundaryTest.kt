@@ -12,7 +12,6 @@
 package net.ccbluex.liquidbounce.features.module.modules.combat.macekill
 
 
-import net.ccbluex.liquidbounce.features.module.modules.combat.macekill.*
 import net.ccbluex.liquidbounce.features.module.modules.combat.macekill.config.*
 import net.ccbluex.liquidbounce.features.module.modules.combat.macekill.debug.*
 import net.ccbluex.liquidbounce.features.module.modules.combat.macekill.event.*
@@ -21,7 +20,6 @@ import net.ccbluex.liquidbounce.features.module.modules.combat.macekill.planner.
 import net.ccbluex.liquidbounce.features.module.modules.combat.macekill.lifecycle.*
 import net.ccbluex.liquidbounce.features.module.modules.combat.macekill.research.*
 import net.ccbluex.liquidbounce.features.module.modules.combat.macekill.target.*
-import net.ccbluex.liquidbounce.features.module.modules.combat.macekill.facade.*
 import net.ccbluex.liquidbounce.features.module.modules.combat.macekill.contract.*
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
@@ -42,15 +40,16 @@ class MaceKillEventHandlerPackageBoundaryTest {
         val directSources = Files.list(runtimeRoot).use { paths ->
             paths.filter { it.isRegularFile() && it.extension == "kt" }.sorted().toList()
         }
-        assertEquals(
-            listOf("MaceKillModuleState.kt"),
-            directSources.map { it.fileName.toString() },
-            "The MaceKill root must contain only module state",
-        )
+        assertTrue(directSources.isEmpty(), "The MaceKill root must not own implementation files")
 
-        directSources.forEach(::assertMaceKillRuntimeBoundary)
+        val orchestrationRoot = runtimeRoot.resolve("orchestration")
+        val orchestrationSources = Files.list(orchestrationRoot).use { paths ->
+            paths.filter { it.isRegularFile() && it.extension == "kt" }.sorted().toList()
+        }
+        assertEquals(31, orchestrationSources.size, "MaceKill orchestration ownership changed")
+        orchestrationSources.forEach(::assertMaceKillRuntimeBoundary)
 
-        val stateSource = Files.readString(runtimeRoot.resolve("MaceKillModuleState.kt"))
+        val stateSource = Files.readString(orchestrationRoot.resolve("MaceKillModuleState.kt"))
         listOf(
             "internal abstract val integration: MaceKillIntegrationPort",
             "internal abstract val routeSession: MaceKillRouteSession",

@@ -19,30 +19,13 @@
 
 package net.ccbluex.liquidbounce.features.module.modules.combat.macekill.event
 
-import net.ccbluex.liquidbounce.features.module.modules.combat.macekill.planner.*
-import net.ccbluex.liquidbounce.features.module.modules.combat.macekill.research.*
-import net.ccbluex.liquidbounce.features.module.modules.combat.macekill.target.*
-
 import net.ccbluex.liquidbounce.common.attack.AcceptedAttackHook
 import net.ccbluex.liquidbounce.common.attack.AcceptedAttackResult
-import net.ccbluex.liquidbounce.features.module.modules.combat.remotekill.*
-
+import net.ccbluex.liquidbounce.features.module.modules.combat.macekill.contract.MaceKillAcceptedAttackHandler
+import net.ccbluex.liquidbounce.features.module.modules.combat.macekill.contract.MaceKillAttackResult
 import net.minecraft.world.entity.Entity
 import net.minecraft.world.entity.player.Player
 import java.util.concurrent.atomic.AtomicReference
-
-enum class MaceKillAttackResult {
-    APPLIED,
-    NOT_APPLIED,
-    REJECTED;
-
-    val allowsAttack: Boolean
-        get() = this !== REJECTED
-}
-
-fun interface MaceKillAcceptedAttackHandler {
-    fun onAcceptedAttack(player: Player, target: Entity): MaceKillAttackResult
-}
 
 /**
  * The single boundary between a validated attack and MaceKill's pre-attack movement spoof.

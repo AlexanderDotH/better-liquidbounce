@@ -10,7 +10,6 @@
  */
 package net.ccbluex.liquidbounce.features.module.modules.combat.macekill.config
 
-import net.ccbluex.liquidbounce.features.module.modules.combat.macekill.planner.*
 
 import net.ccbluex.liquidbounce.features.module.modules.combat.remotekill.*
 

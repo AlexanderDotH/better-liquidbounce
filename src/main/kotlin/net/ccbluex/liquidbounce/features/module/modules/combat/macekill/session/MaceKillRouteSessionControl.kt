@@ -11,8 +11,8 @@
 package net.ccbluex.liquidbounce.features.module.modules.combat.macekill.session
 
 
-import net.ccbluex.liquidbounce.features.module.modules.combat.macekill.*
-import net.ccbluex.liquidbounce.features.module.modules.combat.macekill.MaceKillRouteSession
+
+import net.ccbluex.liquidbounce.features.module.modules.combat.macekill.orchestration.MaceKillRouteSession
 import net.ccbluex.liquidbounce.features.module.modules.combat.remotekill.RemoteKillRouteSession
 import net.minecraft.world.phys.Vec3
 

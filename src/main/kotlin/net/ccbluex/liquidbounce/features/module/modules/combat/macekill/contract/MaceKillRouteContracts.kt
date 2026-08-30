@@ -10,7 +10,8 @@
  */
 package net.ccbluex.liquidbounce.features.module.modules.combat.macekill.contract
 
-import net.ccbluex.liquidbounce.features.module.modules.combat.macekill.config.MACE_KILL_REMOTE_STRIKE_SERVER_TICK_GUARD
+private const val MACE_KILL_REMOTE_STRIKE_SERVER_TICK_GUARD = 2
+
 internal enum class MaceKillRouteOwner {
     NONE,
     MANUAL,

@@ -10,10 +10,10 @@
  */
 package net.ccbluex.liquidbounce.features.module.modules.combat.macekill.maceclip
 
+
 import net.ccbluex.liquidbounce.features.module.modules.combat.macekill.maceclip.research.*
 
 
-import net.ccbluex.liquidbounce.features.module.modules.combat.macekill.*
 import net.ccbluex.liquidbounce.features.module.modules.combat.macekill.config.*
 import net.ccbluex.liquidbounce.features.module.modules.combat.macekill.debug.*
 import net.ccbluex.liquidbounce.features.module.modules.combat.macekill.event.*
@@ -22,7 +22,6 @@ import net.ccbluex.liquidbounce.features.module.modules.combat.macekill.planner.
 import net.ccbluex.liquidbounce.features.module.modules.combat.macekill.lifecycle.*
 import net.ccbluex.liquidbounce.features.module.modules.combat.macekill.research.*
 import net.ccbluex.liquidbounce.features.module.modules.combat.macekill.target.*
-import net.ccbluex.liquidbounce.features.module.modules.combat.macekill.facade.*
 import net.ccbluex.liquidbounce.features.module.modules.combat.macekill.contract.*
 import com.google.gson.JsonParser
 import org.junit.jupiter.api.Assertions.assertEquals

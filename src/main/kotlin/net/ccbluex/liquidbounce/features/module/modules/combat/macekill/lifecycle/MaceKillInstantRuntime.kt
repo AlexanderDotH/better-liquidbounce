@@ -10,11 +10,11 @@
  */
 package net.ccbluex.liquidbounce.features.module.modules.combat.macekill.lifecycle
 
-import net.ccbluex.liquidbounce.features.module.modules.combat.macekill.config.*
-import net.ccbluex.liquidbounce.features.module.modules.combat.macekill.correction.*
+import net.ccbluex.liquidbounce.features.module.modules.combat.macekill.config.MACE_KILL_INSTANT_FAILURE_BACKOFF_TICKS
+import net.ccbluex.liquidbounce.features.module.modules.combat.macekill.config.MACE_KILL_MAX_GROUND_SPOOF_DESCENT
+import net.ccbluex.liquidbounce.features.module.modules.combat.macekill.config.MACE_KILL_MOVEMENT_EPSILON_SQUARED
+
 import net.ccbluex.liquidbounce.features.module.modules.combat.macekill.planner.*
-import net.ccbluex.liquidbounce.features.module.modules.combat.macekill.research.*
-import net.ccbluex.liquidbounce.features.module.modules.combat.macekill.target.*
 import net.ccbluex.liquidbounce.features.module.modules.combat.macekill.maceclip.reach.*
 import net.ccbluex.liquidbounce.features.module.modules.combat.remotekill.RemoteKillRouteRequest
 import net.minecraft.world.phys.Vec3
