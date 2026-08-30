@@ -1,5 +1,3 @@
-"""Contract tests for the versioned repository policy."""
-
 from __future__ import annotations
 
 import importlib.util

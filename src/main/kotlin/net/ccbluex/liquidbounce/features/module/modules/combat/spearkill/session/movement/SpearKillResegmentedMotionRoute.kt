@@ -84,42 +84,56 @@ internal fun resegmentSpearKillUnconfirmedMotionRoute(
         return null
     }
 
-    val untouchedAfterPending = remainingOutboundSteps - 1
     val retainedRecovery = spearKillConfirmedMotionRecoveryTail(
         queuedMovements,
         remainingOutboundSteps,
     ) ?: return null
-
-    val oldOutbound = buildList(remainingOutboundSteps) {
-        add(pendingOutboundMovement)
-        addAll(queuedMovements.take(untouchedAfterPending))
-    }
-    var waypoint = origin
-    val outboundWaypoints = oldOutbound.map { movement ->
-        waypoint = waypoint.add(movement)
-        waypoint
-    }
     val route = buildSpearKillProfiledAStarPacketRoute(
         origin = origin,
-        outboundWaypoints = outboundWaypoints,
+        outboundWaypoints = buildSpearKillOutboundWaypoints(
+            origin,
+            pendingOutboundMovement,
+            queuedMovements,
+            remainingOutboundSteps,
+        ),
         profile = profile,
         segmentValidator = segmentValidator,
     ) ?: return null
-    var recoveryPosition = origin
-    for (movement in retainedRecovery) {
-        val next = recoveryPosition.add(movement)
-        if (movement.lengthSqr() > SPEAR_KILL_PROFILE_EPSILON_SQUARED &&
-            !segmentValidator.isClear(recoveryPosition, next)
-        ) {
-            return null
-        }
-        recoveryPosition = next
-    }
+    if (!isSpearKillRetainedRecoveryClear(origin, retainedRecovery, segmentValidator)) return null
     val rebuiltMovements = buildList(route.roundTripMovements.size - 1 + retainedRecovery.size) {
         addAll(route.roundTripMovements.dropLast(1))
         addAll(retainedRecovery)
     }
     return SpearKillResegmentedMotionRoute(rebuiltMovements, route.outboundMovements.size)
+}
+
+private fun buildSpearKillOutboundWaypoints(
+    origin: Vec3,
+    pendingMovement: Vec3,
+    queuedMovements: List<Vec3>,
+    remainingSteps: Int,
+): List<Vec3> {
+    val movements = listOf(pendingMovement) + queuedMovements.take(remainingSteps - 1)
+    var waypoint = origin
+    return movements.map { movement -> waypoint.add(movement).also { waypoint = it } }
+}
+
+private fun isSpearKillRetainedRecoveryClear(
+    origin: Vec3,
+    movements: List<Vec3>,
+    segmentValidator: SpearKillAStarSegmentValidator,
+): Boolean {
+    var position = origin
+    for (movement in movements) {
+        val next = position.add(movement)
+        if (movement.lengthSqr() > SPEAR_KILL_PROFILE_EPSILON_SQUARED &&
+            !segmentValidator.isClear(position, next)
+        ) {
+            return false
+        }
+        position = next
+    }
+    return true
 }
 
 /** Minecraft 26.2 one-packet moved-too-quickly boundary. */

@@ -20,31 +20,6 @@
 package net.ccbluex.liquidbounce.features.module.modules.combat.killaura
 
 
-import net.ccbluex.liquidbounce.features.module.modules.combat.macekill.config.*
-import net.ccbluex.liquidbounce.features.module.modules.combat.macekill.debug.*
-import net.ccbluex.liquidbounce.features.module.modules.combat.macekill.event.*
-import net.ccbluex.liquidbounce.features.module.modules.combat.macekill.correction.*
-import net.ccbluex.liquidbounce.features.module.modules.combat.macekill.planner.*
-import net.ccbluex.liquidbounce.features.module.modules.combat.macekill.lifecycle.*
-import net.ccbluex.liquidbounce.features.module.modules.combat.macekill.research.*
-import net.ccbluex.liquidbounce.features.module.modules.combat.macekill.target.*
-import net.ccbluex.liquidbounce.features.module.modules.combat.macekill.contract.*
-import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.*
-import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.contract.*
-import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.planner.collision.*
-import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.damage.*
-import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.planner.direct.*
-import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.planner.instant.*
-import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.planner.profiled.*
-import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.planner.schedule.*
-import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.session.attempt.*
-import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.session.movement.*
-import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.session.packet.*
-import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.session.safety.*
-import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.config.*
-import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.debug.*
-import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.target.*
-import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.preview.*
 import net.ccbluex.liquidbounce.utils.aiming.data.Rotation
 import net.minecraft.world.phys.AABB
 import net.minecraft.world.phys.Vec3
