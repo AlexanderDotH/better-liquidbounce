@@ -10,17 +10,7 @@
  */
 package net.ccbluex.liquidbounce.features.module.modules.combat.macekill.config
 
-import net.ccbluex.liquidbounce.features.module.modules.combat.macekill.*
 import net.ccbluex.liquidbounce.features.module.modules.combat.macekill.config.*
-import net.ccbluex.liquidbounce.features.module.modules.combat.macekill.debug.*
-import net.ccbluex.liquidbounce.features.module.modules.combat.macekill.event.*
-import net.ccbluex.liquidbounce.features.module.modules.combat.macekill.correction.*
-import net.ccbluex.liquidbounce.features.module.modules.combat.macekill.planner.*
-import net.ccbluex.liquidbounce.features.module.modules.combat.macekill.lifecycle.*
-import net.ccbluex.liquidbounce.features.module.modules.combat.macekill.research.*
-import net.ccbluex.liquidbounce.features.module.modules.combat.macekill.target.*
-import net.ccbluex.liquidbounce.features.module.modules.combat.macekill.facade.*
-import net.ccbluex.liquidbounce.features.module.modules.combat.macekill.contract.*
 internal const val MACE_KILL_MIN_TARGET_DISTANCE = 3f
 internal const val MACE_KILL_ATTACK_RANGE_SQUARED = 4.5 * 4.5
 internal const val MACE_KILL_ENDPOINT_MAX_SEARCH_RADIUS = 3.6
