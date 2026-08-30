@@ -32,7 +32,7 @@ import net.ccbluex.liquidbounce.features.module.modules.combat.macekill.research
 import net.ccbluex.liquidbounce.features.module.modules.combat.macekill.target.*
 import net.ccbluex.liquidbounce.features.module.modules.combat.macekill.facade.*
 import net.ccbluex.liquidbounce.features.module.modules.combat.macekill.contract.*
-import net.ccbluex.liquidbounce.features.module.modules.combat.macekill.maceclip.MACE_CLIP_MAXIMUM_PHASE_DELAY_TICKS
+import net.ccbluex.liquidbounce.features.module.modules.combat.macekill.maceclip.research.MACE_CLIP_MAXIMUM_PHASE_DELAY_TICKS
 import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.*
 import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.contract.*
 import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.planner.collision.*

@@ -24,7 +24,7 @@ import net.ccbluex.liquidbounce.features.module.modules.combat.macekill.contract
 import net.ccbluex.liquidbounce.features.module.modules.combat.macekill.runtime.*
 
 import net.ccbluex.liquidbounce.features.blink.BlinkManager
-import net.ccbluex.liquidbounce.features.module.modules.combat.macekill.maceclip.MaceClipReachSessionOutcome
+import net.ccbluex.liquidbounce.features.module.modules.combat.macekill.maceclip.reach.MaceClipReachSessionOutcome
 import net.minecraft.network.protocol.game.ServerboundMovePlayerPacket
 import net.minecraft.world.entity.LivingEntity
 import net.minecraft.world.entity.ai.attributes.Attributes

@@ -24,7 +24,7 @@ import net.ccbluex.liquidbounce.features.module.modules.combat.macekill.facade.*
 import net.ccbluex.liquidbounce.features.module.modules.combat.macekill.contract.*
 import net.ccbluex.liquidbounce.features.module.modules.combat.*
 import net.ccbluex.liquidbounce.features.module.modules.combat.fightbot.*
-import net.ccbluex.liquidbounce.features.module.modules.combat.macekill.maceclip.*
+import net.ccbluex.liquidbounce.features.module.modules.combat.macekill.maceclip.reach.*
 import net.ccbluex.liquidbounce.features.module.modules.combat.remotekill.*
 import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.*
 import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.contract.*

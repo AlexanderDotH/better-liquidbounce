@@ -17,7 +17,7 @@
  * along with LiquidBounce. If not, see <https://www.gnu.org/licenses/>.
  */
 
-package net.ccbluex.liquidbounce.features.module.modules.combat.macekill.maceclip
+package net.ccbluex.liquidbounce.features.module.modules.combat.macekill.maceclip.reach
 
 
 

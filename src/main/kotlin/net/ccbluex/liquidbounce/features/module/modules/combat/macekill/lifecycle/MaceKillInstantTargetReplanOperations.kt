@@ -23,7 +23,7 @@ import net.ccbluex.liquidbounce.features.module.modules.combat.macekill.facade.*
 import net.ccbluex.liquidbounce.features.module.modules.combat.macekill.contract.*
 import net.ccbluex.liquidbounce.features.module.modules.combat.macekill.runtime.*
 
-import net.ccbluex.liquidbounce.features.module.modules.combat.macekill.maceclip.*
+import net.ccbluex.liquidbounce.features.module.modules.combat.macekill.maceclip.reach.*
 import net.ccbluex.liquidbounce.features.module.modules.combat.remotekill.RemoteKillRouteRequest
 import net.minecraft.world.entity.LivingEntity
 import net.minecraft.world.phys.Vec3

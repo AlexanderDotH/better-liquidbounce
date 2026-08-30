@@ -8,7 +8,9 @@
  * the Free Software Foundation, either version 3 of the License, or
  * (at your option) any later version.
  */
-package net.ccbluex.liquidbounce.features.module.modules.combat.macekill.maceclip
+package net.ccbluex.liquidbounce.features.module.modules.combat.macekill.maceclip.research
+
+import net.ccbluex.liquidbounce.features.module.modules.combat.macekill.maceclip.reach.*
 
 
 

@@ -24,8 +24,8 @@ import net.ccbluex.liquidbounce.features.module.modules.combat.macekill.contract
 import net.ccbluex.liquidbounce.features.module.modules.combat.macekill.runtime.*
 
 import net.ccbluex.liquidbounce.features.module.modules.combat.macekill.fightbot.MaceKillFightBotState
-import net.ccbluex.liquidbounce.features.module.modules.combat.macekill.maceclip.MaceClipReachSession
-import net.ccbluex.liquidbounce.features.module.modules.combat.macekill.maceclip.MaceClipReachSessionOutcome
+import net.ccbluex.liquidbounce.features.module.modules.combat.macekill.maceclip.reach.MaceClipReachSession
+import net.ccbluex.liquidbounce.features.module.modules.combat.macekill.maceclip.reach.MaceClipReachSessionOutcome
 import net.minecraft.world.entity.LivingEntity
 import net.minecraft.world.phys.Vec3
 

@@ -10,6 +10,8 @@
  */
 package net.ccbluex.liquidbounce.features.module.modules.combat.macekill.maceclip
 
+import net.ccbluex.liquidbounce.features.module.modules.combat.macekill.maceclip.research.*
+
 
 import net.ccbluex.liquidbounce.features.module.modules.combat.macekill.*
 import net.ccbluex.liquidbounce.features.module.modules.combat.macekill.config.*

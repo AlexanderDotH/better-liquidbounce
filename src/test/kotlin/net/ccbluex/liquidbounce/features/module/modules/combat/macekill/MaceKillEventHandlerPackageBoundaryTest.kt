@@ -42,7 +42,11 @@ class MaceKillEventHandlerPackageBoundaryTest {
         val directSources = Files.list(runtimeRoot).use { paths ->
             paths.filter { it.isRegularFile() && it.extension == "kt" }.sorted().toList()
         }
-        assertEquals(58, directSources.size, "The flat runtime package must shrink with the FightBot boundary")
+        assertEquals(
+            listOf("MaceKillModuleState.kt"),
+            directSources.map { it.fileName.toString() },
+            "The MaceKill root must contain only module state",
+        )
 
         directSources.forEach(::assertMaceKillRuntimeBoundary)
 
@@ -71,6 +75,39 @@ class MaceKillEventHandlerPackageBoundaryTest {
         ).forEach { contract ->
             assertTrue(contract in facadeSource, "MaceKill facade contract changed: $contract")
         }
+    }
+
+    @Test
+    fun `MaceClip responsibilities live in focused child packages`() {
+        val maceClipRoot = Path.of(
+            "src/main/kotlin/net/ccbluex/liquidbounce/features/module/modules/combat/macekill/maceclip",
+        )
+        val directSources = Files.list(maceClipRoot).use { paths ->
+            paths.filter { it.isRegularFile() && it.extension == "kt" }.sorted().toList()
+        }
+        assertTrue(directSources.isEmpty(), "MaceClip root must not own implementation files")
+
+        assertPackageSources(
+            maceClipRoot.resolve("reach"),
+            expectedPrefix = "MaceClipReach",
+            expectedCount = 6,
+        )
+        assertPackageSources(
+            maceClipRoot.resolve("research"),
+            expectedPrefix = "MaceClipResearch",
+            expectedCount = 10,
+        )
+    }
+
+    private fun assertPackageSources(packageRoot: Path, expectedPrefix: String, expectedCount: Int) {
+        val sources = Files.list(packageRoot).use { paths ->
+            paths.filter { it.isRegularFile() && it.extension == "kt" }.sorted().toList()
+        }
+        assertEquals(expectedCount, sources.size, "$packageRoot owns an unexpected number of sources")
+        assertTrue(
+            sources.all { it.fileName.toString().startsWith(expectedPrefix) },
+            "$packageRoot contains a source outside its responsibility",
+        )
     }
 
     private fun assertMaceKillRuntimeBoundary(sourcePath: Path) {
@@ -150,6 +187,9 @@ class MaceKillEventHandlerPackageBoundaryTest {
         val runtimeRoot = Path.of(
             "src/main/kotlin/net/ccbluex/liquidbounce/features/module/modules/combat/macekill",
         )
+        val eventRoot = Path.of(
+            "src/main/kotlin/net/ccbluex/liquidbounce/features/module/modules/combat/macekill/event",
+        )
         val obsoleteIntegrationRoot = runtimeRoot.resolve("integration")
         val obsoleteSources = if (Files.exists(obsoleteIntegrationRoot)) {
             Files.walk(obsoleteIntegrationRoot).use { paths ->
@@ -169,8 +209,8 @@ class MaceKillEventHandlerPackageBoundaryTest {
             "MaceKillDisconnectEventHandler.kt" to "handler<DisconnectEvent>",
         )
         handlerFiles.forEach { (fileName, handlerSignature) ->
-            val source = Files.readString(runtimeRoot.resolve(fileName))
-            assertTrue("package net.ccbluex.liquidbounce.features.module.modules.combat.macekill\n" in source)
+            val source = Files.readString(eventRoot.resolve(fileName))
+            assertTrue("package net.ccbluex.liquidbounce.features.module.modules.combat.macekill.event\n" in source)
             assertFalse("package net.ccbluex.liquidbounce.features.module.modules.combat.macekill.integration" in source)
             assertTrue(handlerSignature in source, "$fileName must retain $handlerSignature")
         }

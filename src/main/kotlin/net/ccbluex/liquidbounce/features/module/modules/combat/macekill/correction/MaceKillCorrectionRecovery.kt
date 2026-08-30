@@ -21,7 +21,7 @@ import net.ccbluex.liquidbounce.features.module.modules.combat.macekill.research
 import net.ccbluex.liquidbounce.features.module.modules.combat.macekill.target.*
 import net.ccbluex.liquidbounce.features.module.modules.combat.macekill.facade.*
 import net.ccbluex.liquidbounce.features.module.modules.combat.macekill.contract.*
-import net.ccbluex.liquidbounce.features.module.modules.combat.macekill.maceclip.MaceClipReachSession
+import net.ccbluex.liquidbounce.features.module.modules.combat.macekill.maceclip.reach.MaceClipReachSession
 import net.minecraft.world.entity.player.Player
 import net.minecraft.world.phys.Vec3
 
