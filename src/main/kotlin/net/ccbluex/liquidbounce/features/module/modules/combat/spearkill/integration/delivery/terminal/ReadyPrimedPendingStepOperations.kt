@@ -10,10 +10,6 @@
  */
 package net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.integration.delivery.terminal
 
-import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.integration.planning.*
-import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.integration.delivery.packet.*
-import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.integration.recovery.*
-import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.integration.research.*
 import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.*
 import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.contract.*
 import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.damage.*
@@ -82,6 +78,19 @@ internal fun SpearKillModuleState.planPrimedPendingBurst(
     primingPacketType = settings.primingPacketType,
     instantDirectTeleport = true,
 )
+
+/** Grounded Instant attacks use the normal threshold even if the local Elytra flag lingers. */
+private fun SpearKillModuleState.primedMovementProfile(
+    settings: SpearKillPacketSessionSettings,
+): SpearKillPrimedInstantMovementProfile = if (
+    settings.priming === SpearKillPrimedInstantPriming.Auto
+) {
+    SpearKillPrimedInstantMovementProfile.NORMAL
+} else if (player.isFallFlying) {
+    SpearKillPrimedInstantMovementProfile.ELYTRA
+} else {
+    SpearKillPrimedInstantMovementProfile.NORMAL
+}
 
 internal fun SpearKillModuleState.ensurePrimedPendingStep(
     movement: Vec3,

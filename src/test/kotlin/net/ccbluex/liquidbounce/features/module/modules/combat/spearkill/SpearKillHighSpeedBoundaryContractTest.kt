@@ -106,23 +106,27 @@ class SpearKillHighSpeedBoundaryContractTest {
             .resolve("UpdateSpearKillAttemptEvidenceOperations.kt")
         const val HIGH_SPEED_PACKAGE =
             "package net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.research.highspeed"
-        const val INTEGRATION_PACKAGE =
-            "package net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.integration"
-        const val SPEAR_KILL_PACKAGE =
-            "package net.ccbluex.liquidbounce.features.module.modules.combat.spearkill"
-        const val RUNTIME_PACKAGE =
-            "package net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.runtime"
+        const val DEBUG_PACKAGE =
+            "package net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.debug"
+        const val TERMINAL_INTEGRATION_PACKAGE =
+            "package net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.integration.delivery.terminal"
+        const val STARTUP_INTEGRATION_PACKAGE =
+            "package net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.integration.startup"
+        const val RUNTIME_LIFECYCLE_PACKAGE =
+            "package net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.runtime.lifecycle"
         val DEBUG_LABEL = Regex("""DebugParameterSink\.publish\(this, "([^"]+)"\)""")
         val MODULE_AWARE_OPERATIONS = listOf(
-            INTEGRATION_ROOT.resolve("BeginHighSpeedResearchBurstOperations.kt") to INTEGRATION_PACKAGE,
-            SPEAR_KILL_ROOT.resolve("DebugSpearKillOperations.kt") to SPEAR_KILL_PACKAGE,
-            RUNTIME_ROOT.resolve("LogCompletedSpearKillAttemptOperations.kt") to RUNTIME_PACKAGE,
-            INTEGRATION_ROOT.resolve("LogSpearKillPrimedBurstDecisionOperations.kt") to
-                INTEGRATION_PACKAGE,
-            INTEGRATION_ROOT.resolve("SpearKillHighSpeedResearchPacketTypeOperations.kt") to
-                INTEGRATION_PACKAGE,
-            INTEGRATION_ROOT.resolve("StartExplicitHighSpeedResearchProbeOperations.kt") to
-                INTEGRATION_PACKAGE,
+            INTEGRATION_ROOT.resolve("delivery/terminal/BeginHighSpeedResearchBurstOperations.kt") to
+                TERMINAL_INTEGRATION_PACKAGE,
+            SPEAR_KILL_ROOT.resolve("debug/DebugSpearKillOperations.kt") to DEBUG_PACKAGE,
+            RUNTIME_ROOT.resolve("lifecycle/LogCompletedSpearKillAttemptOperations.kt") to
+                RUNTIME_LIFECYCLE_PACKAGE,
+            INTEGRATION_ROOT.resolve("delivery/terminal/LogSpearKillPrimedBurstDecisionOperations.kt") to
+                TERMINAL_INTEGRATION_PACKAGE,
+            INTEGRATION_ROOT.resolve("startup/SpearKillHighSpeedResearchPacketTypeOperations.kt") to
+                STARTUP_INTEGRATION_PACKAGE,
+            INTEGRATION_ROOT.resolve("startup/StartExplicitHighSpeedResearchProbeOperations.kt") to
+                STARTUP_INTEGRATION_PACKAGE,
         )
         val EXPECTED_DEBUG_LABELS = listOf(
             "Attempt Target",

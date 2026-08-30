@@ -8,11 +8,8 @@
  * the Free Software Foundation, either version 3 of the License, or
  * (at your option) any later version.
  */
-package net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.integration.event
+package net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.integration.delivery.packet
 
-import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.integration.tick.*
-import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.integration.delivery.packet.*
-import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.integration.delivery.terminal.*
 import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.*
 import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.planner.instant.*
 import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.session.attempt.*

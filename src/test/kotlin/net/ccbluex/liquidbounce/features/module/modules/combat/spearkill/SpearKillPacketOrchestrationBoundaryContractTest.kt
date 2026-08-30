@@ -38,10 +38,10 @@ class SpearKillPacketOrchestrationBoundaryContractTest {
 
     @Test
     fun `packet orchestration lives at the integration boundary`() {
-        ORCHESTRATION_FILES.forEach { fileName ->
+        ORCHESTRATION_FILES.forEach { (fileName, integrationPath) ->
             assertFalse(Files.exists(PACKET_ROOT.resolve(fileName)), "$fileName remains packet-owned")
 
-            val source = Files.readString(INTEGRATION_ROOT.resolve(fileName))
+            val source = Files.readString(INTEGRATION_ROOT.resolve(integrationPath).resolve(fileName))
             assertTrue(INTEGRATION_PACKAGE in source, "$fileName is not integration-owned")
         }
     }
@@ -100,15 +100,15 @@ class SpearKillPacketOrchestrationBoundaryContractTest {
             "$SPEAR_KILL_PACKAGE.planner",
             "$SPEAR_KILL_PACKAGE.target",
         )
-        val ORCHESTRATION_FILES = listOf(
-            "ConfirmRemoteSpearKillPacketStepOperations.kt",
-            "DeliverInstantFinalMovementOperations.kt",
-            "DeliverSpearKillTerminalBurstPrefixOperations.kt",
-            "HandlePendingTerminalCommitOperations.kt",
-            "ReadyPrimedPendingStepOperations.kt",
-            "ResegmentPendingMotionRouteOperations.kt",
-            "ValidatePendingSpearKillPacketStepOperations.kt",
-            "ValidatePendingSpearKillTerminalBurstOperations.kt",
+        val ORCHESTRATION_FILES = mapOf(
+            "ConfirmRemoteSpearKillPacketStepOperations.kt" to "delivery/terminal",
+            "DeliverInstantFinalMovementOperations.kt" to "delivery/terminal",
+            "DeliverSpearKillTerminalBurstPrefixOperations.kt" to "delivery/terminal",
+            "HandlePendingTerminalCommitOperations.kt" to "delivery/terminal",
+            "ReadyPrimedPendingStepOperations.kt" to "delivery/terminal",
+            "ResegmentPendingMotionRouteOperations.kt" to "planning",
+            "ValidatePendingSpearKillPacketStepOperations.kt" to "delivery/terminal",
+            "ValidatePendingSpearKillTerminalBurstOperations.kt" to "delivery/terminal",
         )
         val REQUIRED_PACKET_PRIMITIVE_FILES = setOf(
             "SendSpearKillPrimingPacketOperations.kt",

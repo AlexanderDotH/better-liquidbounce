@@ -10,11 +10,7 @@
  */
 package net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.integration.startup
 
-import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.integration.tick.*
 import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.integration.planning.*
-import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.integration.delivery.packet.*
-import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.integration.recovery.*
-import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.integration.research.*
 import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.*
 import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.contract.*
 import net.ccbluex.liquidbounce.features.module.modules.combat.spearkill.damage.*
@@ -176,10 +172,3 @@ internal fun SpearKillModuleState.startHighSpeedAttackProbe(
         SpearKillAttackStartResult.STARTED -> error("Handled above")
     }
 }
-
-internal fun SpearKillModuleState.currentPrimedMovementProfile(): SpearKillPrimedInstantMovementProfile =
-    if (player.isFallFlying) {
-        SpearKillPrimedInstantMovementProfile.ELYTRA
-    } else {
-        SpearKillPrimedInstantMovementProfile.NORMAL
-    }
