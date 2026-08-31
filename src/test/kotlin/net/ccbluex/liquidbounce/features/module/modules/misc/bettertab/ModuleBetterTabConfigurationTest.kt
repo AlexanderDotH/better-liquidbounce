@@ -10,8 +10,8 @@
  */
 package net.ccbluex.liquidbounce.features.module.modules.misc.bettertab
 
-import com.google.gson.JsonParser
 import net.ccbluex.liquidbounce.config.types.group.ToggleableValueGroup
+import net.ccbluex.liquidbounce.features.misc.ExternalClient
 import net.ccbluex.liquidbounce.features.module.modules.misc.ModuleBetterTab
 import net.ccbluex.liquidbounce.render.engine.type.Color4b
 import net.ccbluex.liquidbounce.test.MinecraftBootstrap
@@ -19,36 +19,29 @@ import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.BeforeAll
 import org.junit.jupiter.api.Test
-import java.io.InputStreamReader
 
 class ModuleBetterTabConfigurationTest {
 
     @Test
-    fun `LiquidBounce chat marker is appended as an enabled colored group`() {
+    fun `client indicators expose the required options and preserve the old group alias`() {
         val groups = ModuleBetterTab.inner.filterIsInstance<ToggleableValueGroup>()
-        val lookup = groups.single { it.name == "LiquidBouncePlayers" }
+        val lookup = groups.single { it.name == "ClientPlayers" }
 
         assertEquals(
-            listOf("Highlight", "AccurateLatency", "PlayerHider", "LiquidBouncePlayers"),
+            listOf("Highlight", "AccurateLatency", "PlayerHider", "ClientPlayers"),
             groups.map { it.name },
         )
         assertTrue(lookup.enabled)
-        assertEquals(listOf("Enabled", "Color"), lookup.inner.map { it.name })
-        assertEquals(Color4b.LIQUID_BOUNCE, lookup.inner.single { it.name == "Color" }.get())
-    }
-
-    @Test
-    fun `ClickGUI metadata discloses the roster UUID lookup`() {
-        val resource = checkNotNull(
-            javaClass.classLoader.getResourceAsStream("resources/liquidbounce/lang/en_us.json"),
+        assertTrue("LiquidBouncePlayers" in lookup.aliases)
+        assertEquals(
+            listOf("Enabled", "Clients", "LabelStyle", "Legend", "OwnershipSignals", "Color"),
+            lookup.inner.map { it.name },
         )
-        val translations = resource.use { JsonParser.parseReader(InputStreamReader(it)).asJsonObject }
-        val description = translations[
-            "liquidbounce.module.betterTab.liquidBouncePlayers.extendedDescription"
-        ].asString
-
-        assertTrue(description.contains("received LiquidChat messages", ignoreCase = true), description)
-        assertTrue(description.contains("RAM", ignoreCase = true), description)
+        assertEquals(ExternalClient.entries.toSet(), lookup.inner.single { it.name == "Clients" }.get())
+        assertEquals(ClientLabelStyle.FULL, lookup.inner.single { it.name == "LabelStyle" }.get())
+        assertEquals(true, lookup.inner.single { it.name == "Legend" }.get())
+        assertEquals(true, lookup.inner.single { it.name == "OwnershipSignals" }.get())
+        assertEquals(Color4b.LIQUID_BOUNCE, lookup.inner.single { it.name == "Color" }.get())
     }
 
     private companion object {

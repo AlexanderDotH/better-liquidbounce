@@ -54,7 +54,10 @@ data class C2SLoginMojangPacket(
     val uuid: UUID,
 
     @SerializedName("allow_messages")
-    val allowMessages: Boolean
+    val allowMessages: Boolean,
+
+    @SerializedName("client_id")
+    val clientId: AxoChatClientId,
 
 ) : AxochatPacket.C2S
 
@@ -71,9 +74,28 @@ data class C2SLoginJWTPacket(
     val token: String,
 
     @SerializedName("allow_messages")
-    val allowMessages: Boolean
+    val allowMessages: Boolean,
+
+    @SerializedName("client_id")
+    val clientId: AxoChatClientId,
 
 ) : AxochatPacket.C2S
+
+data class C2SRequestUserPresencePacket(
+
+    @SerializedName("uuids")
+    val uuids: List<UUID>,
+
+) : AxochatPacket.C2S {
+
+    init {
+        require(uuids.size <= MAX_UUIDS) { "AxoChat presence requests are limited to $MAX_UUIDS UUIDs" }
+    }
+
+    companion object {
+        const val MAX_UUIDS = 100
+    }
+}
 
 /**
  * The content of this packet will be sent to every client as Message if it fits the validation scheme.

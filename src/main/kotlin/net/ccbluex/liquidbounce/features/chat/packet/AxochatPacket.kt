@@ -41,3 +41,19 @@ data class AxoUser(
     @SerializedName("uuid")
     val uuid: UUID,
 )
+
+enum class AxoChatClientId {
+    @SerializedName("liquidbounce")
+    LIQUIDBOUNCE,
+
+    @SerializedName("fdpclient")
+    FDPCLIENT,
+}
+
+data class AxoUserPresence(
+    @SerializedName("uuid")
+    val uuid: UUID,
+
+    @SerializedName("client_id")
+    val clientId: AxoChatClientId,
+)

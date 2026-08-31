@@ -82,12 +82,14 @@ public abstract class MixinPlayerTabOverlay {
     }
 
     @ModifyExpressionValue(method = "extractRenderState", at = @At(value = "FIELD", target = "Lnet/minecraft/client/gui/components/PlayerTabOverlay;header:Lnet/minecraft/network/chat/Component;", ordinal = 0, opcode = Opcodes.GETFIELD))
-    private Component hookHeader(Component original) {
+    private Component hookHeader(Component original, @Local(name = "playerInfos") List<PlayerInfo> playerInfos) {
         if (!ModuleBetterTab.INSTANCE.getRunning()) {
             return original;
         }
 
-        return ModuleBetterTab.isVisible(Visibility.HEADER) ? original : null;
+        return ModuleBetterTab.isVisible(Visibility.HEADER)
+                ? ModuleBetterTab.clientHeader(original, playerInfos)
+                : null;
     }
 
     @ModifyExpressionValue(method = "extractRenderState", at = @At(value = "FIELD", target = "Lnet/minecraft/client/gui/components/PlayerTabOverlay;footer:Lnet/minecraft/network/chat/Component;", ordinal = 0, opcode = Opcodes.GETFIELD))
@@ -192,7 +194,7 @@ public abstract class MixinPlayerTabOverlay {
     private Component modifyPlayerName(Component original, PlayerInfo entry) {
         var components = new TextBuilder(PlayerModelAppearanceHook.replacePlayerInfoName(entry, original));
 
-        components.add(ModuleBetterTab.liquidBounceBadge(entry));
+        components.add(ModuleBetterTab.clientBadges(entry));
 
         if (ModuleBetterTab.INSTANCE.getRunning() && ModuleBetterTab.INSTANCE.getShowGameMode()) {
             var playerGameMode = entry.getGameMode();

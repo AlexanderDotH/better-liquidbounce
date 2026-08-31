@@ -18,14 +18,21 @@
  */
 package net.ccbluex.liquidbounce.features.module.modules.misc
 
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import net.ccbluex.liquidbounce.config.types.group.ToggleableValueGroup
 import net.ccbluex.liquidbounce.config.types.group.ValueGroup
 import net.ccbluex.liquidbounce.config.types.list.Tagged
-import net.ccbluex.liquidbounce.features.chat.LiquidChatUsers
+import net.ccbluex.liquidbounce.event.tickHandler
+import net.ccbluex.liquidbounce.features.misc.ExternalClient
+import net.ccbluex.liquidbounce.features.misc.ExternalClientUsers
 import net.ccbluex.liquidbounce.features.module.ClientModule
 import net.ccbluex.liquidbounce.features.module.ModuleCategories
-import net.ccbluex.liquidbounce.features.module.modules.misc.bettertab.BetterTabLiquidBounceBadge
+import net.ccbluex.liquidbounce.features.module.modules.misc.bettertab.BetterTabClientIndicators
+import net.ccbluex.liquidbounce.features.module.modules.misc.bettertab.ClientLabelStyle
+import net.ccbluex.liquidbounce.features.module.modules.misc.bettertab.ExternalClientDetection
 import net.ccbluex.liquidbounce.render.engine.type.Color4b
+import net.ccbluex.liquidbounce.utils.kotlin.Minecraft
 import net.ccbluex.liquidbounce.utils.text.PlainText
 import net.minecraft.client.multiplayer.PlayerInfo
 import net.minecraft.network.chat.Component
@@ -79,15 +86,70 @@ object ModuleBetterTab : ClientModule("BetterTab", ModuleCategories.RENDER) {
         val filter = tree(PlayerFilter())
     }
 
-    object LiquidBouncePlayers : ToggleableValueGroup(ModuleBetterTab, "LiquidBouncePlayers", true) {
+    object ClientPlayers : ToggleableValueGroup(
+        ModuleBetterTab,
+        "ClientPlayers",
+        true,
+        aliases = listOf("LiquidBouncePlayers"),
+    ) {
+        val clients by multiEnumChoice("Clients", ExternalClient.entries)
+        val labelStyle by enumChoice("LabelStyle", ClientLabelStyle.FULL)
+        val legend by boolean("Legend", true)
+        val ownershipSignals by boolean("OwnershipSignals", true)
         val color by color("Color", Color4b.LIQUID_BOUNCE)
     }
 
     @JvmStatic
-    fun liquidBounceBadge(entry: PlayerInfo): Component? = BetterTabLiquidBounceBadge.create(
-        visible = running && LiquidBouncePlayers.running && LiquidChatUsers.contains(entry.profile.id),
-        color = LiquidBouncePlayers.color,
-    )
+    fun clientBadges(entry: PlayerInfo): Component? {
+        if (!running || !ClientPlayers.running) {
+            return null
+        }
+
+        return BetterTabClientIndicators.playerBadges(
+            users = ExternalClientUsers.users(entry.profile.id),
+            labelStyle = ClientPlayers.labelStyle,
+            ownershipSignals = ClientPlayers.ownershipSignals,
+            enabledClients = ClientPlayers.clients,
+            liquidBounceColor = ClientPlayers.color,
+        )
+    }
+
+    @JvmStatic
+    fun clientHeader(serverHeader: Component?, entries: Collection<PlayerInfo>): Component? {
+        if (!ClientPlayers.running || !ClientPlayers.legend) {
+            return serverHeader
+        }
+
+        val listedUuids = entries.mapTo(hashSetOf()) { it.profile.id }
+        val legend = BetterTabClientIndicators.legend(
+            users = ExternalClientUsers.all().filter { it.uuid in listedUuids },
+            labelStyle = ClientPlayers.labelStyle,
+            ownershipSignals = ClientPlayers.ownershipSignals,
+            enabledClients = ClientPlayers.clients,
+            liquidBounceColor = ClientPlayers.color,
+        )
+        return BetterTabClientIndicators.appendLegend(serverHeader, legend)
+    }
+
+    @Suppress("unused", "InjectDispatcher")
+    private val clientDetectionHandler = tickHandler(Dispatchers.IO) {
+        val snapshot = withContext(Dispatchers.Minecraft) {
+            if (!ClientPlayers.running) {
+                return@withContext null
+            }
+            Triple(
+                mc.connection?.listedOnlinePlayers?.map { it.profile.id }.orEmpty(),
+                ClientPlayers.clients.toSet(),
+                ClientPlayers.ownershipSignals,
+            )
+        } ?: return@tickHandler
+        val (uuids, clients, ownershipSignals) = snapshot
+        ExternalClientDetection.refresh(
+            uuids = uuids,
+            clients = clients,
+            ownershipSignals = ownershipSignals,
+        )
+    }
 
     val showGameMode by boolean("ShowGameMode", true)
 
@@ -97,7 +159,7 @@ object ModuleBetterTab : ClientModule("BetterTab", ModuleCategories.RENDER) {
             Highlight,
             AccurateLatency,
             PlayerHider,
-            LiquidBouncePlayers,
+            ClientPlayers,
         )
     }
 

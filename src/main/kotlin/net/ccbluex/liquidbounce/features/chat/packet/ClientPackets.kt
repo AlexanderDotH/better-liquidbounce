@@ -120,3 +120,10 @@ data class S2CErrorPacket(
     val message: String
 
 ) : AxochatPacket.S2C
+
+data class S2CUserPresencePacket(
+
+    @SerializedName("users")
+    val users: List<AxoUserPresence>,
+
+) : AxochatPacket.S2C

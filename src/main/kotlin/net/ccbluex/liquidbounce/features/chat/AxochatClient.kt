@@ -52,6 +52,8 @@ import net.ccbluex.liquidbounce.event.events.ClientChatJwtTokenEvent
 import net.ccbluex.liquidbounce.event.events.ClientChatMessageEvent
 import net.ccbluex.liquidbounce.event.events.ClientChatStateChange
 import net.ccbluex.liquidbounce.features.chat.packet.AxochatPacket
+import net.ccbluex.liquidbounce.features.chat.packet.AxoChatClientId
+import net.ccbluex.liquidbounce.features.chat.packet.AxoUserPresence
 import net.ccbluex.liquidbounce.features.chat.packet.C2SBanUserPacket
 import net.ccbluex.liquidbounce.features.chat.packet.C2SLoginJWTPacket
 import net.ccbluex.liquidbounce.features.chat.packet.C2SLoginMojangPacket
@@ -59,6 +61,7 @@ import net.ccbluex.liquidbounce.features.chat.packet.C2SMessagePacket
 import net.ccbluex.liquidbounce.features.chat.packet.C2SPrivateMessagePacket
 import net.ccbluex.liquidbounce.features.chat.packet.C2SRequestJWTPacket
 import net.ccbluex.liquidbounce.features.chat.packet.C2SRequestMojangInfoPacket
+import net.ccbluex.liquidbounce.features.chat.packet.C2SRequestUserPresencePacket
 import net.ccbluex.liquidbounce.features.chat.packet.C2SUnbanUserPacket
 import net.ccbluex.liquidbounce.features.chat.packet.PacketDeserializer
 import net.ccbluex.liquidbounce.features.chat.packet.PacketSerializer
@@ -68,6 +71,7 @@ import net.ccbluex.liquidbounce.features.chat.packet.S2CMojangInfoPacket
 import net.ccbluex.liquidbounce.features.chat.packet.S2CNewJWTPacket
 import net.ccbluex.liquidbounce.features.chat.packet.S2CPrivateMessagePacket
 import net.ccbluex.liquidbounce.features.chat.packet.S2CSuccessPacket
+import net.ccbluex.liquidbounce.features.chat.packet.S2CUserPresencePacket
 import net.ccbluex.liquidbounce.utils.client.chat
 import net.ccbluex.liquidbounce.utils.client.logger
 import net.ccbluex.liquidbounce.utils.client.mc
@@ -76,7 +80,9 @@ import net.ccbluex.liquidbounce.utils.netty.syncSuspend
 import java.net.URI
 import java.util.UUID
 
-class AxochatClient {
+class AxochatClient(
+    private val onUserPresence: (List<AxoUserPresence>) -> Unit = {},
+) {
 
     private var channel: Channel? = null
 
@@ -89,6 +95,7 @@ class AxochatClient {
         register<C2SUnbanUserPacket>("UnbanUser")
         register<C2SRequestJWTPacket>("RequestJWT")
         register<C2SLoginJWTPacket>("LoginJWT")
+        register<C2SRequestUserPresencePacket>("RequestUserPresence")
     }
 
     private val deserializer = PacketDeserializer().apply {
@@ -98,6 +105,7 @@ class AxochatClient {
         register<S2CPrivateMessagePacket>("PrivateMessage")
         register<S2CErrorPacket>("Error")
         register<S2CSuccessPacket>("Success")
+        register<S2CUserPresencePacket>("UserPresence")
     }
 
     val isConnected: Boolean
@@ -251,8 +259,11 @@ class AxochatClient {
      */
     fun loginViaJwt(token: String) {
         EventManager.callEvent(ClientChatStateChange(ClientChatStateChange.State.LOGGING_IN))
-        sendPacket(C2SLoginJWTPacket(token, allowMessages = true))
+        sendPacket(C2SLoginJWTPacket(token, allowMessages = true, clientId = AxoChatClientId.LIQUIDBOUNCE))
     }
+
+    fun requestUserPresence(uuids: Collection<UUID>) =
+        sendPacket(C2SRequestUserPresencePacket(uuids.toList()))
 
     /**
      * Send packet to server
@@ -278,7 +289,8 @@ class AxochatClient {
                         C2SLoginMojangPacket(
                             mc.user.name,
                             mc.user.profileId,
-                            allowMessages = true
+                            allowMessages = true,
+                            clientId = AxoChatClientId.LIQUIDBOUNCE,
                         )
                     )
                 }.onFailure { cause ->
@@ -315,6 +327,7 @@ class AxochatClient {
             }
 
             is S2CNewJWTPacket -> EventManager.callEvent(ClientChatJwtTokenEvent(packet.token))
+            is S2CUserPresencePacket -> onUserPresence(packet.users)
         }
     }
 
