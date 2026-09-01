@@ -18,10 +18,11 @@ import kotlin.test.assertTrue
 class ChatTabLayoutTest {
 
     @Test
-    fun `tabs stack beside the chat and end above the input`() {
+    fun `icon tabs stack beside the chat and end above the input`() {
         val tabs = listOf(
-            ChatTabSpec("minecraft", "Minecraft", 48, selected = true),
-            ChatTabSpec("axochat", "LiquidBounce/FDP (12)", 104),
+            ChatTabSpec("minecraft", "Minecraft", ChatNetwork.MINECRAFT.icon, 48, selected = true),
+            ChatTabSpec("liquidbounce", "LiquidBounce", ChatNetwork.LIQUIDBOUNCE.icon, 72),
+            ChatTabSpec("fdpclient", "FDPClient (12)", ChatNetwork.FDPCLIENT.icon, 76),
         )
 
         val bounds = ChatTabLayout.arrangeSide(
@@ -32,7 +33,8 @@ class ChatTabLayoutTest {
         )
 
         assertEquals(tabs.map(ChatTabSpec::label), bounds.map(ChatTabBounds::label))
-        assertTrue(bounds.all { it.left == 120 && it.right <= 318 })
+        assertEquals(tabs.map(ChatTabSpec::icon), bounds.map(ChatTabBounds::icon))
+        assertTrue(bounds.all { it.left == 120 && it.right <= 318 && it.height == ChatTabLayout.ROW_HEIGHT })
         assertEquals(260, bounds.last().bottom)
         assertTrue(bounds.zipWithNext().all { (top, bottom) -> top.bottom < bottom.top })
     }
@@ -41,8 +43,8 @@ class ChatTabLayoutTest {
     fun `hitboxes include their top left edges and exclude bottom right edges`() {
         val bounds = ChatTabLayout.arrangeSide(
             listOf(
-                ChatTabSpec("minecraft", "Minecraft", 20),
-                ChatTabSpec("axochat", "LiquidBounce/FDP", 20),
+                ChatTabSpec("minecraft", "Minecraft", ChatNetwork.MINECRAFT.icon, 20),
+                ChatTabSpec("liquidbounce", "LiquidBounce", ChatNetwork.LIQUIDBOUNCE.icon, 20),
             ),
             viewportWidth = 200,
             requestedLeft = 100,
@@ -54,7 +56,10 @@ class ChatTabLayoutTest {
         assertEquals("minecraft", ChatTabLayout.hitTest(bounds, first.left.toDouble(), first.top.toDouble()))
         assertEquals("minecraft", ChatTabLayout.hitTest(bounds, first.right - 0.01, first.bottom - 0.01))
         assertNull(ChatTabLayout.hitTest(bounds, first.right.toDouble(), first.top.toDouble()))
-        assertEquals("axochat", ChatTabLayout.hitTest(bounds, second.left.toDouble(), second.top.toDouble()))
+        assertEquals("liquidbounce", ChatTabLayout.hitTest(bounds, second.left.toDouble(), second.top.toDouble()))
         assertNull(ChatTabLayout.hitTest(bounds, second.left.toDouble(), second.bottom.toDouble()))
     }
+
+    private val ChatTabBounds.height
+        get() = bottom - top
 }

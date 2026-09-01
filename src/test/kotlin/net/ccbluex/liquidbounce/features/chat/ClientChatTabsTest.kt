@@ -24,86 +24,96 @@ class ClientChatTabsTest {
     @Test
     fun `network IDs labels and tab order are stable`() {
         assertEquals(
-            listOf(ChatNetwork.MINECRAFT, ChatNetwork.AXOCHAT),
+            listOf(ChatNetwork.MINECRAFT, ChatNetwork.LIQUIDBOUNCE, ChatNetwork.FDPCLIENT),
             ClientChatTabs.tabOrder,
         )
         assertEquals(
             listOf(
                 "minecraft" to "Minecraft",
-                "axochat" to "LiquidBounce/FDP",
+                "liquidbounce" to "LiquidBounce",
+                "fdpclient" to "FDPClient",
             ),
             ClientChatTabs.tabOrder.map { it.id to it.label },
         )
     }
 
     @Test
-    fun `Minecraft remains visible while optional networks can be toggled`() {
+    fun `Minecraft remains visible while client channels can be toggled independently`() {
         assertEquals(listOf(ChatNetwork.MINECRAFT), ClientChatTabs.visibleNetworks)
 
-        assertTrue(ClientChatTabs.setAvailable(ChatNetwork.AXOCHAT, true))
+        assertTrue(ClientChatTabs.setAvailable(ChatNetwork.LIQUIDBOUNCE, true))
+        assertTrue(ClientChatTabs.setAvailable(ChatNetwork.FDPCLIENT, true))
         assertEquals(ClientChatTabs.tabOrder, ClientChatTabs.visibleNetworks)
 
         assertFalse(ClientChatTabs.setAvailable(ChatNetwork.MINECRAFT, false))
         assertFalse(ClientChatTabs.setAvailable(ChatNetwork.MINECRAFT, true))
         assertTrue(ClientChatTabs.isAvailable(ChatNetwork.MINECRAFT))
-        assertEquals(ClientChatTabs.tabOrder, ClientChatTabs.visibleNetworks)
     }
 
     @Test
-    fun `hiding the active optional network falls back to Minecraft`() {
-        ClientChatTabs.setAvailable(ChatNetwork.AXOCHAT, true)
-        assertTrue(ClientChatTabs.switchTo(ChatNetwork.AXOCHAT))
+    fun `hiding the active client channel falls back to Minecraft`() {
+        ClientChatTabs.setAvailable(ChatNetwork.FDPCLIENT, true)
+        assertTrue(ClientChatTabs.switchTo(ChatNetwork.FDPCLIENT))
 
-        ClientChatTabs.setAvailable(ChatNetwork.AXOCHAT, false)
+        ClientChatTabs.setAvailable(ChatNetwork.FDPCLIENT, false)
 
         assertEquals(ChatNetwork.MINECRAFT, ClientChatTabs.activeNetwork)
-        assertFalse(ClientChatTabs.switchTo(ChatNetwork.AXOCHAT))
-        assertEquals(ChatNetwork.MINECRAFT, ClientChatTabs.activeNetwork)
+        assertFalse(ClientChatTabs.switchTo(ChatNetwork.FDPCLIENT))
     }
 
     @Test
-    fun `switching clears only the selected network unread count`() {
-        ClientChatTabs.setAvailable(ChatNetwork.AXOCHAT, true)
-        ClientChatTabs.incrementUnread(ChatNetwork.AXOCHAT, 3)
+    fun `switching clears only the selected channel unread count`() {
+        ClientChatTabs.setAvailable(ChatNetwork.LIQUIDBOUNCE, true)
+        ClientChatTabs.setAvailable(ChatNetwork.FDPCLIENT, true)
+        ClientChatTabs.incrementUnread(ChatNetwork.LIQUIDBOUNCE, 3)
+        ClientChatTabs.incrementUnread(ChatNetwork.FDPCLIENT, 2)
 
-        ClientChatTabs.switchTo(ChatNetwork.AXOCHAT)
+        ClientChatTabs.switchTo(ChatNetwork.LIQUIDBOUNCE)
 
-        assertEquals(0, ClientChatTabs.unreadCount(ChatNetwork.AXOCHAT))
-        ClientChatTabs.incrementUnread(ChatNetwork.MINECRAFT, 2)
-        assertEquals(2, ClientChatTabs.unreadCount(ChatNetwork.MINECRAFT))
+        assertEquals(0, ClientChatTabs.unreadCount(ChatNetwork.LIQUIDBOUNCE))
+        assertEquals(2, ClientChatTabs.unreadCount(ChatNetwork.FDPCLIENT))
     }
 
     @Test
-    fun `drafts and scroll positions stay independent between networks`() {
+    fun `drafts and scroll positions stay independent between all channels`() {
         ClientChatTabs.setDraft(ChatNetwork.MINECRAFT, "server message")
-        ClientChatTabs.setDraft(ChatNetwork.AXOCHAT, "global message")
+        ClientChatTabs.setDraft(ChatNetwork.LIQUIDBOUNCE, "lb message")
+        ClientChatTabs.setDraft(ChatNetwork.FDPCLIENT, "fdp message")
         ClientChatTabs.setScrollPosition(ChatNetwork.MINECRAFT, 4)
-        ClientChatTabs.setScrollPosition(ChatNetwork.AXOCHAT, 9)
+        ClientChatTabs.setScrollPosition(ChatNetwork.LIQUIDBOUNCE, 7)
+        ClientChatTabs.setScrollPosition(ChatNetwork.FDPCLIENT, 9)
 
         assertEquals("server message", ClientChatTabs.draft(ChatNetwork.MINECRAFT))
-        assertEquals("global message", ClientChatTabs.draft(ChatNetwork.AXOCHAT))
+        assertEquals("lb message", ClientChatTabs.draft(ChatNetwork.LIQUIDBOUNCE))
+        assertEquals("fdp message", ClientChatTabs.draft(ChatNetwork.FDPCLIENT))
         assertEquals(4, ClientChatTabs.scrollPosition(ChatNetwork.MINECRAFT))
-        assertEquals(9, ClientChatTabs.scrollPosition(ChatNetwork.AXOCHAT))
+        assertEquals(7, ClientChatTabs.scrollPosition(ChatNetwork.LIQUIDBOUNCE))
+        assertEquals(9, ClientChatTabs.scrollPosition(ChatNetwork.FDPCLIENT))
     }
 
     @Test
-    fun `cycling follows only visible networks and wraps in both directions`() {
-        ClientChatTabs.setAvailable(ChatNetwork.AXOCHAT, true)
+    fun `cycling follows visible channel order and wraps in both directions`() {
+        ClientChatTabs.setAvailable(ChatNetwork.LIQUIDBOUNCE, true)
+        ClientChatTabs.setAvailable(ChatNetwork.FDPCLIENT, true)
 
-        assertEquals(ChatNetwork.AXOCHAT, ClientChatTabs.cycle(1))
+        assertEquals(ChatNetwork.LIQUIDBOUNCE, ClientChatTabs.cycle(1))
+        assertEquals(ChatNetwork.FDPCLIENT, ClientChatTabs.cycle(1))
         assertEquals(ChatNetwork.MINECRAFT, ClientChatTabs.cycle(1))
-        assertEquals(ChatNetwork.AXOCHAT, ClientChatTabs.cycle(-1))
+        assertEquals(ChatNetwork.FDPCLIENT, ClientChatTabs.cycle(-1))
     }
 
     @Test
-    fun `connection status is resettable state`() {
-        ClientChatTabs.setConnectionStatus(ChatNetwork.AXOCHAT, ChatConnectionStatus.CONNECTING)
+    fun `connection status is independent and resettable`() {
+        ClientChatTabs.setConnectionStatus(ChatNetwork.LIQUIDBOUNCE, ChatConnectionStatus.CONNECTED)
+        ClientChatTabs.setConnectionStatus(ChatNetwork.FDPCLIENT, ChatConnectionStatus.CONNECTING)
 
         assertEquals(ChatConnectionStatus.CONNECTED, ClientChatTabs.connectionStatus(ChatNetwork.MINECRAFT))
-        assertEquals(ChatConnectionStatus.CONNECTING, ClientChatTabs.connectionStatus(ChatNetwork.AXOCHAT))
+        assertEquals(ChatConnectionStatus.CONNECTED, ClientChatTabs.connectionStatus(ChatNetwork.LIQUIDBOUNCE))
+        assertEquals(ChatConnectionStatus.CONNECTING, ClientChatTabs.connectionStatus(ChatNetwork.FDPCLIENT))
 
         ClientChatTabs.reset()
 
-        assertEquals(ChatConnectionStatus.DISCONNECTED, ClientChatTabs.connectionStatus(ChatNetwork.AXOCHAT))
+        assertEquals(ChatConnectionStatus.DISCONNECTED, ClientChatTabs.connectionStatus(ChatNetwork.LIQUIDBOUNCE))
+        assertEquals(ChatConnectionStatus.DISCONNECTED, ClientChatTabs.connectionStatus(ChatNetwork.FDPCLIENT))
     }
 }

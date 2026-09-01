@@ -34,6 +34,7 @@ import net.minecraft.client.gui.screens.ChatScreen;
 import net.minecraft.client.input.KeyEvent;
 import net.minecraft.client.input.MouseButtonEvent;
 import net.minecraft.client.multiplayer.chat.GuiMessage;
+import net.minecraft.client.renderer.RenderPipelines;
 import net.minecraft.util.ArrayListDeque;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
@@ -159,7 +160,7 @@ public abstract class MixinChatScreen extends MixinScreen {
 
     @Inject(method = "extractRenderState", at = @At("HEAD"))
     private void renderChatTabs(GuiGraphicsExtractor graphics, int mouseX, int mouseY, float delta, CallbackInfo ci) {
-        liquidbounce$renderTabRow(graphics, liquidbounce$networkTabBounds());
+        liquidbounce$renderTabRow(graphics, liquidbounce$networkTabBounds(), mouseX, mouseY);
     }
 
     @Inject(method = "mouseClicked", at = @At("HEAD"), cancellable = true)
@@ -219,6 +220,7 @@ public abstract class MixinChatScreen extends MixinScreen {
             tabs.add(new ChatTabSpec(
                 tab.getId(),
                 tab.getLabel(),
+                tab.getIcon(),
                 font.width(tab.getLabel()),
                 tab.getSelected(),
                 tab.getColor(),
@@ -237,10 +239,16 @@ public abstract class MixinChatScreen extends MixinScreen {
     }
 
     @Unique
-    private void liquidbounce$renderTabRow(GuiGraphicsExtractor graphics, List<ChatTabBounds> tabs) {
+    private void liquidbounce$renderTabRow(
+        GuiGraphicsExtractor graphics,
+        List<ChatTabBounds> tabs,
+        int mouseX,
+        int mouseY
+    ) {
         for (var tab : tabs) {
-            int background = tab.getSelected() ? 0xD0404040 : 0xA0000000;
-            int textColor = tab.getSelected() ? tab.getColor() : (tab.getColor() & 0x00FFFFFF) | 0xCC000000;
+            boolean hovered = tab.contains(mouseX, mouseY);
+            int background = tab.getSelected() ? 0xE51B1D22 : hovered ? 0xD02A2D34 : 0xB0141519;
+            int textColor = tab.getSelected() ? tab.getColor() : 0xFFE0E0E0;
             int statusColor = switch (tab.getStatus()) {
                 case CONNECTED -> 0xFF45C46A;
                 case CONNECTING -> 0xFFF0B84B;
@@ -248,11 +256,24 @@ public abstract class MixinChatScreen extends MixinScreen {
             };
             graphics.fill(tab.getLeft(), tab.getTop(), tab.getRight(), tab.getBottom(), background);
             if (tab.getSelected()) {
-                graphics.fill(tab.getLeft(), tab.getBottom() - 1, tab.getRight(), tab.getBottom(), tab.getColor());
+                graphics.fill(tab.getLeft(), tab.getTop(), tab.getLeft() + 2, tab.getBottom(), tab.getColor());
             }
-            graphics.fill(tab.getRight() - 3, tab.getTop() + 2, tab.getRight() - 1, tab.getTop() + 4, statusColor);
-            graphics.enableScissor(tab.getLeft(), tab.getTop(), tab.getRight(), tab.getBottom());
-            graphics.text(font, tab.getLabel(), tab.getLeft() + 4, tab.getTop() + 2, textColor, false);
+
+            int iconX = tab.getLeft() + 5;
+            int iconY = tab.getTop() + (ChatTabLayout.ROW_HEIGHT - ChatTabLayout.ICON_SIZE) / 2;
+            int textX = iconX + ChatTabLayout.ICON_SIZE + ChatTabLayout.ICON_GAP;
+            int textY = tab.getTop() + (ChatTabLayout.ROW_HEIGHT - font.lineHeight) / 2;
+            graphics.blitSprite(
+                RenderPipelines.GUI_TEXTURED,
+                tab.getIcon(),
+                iconX,
+                iconY,
+                ChatTabLayout.ICON_SIZE,
+                ChatTabLayout.ICON_SIZE
+            );
+            graphics.fill(tab.getRight() - 5, tab.getTop() + 3, tab.getRight() - 2, tab.getTop() + 6, statusColor);
+            graphics.enableScissor(textX, tab.getTop(), tab.getRight() - 7, tab.getBottom());
+            graphics.text(font, tab.getLabel(), textX, textY, textColor, false);
             graphics.disableScissor();
         }
     }

@@ -72,7 +72,10 @@ data class S2CMessagePacket(
     val user: AxoUser,
 
     @SerializedName("content")
-    val content: String
+    val content: String,
+
+    @SerializedName("channel")
+    val channel: AxoChatClientId?,
 
 ) : AxochatPacket.S2C
 
@@ -93,7 +96,10 @@ data class S2CPrivateMessagePacket(
     val user: AxoUser,
 
     @SerializedName("content")
-    val content: String
+    val content: String,
+
+    @SerializedName("channel")
+    val channel: AxoChatClientId?,
 
 ) : AxochatPacket.S2C
 
@@ -105,7 +111,10 @@ data class S2CPrivateMessagePacket(
 data class S2CSuccessPacket(
 
     @SerializedName("reason")
-    val reason: String
+    val reason: String,
+
+    @SerializedName("supports_channels")
+    val supportsChannels: Boolean = false,
 
 ) : AxochatPacket.S2C
 

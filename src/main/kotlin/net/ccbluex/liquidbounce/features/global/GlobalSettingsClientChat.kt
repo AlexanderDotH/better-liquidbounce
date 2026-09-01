@@ -44,6 +44,7 @@ import net.ccbluex.liquidbounce.features.chat.AxochatClient
 import net.ccbluex.liquidbounce.features.chat.ChatConnectionStatus
 import net.ccbluex.liquidbounce.features.chat.ChatNetwork
 import net.ccbluex.liquidbounce.features.chat.ClientChatTabs
+import net.ccbluex.liquidbounce.features.chat.axoChatClientId
 import net.ccbluex.liquidbounce.features.chat.packet.C2SRequestJWTPacket
 import net.ccbluex.liquidbounce.features.command.CommandExecutor.suspendHandler
 import net.ccbluex.liquidbounce.features.command.CommandManager
@@ -162,17 +163,22 @@ object GlobalSettingsClientChat : ToggleableValueGroup(
             setAxochatAvailable(enabled && LiquidBounceFDP.enabled)
         }
 
-    private val prefix: Component = "".asText()
+    private fun prefix(network: ChatNetwork): Component = "".asText()
         .withStyle(ChatFormatting.RESET).withStyle(ChatFormatting.GRAY)
-        .append(LiquidBounceFDP.name.asPlainText(ChatFormatting.BLUE))
+        .append(
+            network.label.asPlainText(
+                if (network == ChatNetwork.FDPCLIENT) ChatFormatting.RED else ChatFormatting.BLUE
+            )
+        )
         .withStyle(ChatFormatting.BOLD)
         .append(" ▸ ".asText().withStyle(ChatFormatting.RESET).withColor(ChatFormatting.DARK_GRAY))
     private val exceptionData = MessageMetadata(
         prefix = false,
         id = "LiquidChat#exception",
-        network = ChatNetwork.AXOCHAT,
+        network = ChatNetwork.LIQUIDBOUNCE,
     )
-    private val messageData = MessageMetadata(prefix = false, network = ChatNetwork.AXOCHAT)
+    private fun messageData(network: ChatNetwork) = MessageMetadata(prefix = false, network = network)
+
     private fun createChatWriteCommand() = CommandBuilder
         .begin("chat")
         .parameter(
@@ -186,7 +192,8 @@ object GlobalSettingsClientChat : ToggleableValueGroup(
         .suspendHandler {
             if (!chatClient.isConnected) {
                 chat(
-                    prefix, translation("liquidbounce.liquidchat.notConnected").withStyle(ChatFormatting.GRAY),
+                    prefix(ChatNetwork.LIQUIDBOUNCE),
+                    translation("liquidbounce.liquidchat.notConnected").withStyle(ChatFormatting.GRAY),
                     metadata = exceptionData
                 )
                 return@suspendHandler
@@ -194,13 +201,17 @@ object GlobalSettingsClientChat : ToggleableValueGroup(
 
             if (!chatClient.isLoggedIn) {
                 chat(
-                    prefix, translation("liquidbounce.liquidchat.notLoggedIn").withStyle(ChatFormatting.GRAY),
+                    prefix(ChatNetwork.LIQUIDBOUNCE),
+                    translation("liquidbounce.liquidchat.notLoggedIn").withStyle(ChatFormatting.GRAY),
                     metadata = exceptionData
                 )
                 return@suspendHandler
             }
 
-            sendAxochatMessage((args[0] as Array<*>).joinToString(" ") { it as String })
+            sendAxochatMessage(
+                ChatNetwork.LIQUIDBOUNCE,
+                (args[0] as Array<*>).joinToString(" ") { it as String },
+            )
         }
         .build()
 
@@ -209,7 +220,8 @@ object GlobalSettingsClientChat : ToggleableValueGroup(
         .suspendHandler {
             if (!chatClient.isConnected) {
                 chat(
-                    prefix, translation("liquidbounce.liquidchat.notConnected").withStyle(ChatFormatting.GRAY),
+                    prefix(ChatNetwork.LIQUIDBOUNCE),
+                    translation("liquidbounce.liquidchat.notConnected").withStyle(ChatFormatting.GRAY),
                     metadata = exceptionData
                 )
                 return@suspendHandler
@@ -217,7 +229,8 @@ object GlobalSettingsClientChat : ToggleableValueGroup(
 
             chatClient.sendPacket(C2SRequestJWTPacket())
             chat(
-                prefix, translation("liquidbounce.liquidchat.jwtTokenRequested").withStyle(ChatFormatting.GRAY),
+                prefix(ChatNetwork.LIQUIDBOUNCE),
+                translation("liquidbounce.liquidchat.jwtTokenRequested").withStyle(ChatFormatting.GRAY),
                 metadata = exceptionData
             )
         }
@@ -244,12 +257,15 @@ object GlobalSettingsClientChat : ToggleableValueGroup(
     }
 
     @JvmStatic
-    fun sendAxochatMessage(message: String): Boolean {
-        if (!running || !LiquidBounceFDP.enabled || !chatClient.isConnected || !chatClient.isLoggedIn) {
+    fun sendAxochatMessage(network: ChatNetwork, message: String): Boolean {
+        val channel = network.axoChatClientId ?: return false
+        if (!running || !LiquidBounceFDP.enabled || !chatClient.isConnected || !chatClient.isLoggedIn ||
+            !chatClient.supportsClientChannels
+        ) {
             return false
         }
 
-        chatClient.sendMessage(message)
+        chatClient.sendMessage(message, channel)
         return true
     }
 
@@ -286,11 +302,16 @@ object GlobalSettingsClientChat : ToggleableValueGroup(
             return@suspendHandler
         }
 
+        val externalClient = when (event.network) {
+            ChatNetwork.MINECRAFT -> return@suspendHandler
+            ChatNetwork.LIQUIDBOUNCE -> ExternalClient.LIQUIDBOUNCE
+            ChatNetwork.FDPCLIENT -> ExternalClient.LIQUIDBOUNCE_FDP
+        }
         val observedAt = Instant.now()
         ExternalClientUsers.observe(
             ExternalClientUser(
                 uuid = event.user.uuid,
-                client = ExternalClient.LIQUIDBOUNCE_FDP,
+                client = externalClient,
                 evidence = ExternalClientEvidence.RECENT_CHAT,
                 observedAt = observedAt,
                 expiresAt = observedAt.plusMillis(15.minutes.inWholeMilliseconds),
@@ -331,7 +352,7 @@ object GlobalSettingsClientChat : ToggleableValueGroup(
                 )
         }
 
-        writeChat(prefix, regular(event.message).copyable(copyContent = event.message), event.chatGroup)
+        writeChat(event.network, prefix, regular(event.message).copyable(copyContent = event.message), event.chatGroup)
 
         if (event.chatGroup !in LiquidBounceFDP.autoTranslate) {
             return@suspendHandler
@@ -339,7 +360,7 @@ object GlobalSettingsClientChat : ToggleableValueGroup(
 
         val result = GlobalSettingsAutoTranslate.translate(text = event.message)
         if (result.isValid) {
-            writeChat(prefix, result.toResultText(), event.chatGroup)
+            writeChat(event.network, prefix, result.toResultText(), event.chatGroup)
         }
     }
 
@@ -353,7 +374,13 @@ object GlobalSettingsClientChat : ToggleableValueGroup(
 
     @Suppress("unused")
     private val handleStateChange = suspendHandler<ClientChatStateChange>(behavior = CancelPrevious) {
-        ClientChatTabs.setConnectionStatus(ChatNetwork.AXOCHAT, it.state.connectionStatus)
+        val status = if (it.state == ClientChatStateChange.State.LOGGED_IN && !chatClient.supportsClientChannels) {
+            ChatConnectionStatus.DISCONNECTED
+        } else {
+            it.state.connectionStatus
+        }
+        ClientChatTabs.setConnectionStatus(ChatNetwork.LIQUIDBOUNCE, status)
+        ClientChatTabs.setConnectionStatus(ChatNetwork.FDPCLIENT, status)
 
         if (it.state != ClientChatStateChange.State.LOGGED_IN) {
             clearRecentChatUsers()
@@ -398,21 +425,24 @@ object GlobalSettingsClientChat : ToggleableValueGroup(
     }
 
     private fun writeChat(
+        network: ChatNetwork,
         playerPrefix: Component,
         message: Component,
         chatGroup: ClientChatMessageEvent.ChatGroup,
     ) {
         if (!inGame) {
-            logger.info("[Chat] Received ${chatGroup.tag} AxoChat message")
+            logger.info("[Chat] Received ${chatGroup.tag} ${network.label} message")
         } else {
-            chat(prefix, playerPrefix, message, metadata = messageData)
+            chat(prefix(network), playerPrefix, message, metadata = messageData(network))
         }
     }
 
     private fun setAxochatAvailable(available: Boolean) {
-        ClientChatTabs.setAvailable(ChatNetwork.AXOCHAT, available)
+        ClientChatTabs.setAvailable(ChatNetwork.LIQUIDBOUNCE, available)
+        ClientChatTabs.setAvailable(ChatNetwork.FDPCLIENT, available)
         if (!available) {
-            ClientChatTabs.setConnectionStatus(ChatNetwork.AXOCHAT, ChatConnectionStatus.DISCONNECTED)
+            ClientChatTabs.setConnectionStatus(ChatNetwork.LIQUIDBOUNCE, ChatConnectionStatus.DISCONNECTED)
+            ClientChatTabs.setConnectionStatus(ChatNetwork.FDPCLIENT, ChatConnectionStatus.DISCONNECTED)
         }
     }
 
@@ -425,11 +455,16 @@ object GlobalSettingsClientChat : ToggleableValueGroup(
             else -> ChatConnectionStatus.CONNECTING
         }
 
-    private fun clearRecentChatUsers() =
+    private fun clearRecentChatUsers() {
+        ExternalClientUsers.clear(
+            client = ExternalClient.LIQUIDBOUNCE,
+            evidence = ExternalClientEvidence.RECENT_CHAT,
+        )
         ExternalClientUsers.clear(
             client = ExternalClient.LIQUIDBOUNCE_FDP,
             evidence = ExternalClientEvidence.RECENT_CHAT,
         )
+    }
 
     override fun prepareDeserialize(jsonObject: JsonObject) {
         super.prepareDeserialize(jsonObject)

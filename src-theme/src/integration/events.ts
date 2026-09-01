@@ -260,6 +260,7 @@ export interface ClientChatMessageEvent {
     };
     message: string;
     chatGroup: "PublicChat" | "PrivateChat";
+    network: "MINECRAFT" | "LIQUIDBOUNCE" | "FDPCLIENT";
     // Not "public"/"private" because the EnumChoiceSerializer in Kotlin ignores @SerializedName annotations, bug?
 }
 

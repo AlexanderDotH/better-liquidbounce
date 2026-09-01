@@ -16,10 +16,12 @@ import net.ccbluex.liquidbounce.features.misc.ClientBrand
 import net.ccbluex.liquidbounce.features.misc.ClientBrandColors
 import net.ccbluex.liquidbounce.features.global.GlobalSettingsClientChat
 import net.ccbluex.liquidbounce.render.engine.type.Color4b
+import net.minecraft.resources.Identifier
 
 data class ChatTabView(
     val id: String,
     val label: String,
+    val icon: Identifier,
     val selected: Boolean,
     val color: Int,
     val status: ChatConnectionStatus,
@@ -40,16 +42,17 @@ object ClientChatScreenBridge {
     @JvmOverloads
     fun visibleTabs(liquidBounceColor: Color4b = Color4b.LIQUID_BOUNCE): List<ChatTabView> =
         ClientChatTabs.visibleNetworks.map { network ->
-        val unread = ClientChatTabs.unreadCount(network)
-        val label = if (unread == 0) network.label else "${network.label} ($unread)"
-        ChatTabView(
-            network.id,
-            label,
-            network == ClientChatTabs.activeNetwork,
-            chatNetworkColor(network, liquidBounceColor).argb,
-            ClientChatTabs.connectionStatus(network),
-        )
-    }
+            val unread = ClientChatTabs.unreadCount(network)
+            val label = if (unread == 0) network.label else "${network.label} ($unread)"
+            ChatTabView(
+                network.id,
+                label,
+                network.icon,
+                network == ClientChatTabs.activeNetwork,
+                chatNetworkColor(network, liquidBounceColor).argb,
+                ClientChatTabs.connectionStatus(network),
+            )
+        }
 
     @JvmStatic
     fun initialState(vanillaDraft: String): ChatTabTransition {
@@ -117,7 +120,9 @@ object ClientChatScreenBridge {
 
     private fun sendExternal(network: ChatNetwork, message: String) = when (network) {
         ChatNetwork.MINECRAFT -> false
-        ChatNetwork.AXOCHAT -> GlobalSettingsClientChat.sendAxochatMessage(message)
+        ChatNetwork.LIQUIDBOUNCE,
+        ChatNetwork.FDPCLIENT,
+        -> GlobalSettingsClientChat.sendAxochatMessage(network, message)
     }
 
     private fun rememberCurrent(draft: String, scrollPosition: Int) {
@@ -134,5 +139,6 @@ object ClientChatScreenBridge {
 
 internal fun chatNetworkColor(network: ChatNetwork, liquidBounceColor: Color4b): Color4b = when (network) {
     ChatNetwork.MINECRAFT -> Color4b.WHITE
-    ChatNetwork.AXOCHAT -> ClientBrandColors.color(ClientBrand.LIQUIDBOUNCE, liquidBounceColor)
+    ChatNetwork.LIQUIDBOUNCE -> ClientBrandColors.color(ClientBrand.LIQUIDBOUNCE, liquidBounceColor)
+    ChatNetwork.FDPCLIENT -> Color4b.fromHex("#FF5C5C")
 }

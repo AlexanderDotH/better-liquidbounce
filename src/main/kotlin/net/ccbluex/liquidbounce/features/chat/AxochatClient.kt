@@ -95,9 +95,10 @@ internal fun createAxochatSslHandler(
 
 class AxochatClient(
     private val onUserPresence: (List<AxoUserPresence>) -> Unit = {},
-    private val onMessage: (AxoUser, String, ClientChatMessageEvent.ChatGroup) -> Unit = { user, message, group ->
-        EventManager.callEvent(ClientChatMessageEvent(user, message, group))
-    },
+    private val onMessage: (AxoUser, String, ClientChatMessageEvent.ChatGroup, ChatNetwork) -> Unit =
+        { user, message, group, network ->
+            EventManager.callEvent(ClientChatMessageEvent(user, message, group, network))
+        },
 ) {
 
     private var channel: Channel? = null
@@ -131,6 +132,9 @@ class AxochatClient(
     var isLoggedIn = false
         private set
 
+    var supportsClientChannels = false
+        private set
+
     private val serializerGson by lazy {
         GsonBuilder()
             .registerTypeAdapter(AxochatPacket.C2S::class.java, serializer)
@@ -155,6 +159,7 @@ class AxochatClient(
         EventManager.callEvent(ClientChatStateChange(ClientChatStateChange.State.CONNECTING))
         isConnecting = true
         isLoggedIn = false
+        supportsClientChannels = false
 
         val uri = URI("wss://chat.liquidbounce.net:7886/ws")
 
@@ -224,6 +229,7 @@ class AxochatClient(
         EventManager.callEvent(ClientChatStateChange(ClientChatStateChange.State.DISCONNECTED))
         isConnecting = false
         isLoggedIn = false
+        supportsClientChannels = false
     }
 
     suspend fun reconnect() {
@@ -240,7 +246,8 @@ class AxochatClient(
     /**
      * Send chat message to server
      */
-    fun sendMessage(message: String) = sendPacket(C2SMessagePacket(message))
+    fun sendMessage(message: String, channel: AxoChatClientId) =
+        sendPacket(C2SMessagePacket(message, channel))
 
     /**
      * Send private chat message to server
@@ -323,35 +330,44 @@ class AxochatClient(
                 return
             }
 
-            is S2CMessagePacket -> onMessage(
-                packet.user,
-                packet.content,
-                ClientChatMessageEvent.ChatGroup.PUBLIC_CHAT,
-            )
-            is S2CPrivateMessagePacket -> onMessage(
-                packet.user,
-                packet.content,
-                ClientChatMessageEvent.ChatGroup.PRIVATE_CHAT,
-            )
+            is S2CMessagePacket -> packet.channel?.chatNetwork?.let { network ->
+                onMessage(
+                    packet.user,
+                    packet.content,
+                    ClientChatMessageEvent.ChatGroup.PUBLIC_CHAT,
+                    network,
+                )
+            }
+            is S2CPrivateMessagePacket -> packet.channel?.chatNetwork?.let { network ->
+                onMessage(
+                    packet.user,
+                    packet.content,
+                    ClientChatMessageEvent.ChatGroup.PRIVATE_CHAT,
+                    network,
+                )
+            }
             is S2CErrorPacket -> {
                 // TODO: Replace with translation
                 EventManager.callEvent(ClientChatErrorEvent(translateErrorMessage(packet)))
             }
-            is S2CSuccessPacket -> {
-                when (packet.reason) {
-                    "Login" -> {
-                        EventManager.callEvent(ClientChatStateChange(ClientChatStateChange.State.LOGGED_IN))
-                        isLoggedIn = true
-                    }
-
-                    // TODO: Replace with translation
-                    "Ban" -> chat("§7[§a§lChat§7] §9Successfully banned user!")
-                    "Unban" -> chat("§7[§a§lChat§7] §9Successfully unbanned user!")
-                }
-            }
+            is S2CSuccessPacket -> handleSuccess(packet)
 
             is S2CNewJWTPacket -> EventManager.callEvent(ClientChatJwtTokenEvent(packet.token))
             is S2CUserPresencePacket -> onUserPresence(packet.users)
+        }
+    }
+
+    private fun handleSuccess(packet: S2CSuccessPacket) {
+        when (packet.reason) {
+            "Login" -> {
+                supportsClientChannels = packet.supportsChannels
+                isLoggedIn = true
+                EventManager.callEvent(ClientChatStateChange(ClientChatStateChange.State.LOGGED_IN))
+            }
+
+            // TODO: Replace with translation
+            "Ban" -> chat("§7[§a§lChat§7] §9Successfully banned user!")
+            "Unban" -> chat("§7[§a§lChat§7] §9Successfully unbanned user!")
         }
     }
 
@@ -427,7 +443,7 @@ class AxochatClient(
          * Subclasses may override this method to change behavior.
          */
         override fun exceptionCaught(ctx: ChannelHandlerContext, cause: Throwable) {
-            logger.error("LiquidChat error (${cause.javaClass.simpleName})")
+            logger.error("LiquidChat error (${cause.javaClass.simpleName})", cause)
             EventManager.callEvent(ClientChatErrorEvent(
                 cause.localizedMessage ?: cause.message ?: cause.javaClass.name
             ))

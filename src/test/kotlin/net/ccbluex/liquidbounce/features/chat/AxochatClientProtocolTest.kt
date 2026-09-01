@@ -20,6 +20,7 @@ import net.ccbluex.liquidbounce.features.chat.packet.AxoUserPresence
 import net.ccbluex.liquidbounce.features.chat.packet.AxochatPacket
 import net.ccbluex.liquidbounce.features.chat.packet.C2SLoginJWTPacket
 import net.ccbluex.liquidbounce.features.chat.packet.C2SLoginMojangPacket
+import net.ccbluex.liquidbounce.features.chat.packet.C2SMessagePacket
 import net.ccbluex.liquidbounce.features.chat.packet.C2SRequestUserPresencePacket
 import net.ccbluex.liquidbounce.features.chat.packet.PacketSerializer
 import java.net.URI
@@ -29,17 +30,19 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertFailsWith
+import kotlin.test.assertTrue
 
 class AxochatClientProtocolTest {
 
-    private val loginSerializer = PacketSerializer().apply {
+    private val serializer = PacketSerializer().apply {
         register<C2SLoginMojangPacket>("LoginMojang")
         register<C2SLoginJWTPacket>("LoginJWT")
         register<C2SRequestUserPresencePacket>("RequestUserPresence")
+        register<C2SMessagePacket>("Message")
     }
 
     private val gson = GsonBuilder()
-        .registerTypeAdapter(AxochatPacket.C2S::class.java, loginSerializer)
+        .registerTypeAdapter(AxochatPacket.C2S::class.java, serializer)
         .create()
 
     @Test
@@ -69,6 +72,25 @@ class AxochatClientProtocolTest {
                 """{"m":"LoginJWT","c":{"token":"token","allow_messages":true,"client_id":"liquidbounce"}}"""
             ),
             JsonParser.parseString(gson.toJson(jwt, AxochatPacket.C2S::class.java))
+        )
+    }
+
+    @Test
+    fun `public messages serialize the selected client channel`() {
+        val liquidBounce = C2SMessagePacket("hello LB", AxoChatClientId.LIQUIDBOUNCE)
+        val fdp = C2SMessagePacket("hello FDP", AxoChatClientId.FDPCLIENT)
+
+        assertEquals(
+            JsonParser.parseString(
+                """{"m":"Message","c":{"content":"hello LB","channel":"liquidbounce"}}"""
+            ),
+            JsonParser.parseString(gson.toJson(liquidBounce, AxochatPacket.C2S::class.java)),
+        )
+        assertEquals(
+            JsonParser.parseString(
+                """{"m":"Message","c":{"content":"hello FDP","channel":"fdpclient"}}"""
+            ),
+            JsonParser.parseString(gson.toJson(fdp, AxochatPacket.C2S::class.java)),
         )
     }
 
@@ -105,33 +127,88 @@ class AxochatClientProtocolTest {
     }
 
     @Test
-    fun `public and private packets keep their distinct AxoChat groups`() {
+    fun `incoming messages keep channel and public-private group separate`() {
         val uuid = UUID.fromString("922ad8ba-4b1e-4c6c-b217-61dba0d21731")
-        val received = mutableListOf<Pair<ClientChatMessageEvent.ChatGroup, String>>()
-        val client = AxochatClient(onMessage = { _, message, group -> received += group to message })
+        val received = mutableListOf<ReceivedMessage>()
+        val client = AxochatClient(onMessage = { _, message, group, network ->
+            received += ReceivedMessage(network, group, message)
+        })
 
         client.handlePlainMessage(
             """
             {"m":"Message","c":{
-              "author_id":"1","author_info":{"name":"Alex","uuid":"$uuid"},"content":"public"
+              "author_id":"1","author_info":{"name":"Alex","uuid":"$uuid"},
+              "content":"public","channel":"liquidbounce"
             }}
             """.trimIndent()
         )
         client.handlePlainMessage(
             """
             {"m":"PrivateMessage","c":{
-              "author_id":"1","author_info":{"name":"Alex","uuid":"$uuid"},"content":"private"
+              "author_id":"1","author_info":{"name":"Alex","uuid":"$uuid"},
+              "content":"private","channel":"fdpclient"
             }}
             """.trimIndent()
         )
 
         assertEquals(
             listOf(
-                ClientChatMessageEvent.ChatGroup.PUBLIC_CHAT to "public",
-                ClientChatMessageEvent.ChatGroup.PRIVATE_CHAT to "private",
+                ReceivedMessage(
+                    ChatNetwork.LIQUIDBOUNCE,
+                    ClientChatMessageEvent.ChatGroup.PUBLIC_CHAT,
+                    "public",
+                ),
+                ReceivedMessage(
+                    ChatNetwork.FDPCLIENT,
+                    ClientChatMessageEvent.ChatGroup.PRIVATE_CHAT,
+                    "private",
+                ),
             ),
             received,
         )
+    }
+
+    @Test
+    fun `missing unknown and legacy channels are ignored instead of mixed`() {
+        val uuid = UUID.fromString("922ad8ba-4b1e-4c6c-b217-61dba0d21731")
+        val received = mutableListOf<String>()
+        val client = AxochatClient(onMessage = { _, message, _, _ -> received += message })
+
+        listOf(
+            """
+            {"m":"Message","c":{
+              "author_info":{"name":"Alex","uuid":"$uuid"},"content":"missing"
+            }}
+            """.trimIndent(),
+            """
+            {"m":"Message","c":{
+              "author_info":{"name":"Alex","uuid":"$uuid"},"content":"unknown","channel":"other"
+            }}
+            """.trimIndent(),
+            """
+            {"m":"Message","c":{
+              "author_info":{"name":"Alex","uuid":"$uuid"},"content":"legacy","channel":"legacy"
+            }}
+            """.trimIndent(),
+        ).forEach(client::handlePlainMessage)
+
+        assertEquals(emptyList(), received)
+    }
+
+    @Test
+    fun `login response advertises channel support`() {
+        val supported = AxochatClient()
+        val legacy = AxochatClient()
+
+        supported.handlePlainMessage(
+            """{"m":"Success","c":{"reason":"Login","supports_channels":true}}"""
+        )
+        legacy.handlePlainMessage("""{"m":"Success","c":{"reason":"Login"}}""")
+
+        assertTrue(supported.isLoggedIn)
+        assertTrue(supported.supportsClientChannels)
+        assertTrue(legacy.isLoggedIn)
+        assertFalse(legacy.supportsClientChannels)
     }
 
     @Test
@@ -154,4 +231,10 @@ class AxochatClientProtocolTest {
             handler.engine().closeOutbound()
         }
     }
+
+    private data class ReceivedMessage(
+        val network: ChatNetwork,
+        val group: ClientChatMessageEvent.ChatGroup,
+        val content: String,
+    )
 }

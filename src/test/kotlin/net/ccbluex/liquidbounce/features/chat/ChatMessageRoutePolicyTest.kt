@@ -19,18 +19,17 @@ import kotlin.test.assertTrue
 class ChatMessageRoutePolicyTest {
 
     @Test
-    fun `only messages from the active network are visible`() {
-        assertTrue(ChatMessageRoutePolicy.isVisible(ChatNetwork.AXOCHAT, ChatNetwork.AXOCHAT))
-        assertFalse(ChatMessageRoutePolicy.isVisible(ChatNetwork.MINECRAFT, ChatNetwork.AXOCHAT))
+    fun `only messages from the active channel are visible`() {
+        assertTrue(ChatMessageRoutePolicy.isVisible(ChatNetwork.LIQUIDBOUNCE, ChatNetwork.LIQUIDBOUNCE))
+        assertTrue(ChatMessageRoutePolicy.isVisible(ChatNetwork.FDPCLIENT, ChatNetwork.FDPCLIENT))
+        assertFalse(ChatMessageRoutePolicy.isVisible(ChatNetwork.LIQUIDBOUNCE, ChatNetwork.FDPCLIENT))
+        assertFalse(ChatMessageRoutePolicy.isVisible(ChatNetwork.MINECRAFT, ChatNetwork.LIQUIDBOUNCE))
     }
 
     @Test
-    fun `history keeps the newest one hundred messages from each network`() {
+    fun `history keeps the newest one hundred messages from each channel`() {
         val messages = (0..ChatMessageRoutePolicy.MAX_MESSAGES_PER_NETWORK).flatMap { index ->
-            listOf(
-                RoutedMessage(index, ChatNetwork.MINECRAFT),
-                RoutedMessage(index, ChatNetwork.AXOCHAT),
-            )
+            ChatNetwork.entries.map { RoutedMessage(index, it) }
         }.toMutableList()
 
         ChatMessageRoutePolicy.prune(
@@ -39,13 +38,13 @@ class ChatMessageRoutePolicyTest {
             networkOf = RoutedMessage::network,
         )
 
-        assertEquals(100, messages.count { it.network == ChatNetwork.MINECRAFT })
-        assertEquals(100, messages.count { it.network == ChatNetwork.AXOCHAT })
-        assertEquals(99, messages.last { it.network == ChatNetwork.MINECRAFT }.id)
-        assertEquals(99, messages.last { it.network == ChatNetwork.AXOCHAT }.id)
+        ChatNetwork.entries.forEach { network ->
+            assertEquals(100, messages.count { it.network == network })
+            assertEquals(99, messages.last { it.network == network }.id)
+        }
 
         val infiniteHistory = (0..ChatMessageRoutePolicy.MAX_MESSAGES_PER_NETWORK)
-            .map { RoutedMessage(it, ChatNetwork.AXOCHAT) }
+            .map { RoutedMessage(it, ChatNetwork.FDPCLIENT) }
             .toMutableList()
         ChatMessageRoutePolicy.prune(
             infiniteHistory,
@@ -56,10 +55,28 @@ class ChatMessageRoutePolicyTest {
     }
 
     @Test
-    fun `route clear removes only the active network unless all history is requested`() {
-        assertTrue(ChatMessageRoutePolicy.shouldClear(ChatNetwork.AXOCHAT, ChatNetwork.AXOCHAT, clearAll = false))
-        assertFalse(ChatMessageRoutePolicy.shouldClear(ChatNetwork.MINECRAFT, ChatNetwork.AXOCHAT, clearAll = false))
-        assertTrue(ChatMessageRoutePolicy.shouldClear(ChatNetwork.MINECRAFT, ChatNetwork.AXOCHAT, clearAll = true))
+    fun `route clear removes only the active channel unless all history is requested`() {
+        assertTrue(
+            ChatMessageRoutePolicy.shouldClear(
+                ChatNetwork.FDPCLIENT,
+                ChatNetwork.FDPCLIENT,
+                clearAll = false,
+            )
+        )
+        assertFalse(
+            ChatMessageRoutePolicy.shouldClear(
+                ChatNetwork.LIQUIDBOUNCE,
+                ChatNetwork.FDPCLIENT,
+                clearAll = false,
+            )
+        )
+        assertTrue(
+            ChatMessageRoutePolicy.shouldClear(
+                ChatNetwork.LIQUIDBOUNCE,
+                ChatNetwork.FDPCLIENT,
+                clearAll = true,
+            )
+        )
     }
 
     @Test

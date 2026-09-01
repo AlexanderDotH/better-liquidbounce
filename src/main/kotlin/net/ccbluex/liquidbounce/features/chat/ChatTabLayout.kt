@@ -10,9 +10,12 @@
  */
 package net.ccbluex.liquidbounce.features.chat
 
+import net.minecraft.resources.Identifier
+
 data class ChatTabSpec(
     val id: String,
     val label: String,
+    val icon: Identifier,
     val contentWidth: Int,
     val selected: Boolean = false,
     val color: Int = -1,
@@ -22,6 +25,7 @@ data class ChatTabSpec(
 data class ChatTabBounds(
     val id: String,
     val label: String,
+    val icon: Identifier,
     val selected: Boolean,
     val color: Int,
     val status: ChatConnectionStatus,
@@ -38,10 +42,12 @@ data class ChatTabBounds(
 
 object ChatTabLayout {
 
-    const val ROW_HEIGHT = 12
+    const val ROW_HEIGHT = 18
+    const val ICON_SIZE = 10
+    const val ICON_GAP = 4
     private const val EDGE_MARGIN = 2
-    private const val TAB_GAP = 2
-    private const val HORIZONTAL_PADDING = 8
+    private const val TAB_GAP = 3
+    private const val HORIZONTAL_PADDING = 10
 
     @JvmStatic
     fun arrangeSide(
@@ -55,8 +61,9 @@ object ChatTabLayout {
         val maxLeft = (viewportWidth - EDGE_MARGIN - 1).coerceAtLeast(EDGE_MARGIN)
         val left = requestedLeft.coerceIn(EDGE_MARGIN, maxLeft)
         val availableWidth = (viewportWidth - EDGE_MARGIN - left).coerceAtLeast(1)
-        val width = tabs.maxOf { it.contentWidth.coerceAtLeast(0) + HORIZONTAL_PADDING }
-            .coerceAtMost(availableWidth)
+        val width = tabs.maxOf {
+            it.contentWidth.coerceAtLeast(0) + ICON_SIZE + ICON_GAP + HORIZONTAL_PADDING
+        }.coerceAtMost(availableWidth)
         val totalHeight = tabs.size * ROW_HEIGHT + (tabs.size - 1) * TAB_GAP
         var top = (bottom - totalHeight).coerceAtLeast(EDGE_MARGIN)
 
@@ -64,6 +71,7 @@ object ChatTabLayout {
             ChatTabBounds(
                 id = tab.id,
                 label = tab.label,
+                icon = tab.icon,
                 selected = tab.selected,
                 color = tab.color,
                 status = tab.status,

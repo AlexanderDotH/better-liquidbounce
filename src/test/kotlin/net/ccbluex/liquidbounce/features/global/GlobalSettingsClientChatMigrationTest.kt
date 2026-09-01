@@ -62,7 +62,10 @@ class GlobalSettingsClientChatMigrationTest {
         assertTrue(source.contains("object LiquidBounceFDP : ToggleableValueGroup"))
         assertFalse(source.contains("object Essential : ToggleableValueGroup"))
         assertTrue(source.contains("text(\"JwtToken\", \"\").notAnOption()"))
-        assertTrue(source.contains("network = ChatNetwork.AXOCHAT"))
+        assertTrue(source.contains("ChatNetwork.LIQUIDBOUNCE"))
+        assertTrue(source.contains("ChatNetwork.FDPCLIENT"))
+        assertFalse(source.contains("ChatNetwork.AXOCHAT"))
+        assertTrue(source.contains("chatClient.supportsClientChannels"))
         assertFalse(source.contains("translation(\"liquidbounce.liquidchat.states.disconnected\")"))
         assertTrue(source.contains("chatClient.connect()\n        }\n        delay(5.seconds)"))
     }

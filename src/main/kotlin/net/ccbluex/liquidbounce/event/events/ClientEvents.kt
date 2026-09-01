@@ -27,6 +27,7 @@ import net.ccbluex.liquidbounce.config.types.group.ValueGroup
 import net.ccbluex.liquidbounce.config.types.list.Tagged
 import net.ccbluex.liquidbounce.event.CancellableEvent
 import net.ccbluex.liquidbounce.event.Event
+import net.ccbluex.liquidbounce.features.chat.ChatNetwork
 import net.ccbluex.liquidbounce.features.chat.packet.AxoUser
 import net.ccbluex.liquidbounce.features.misc.proxy.Proxy
 import net.ccbluex.liquidbounce.integration.interop.protocol.event.WebSocketEvent
@@ -133,6 +134,7 @@ class ClientChatMessageEvent(
     val user: AxoUser,
     val message: String,
     val chatGroup: ChatGroup,
+    val network: ChatNetwork,
 ) : Event(), WebSocketEvent {
     enum class ChatGroup(override val tag: String) : Tagged {
         @SerializedName("public")

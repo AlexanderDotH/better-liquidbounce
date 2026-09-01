@@ -10,7 +10,33 @@
  */
 package net.ccbluex.liquidbounce.features.chat
 
-enum class ChatNetwork(val id: String, val label: String) {
-    MINECRAFT("minecraft", "Minecraft"),
-    AXOCHAT("axochat", "LiquidBounce/FDP"),
+import net.ccbluex.liquidbounce.features.chat.packet.AxoChatClientId
+import net.minecraft.resources.Identifier
+
+enum class ChatNetwork(val id: String, val label: String, val icon: Identifier) {
+    MINECRAFT("minecraft", "Minecraft", Identifier.withDefaultNamespace("icon/draft_report")),
+    LIQUIDBOUNCE(
+        "liquidbounce",
+        "LiquidBounce",
+        Identifier.fromNamespaceAndPath("liquidbounce", "client_icons/liquidbounce"),
+    ),
+    FDPCLIENT(
+        "fdpclient",
+        "FDPClient",
+        Identifier.fromNamespaceAndPath("liquidbounce", "client_icons/fdpclient"),
+    ),
 }
+
+val AxoChatClientId.chatNetwork: ChatNetwork?
+    get() = when (this) {
+        AxoChatClientId.LIQUIDBOUNCE -> ChatNetwork.LIQUIDBOUNCE
+        AxoChatClientId.FDPCLIENT -> ChatNetwork.FDPCLIENT
+        AxoChatClientId.LEGACY -> null
+    }
+
+val ChatNetwork.axoChatClientId: AxoChatClientId?
+    get() = when (this) {
+        ChatNetwork.MINECRAFT -> null
+        ChatNetwork.LIQUIDBOUNCE -> AxoChatClientId.LIQUIDBOUNCE
+        ChatNetwork.FDPCLIENT -> AxoChatClientId.FDPCLIENT
+    }

@@ -105,7 +105,10 @@ data class C2SRequestUserPresencePacket(
 data class C2SMessagePacket(
 
     @SerializedName("content")
-    val content: String
+    val content: String,
+
+    @SerializedName("channel")
+    val channel: AxoChatClientId,
 
 ) : AxochatPacket.C2S
 

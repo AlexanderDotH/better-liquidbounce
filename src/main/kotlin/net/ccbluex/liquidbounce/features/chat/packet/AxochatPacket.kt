@@ -48,6 +48,9 @@ enum class AxoChatClientId {
 
     @SerializedName("fdpclient")
     FDPCLIENT,
+
+    @SerializedName("legacy")
+    LEGACY,
 }
 
 data class AxoUserPresence(

@@ -25,12 +25,12 @@ class ClientChatScreenBridgeTest {
     fun resetTabs() = ClientChatTabs.reset()
 
     @Test
-    fun `client commands run before an external provider can receive input`() {
+    fun `client commands run before an external channel can receive input`() {
         var sends = 0
 
         val submission = ClientChatScreenBridge.routeInput(
             message = ".toggle fly",
-            activeNetwork = ChatNetwork.AXOCHAT,
+            activeNetwork = ChatNetwork.LIQUIDBOUNCE,
             commandConsumed = true,
         ) { _, _ ->
             sends++
@@ -47,7 +47,7 @@ class ClientChatScreenBridgeTest {
 
         val submission = ClientChatScreenBridge.routeInput(
             message = "/msg Alex hello",
-            activeNetwork = ChatNetwork.AXOCHAT,
+            activeNetwork = ChatNetwork.FDPCLIENT,
             commandConsumed = false,
         ) { _, _ ->
             sends++
@@ -62,7 +62,7 @@ class ClientChatScreenBridgeTest {
     fun `failed external sends keep the draft and never fall back to Minecraft`() {
         val submission = ClientChatScreenBridge.routeInput(
             message = "still here",
-            activeNetwork = ChatNetwork.AXOCHAT,
+            activeNetwork = ChatNetwork.FDPCLIENT,
             commandConsumed = false,
         ) { _, _ -> false }
 
@@ -72,7 +72,7 @@ class ClientChatScreenBridgeTest {
     }
 
     @Test
-    fun `successful ordinary text is intercepted only on an external tab`() {
+    fun `ordinary text preserves the selected external channel`() {
         val sent = mutableListOf<Pair<ChatNetwork, String>>()
         val sender = { network: ChatNetwork, message: String ->
             sent += network to message
@@ -80,11 +80,19 @@ class ClientChatScreenBridgeTest {
         }
 
         val minecraft = ClientChatScreenBridge.routeInput("hello", ChatNetwork.MINECRAFT, false, sender)
-        val axochat = ClientChatScreenBridge.routeInput("hello", ChatNetwork.AXOCHAT, false, sender)
+        val liquidBounce = ClientChatScreenBridge.routeInput("hello LB", ChatNetwork.LIQUIDBOUNCE, false, sender)
+        val fdp = ClientChatScreenBridge.routeInput("hello FDP", ChatNetwork.FDPCLIENT, false, sender)
 
         assertEquals(ChatSubmission.VANILLA, minecraft)
-        assertEquals(ChatSubmission.EXTERNAL_SENT, axochat)
-        assertEquals(listOf(ChatNetwork.AXOCHAT to "hello"), sent)
+        assertEquals(ChatSubmission.EXTERNAL_SENT, liquidBounce)
+        assertEquals(ChatSubmission.EXTERNAL_SENT, fdp)
+        assertEquals(
+            listOf(
+                ChatNetwork.LIQUIDBOUNCE to "hello LB",
+                ChatNetwork.FDPCLIENT to "hello FDP",
+            ),
+            sent,
+        )
     }
 
     @Test
@@ -96,52 +104,59 @@ class ClientChatScreenBridgeTest {
     }
 
     @Test
-    fun `switching and cycling preserve each tab draft and scroll`() {
-        ClientChatTabs.setAvailable(ChatNetwork.AXOCHAT, true)
-        ClientChatTabs.setDraft(ChatNetwork.AXOCHAT, "Axo draft")
-        ClientChatTabs.setScrollPosition(ChatNetwork.AXOCHAT, 7)
+    fun `switching and cycling preserve each channel draft and scroll`() {
+        ClientChatTabs.setAvailable(ChatNetwork.LIQUIDBOUNCE, true)
+        ClientChatTabs.setAvailable(ChatNetwork.FDPCLIENT, true)
+        ClientChatTabs.setDraft(ChatNetwork.LIQUIDBOUNCE, "LB draft")
+        ClientChatTabs.setDraft(ChatNetwork.FDPCLIENT, "FDP draft")
+        ClientChatTabs.setScrollPosition(ChatNetwork.LIQUIDBOUNCE, 7)
+        ClientChatTabs.setScrollPosition(ChatNetwork.FDPCLIENT, 9)
 
-        val axochat = ClientChatScreenBridge.switchTo("axochat", "Minecraft draft", 3)!!
-        val minecraft = ClientChatScreenBridge.cycle(-1, "Edited Axo draft", 5)
+        val liquidBounce = ClientChatScreenBridge.switchTo("liquidbounce", "Minecraft draft", 3)!!
+        val fdp = ClientChatScreenBridge.cycle(1, "Edited LB draft", 5)
 
-        assertEquals(ChatTabTransition("Axo draft", 7), axochat)
-        assertEquals(ChatTabTransition("Minecraft draft", 3), minecraft)
-        assertEquals("Edited Axo draft", ClientChatTabs.draft(ChatNetwork.AXOCHAT))
-        assertEquals(5, ClientChatTabs.scrollPosition(ChatNetwork.AXOCHAT))
+        assertEquals(ChatTabTransition("LB draft", 7), liquidBounce)
+        assertEquals(ChatTabTransition("FDP draft", 9), fdp)
+        assertEquals("Edited LB draft", ClientChatTabs.draft(ChatNetwork.LIQUIDBOUNCE))
+        assertEquals(5, ClientChatTabs.scrollPosition(ChatNetwork.LIQUIDBOUNCE))
     }
 
     @Test
-    fun `visible tabs use full labels and append unread counts`() {
-        ClientChatTabs.setAvailable(ChatNetwork.AXOCHAT, true)
-        ClientChatTabs.incrementUnread(ChatNetwork.AXOCHAT, 12)
+    fun `visible tabs use separate labels icons and unread counts`() {
+        ClientChatTabs.setAvailable(ChatNetwork.LIQUIDBOUNCE, true)
+        ClientChatTabs.setAvailable(ChatNetwork.FDPCLIENT, true)
+        ClientChatTabs.incrementUnread(ChatNetwork.FDPCLIENT, 12)
 
         val tabs = ClientChatScreenBridge.visibleTabs()
 
-        assertEquals(listOf("Minecraft", "LiquidBounce/FDP (12)"), tabs.map(ChatTabView::label))
+        assertEquals(listOf("Minecraft", "LiquidBounce", "FDPClient (12)"), tabs.map(ChatTabView::label))
+        assertEquals(ChatNetwork.entries.map(ChatNetwork::icon), tabs.map(ChatTabView::icon))
         assertTrue(tabs.first().selected)
         assertFalse(tabs.last().selected)
     }
 
     @Test
     fun `slash-prefilled chat always opens the Minecraft tab`() {
-        ClientChatTabs.setAvailable(ChatNetwork.AXOCHAT, true)
-        ClientChatTabs.switchTo(ChatNetwork.AXOCHAT)
-        ClientChatTabs.setDraft(ChatNetwork.AXOCHAT, "external draft")
+        ClientChatTabs.setAvailable(ChatNetwork.FDPCLIENT, true)
+        ClientChatTabs.switchTo(ChatNetwork.FDPCLIENT)
+        ClientChatTabs.setDraft(ChatNetwork.FDPCLIENT, "external draft")
 
         val transition = ClientChatScreenBridge.initialState("/")
 
         assertEquals(ChatNetwork.MINECRAFT, ClientChatTabs.activeNetwork)
         assertEquals(ChatTabTransition("/", 0), transition)
-        assertEquals("external draft", ClientChatTabs.draft(ChatNetwork.AXOCHAT))
+        assertEquals("external draft", ClientChatTabs.draft(ChatNetwork.FDPCLIENT))
     }
 
     @Test
-    fun `chat networks use the same brand colors as client indicators`() {
+    fun `chat channels use distinct brand colors`() {
         val liquidBounceColor = Color4b.fromHex("#0080FF")
 
         assertEquals(
             ClientBrandColors.color(ClientBrand.LIQUIDBOUNCE, liquidBounceColor),
-            chatNetworkColor(ChatNetwork.AXOCHAT, liquidBounceColor),
+            chatNetworkColor(ChatNetwork.LIQUIDBOUNCE, liquidBounceColor),
         )
+        assertEquals(Color4b.fromHex("#FF5C5C"), chatNetworkColor(ChatNetwork.FDPCLIENT, liquidBounceColor))
+        assertEquals(Color4b.WHITE, chatNetworkColor(ChatNetwork.MINECRAFT, liquidBounceColor))
     }
 }
