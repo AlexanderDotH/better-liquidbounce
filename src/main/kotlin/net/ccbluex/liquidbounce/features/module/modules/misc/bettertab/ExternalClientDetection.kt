@@ -20,6 +20,7 @@ package net.ccbluex.liquidbounce.features.module.modules.misc.bettertab
 
 import com.google.gson.JsonArray
 import com.google.gson.JsonObject
+import com.mojang.util.UndashedUuid
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.async
@@ -31,6 +32,7 @@ import kotlinx.coroutines.withTimeoutOrNull
 import net.ccbluex.liquidbounce.api.core.HttpClient
 import net.ccbluex.liquidbounce.api.core.HttpException
 import net.ccbluex.liquidbounce.api.core.HttpMethod
+import net.ccbluex.liquidbounce.api.core.HttpClient.mojangApiClient
 import net.ccbluex.liquidbounce.api.models.cosmetics.CosmeticCategory
 import net.ccbluex.liquidbounce.features.cosmetic.CosmeticService
 import net.ccbluex.liquidbounce.features.misc.ExternalClient
@@ -44,7 +46,11 @@ import okhttp3.Response
 import java.net.URI
 import java.time.Duration
 import java.time.Instant
+import java.util.Locale
 import java.util.UUID
+
+private const val OPTIFINE_CAPE_PREFIX = "https://optifine.net/capes/"
+private val MINECRAFT_NAME = Regex("[A-Za-z0-9_]{1,16}")
 
 @Suppress("TooManyFunctions")
 object ExternalClientDetection {
@@ -55,10 +61,12 @@ object ExternalClientDetection {
     private const val LABY_CAPE_PREFIX = "https://dl.labymod.net/capes/"
 
     private val listCacheLifetime = Duration.ofMinutes(10)
-    private val featherRefreshInterval = Duration.ofSeconds(30)
+    private val networkRefreshInterval = Duration.ofSeconds(30)
     private val featherAccountLifetime = Duration.ofMinutes(30)
-    private val featherOnlineLifetime = Duration.ofSeconds(90)
+    private val networkOnlineLifetime = Duration.ofSeconds(90)
     private val labyCacheLifetime = Duration.ofMinutes(30)
+    private val optifineCacheLifetime = Duration.ofMinutes(30)
+    private val profileCacheLifetime = Duration.ofMinutes(30)
     private val liquidBounceCacheLifetime = Duration.ofSeconds(60)
 
     private val lock = Any()
@@ -66,6 +74,9 @@ object ExternalClientDetection {
     private var nextWurstRefresh = Instant.EPOCH
     private var nextFeatherRefresh = Instant.EPOCH
     private var nextLabyRefresh = Instant.EPOCH
+    private var nextOptifineRefresh = Instant.EPOCH
+    private var nextEssentialRefresh = Instant.EPOCH
+    private var nextProfileRefresh = Instant.EPOCH
     private var meteorOwners = emptySet<UUID>()
     private var meteorOwnersExpireAt = Instant.EPOCH
     private var wurstOwners = emptySet<UUID>()
@@ -73,10 +84,15 @@ object ExternalClientDetection {
     private val liquidBounceCheckedUntil = hashMapOf<UUID, Instant>()
     private val labyCheckedUntil = hashMapOf<UUID, Instant>()
     private val labyInFlight = hashSetOf<UUID>()
+    private val optifineCheckedUntil = hashMapOf<UUID, Instant>()
+    private val optifineInFlight = hashSetOf<UUID>()
+    private val profileCache = hashMapOf<String, CachedProfile>()
 
     @Suppress("CognitiveComplexMethod", "LongMethod")
-    suspend fun refresh(uuids: Collection<UUID>, clients: Set<ExternalClient>, ownershipSignals: Boolean) {
-        val requested = uuids.toCollection(linkedSetOf())
+    suspend fun refresh(players: Map<UUID, String>, clients: Set<ExternalClient>, ownershipSignals: Boolean) {
+        val canonicalByLocal = resolveCanonicalPlayerUuids(players)
+        val providerPlayers = players.entries.associate { (uuid, name) -> canonicalByLocal.getValue(uuid) to name }
+        val requested = providerPlayers.keys.toCollection(linkedSetOf())
         if (requested.isEmpty()) {
             return
         }
@@ -84,6 +100,7 @@ object ExternalClientDetection {
         val now = Instant.now()
         var liquidBounceCandidates = emptyList<UUID>()
         var labyCandidates = emptyList<UUID>()
+        var optifineCandidates = emptyList<Pair<UUID, String>>()
         var cachedMeteorOwners = emptyList<UUID>()
         var cachedMeteorExpiresAt = Instant.EPOCH
         var cachedWurstOwners = emptyList<UUID>()
@@ -91,6 +108,7 @@ object ExternalClientDetection {
         var meteorDue = false
         var wurstDue = false
         var featherDue = false
+        var essentialDue = false
         synchronized(lock) {
             if (ownershipSignals && ExternalClient.LIQUIDBOUNCE in clients) {
                 liquidBounceCandidates = claimUnchecked(
@@ -121,12 +139,20 @@ object ExternalClientDetection {
                 }
             }
             if (ExternalClient.FEATHER in clients && !now.isBefore(nextFeatherRefresh)) {
-                nextFeatherRefresh = now.plus(featherRefreshInterval)
+                nextFeatherRefresh = now.plus(networkRefreshInterval)
                 featherDue = true
             }
             if (ownershipSignals && ExternalClient.LABYMOD in clients && !now.isBefore(nextLabyRefresh)) {
-                nextLabyRefresh = now.plus(featherRefreshInterval)
+                nextLabyRefresh = now.plus(networkRefreshInterval)
                 labyCandidates = claimLaby(requested, now)
+            }
+            if (ownershipSignals && ExternalClient.OPTIFINE in clients && !now.isBefore(nextOptifineRefresh)) {
+                nextOptifineRefresh = now.plus(networkRefreshInterval)
+                optifineCandidates = claimOptifine(providerPlayers, now)
+            }
+            if (ExternalClient.ESSENTIAL in clients && !now.isBefore(nextEssentialRefresh)) {
+                nextEssentialRefresh = now.plus(networkRefreshInterval)
+                essentialDue = true
             }
         }
 
@@ -146,6 +172,82 @@ object ExternalClientDetection {
             if (wurstDue) launch { detectWurst(requested) }
             if (featherDue) launch { detectFeather(requested, ownershipSignals) }
             if (labyCandidates.isNotEmpty()) launch { detectLaby(labyCandidates) }
+            if (optifineCandidates.isNotEmpty()) launch { detectOptifine(optifineCandidates) }
+            if (essentialDue) launch { detectEssential(players.keys) }
+        }
+        mirrorCanonicalObservations(canonicalByLocal)
+    }
+
+    private suspend fun resolveCanonicalPlayerUuids(players: Map<UUID, String>): Map<UUID, UUID> {
+        val now = Instant.now()
+        val names = synchronized(lock) {
+            profileCache.entries.removeIf { !it.value.expiresAt.isAfter(now) }
+            if (now.isBefore(nextProfileRefresh)) {
+                emptyList()
+            } else {
+                players.asSequence()
+                    .filter { (uuid, name) -> uuid.version() != 4 && MINECRAFT_NAME.matches(name) }
+                    .map { it.value }
+                    .distinctBy(String::normalizedMinecraftName)
+                    .filterNot { profileCache.containsKey(it.normalizedMinecraftName()) }
+                    .take(PROFILE_LOOKUP_LIMIT)
+                    .toList()
+            }
+        }
+
+        if (names.isNotEmpty()) {
+            var complete = true
+            names.chunked(PROFILE_LOOKUP_BATCH_SIZE).forEach { batch ->
+                if (!resolveProfileBatch(batch)) {
+                    complete = false
+                }
+            }
+            synchronized(lock) {
+                nextProfileRefresh = Instant.now().plusSeconds(if (complete) 1 else 30)
+            }
+        }
+
+        val resolved = synchronized(lock) {
+            profileCache.mapNotNull { (name, cached) -> cached.uuid?.let { name to it } }.toMap()
+        }
+        return canonicalPlayerUuids(players, resolved)
+    }
+
+    private suspend fun resolveProfileBatch(names: List<String>): Boolean {
+        val profiles = try {
+            withTimeoutOrNull(5_000L) { mojangApiClient.mojangApi.fetchProfiles(names) }
+                ?: return false
+        } catch (exception: CancellationException) {
+            throw exception
+        } catch (_: Exception) {
+            return false
+        }
+        val requested = names.associateBy(String::normalizedMinecraftName)
+        val resolved = profiles.mapNotNull { profile ->
+            val normalizedName = profile.name.normalizedMinecraftName()
+            if (normalizedName !in requested) {
+                return@mapNotNull null
+            }
+            val uuid = runCatching { UndashedUuid.fromString(profile.id) }.getOrNull()
+                ?.takeIf { it.version() == 4 }
+                ?: return@mapNotNull null
+            normalizedName to uuid
+        }.toMap()
+        val expiresAt = Instant.now().plus(profileCacheLifetime)
+        synchronized(lock) {
+            requested.keys.forEach { name -> profileCache[name] = CachedProfile(resolved[name], expiresAt) }
+        }
+        return true
+    }
+
+    private fun mirrorCanonicalObservations(canonicalByLocal: Map<UUID, UUID>) {
+        canonicalByLocal.forEach { (local, canonical) ->
+            if (local == canonical) {
+                return@forEach
+            }
+            ExternalClientUsers.users(canonical).forEach { user ->
+                ExternalClientUsers.observe(user.copy(uuid = local))
+            }
         }
     }
 
@@ -204,7 +306,7 @@ object ExternalClientDetection {
                         account.uuid,
                         ExternalClient.FEATHER,
                         ExternalClientEvidence.NETWORK_ONLINE,
-                        featherOnlineLifetime,
+                        networkOnlineLifetime,
                     )
                 }
             }
@@ -237,6 +339,41 @@ object ExternalClientDetection {
         }
         if (hasCape == true) {
             observeUntil(uuid, ExternalClient.LABYMOD, ExternalClientEvidence.CAPE, requireNotNull(expiresAt))
+        }
+    }
+
+    private suspend fun detectOptifine(candidates: List<Pair<UUID, String>>) {
+        candidates.chunked(4).forEach { chunk ->
+            coroutineScope {
+                chunk.map { (uuid, url) ->
+                    async { detectOptifine(uuid, url) }
+                }.awaitAll()
+            }
+        }
+    }
+
+    private suspend fun detectOptifine(uuid: UUID, url: String) {
+        val hasCape = try {
+            head(url)
+        } catch (exception: CancellationException) {
+            synchronized(lock) { optifineInFlight.remove(uuid) }
+            throw exception
+        }
+        val expiresAt = hasCape?.let { Instant.now().plus(optifineCacheLifetime) }
+        synchronized(lock) {
+            optifineInFlight.remove(uuid)
+            if (expiresAt != null) {
+                optifineCheckedUntil[uuid] = expiresAt
+            }
+        }
+        if (hasCape == true) {
+            observeUntil(uuid, ExternalClient.OPTIFINE, ExternalClientEvidence.CAPE, requireNotNull(expiresAt))
+        }
+    }
+
+    private fun detectEssential(requested: Set<UUID>) {
+        EssentialPresenceBridge.onlineUsers(requested).forEach { uuid ->
+            observe(uuid, ExternalClient.ESSENTIAL, ExternalClientEvidence.NETWORK_ONLINE, networkOnlineLifetime)
         }
     }
 
@@ -288,7 +425,9 @@ object ExternalClientDetection {
 
         return try {
             withTimeoutOrNull(5_000L) {
-                HttpClient.request(url, HttpMethod.HEAD).use { it.request.url.isHttps }
+                HttpClient.request(url, HttpMethod.HEAD).use { response ->
+                    response.request.url.isHttps && isCapeContentType(response.header("Content-Type"))
+                }
             }
         } catch (exception: HttpException) {
             false.takeIf { exception.code == 404 }
@@ -342,7 +481,41 @@ object ExternalClientDetection {
             .onEach(labyInFlight::add)
     }
 
+    private fun claimOptifine(players: Map<UUID, String>, now: Instant): List<Pair<UUID, String>> {
+        optifineCheckedUntil.entries.removeIf { !it.value.isAfter(now) }
+        return players.asSequence()
+            .mapNotNull { (uuid, name) -> optifineCapeUrl(name)?.let { uuid to it } }
+            .filterNot { (uuid) -> uuid in optifineCheckedUntil || uuid in optifineInFlight }
+            .take(20)
+            .toList()
+            .onEach { (uuid) -> optifineInFlight.add(uuid) }
+    }
+
     private fun String.isHttps(): Boolean = runCatching {
         URI(this).scheme.equals("https", ignoreCase = true)
     }.getOrDefault(false)
 }
+
+private const val PROFILE_LOOKUP_BATCH_SIZE = 10
+private const val PROFILE_LOOKUP_LIMIT = 20
+
+private data class CachedProfile(val uuid: UUID?, val expiresAt: Instant)
+
+internal fun canonicalPlayerUuids(
+    players: Map<UUID, String>,
+    resolvedByName: Map<String, UUID>,
+): Map<UUID, UUID> = players.mapValues { (uuid, name) ->
+    if (uuid.version() == 4) {
+        uuid
+    } else {
+        resolvedByName[name.normalizedMinecraftName()]?.takeIf { it.version() == 4 } ?: uuid
+    }
+}
+
+private fun String.normalizedMinecraftName() = lowercase(Locale.ROOT)
+
+internal fun optifineCapeUrl(name: String): String? =
+    name.takeIf(MINECRAFT_NAME::matches)?.let { "$OPTIFINE_CAPE_PREFIX$it.png" }
+
+internal fun isCapeContentType(value: String?): Boolean =
+    value?.substringBefore(';')?.trim()?.equals("image/png", ignoreCase = true) == true

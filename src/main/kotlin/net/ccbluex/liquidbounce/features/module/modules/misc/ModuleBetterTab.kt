@@ -138,14 +138,14 @@ object ModuleBetterTab : ClientModule("BetterTab", ModuleCategories.RENDER) {
                 return@withContext null
             }
             Triple(
-                mc.connection?.listedOnlinePlayers?.map { it.profile.id }.orEmpty(),
+                mc.connection?.onlinePlayers?.associate { it.profile.id to it.profile.name }.orEmpty(),
                 ClientPlayers.clients.toSet(),
                 ClientPlayers.ownershipSignals,
             )
         } ?: return@tickHandler
-        val (uuids, clients, ownershipSignals) = snapshot
+        val (players, clients, ownershipSignals) = snapshot
         ExternalClientDetection.refresh(
-            uuids = uuids,
+            players = players,
             clients = clients,
             ownershipSignals = ownershipSignals,
         )

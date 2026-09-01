@@ -18,10 +18,12 @@
  */
 package net.ccbluex.liquidbounce.features.module.modules.misc.bettertab
 
+import java.util.Optional
 import java.util.UUID
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class ExternalClientDetectionTest {
@@ -103,5 +105,84 @@ class ExternalClientDetectionTest {
 
         assertEquals(listOf(100, 100, 1), batches.map(List<UUID>::size))
         assertEquals(201, batches.flatten().toSet().size)
+    }
+
+    @Test
+    fun `offline server UUIDs use exact resolved Mojang profiles for provider lookups`() {
+        val offline = UUID.nameUUIDFromBytes("OfflinePlayer:Alex_123".encodeToByteArray())
+        val unresolved = UUID.nameUUIDFromBytes("OfflinePlayer:Unknown".encodeToByteArray())
+        val invalidResolution = UUID.nameUUIDFromBytes("OfflinePlayer:StillOffline".encodeToByteArray())
+
+        assertEquals(
+            mapOf(
+                requested to requested,
+                offline to other,
+                unresolved to unresolved,
+            ),
+            canonicalPlayerUuids(
+                players = mapOf(
+                    requested to "OnlinePlayer",
+                    offline to "Alex_123",
+                    unresolved to "Unknown",
+                ),
+                resolvedByName = mapOf(
+                    "alex_123" to other,
+                    "unknown" to invalidResolution,
+                ),
+            ),
+        )
+    }
+
+    @Test
+    fun `OptiFine cape lookup accepts only exact Minecraft names`() {
+        assertEquals("https://optifine.net/capes/Alex_123.png", optifineCapeUrl("Alex_123"))
+        assertNull(optifineCapeUrl(""))
+        assertNull(optifineCapeUrl("more_than_16_chars"))
+        assertNull(optifineCapeUrl("../Alex"))
+    }
+
+    @Test
+    fun `cape probes accept PNG responses only`() {
+        assertTrue(isCapeContentType("image/png"))
+        assertTrue(isCapeContentType("IMAGE/PNG; charset=binary"))
+        assertFalse(isCapeContentType("text/html"))
+        assertFalse(isCapeContentType(null))
+    }
+
+    @Test
+    fun `Essential bridge keeps only exact online statuses and fails closed`() {
+        assertEquals(
+            setOf(requested),
+            essentialOnlineUsers(setOf(requested, other), FakeEssential::class.java),
+        )
+        assertTrue(essentialOnlineUsers(setOf(requested), String::class.java).isEmpty())
+    }
+
+    class FakeEssential {
+        fun getConnectionManager() = FakeConnectionManager()
+
+        companion object {
+            @JvmStatic
+            fun getInstance() = FakeEssential()
+        }
+    }
+
+    class FakeConnectionManager {
+        fun getProfileManager() = FakeProfileManager()
+    }
+
+    class FakeProfileManager {
+        fun getStatusIfLoaded(uuid: UUID): Optional<FakeStatus> = Optional.of(
+            if (uuid == UUID.fromString("1229d842-ca63-4aa5-b218-9efd7dbc4341")) {
+                FakeStatus.ONLINE
+            } else {
+                FakeStatus.OFFLINE
+            }
+        )
+    }
+
+    enum class FakeStatus {
+        ONLINE,
+        OFFLINE,
     }
 }

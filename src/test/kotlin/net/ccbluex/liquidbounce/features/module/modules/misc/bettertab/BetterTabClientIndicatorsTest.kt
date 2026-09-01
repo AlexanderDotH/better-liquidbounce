@@ -16,17 +16,21 @@ import net.ccbluex.liquidbounce.features.misc.ExternalClientUser
 import net.ccbluex.liquidbounce.render.engine.type.Color4b
 import net.ccbluex.liquidbounce.utils.text.PlainText
 import net.minecraft.network.chat.Component
+import net.minecraft.network.chat.contents.ObjectContents
+import net.minecraft.network.chat.contents.objects.AtlasSprite
+import net.minecraft.resources.Identifier
 import java.time.Instant
 import java.util.UUID
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertSame
 
 class BetterTabClientIndicatorsTest {
 
     @Test
-    fun `full and short labels cover every supported client`() {
+    fun `icons retain full and short accessible labels for every supported client`() {
         val fullLabels = mapOf(
             ExternalClient.LIQUIDBOUNCE to "LiquidBounce",
             ExternalClient.LIQUIDBOUNCE_FDP to "LiquidBounce/FDP",
@@ -49,22 +53,48 @@ class BetterTabClientIndicatorsTest {
         )
 
         fullLabels.forEach { (client, label) ->
-            assertEquals(" [$label]", badges(user(client), labelStyle = ClientLabelStyle.FULL).string)
+            val badge = badges(user(client), labelStyle = ClientLabelStyle.FULL)
+
+            assertEquals(" $label", badge.string)
+            assertEquals(listOf(clientIconId(client)), iconSprites(badge))
         }
         shortLabels.forEach { (client, label) ->
-            assertEquals(" [$label]", badges(user(client), labelStyle = ClientLabelStyle.SHORT).string)
+            val badge = badges(user(client), labelStyle = ClientLabelStyle.SHORT)
+
+            assertEquals(" $label", badge.string)
+            assertEquals(listOf(clientIconId(client)), iconSprites(badge))
         }
     }
 
     @Test
-    fun `ownership evidence carries a question mark and can be hidden`() {
+    fun `every client icon is bundled in the GUI sprite atlas path`() {
+        ExternalClient.entries.map(::clientIconId).distinct().forEach { id ->
+            assertNotNull(
+                javaClass.getResource("/assets/${id.namespace}/textures/gui/sprites/${id.path}.png"),
+                id.toString(),
+            )
+        }
+    }
+
+    @Test
+    fun `ownership evidence renders without a question mark and can be hidden`() {
         val users = listOf(
             user(ExternalClient.LIQUIDBOUNCE, ExternalClientEvidence.CAPE),
             user(ExternalClient.METEOR, ExternalClientEvidence.ACCOUNT),
             user(ExternalClient.OPTIFINE, ExternalClientEvidence.CAPE),
         )
 
-        assertEquals(" [LiquidBounce?] [Meteor?] [OptiFine?]", badges(*users.toTypedArray()).string)
+        val badges = badges(*users.toTypedArray())
+
+        assertEquals(" LiquidBounce Meteor OptiFine", badges.string)
+        assertEquals(
+            listOf(
+                clientIconId(ExternalClient.LIQUIDBOUNCE),
+                clientIconId(ExternalClient.METEOR),
+                clientIconId(ExternalClient.OPTIFINE),
+            ),
+            iconSprites(badges),
+        )
         assertNull(
             BetterTabClientIndicators.playerBadges(
                 users = users,
@@ -84,7 +114,7 @@ class BetterTabClientIndicatorsTest {
             user(ExternalClient.ESSENTIAL, ExternalClientEvidence.NETWORK_ONLINE),
         )
 
-        assertEquals(" [LiquidBounce/FDP] [Feather] [Essential]", badges(*users.toTypedArray()).string)
+        assertEquals(" LiquidBounce/FDP Feather Essential", badges(*users.toTypedArray()).string)
     }
 
     @Test
@@ -95,7 +125,7 @@ class BetterTabClientIndicatorsTest {
             user(ExternalClient.LIQUIDBOUNCE_FDP, ExternalClientEvidence.RECENT_CHAT, uuid),
         )
 
-        assertEquals(" [LiquidBounce/FDP]", badges(*users.toTypedArray()).string)
+        assertEquals(" LiquidBounce/FDP", badges(*users.toTypedArray()).string)
     }
 
     @Test
@@ -106,7 +136,7 @@ class BetterTabClientIndicatorsTest {
             user(ExternalClient.WURST, ExternalClientEvidence.ACCOUNT, uuid),
         )
 
-        assertEquals(" [Meteor] [Wurst?]", badges(*users.toTypedArray()).string)
+        assertEquals(" Meteor Wurst", badges(*users.toTypedArray()).string)
     }
 
     @Test
@@ -114,7 +144,7 @@ class BetterTabClientIndicatorsTest {
         val users = listOf(
             user(ExternalClient.FEATHER, ExternalClientEvidence.NETWORK_ONLINE),
             user(ExternalClient.METEOR, ExternalClientEvidence.ACCOUNT),
-            user(ExternalClient.METEOR, ExternalClientEvidence.ACCOUNT),
+            user(ExternalClient.METEOR, ExternalClientEvidence.NETWORK_ONLINE),
         )
 
         val legend = BetterTabClientIndicators.legend(
@@ -125,7 +155,11 @@ class BetterTabClientIndicatorsTest {
             liquidBounceColor = LB_COLOR,
         )
 
-        assertEquals("Clients: [Feather 1] [Meteor? 2]", legend!!.string)
+        assertEquals("Clients: Feather 1 Meteor 2", legend!!.string)
+        assertEquals(
+            listOf(clientIconId(ExternalClient.FEATHER), clientIconId(ExternalClient.METEOR)),
+            iconSprites(legend),
+        )
     }
 
     @Test
@@ -141,8 +175,8 @@ class BetterTabClientIndicatorsTest {
         )!!
         val expected = BetterTabClientIndicators.color(ExternalClient.METEOR, LB_COLOR).toTextColor()
 
-        assertEquals(expected, coloredSegment(badge).style.color)
-        assertEquals(expected, coloredSegment(legend).style.color)
+        assertEquals(expected, coloredIcon(badge).style.color)
+        assertEquals(expected, coloredIcon(legend).style.color)
         assertEquals(Color4b.fromHex("#0080FF"), BetterTabClientIndicators.color(ExternalClient.LIQUIDBOUNCE, LB_COLOR))
         assertEquals(
             Color4b.fromHex("#0080FF"),
@@ -192,8 +226,14 @@ class BetterTabClientIndicatorsTest {
         expiresAt = NOW.plusSeconds(60),
     )
 
-    private fun coloredSegment(component: Component) =
-        (listOf(component) + component.siblings).single { it.style.color != null }
+    private fun iconSprites(component: Component): List<Identifier> =
+        (listOf(component) + component.siblings).mapNotNull { child ->
+            val objectContents = child.contents as? ObjectContents ?: return@mapNotNull null
+            (objectContents.contents as? AtlasSprite)?.sprite
+        }
+
+    private fun coloredIcon(component: Component) =
+        (listOf(component) + component.siblings).single { it.contents is ObjectContents }
 
     private companion object {
         val NOW: Instant = Instant.parse("2026-08-31T12:00:00Z")

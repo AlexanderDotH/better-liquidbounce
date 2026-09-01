@@ -20,6 +20,8 @@ import net.ccbluex.liquidbounce.render.engine.type.Color4b
 import net.ccbluex.liquidbounce.utils.text.PlainText
 import net.ccbluex.liquidbounce.utils.text.TextBuilder
 import net.minecraft.network.chat.Component
+import net.minecraft.network.chat.contents.objects.AtlasSprite
+import net.minecraft.resources.Identifier
 
 enum class ClientLabelStyle(override val tag: String) : Tagged {
     FULL("Full"),
@@ -42,12 +44,8 @@ internal object BetterTabClientIndicators {
 
         return TextBuilder().apply {
             markers.forEach { marker ->
-                add(
-                    PlainText.of(
-                        " [${marker.label(labelStyle)}]",
-                        color(marker.client, liquidBounceColor).toTextColor(),
-                    ),
-                )
+                add(PlainText.SPACE)
+                add(marker.icon(labelStyle, liquidBounceColor))
             }
         }.build()
     }
@@ -70,14 +68,11 @@ internal object BetterTabClientIndicators {
 
         return TextBuilder(PlainText.of("Clients:")).apply {
             counts.entries
-                .sortedWith(compareBy({ it.key.client.ordinal }, { it.key.uncertain }))
+                .sortedBy { it.key.client.ordinal }
                 .forEach { (marker, count) ->
-                    add(
-                        PlainText.of(
-                            " [${marker.label(labelStyle)} $count]",
-                            color(marker.client, liquidBounceColor).toTextColor(),
-                        ),
-                    )
+                    add(PlainText.SPACE)
+                    add(marker.icon(labelStyle, liquidBounceColor))
+                    add(PlainText.of(" $count", color(marker.client, liquidBounceColor).toTextColor()))
                 }
         }.build()
     }
@@ -115,15 +110,18 @@ internal object BetterTabClientIndicators {
 
         return strongest.values
             .sortedBy { it.client.ordinal }
-            .map { ClientMarker(it.client, it.evidence.uncertain) }
+            .map { ClientMarker(it.client) }
     }
 
-    private fun ClientMarker.label(style: ClientLabelStyle): String {
-        val label = when (style) {
+    private fun ClientMarker.icon(style: ClientLabelStyle, liquidBounceColor: Color4b): Component {
+        val fallback = when (style) {
             ClientLabelStyle.FULL -> client.fullLabel()
             ClientLabelStyle.SHORT -> client.shortLabel()
         }
-        return label + if (uncertain) "?" else ""
+        return Component.`object`(
+            AtlasSprite(GUI_ATLAS, clientIconId(client)),
+            PlainText.of(fallback),
+        ).withStyle { it.withColor(color(client, liquidBounceColor).toTextColor()) }
     }
 
     private fun ExternalClient.fullLabel() = when (this) {
@@ -161,10 +159,27 @@ internal object BetterTabClientIndicators {
             ExternalClient.ESSENTIAL -> ClientBrand.ESSENTIAL
         }
 
-    private data class ClientMarker(val client: ExternalClient, val uncertain: Boolean)
+    private data class ClientMarker(val client: ExternalClient)
 
     private val USER_ORDER = compareBy<ExternalClientUser> { it.evidence.strength }
         .thenBy { it.observedAt }
         .thenBy { it.expiresAt }
 
 }
+
+private val GUI_ATLAS = Identifier.withDefaultNamespace("gui")
+
+internal fun clientIconId(client: ExternalClient): Identifier = Identifier.fromNamespaceAndPath(
+    "liquidbounce",
+    "client_icons/" + when (client) {
+        ExternalClient.LIQUIDBOUNCE,
+        ExternalClient.LIQUIDBOUNCE_FDP,
+        -> "liquidbounce"
+        ExternalClient.FEATHER -> "feather"
+        ExternalClient.METEOR -> "meteor"
+        ExternalClient.WURST -> "wurst"
+        ExternalClient.LABYMOD -> "labymod"
+        ExternalClient.OPTIFINE -> "optifine"
+        ExternalClient.ESSENTIAL -> "essential"
+    },
+)
