@@ -25,8 +25,6 @@ data class ChatTabView(
     val status: ChatConnectionStatus,
 )
 
-data class EssentialTargetView(val id: String, val label: String, val selected: Boolean, val color: Int)
-
 data class ChatTabTransition(val draft: String, val scrollPosition: Int)
 
 enum class ChatSubmission(val cancelVanilla: Boolean, val keepDraft: Boolean) {
@@ -51,26 +49,6 @@ object ClientChatScreenBridge {
             chatNetworkColor(network, liquidBounceColor).argb,
             ClientChatTabs.connectionStatus(network),
         )
-    }
-
-    @JvmStatic
-    fun refreshAvailability() = GlobalSettingsClientChat.refreshEssentialAvailability()
-
-    @JvmStatic
-    fun refreshEssentialChat() = GlobalSettingsClientChat.refreshEssentialChat()
-
-    @JvmStatic
-    @JvmOverloads
-    fun essentialTargets(liquidBounceColor: Color4b = Color4b.LIQUID_BOUNCE): List<EssentialTargetView> {
-        if (ClientChatTabs.activeNetwork != ChatNetwork.ESSENTIAL) return emptyList()
-
-        val targets = GlobalSettingsClientChat.essentialTargets()
-        val selected = ClientChatTabs.essentialSelectedTarget
-        if (selected != null && targets.none { it.id == selected }) {
-            ClientChatTabs.selectEssentialTarget(null)
-        }
-        val color = chatNetworkColor(ChatNetwork.ESSENTIAL, liquidBounceColor).argb
-        return targets.map { EssentialTargetView(it.id.toString(), it.label, it.id == selected, color) }
     }
 
     @JvmStatic
@@ -100,7 +78,6 @@ object ClientChatScreenBridge {
         val target = ChatNetwork.entries.firstOrNull { it.id == networkId } ?: return null
         rememberCurrent(currentDraft, currentScroll)
         if (!ClientChatTabs.switchTo(target)) return null
-        if (target == ChatNetwork.ESSENTIAL) GlobalSettingsClientChat.refreshEssentialChat()
         return activeTransition()
     }
 
@@ -108,14 +85,7 @@ object ClientChatScreenBridge {
     fun cycle(direction: Int, currentDraft: String, currentScroll: Int): ChatTabTransition {
         rememberCurrent(currentDraft, currentScroll)
         ClientChatTabs.cycle(direction)
-        if (ClientChatTabs.activeNetwork == ChatNetwork.ESSENTIAL) GlobalSettingsClientChat.refreshEssentialChat()
         return activeTransition()
-    }
-
-    @JvmStatic
-    fun selectEssentialTarget(id: String): Boolean {
-        val target = id.toLongOrNull() ?: return false
-        return GlobalSettingsClientChat.selectEssentialTarget(target)
     }
 
     @JvmStatic
@@ -148,7 +118,6 @@ object ClientChatScreenBridge {
     private fun sendExternal(network: ChatNetwork, message: String) = when (network) {
         ChatNetwork.MINECRAFT -> false
         ChatNetwork.AXOCHAT -> GlobalSettingsClientChat.sendAxochatMessage(message)
-        ChatNetwork.ESSENTIAL -> GlobalSettingsClientChat.sendEssentialMessage(message)
     }
 
     private fun rememberCurrent(draft: String, scrollPosition: Int) {
@@ -166,5 +135,4 @@ object ClientChatScreenBridge {
 internal fun chatNetworkColor(network: ChatNetwork, liquidBounceColor: Color4b): Color4b = when (network) {
     ChatNetwork.MINECRAFT -> Color4b.WHITE
     ChatNetwork.AXOCHAT -> ClientBrandColors.color(ClientBrand.LIQUIDBOUNCE, liquidBounceColor)
-    ChatNetwork.ESSENTIAL -> ClientBrandColors.color(ClientBrand.ESSENTIAL, liquidBounceColor)
 }

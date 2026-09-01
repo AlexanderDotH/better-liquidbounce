@@ -14,7 +14,6 @@ import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
-import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class ClientChatTabsTest {
@@ -25,14 +24,13 @@ class ClientChatTabsTest {
     @Test
     fun `network IDs labels and tab order are stable`() {
         assertEquals(
-            listOf(ChatNetwork.MINECRAFT, ChatNetwork.AXOCHAT, ChatNetwork.ESSENTIAL),
+            listOf(ChatNetwork.MINECRAFT, ChatNetwork.AXOCHAT),
             ClientChatTabs.tabOrder,
         )
         assertEquals(
             listOf(
                 "minecraft" to "Minecraft",
                 "axochat" to "LiquidBounce/FDP",
-                "essential" to "Essential",
             ),
             ClientChatTabs.tabOrder.map { it.id to it.label },
         )
@@ -42,7 +40,6 @@ class ClientChatTabsTest {
     fun `Minecraft remains visible while optional networks can be toggled`() {
         assertEquals(listOf(ChatNetwork.MINECRAFT), ClientChatTabs.visibleNetworks)
 
-        assertTrue(ClientChatTabs.setAvailable(ChatNetwork.ESSENTIAL, true))
         assertTrue(ClientChatTabs.setAvailable(ChatNetwork.AXOCHAT, true))
         assertEquals(ClientChatTabs.tabOrder, ClientChatTabs.visibleNetworks)
 
@@ -67,16 +64,13 @@ class ClientChatTabsTest {
     @Test
     fun `switching clears only the selected network unread count`() {
         ClientChatTabs.setAvailable(ChatNetwork.AXOCHAT, true)
-        ClientChatTabs.setAvailable(ChatNetwork.ESSENTIAL, true)
+        ClientChatTabs.incrementUnread(ChatNetwork.AXOCHAT, 3)
+
         ClientChatTabs.switchTo(ChatNetwork.AXOCHAT)
-        ClientChatTabs.incrementUnread(ChatNetwork.MINECRAFT, 2)
-        ClientChatTabs.incrementUnread(ChatNetwork.ESSENTIAL, 3)
 
-        ClientChatTabs.switchTo(ChatNetwork.MINECRAFT)
-
-        assertEquals(0, ClientChatTabs.unreadCount(ChatNetwork.MINECRAFT))
-        assertEquals(3, ClientChatTabs.unreadCount(ChatNetwork.ESSENTIAL))
         assertEquals(0, ClientChatTabs.unreadCount(ChatNetwork.AXOCHAT))
+        ClientChatTabs.incrementUnread(ChatNetwork.MINECRAFT, 2)
+        assertEquals(2, ClientChatTabs.unreadCount(ChatNetwork.MINECRAFT))
     }
 
     @Test
@@ -88,33 +82,28 @@ class ClientChatTabsTest {
 
         assertEquals("server message", ClientChatTabs.draft(ChatNetwork.MINECRAFT))
         assertEquals("global message", ClientChatTabs.draft(ChatNetwork.AXOCHAT))
-        assertEquals("", ClientChatTabs.draft(ChatNetwork.ESSENTIAL))
         assertEquals(4, ClientChatTabs.scrollPosition(ChatNetwork.MINECRAFT))
         assertEquals(9, ClientChatTabs.scrollPosition(ChatNetwork.AXOCHAT))
-        assertEquals(0, ClientChatTabs.scrollPosition(ChatNetwork.ESSENTIAL))
     }
 
     @Test
     fun `cycling follows only visible networks and wraps in both directions`() {
-        ClientChatTabs.setAvailable(ChatNetwork.ESSENTIAL, true)
+        ClientChatTabs.setAvailable(ChatNetwork.AXOCHAT, true)
 
-        assertEquals(ChatNetwork.ESSENTIAL, ClientChatTabs.cycle(1))
+        assertEquals(ChatNetwork.AXOCHAT, ClientChatTabs.cycle(1))
         assertEquals(ChatNetwork.MINECRAFT, ClientChatTabs.cycle(1))
-        assertEquals(ChatNetwork.ESSENTIAL, ClientChatTabs.cycle(-1))
+        assertEquals(ChatNetwork.AXOCHAT, ClientChatTabs.cycle(-1))
     }
 
     @Test
-    fun `connection status and Essential target are pure resettable state`() {
+    fun `connection status is resettable state`() {
         ClientChatTabs.setConnectionStatus(ChatNetwork.AXOCHAT, ChatConnectionStatus.CONNECTING)
-        ClientChatTabs.selectEssentialTarget(42L)
 
         assertEquals(ChatConnectionStatus.CONNECTED, ClientChatTabs.connectionStatus(ChatNetwork.MINECRAFT))
         assertEquals(ChatConnectionStatus.CONNECTING, ClientChatTabs.connectionStatus(ChatNetwork.AXOCHAT))
-        assertEquals(42L, ClientChatTabs.essentialSelectedTarget)
 
         ClientChatTabs.reset()
 
         assertEquals(ChatConnectionStatus.DISCONNECTED, ClientChatTabs.connectionStatus(ChatNetwork.AXOCHAT))
-        assertNull(ClientChatTabs.essentialSelectedTarget)
     }
 }

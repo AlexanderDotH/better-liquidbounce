@@ -30,9 +30,6 @@ object ClientChatTabs {
     var activeNetwork = ChatNetwork.MINECRAFT
         private set
 
-    var essentialSelectedTarget: Long? = null
-        private set
-
     val visibleNetworks: List<ChatNetwork>
         get() = tabOrder.filter(::isAvailable)
 
@@ -96,10 +93,6 @@ object ClientChatTabs {
         connectionStatuses[network] = status
     }
 
-    fun selectEssentialTarget(target: Long?) {
-        essentialSelectedTarget = target
-    }
-
     fun reset() {
         availableNetworks.clear()
         availableNetworks += ChatNetwork.MINECRAFT
@@ -108,6 +101,5 @@ object ClientChatTabs {
         scrollPositions.clear()
         unreadCounts.clear()
         connectionStatuses.clear()
-        essentialSelectedTarget = null
     }
 }

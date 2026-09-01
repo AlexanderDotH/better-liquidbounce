@@ -40,19 +40,10 @@ import net.ccbluex.liquidbounce.event.events.SessionEvent
 import net.ccbluex.liquidbounce.event.handler
 import net.ccbluex.liquidbounce.event.suspendHandler
 import net.ccbluex.liquidbounce.event.tickHandler
-import net.ccbluex.liquidbounce.event.waitTicks
 import net.ccbluex.liquidbounce.features.chat.AxochatClient
 import net.ccbluex.liquidbounce.features.chat.ChatConnectionStatus
 import net.ccbluex.liquidbounce.features.chat.ChatNetwork
 import net.ccbluex.liquidbounce.features.chat.ClientChatTabs
-import net.ccbluex.liquidbounce.features.chat.EssentialChatAvailability
-import net.ccbluex.liquidbounce.features.chat.EssentialChatBridge
-import net.ccbluex.liquidbounce.features.chat.EssentialChatMessage
-import net.ccbluex.liquidbounce.features.chat.EssentialChatMessageKey
-import net.ccbluex.liquidbounce.features.chat.EssentialChatSnapshot
-import net.ccbluex.liquidbounce.features.chat.EssentialChatTarget
-import net.ccbluex.liquidbounce.features.chat.key
-import net.ccbluex.liquidbounce.features.chat.reconcileEssentialMessages
 import net.ccbluex.liquidbounce.features.chat.packet.C2SRequestJWTPacket
 import net.ccbluex.liquidbounce.features.command.CommandExecutor.suspendHandler
 import net.ccbluex.liquidbounce.features.command.CommandManager
@@ -72,7 +63,6 @@ import net.ccbluex.liquidbounce.utils.client.copyable
 import net.ccbluex.liquidbounce.utils.client.inGame
 import net.ccbluex.liquidbounce.utils.client.logger
 import net.ccbluex.liquidbounce.utils.client.notification
-import net.ccbluex.liquidbounce.utils.client.removeMessage
 import net.ccbluex.liquidbounce.utils.text.plus
 import net.ccbluex.liquidbounce.utils.client.regular
 import net.ccbluex.liquidbounce.utils.text.textOf
@@ -167,25 +157,9 @@ object GlobalSettingsClientChat : ToggleableValueGroup(
             }
     }
 
-    object Essential : ToggleableValueGroup(GlobalSettingsClientChat, "Essential", true) {
-
-        val directMessages by boolean("DirectMessages", true)
-
-        val groupMessages by boolean("GroupMessages", true)
-
-        override fun onEnabled() {
-            if (GlobalSettingsClientChat.running) {
-                GlobalSettingsClientChat.refreshEssentialChat()
-            }
-        }
-
-        override fun onDisabled() = GlobalSettingsClientChat.disableEssentialChat()
-    }
-
     override fun onEnabledValueRegistration(value: Value<Boolean>) =
         super.onEnabledValueRegistration(value).onChanged {
             setAxochatAvailable(enabled && LiquidBounceFDP.enabled)
-            if (!enabled) disableEssentialChat()
         }
 
     private val prefix: Component = "".asText()
@@ -199,14 +173,6 @@ object GlobalSettingsClientChat : ToggleableValueGroup(
         network = ChatNetwork.AXOCHAT,
     )
     private val messageData = MessageMetadata(prefix = false, network = ChatNetwork.AXOCHAT)
-    private var essentialSnapshot = EssentialChatSnapshot(
-        EssentialChatAvailability.UNAVAILABLE,
-        emptyList(),
-        emptyList(),
-        null,
-    )
-    private var renderedEssentialMessages = emptyMap<EssentialChatMessageKey, EssentialChatMessage>()
-
     private fun createChatWriteCommand() = CommandBuilder
         .begin("chat")
         .parameter(
@@ -258,7 +224,7 @@ object GlobalSettingsClientChat : ToggleableValueGroup(
         .build()
 
     init {
-        treeAll(LiquidBounceFDP, Essential)
+        treeAll(LiquidBounceFDP)
         setAxochatAvailable(enabled && LiquidBounceFDP.enabled)
         CommandManager.addCommand(createChatWriteCommand())
         CommandManager.addCommand(createChatJwtCommand())
@@ -269,12 +235,10 @@ object GlobalSettingsClientChat : ToggleableValueGroup(
         if (LiquidBounceFDP.enabled) {
             eventListenerScope.launch { chatClient.connect() }
         }
-        refreshEssentialChat()
     }
 
     override fun onDisabled() {
         setAxochatAvailable(false)
-        disableEssentialChat()
         clearRecentChatUsers()
         chatClient.disconnect()
     }
@@ -289,132 +253,8 @@ object GlobalSettingsClientChat : ToggleableValueGroup(
         return true
     }
 
-    internal fun essentialTargets(): List<EssentialChatTarget> = essentialSnapshot.targets
-
-    internal fun refreshEssentialAvailability() {
-        val available = running && Essential.enabled &&
-            essentialSnapshot.availability == EssentialChatAvailability.AVAILABLE
-        setEssentialAvailable(available)
-    }
-
-    internal fun refreshEssentialChat() {
-        if (!running || !Essential.enabled) {
-            disableEssentialChat()
-            return
-        }
-
-        val snapshot = EssentialChatBridge.snapshot(Essential.directMessages, Essential.groupMessages)
-        essentialSnapshot = snapshot
-        val available = snapshot.availability == EssentialChatAvailability.AVAILABLE
-        setEssentialAvailable(available)
-        if (!available) {
-            clearRenderedEssentialMessages()
-            return
-        }
-
-        val selected = ClientChatTabs.essentialSelectedTarget
-            ?.takeIf { target -> snapshot.targets.any { it.id == target } }
-        if (selected == null) {
-            ClientChatTabs.selectEssentialTarget(null)
-            EssentialChatBridge.selectTarget(null)
-        } else {
-            EssentialChatBridge.selectTarget(selected)
-        }
-        syncEssentialMessages(snapshot)
-    }
-
-    internal fun selectEssentialTarget(targetId: Long): Boolean {
-        if (!running || !Essential.enabled || essentialSnapshot.targets.none { it.id == targetId }) {
-            return false
-        }
-        if (!EssentialChatBridge.selectTarget(targetId)) {
-            return false
-        }
-
-        ClientChatTabs.selectEssentialTarget(targetId)
-        syncEssentialMessages(essentialSnapshot)
-        return true
-    }
-
-    internal fun sendEssentialMessage(message: String): Boolean {
-        if (!running || !Essential.enabled ||
-            ClientChatTabs.connectionStatus(ChatNetwork.ESSENTIAL) != ChatConnectionStatus.CONNECTED
-        ) {
-            return false
-        }
-        return EssentialChatBridge.sendMessage(message)
-    }
-
-    internal fun disableEssentialChat() {
-        setEssentialAvailable(false)
-        essentialSnapshot = EssentialChatSnapshot(
-            EssentialChatAvailability.UNAVAILABLE,
-            emptyList(),
-            emptyList(),
-            null,
-        )
-        ClientChatTabs.selectEssentialTarget(null)
-        EssentialChatBridge.selectTarget(null)
-        clearRenderedEssentialMessages()
-    }
-
-    private fun syncEssentialMessages(snapshot: EssentialChatSnapshot) {
-        if (!inGame) {
-            renderedEssentialMessages = emptyMap()
-            return
-        }
-
-        val selected = ClientChatTabs.essentialSelectedTarget
-        val reconciliation = reconcileEssentialMessages(renderedEssentialMessages, snapshot, selected)
-        reconciliation.removed.forEach { key ->
-            mc.gui.hud.chat.removeMessage(key.metadataId, ChatNetwork.ESSENTIAL)
-        }
-        val targetLabel = snapshot.targets.firstOrNull { it.id == selected }?.label ?: Essential.name
-        reconciliation.upserts.forEach { message -> writeEssentialMessage(targetLabel, message) }
-        renderedEssentialMessages = reconciliation.current
-    }
-
-    private fun writeEssentialMessage(targetLabel: String, message: EssentialChatMessage) {
-        val sender = if (message.senderId == mc.user.profileId) "You" else message.senderId.toString().take(8)
-        val messagePrefix = textOf(
-            "[Essential • $targetLabel] ".asPlainText(ChatFormatting.BLUE),
-            sender.asPlainText(ChatFormatting.GRAY),
-            " ▸ ".asPlainText(ChatFormatting.DARK_GRAY),
-        )
-        chat(
-            messagePrefix,
-            regular(message.content).copyable(copyContent = message.content),
-            metadata = MessageMetadata(
-                prefix = false,
-                id = message.key.metadataId,
-                network = ChatNetwork.ESSENTIAL,
-            ),
-        )
-    }
-
-    private fun clearRenderedEssentialMessages() {
-        if (inGame) {
-            renderedEssentialMessages.keys.forEach { key ->
-                mc.gui.hud.chat.removeMessage(key.metadataId, ChatNetwork.ESSENTIAL)
-            }
-        }
-        renderedEssentialMessages = emptyMap()
-    }
-
-    private fun setEssentialAvailable(available: Boolean) {
-        ClientChatTabs.setAvailable(ChatNetwork.ESSENTIAL, available)
-        ClientChatTabs.setConnectionStatus(
-            ChatNetwork.ESSENTIAL,
-            if (available) ChatConnectionStatus.CONNECTED else ChatConnectionStatus.DISCONNECTED,
-        )
-    }
-
-    private val EssentialChatMessageKey.metadataId
-        get() = "Essential#$channelId#$messageId"
-
     @Suppress("unused")
     private val shutdownHandler = handler<ClientShutdownEvent> {
-        disableEssentialChat()
         clearRecentChatUsers()
         chatClient.disconnect()
     }
@@ -429,16 +269,8 @@ object GlobalSettingsClientChat : ToggleableValueGroup(
         setAxochatAvailable(true)
         if (!chatClient.isConnected) {
             chatClient.connect()
-        } else {
-            // Wait 5 seconds before retrying
-            delay(5.seconds)
         }
-    }
-
-    @Suppress("unused")
-    private val essentialSync = tickHandler {
-        waitTicks(20)
-        refreshEssentialChat()
+        delay(5.seconds)
     }
 
     @Suppress("unused")
@@ -551,13 +383,7 @@ object GlobalSettingsClientChat : ToggleableValueGroup(
                     NotificationEvent.Severity.INFO
                 )
             }
-            ClientChatStateChange.State.DISCONNECTED -> {
-                notification(
-                    "LiquidChat",
-                    translation("liquidbounce.liquidchat.states.disconnected"),
-                    NotificationEvent.Severity.INFO
-                )
-            }
+            ClientChatStateChange.State.DISCONNECTED -> Unit
             ClientChatStateChange.State.AUTHENTICATION_FAILED -> {
                 notification(
                     "LiquidChat",

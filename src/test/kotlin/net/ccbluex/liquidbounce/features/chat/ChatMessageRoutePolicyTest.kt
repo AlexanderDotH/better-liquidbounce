@@ -45,7 +45,7 @@ class ChatMessageRoutePolicyTest {
         assertEquals(99, messages.last { it.network == ChatNetwork.AXOCHAT }.id)
 
         val infiniteHistory = (0..ChatMessageRoutePolicy.MAX_MESSAGES_PER_NETWORK)
-            .map { RoutedMessage(it, ChatNetwork.ESSENTIAL) }
+            .map { RoutedMessage(it, ChatNetwork.AXOCHAT) }
             .toMutableList()
         ChatMessageRoutePolicy.prune(
             infiniteHistory,

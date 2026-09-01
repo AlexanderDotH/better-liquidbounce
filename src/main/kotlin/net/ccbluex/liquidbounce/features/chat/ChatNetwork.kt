@@ -13,5 +13,4 @@ package net.ccbluex.liquidbounce.features.chat
 enum class ChatNetwork(val id: String, val label: String) {
     MINECRAFT("minecraft", "Minecraft"),
     AXOCHAT("axochat", "LiquidBounce/FDP"),
-    ESSENTIAL("essential", "Essential"),
 }

@@ -44,17 +44,23 @@ object ChatTabLayout {
     private const val HORIZONTAL_PADDING = 8
 
     @JvmStatic
-    fun arrange(tabs: List<ChatTabSpec>, viewportWidth: Int, rowTop: Int): List<ChatTabBounds> {
+    fun arrangeSide(
+        tabs: List<ChatTabSpec>,
+        viewportWidth: Int,
+        requestedLeft: Int,
+        bottom: Int,
+    ): List<ChatTabBounds> {
         if (tabs.isEmpty()) return emptyList()
 
-        val innerWidth = (viewportWidth - EDGE_MARGIN * 2).coerceAtLeast(tabs.size)
-        val gap = if (tabs.size == 1) 0 else minOf(TAB_GAP, (innerWidth - tabs.size) / (tabs.size - 1))
-        val tabWidth = innerWidth - gap * (tabs.size - 1)
-        val preferred = tabs.map { it.contentWidth.coerceAtLeast(0) + HORIZONTAL_PADDING }
-        val widths = if (preferred.sum() <= tabWidth) preferred else distribute(tabWidth, tabs.size)
+        val maxLeft = (viewportWidth - EDGE_MARGIN - 1).coerceAtLeast(EDGE_MARGIN)
+        val left = requestedLeft.coerceIn(EDGE_MARGIN, maxLeft)
+        val availableWidth = (viewportWidth - EDGE_MARGIN - left).coerceAtLeast(1)
+        val width = tabs.maxOf { it.contentWidth.coerceAtLeast(0) + HORIZONTAL_PADDING }
+            .coerceAtMost(availableWidth)
+        val totalHeight = tabs.size * ROW_HEIGHT + (tabs.size - 1) * TAB_GAP
+        var top = (bottom - totalHeight).coerceAtLeast(EDGE_MARGIN)
 
-        var left = EDGE_MARGIN
-        return tabs.mapIndexed { index, tab ->
+        return tabs.map { tab ->
             ChatTabBounds(
                 id = tab.id,
                 label = tab.label,
@@ -62,17 +68,14 @@ object ChatTabLayout {
                 color = tab.color,
                 status = tab.status,
                 left = left,
-                top = rowTop,
-                right = left + widths[index],
-                bottom = rowTop + ROW_HEIGHT,
-            ).also { left = it.right + gap }
+                top = top,
+                right = left + width,
+                bottom = top + ROW_HEIGHT,
+            ).also { top = it.bottom + TAB_GAP }
         }
     }
 
     @JvmStatic
     fun hitTest(bounds: List<ChatTabBounds>, x: Double, y: Double): String? =
         bounds.firstOrNull { it.contains(x, y) }?.id
-
-    private fun distribute(width: Int, count: Int) =
-        List(count) { width / count + if (it < width % count) 1 else 0 }
 }

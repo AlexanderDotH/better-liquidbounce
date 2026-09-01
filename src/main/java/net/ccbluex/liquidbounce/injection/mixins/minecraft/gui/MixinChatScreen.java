@@ -57,10 +57,10 @@ public abstract class MixinChatScreen extends MixinScreen {
     public abstract String normalizeChatMessage(String message);
 
     @Unique
-    private static final int MAIN_TAB_TOP_OFFSET = 27;
+    private static final int CHAT_BOTTOM_OFFSET = 40;
 
     @Unique
-    private static final int ESSENTIAL_TAB_TOP_OFFSET = 40;
+    private static final int CHAT_SIDE_GAP = 6;
 
     @Unique
     private ChatSubmission liquidbounce$lastSubmission;
@@ -99,7 +99,6 @@ public abstract class MixinChatScreen extends MixinScreen {
     @Inject(method = "init", at = @At("TAIL"))
     private void initializeChatTabs(CallbackInfo ci) {
         liquidbounce$lastSubmission = null;
-        ClientChatScreenBridge.refreshEssentialChat();
         liquidbounce$applyTransition(ClientChatScreenBridge.initialState(input.getValue()));
     }
 
@@ -160,7 +159,6 @@ public abstract class MixinChatScreen extends MixinScreen {
 
     @Inject(method = "extractRenderState", at = @At("HEAD"))
     private void renderChatTabs(GuiGraphicsExtractor graphics, int mouseX, int mouseY, float delta, CallbackInfo ci) {
-        liquidbounce$renderTabRow(graphics, liquidbounce$essentialTabBounds());
         liquidbounce$renderTabRow(graphics, liquidbounce$networkTabBounds());
     }
 
@@ -198,11 +196,6 @@ public abstract class MixinChatScreen extends MixinScreen {
 
     @Unique
     private boolean liquidbounce$handleTabClick(double mouseX, double mouseY) {
-        String target = ChatTabLayout.hitTest(liquidbounce$essentialTabBounds(), mouseX, mouseY);
-        if (target != null && ClientChatScreenBridge.selectEssentialTarget(target)) {
-            return true;
-        }
-
         String network = ChatTabLayout.hitTest(liquidbounce$networkTabBounds(), mouseX, mouseY);
         if (network == null) {
             return false;
@@ -221,7 +214,6 @@ public abstract class MixinChatScreen extends MixinScreen {
 
     @Unique
     private List<ChatTabBounds> liquidbounce$networkTabBounds() {
-        ClientChatScreenBridge.refreshAvailability();
         var tabs = new ArrayList<ChatTabSpec>();
         for (var tab : ClientChatScreenBridge.visibleTabs(ModuleBetterTab.ClientPlayers.INSTANCE.getColor())) {
             tabs.add(new ChatTabSpec(
@@ -233,23 +225,15 @@ public abstract class MixinChatScreen extends MixinScreen {
                 tab.getStatus()
             ));
         }
-        return ChatTabLayout.arrange(tabs, width, height - MAIN_TAB_TOP_OFFSET);
-    }
-
-    @Unique
-    private List<ChatTabBounds> liquidbounce$essentialTabBounds() {
-        var tabs = new ArrayList<ChatTabSpec>();
-        for (var target : ClientChatScreenBridge.essentialTargets(ModuleBetterTab.ClientPlayers.INSTANCE.getColor())) {
-            tabs.add(new ChatTabSpec(
-                target.getId(),
-                target.getLabel(),
-                font.width(target.getLabel()),
-                target.getSelected(),
-                target.getColor(),
-                net.ccbluex.liquidbounce.features.chat.ChatConnectionStatus.CONNECTED
-            ));
-        }
-        return ChatTabLayout.arrange(tabs, width, height - ESSENTIAL_TAB_TOP_OFFSET);
+        var chat = (MixinChatComponentAccessor) minecraft.gui.hud.getChat();
+        double scale = Math.max(chat.invokeGetScale(), 0.01);
+        int chatRight = (int) Math.ceil((Math.ceil(chat.invokeGetWidth() / scale) + 4.0) * scale);
+        return ChatTabLayout.arrangeSide(
+            tabs,
+            width,
+            chatRight + CHAT_SIDE_GAP,
+            height - CHAT_BOTTOM_OFFSET
+        );
     }
 
     @Unique

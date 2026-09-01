@@ -18,29 +18,35 @@ import kotlin.test.assertTrue
 class ChatTabLayoutTest {
 
     @Test
-    fun `narrow rows retain every full label inside the viewport`() {
+    fun `tabs stack beside the chat and end above the input`() {
         val tabs = listOf(
             ChatTabSpec("minecraft", "Minecraft", 48, selected = true),
             ChatTabSpec("axochat", "LiquidBounce/FDP (12)", 104),
-            ChatTabSpec("essential", "Essential", 48),
         )
 
-        val bounds = ChatTabLayout.arrange(tabs, viewportWidth = 50, rowTop = 20)
+        val bounds = ChatTabLayout.arrangeSide(
+            tabs,
+            viewportWidth = 320,
+            requestedLeft = 120,
+            bottom = 260,
+        )
 
         assertEquals(tabs.map(ChatTabSpec::label), bounds.map(ChatTabBounds::label))
-        assertTrue(bounds.all { it.width > 0 && it.left >= 2 && it.right <= 48 })
-        assertTrue(bounds.zipWithNext().all { (left, right) -> left.right <= right.left })
+        assertTrue(bounds.all { it.left == 120 && it.right <= 318 })
+        assertEquals(260, bounds.last().bottom)
+        assertTrue(bounds.zipWithNext().all { (top, bottom) -> top.bottom < bottom.top })
     }
 
     @Test
     fun `hitboxes include their top left edges and exclude bottom right edges`() {
-        val bounds = ChatTabLayout.arrange(
+        val bounds = ChatTabLayout.arrangeSide(
             listOf(
                 ChatTabSpec("minecraft", "Minecraft", 20),
                 ChatTabSpec("axochat", "LiquidBounce/FDP", 20),
             ),
-            viewportWidth = 100,
-            rowTop = 30,
+            viewportWidth = 200,
+            requestedLeft = 100,
+            bottom = 100,
         )
         val first = bounds.first()
         val second = bounds.last()

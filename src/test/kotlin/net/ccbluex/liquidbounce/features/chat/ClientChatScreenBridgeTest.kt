@@ -47,7 +47,7 @@ class ClientChatScreenBridgeTest {
 
         val submission = ClientChatScreenBridge.routeInput(
             message = "/msg Alex hello",
-            activeNetwork = ChatNetwork.ESSENTIAL,
+            activeNetwork = ChatNetwork.AXOCHAT,
             commandConsumed = false,
         ) { _, _ ->
             sends++
@@ -142,10 +142,6 @@ class ClientChatScreenBridgeTest {
         assertEquals(
             ClientBrandColors.color(ClientBrand.LIQUIDBOUNCE, liquidBounceColor),
             chatNetworkColor(ChatNetwork.AXOCHAT, liquidBounceColor),
-        )
-        assertEquals(
-            ClientBrandColors.color(ClientBrand.ESSENTIAL, liquidBounceColor),
-            chatNetworkColor(ChatNetwork.ESSENTIAL, liquidBounceColor),
         )
     }
 }

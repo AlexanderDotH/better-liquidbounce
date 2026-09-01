@@ -13,6 +13,7 @@ package net.ccbluex.liquidbounce.features.global
 import com.google.gson.JsonParser
 import java.nio.file.Path
 import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 
@@ -59,8 +60,10 @@ class GlobalSettingsClientChatMigrationTest {
         assertTrue(source.contains("name = \"ClientChats\""))
         assertTrue(source.contains("aliases = listOf(\"ClientChat\", \"GlobalChat\", \"IRC\")"))
         assertTrue(source.contains("object LiquidBounceFDP : ToggleableValueGroup"))
-        assertTrue(source.contains("object Essential : ToggleableValueGroup"))
+        assertFalse(source.contains("object Essential : ToggleableValueGroup"))
         assertTrue(source.contains("text(\"JwtToken\", \"\").notAnOption()"))
         assertTrue(source.contains("network = ChatNetwork.AXOCHAT"))
+        assertFalse(source.contains("translation(\"liquidbounce.liquidchat.states.disconnected\")"))
+        assertTrue(source.contains("chatClient.connect()\n        }\n        delay(5.seconds)"))
     }
 }
