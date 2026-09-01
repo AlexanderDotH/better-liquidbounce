@@ -18,6 +18,7 @@
  */
 package net.ccbluex.liquidbounce.utils.client
 
+import net.ccbluex.liquidbounce.features.chat.ChatNetwork
 import net.ccbluex.liquidbounce.interfaces.GuiMessageAddition
 import net.ccbluex.liquidbounce.interfaces.GuiMessageLineAddition
 import net.minecraft.client.gui.components.ChatComponent
@@ -48,11 +49,21 @@ private fun getTag() = if (mc.isSingleplayer) {
  * @see ChatComponent.addMessage
  */
 @Suppress("CAST_NEVER_SUCCEEDS")
-fun ChatComponent.addMessage(message: Component, id: String?, count: Int) = mc.execute {
+fun ChatComponent.addMessage(
+    message: Component,
+    id: String?,
+    count: Int,
+    network: ChatNetwork = ChatNetwork.MINECRAFT,
+) = mc.execute {
     val guiMessage = GuiMessage(mc.gui.hud.guiTicks, message, null, GuiMessageSource.SYSTEM_CLIENT, getTag())
     (guiMessage as GuiMessageLineAddition).`liquid_bounce$setId`(id)
-    (guiMessage as GuiMessageAddition).`liquid_bounce$setCount`(count)
-    this.logChatMessage(guiMessage)
+    (guiMessage as GuiMessageAddition).apply {
+        `liquid_bounce$setCount`(count)
+        `liquid_bounce$setNetwork`(network)
+    }
+    if (network == ChatNetwork.MINECRAFT) {
+        this.logChatMessage(guiMessage)
+    }
     this.addMessageToDisplayQueue(guiMessage)
     this.addMessageToQueue(guiMessage)
 }
@@ -61,13 +72,15 @@ fun ChatComponent.addMessage(message: Component, id: String?, count: Int) = mc.e
  * Removes all messages with the given ID.
  */
 @Suppress("CAST_NEVER_SUCCEEDS")
-fun ChatComponent.removeMessage(id: String?) = mc.execute {
+fun ChatComponent.removeMessage(id: String?, network: ChatNetwork = ChatNetwork.MINECRAFT) = mc.execute {
     allMessages.removeIf {
         val removable = it as? GuiMessageLineAddition ?: return@removeIf false
-        id == removable.`liquid_bounce$getId`()
+        val routed = it as? GuiMessageAddition ?: return@removeIf false
+        id == removable.`liquid_bounce$getId`() && network == routed.`liquid_bounce$getNetwork`()
     }
     trimmedMessages.removeIf {
         val removable = it as? GuiMessageLineAddition ?: return@removeIf false
-        id == removable.`liquid_bounce$getId`()
+        val routed = it.parent() as? GuiMessageAddition ?: return@removeIf false
+        id == removable.`liquid_bounce$getId`() && network == routed.`liquid_bounce$getNetwork`()
     }
 }

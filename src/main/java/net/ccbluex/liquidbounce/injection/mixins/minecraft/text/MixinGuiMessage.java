@@ -18,6 +18,7 @@
  */
 package net.ccbluex.liquidbounce.injection.mixins.minecraft.text;
 
+import net.ccbluex.liquidbounce.features.chat.ChatNetwork;
 import net.ccbluex.liquidbounce.interfaces.GuiMessageAddition;
 import net.ccbluex.liquidbounce.interfaces.GuiMessageLineAddition;
 import net.minecraft.client.multiplayer.chat.GuiMessage;
@@ -33,6 +34,9 @@ public abstract class MixinGuiMessage implements GuiMessageLineAddition, GuiMess
 
     @Unique
     private int liquid_bounce$count = 1;
+
+    @Unique
+    private ChatNetwork liquid_bounce$network = ChatNetwork.MINECRAFT;
 
     @Unique
     @Override
@@ -56,6 +60,18 @@ public abstract class MixinGuiMessage implements GuiMessageLineAddition, GuiMess
     @Override
     public int liquid_bounce$getCount() {
         return liquid_bounce$count;
+    }
+
+    @Unique
+    @Override
+    public void liquid_bounce$setNetwork(ChatNetwork network) {
+        this.liquid_bounce$network = network;
+    }
+
+    @Unique
+    @Override
+    public ChatNetwork liquid_bounce$getNetwork() {
+        return liquid_bounce$network;
     }
 
 }

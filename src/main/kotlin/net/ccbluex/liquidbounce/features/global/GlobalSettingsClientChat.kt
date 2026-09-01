@@ -19,11 +19,15 @@
 
 package net.ccbluex.liquidbounce.features.global
 
+import com.google.gson.JsonArray
+import com.google.gson.JsonElement
+import com.google.gson.JsonObject
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.future.await
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
+import net.ccbluex.liquidbounce.config.types.Value
 import net.ccbluex.liquidbounce.config.types.group.ToggleableValueGroup
 import net.ccbluex.liquidbounce.event.SuspendHandlerBehavior.CancelPrevious
 import net.ccbluex.liquidbounce.event.eventListenerScope
@@ -36,7 +40,19 @@ import net.ccbluex.liquidbounce.event.events.SessionEvent
 import net.ccbluex.liquidbounce.event.handler
 import net.ccbluex.liquidbounce.event.suspendHandler
 import net.ccbluex.liquidbounce.event.tickHandler
+import net.ccbluex.liquidbounce.event.waitTicks
 import net.ccbluex.liquidbounce.features.chat.AxochatClient
+import net.ccbluex.liquidbounce.features.chat.ChatConnectionStatus
+import net.ccbluex.liquidbounce.features.chat.ChatNetwork
+import net.ccbluex.liquidbounce.features.chat.ClientChatTabs
+import net.ccbluex.liquidbounce.features.chat.EssentialChatAvailability
+import net.ccbluex.liquidbounce.features.chat.EssentialChatBridge
+import net.ccbluex.liquidbounce.features.chat.EssentialChatMessage
+import net.ccbluex.liquidbounce.features.chat.EssentialChatMessageKey
+import net.ccbluex.liquidbounce.features.chat.EssentialChatSnapshot
+import net.ccbluex.liquidbounce.features.chat.EssentialChatTarget
+import net.ccbluex.liquidbounce.features.chat.key
+import net.ccbluex.liquidbounce.features.chat.reconcileEssentialMessages
 import net.ccbluex.liquidbounce.features.chat.packet.C2SRequestJWTPacket
 import net.ccbluex.liquidbounce.features.command.CommandExecutor.suspendHandler
 import net.ccbluex.liquidbounce.features.command.CommandManager
@@ -56,6 +72,7 @@ import net.ccbluex.liquidbounce.utils.client.copyable
 import net.ccbluex.liquidbounce.utils.client.inGame
 import net.ccbluex.liquidbounce.utils.client.logger
 import net.ccbluex.liquidbounce.utils.client.notification
+import net.ccbluex.liquidbounce.utils.client.removeMessage
 import net.ccbluex.liquidbounce.utils.text.plus
 import net.ccbluex.liquidbounce.utils.client.regular
 import net.ccbluex.liquidbounce.utils.text.textOf
@@ -75,24 +92,120 @@ import java.time.Instant
 import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Duration.Companion.seconds
 
+internal object ClientChatSettingsMigration {
+
+    private const val PROVIDER_NAME = "LiquidBounceFDP"
+    private val legacySettingNames = setOf("AutoTranslate", "JwtToken")
+
+    fun migrate(settings: JsonObject): Boolean {
+        val rootValues = settings["value"]?.takeIf { it.isJsonArray }?.asJsonArray ?: return false
+        val legacyValues = rootValues.filter { it.settingName() in legacySettingNames }
+        if (legacyValues.isEmpty()) {
+            return false
+        }
+
+        val provider = rootValues.firstOrNull { it.settingName() == PROVIDER_NAME }
+            ?.takeIf { it.isJsonObject }?.asJsonObject
+            ?: JsonObject().apply {
+                addProperty("name", PROVIDER_NAME)
+                add("value", JsonArray())
+                rootValues.add(this)
+            }
+        val providerValues = provider["value"]?.takeIf { it.isJsonArray }?.asJsonArray ?: return false
+        val providerNames = providerValues.mapNotNullTo(mutableSetOf()) { it.settingName() }
+
+        legacyValues.forEach { legacyValue ->
+            rootValues.remove(legacyValue)
+            if (providerNames.add(requireNotNull(legacyValue.settingName()))) {
+                providerValues.add(legacyValue)
+            }
+        }
+        return true
+    }
+
+    private fun JsonElement.settingName(): String? = takeIf { it.isJsonObject }
+        ?.asJsonObject
+        ?.get("name")
+        ?.takeIf { it.isJsonPrimitive && it.asJsonPrimitive.isString }
+        ?.asString
+}
+
+@Suppress("TooManyFunctions")
 object GlobalSettingsClientChat : ToggleableValueGroup(
-    name = "ClientChat",
+    name = "ClientChats",
     enabled = true,
-    aliases = listOf("GlobalChat", "IRC")
+    aliases = listOf("ClientChat", "GlobalChat", "IRC")
 ) {
 
-    private var jwtToken by text("JwtToken", "")
-
-    private val autoTranslate by multiEnumChoice<ClientChatMessageEvent.ChatGroup>("AutoTranslate")
-
     private val chatClient = AxochatClient()
+
+    object LiquidBounceFDP : ToggleableValueGroup(GlobalSettingsClientChat, "LiquidBounceFDP", true) {
+
+        internal var jwtToken by text("JwtToken", "").notAnOption()
+
+        internal val autoTranslate by multiEnumChoice<ClientChatMessageEvent.ChatGroup>("AutoTranslate")
+
+        override fun onEnabled() {
+            if (!GlobalSettingsClientChat.running) {
+                return
+            }
+            GlobalSettingsClientChat.setAxochatAvailable(true)
+            GlobalSettingsClientChat.eventListenerScope.launch {
+                GlobalSettingsClientChat.chatClient.connect()
+            }
+        }
+
+        override fun onDisabled() {
+            GlobalSettingsClientChat.setAxochatAvailable(false)
+            GlobalSettingsClientChat.clearRecentChatUsers()
+            GlobalSettingsClientChat.chatClient.disconnect()
+        }
+
+        override fun onEnabledValueRegistration(value: Value<Boolean>) =
+            super.onEnabledValueRegistration(value).onChanged {
+                GlobalSettingsClientChat.setAxochatAvailable(enabled && GlobalSettingsClientChat.enabled)
+            }
+    }
+
+    object Essential : ToggleableValueGroup(GlobalSettingsClientChat, "Essential", true) {
+
+        val directMessages by boolean("DirectMessages", true)
+
+        val groupMessages by boolean("GroupMessages", true)
+
+        override fun onEnabled() {
+            if (GlobalSettingsClientChat.running) {
+                GlobalSettingsClientChat.refreshEssentialChat()
+            }
+        }
+
+        override fun onDisabled() = GlobalSettingsClientChat.disableEssentialChat()
+    }
+
+    override fun onEnabledValueRegistration(value: Value<Boolean>) =
+        super.onEnabledValueRegistration(value).onChanged {
+            setAxochatAvailable(enabled && LiquidBounceFDP.enabled)
+            if (!enabled) disableEssentialChat()
+        }
+
     private val prefix: Component = "".asText()
         .withStyle(ChatFormatting.RESET).withStyle(ChatFormatting.GRAY)
-        .append(this.name.asPlainText(ChatFormatting.BLUE))
+        .append(LiquidBounceFDP.name.asPlainText(ChatFormatting.BLUE))
         .withStyle(ChatFormatting.BOLD)
         .append(" ▸ ".asText().withStyle(ChatFormatting.RESET).withColor(ChatFormatting.DARK_GRAY))
-    private val exceptionData = MessageMetadata(prefix = false, id = "LiquidChat#exception")
-    private val messageData = MessageMetadata(prefix = false)
+    private val exceptionData = MessageMetadata(
+        prefix = false,
+        id = "LiquidChat#exception",
+        network = ChatNetwork.AXOCHAT,
+    )
+    private val messageData = MessageMetadata(prefix = false, network = ChatNetwork.AXOCHAT)
+    private var essentialSnapshot = EssentialChatSnapshot(
+        EssentialChatAvailability.UNAVAILABLE,
+        emptyList(),
+        emptyList(),
+        null,
+    )
+    private var renderedEssentialMessages = emptyMap<EssentialChatMessageKey, EssentialChatMessage>()
 
     private fun createChatWriteCommand() = CommandBuilder
         .begin("chat")
@@ -121,7 +234,7 @@ object GlobalSettingsClientChat : ToggleableValueGroup(
                 return@suspendHandler
             }
 
-            chatClient.sendMessage((args[0] as Array<*>).joinToString(" ") { it as String })
+            sendAxochatMessage((args[0] as Array<*>).joinToString(" ") { it as String })
         }
         .build()
 
@@ -145,29 +258,175 @@ object GlobalSettingsClientChat : ToggleableValueGroup(
         .build()
 
     init {
+        treeAll(LiquidBounceFDP, Essential)
+        setAxochatAvailable(enabled && LiquidBounceFDP.enabled)
         CommandManager.addCommand(createChatWriteCommand())
         CommandManager.addCommand(createChatJwtCommand())
     }
 
     override fun onEnabled() {
-        eventListenerScope.launch {
-            chatClient.connect()
+        setAxochatAvailable(LiquidBounceFDP.enabled)
+        if (LiquidBounceFDP.enabled) {
+            eventListenerScope.launch { chatClient.connect() }
         }
+        refreshEssentialChat()
     }
 
     override fun onDisabled() {
+        setAxochatAvailable(false)
+        disableEssentialChat()
         clearRecentChatUsers()
         chatClient.disconnect()
     }
 
+    @JvmStatic
+    fun sendAxochatMessage(message: String): Boolean {
+        if (!running || !LiquidBounceFDP.enabled || !chatClient.isConnected || !chatClient.isLoggedIn) {
+            return false
+        }
+
+        chatClient.sendMessage(message)
+        return true
+    }
+
+    internal fun essentialTargets(): List<EssentialChatTarget> = essentialSnapshot.targets
+
+    internal fun refreshEssentialAvailability() {
+        val available = running && Essential.enabled &&
+            essentialSnapshot.availability == EssentialChatAvailability.AVAILABLE
+        setEssentialAvailable(available)
+    }
+
+    internal fun refreshEssentialChat() {
+        if (!running || !Essential.enabled) {
+            disableEssentialChat()
+            return
+        }
+
+        val snapshot = EssentialChatBridge.snapshot(Essential.directMessages, Essential.groupMessages)
+        essentialSnapshot = snapshot
+        val available = snapshot.availability == EssentialChatAvailability.AVAILABLE
+        setEssentialAvailable(available)
+        if (!available) {
+            clearRenderedEssentialMessages()
+            return
+        }
+
+        val selected = ClientChatTabs.essentialSelectedTarget
+            ?.takeIf { target -> snapshot.targets.any { it.id == target } }
+        if (selected == null) {
+            ClientChatTabs.selectEssentialTarget(null)
+            EssentialChatBridge.selectTarget(null)
+        } else {
+            EssentialChatBridge.selectTarget(selected)
+        }
+        syncEssentialMessages(snapshot)
+    }
+
+    internal fun selectEssentialTarget(targetId: Long): Boolean {
+        if (!running || !Essential.enabled || essentialSnapshot.targets.none { it.id == targetId }) {
+            return false
+        }
+        if (!EssentialChatBridge.selectTarget(targetId)) {
+            return false
+        }
+
+        ClientChatTabs.selectEssentialTarget(targetId)
+        syncEssentialMessages(essentialSnapshot)
+        return true
+    }
+
+    internal fun sendEssentialMessage(message: String): Boolean {
+        if (!running || !Essential.enabled ||
+            ClientChatTabs.connectionStatus(ChatNetwork.ESSENTIAL) != ChatConnectionStatus.CONNECTED
+        ) {
+            return false
+        }
+        return EssentialChatBridge.sendMessage(message)
+    }
+
+    internal fun disableEssentialChat() {
+        setEssentialAvailable(false)
+        essentialSnapshot = EssentialChatSnapshot(
+            EssentialChatAvailability.UNAVAILABLE,
+            emptyList(),
+            emptyList(),
+            null,
+        )
+        ClientChatTabs.selectEssentialTarget(null)
+        EssentialChatBridge.selectTarget(null)
+        clearRenderedEssentialMessages()
+    }
+
+    private fun syncEssentialMessages(snapshot: EssentialChatSnapshot) {
+        if (!inGame) {
+            renderedEssentialMessages = emptyMap()
+            return
+        }
+
+        val selected = ClientChatTabs.essentialSelectedTarget
+        val reconciliation = reconcileEssentialMessages(renderedEssentialMessages, snapshot, selected)
+        reconciliation.removed.forEach { key ->
+            mc.gui.hud.chat.removeMessage(key.metadataId, ChatNetwork.ESSENTIAL)
+        }
+        val targetLabel = snapshot.targets.firstOrNull { it.id == selected }?.label ?: Essential.name
+        reconciliation.upserts.forEach { message -> writeEssentialMessage(targetLabel, message) }
+        renderedEssentialMessages = reconciliation.current
+    }
+
+    private fun writeEssentialMessage(targetLabel: String, message: EssentialChatMessage) {
+        val sender = if (message.senderId == mc.user.profileId) "You" else message.senderId.toString().take(8)
+        val messagePrefix = textOf(
+            "[Essential • $targetLabel] ".asPlainText(ChatFormatting.BLUE),
+            sender.asPlainText(ChatFormatting.GRAY),
+            " ▸ ".asPlainText(ChatFormatting.DARK_GRAY),
+        )
+        chat(
+            messagePrefix,
+            regular(message.content).copyable(copyContent = message.content),
+            metadata = MessageMetadata(
+                prefix = false,
+                id = message.key.metadataId,
+                network = ChatNetwork.ESSENTIAL,
+            ),
+        )
+    }
+
+    private fun clearRenderedEssentialMessages() {
+        if (inGame) {
+            renderedEssentialMessages.keys.forEach { key ->
+                mc.gui.hud.chat.removeMessage(key.metadataId, ChatNetwork.ESSENTIAL)
+            }
+        }
+        renderedEssentialMessages = emptyMap()
+    }
+
+    private fun setEssentialAvailable(available: Boolean) {
+        ClientChatTabs.setAvailable(ChatNetwork.ESSENTIAL, available)
+        ClientChatTabs.setConnectionStatus(
+            ChatNetwork.ESSENTIAL,
+            if (available) ChatConnectionStatus.CONNECTED else ChatConnectionStatus.DISCONNECTED,
+        )
+    }
+
+    private val EssentialChatMessageKey.metadataId
+        get() = "Essential#$channelId#$messageId"
+
     @Suppress("unused")
     private val shutdownHandler = handler<ClientShutdownEvent> {
+        disableEssentialChat()
         clearRecentChatUsers()
         chatClient.disconnect()
     }
 
     @Suppress("unused")
     private val repeatable = tickHandler(Dispatchers.IO) {
+        if (!LiquidBounceFDP.enabled) {
+            setAxochatAvailable(false)
+            return@tickHandler
+        }
+
+        setAxochatAvailable(true)
         if (!chatClient.isConnected) {
             chatClient.connect()
         } else {
@@ -177,12 +436,24 @@ object GlobalSettingsClientChat : ToggleableValueGroup(
     }
 
     @Suppress("unused")
+    private val essentialSync = tickHandler {
+        waitTicks(20)
+        refreshEssentialChat()
+    }
+
+    @Suppress("unused")
     private val sessionChange = suspendHandler<SessionEvent>(behavior = CancelPrevious) {
-        chatClient.reconnect()
+        if (LiquidBounceFDP.enabled) {
+            chatClient.reconnect()
+        }
     }
 
     @Suppress("unused")
     private val handleChatMessage = suspendHandler<ClientChatMessageEvent> { event ->
+        if (!LiquidBounceFDP.enabled) {
+            return@suspendHandler
+        }
+
         val observedAt = Instant.now()
         ExternalClientUsers.observe(
             ExternalClientUser(
@@ -228,26 +499,30 @@ object GlobalSettingsClientChat : ToggleableValueGroup(
                 )
         }
 
-        writeChat(prefix, regular(event.message).copyable(copyContent = event.message))
+        writeChat(prefix, regular(event.message).copyable(copyContent = event.message), event.chatGroup)
 
-        if (event.chatGroup !in autoTranslate) {
+        if (event.chatGroup !in LiquidBounceFDP.autoTranslate) {
             return@suspendHandler
         }
 
         val result = GlobalSettingsAutoTranslate.translate(text = event.message)
         if (result.isValid) {
-            writeChat(prefix, result.toResultText())
+            writeChat(prefix, result.toResultText(), event.chatGroup)
         }
     }
 
     @Suppress("unused")
     private val handleIncomingJwtToken = suspendHandler<ClientChatJwtTokenEvent>(behavior = CancelPrevious) { event ->
-        jwtToken = event.jwt
-        chatClient.reconnect()
+        LiquidBounceFDP.jwtToken = event.jwt
+        if (LiquidBounceFDP.enabled) {
+            chatClient.reconnect()
+        }
     }
 
     @Suppress("unused")
     private val handleStateChange = suspendHandler<ClientChatStateChange>(behavior = CancelPrevious) {
+        ClientChatTabs.setConnectionStatus(ChatNetwork.AXOCHAT, it.state.connectionStatus)
+
         if (it.state != ClientChatStateChange.State.LOGGED_IN) {
             clearRecentChatUsers()
         }
@@ -261,9 +536,9 @@ object GlobalSettingsClientChat : ToggleableValueGroup(
                 )
 
                 // When the token is not empty, we can try to login via JWT
-                if (jwtToken.isNotEmpty()) {
+                if (LiquidBounceFDP.jwtToken.isNotEmpty()) {
                     logger.info("Logging in via JWT...")
-                    chatClient.loginViaJwt(jwtToken)
+                    chatClient.loginViaJwt(LiquidBounceFDP.jwtToken)
                 } else {
                     logger.info("Requesting to login into Mojang...")
                     chatClient.requestMojangLogin()
@@ -296,19 +571,44 @@ object GlobalSettingsClientChat : ToggleableValueGroup(
         }
     }
 
-    private fun writeChat(playerPrefix: Component, message: Component) {
+    private fun writeChat(
+        playerPrefix: Component,
+        message: Component,
+        chatGroup: ClientChatMessageEvent.ChatGroup,
+    ) {
         if (!inGame) {
-            logger.info("[Chat] ${playerPrefix.string} ${message.string}")
+            logger.info("[Chat] Received ${chatGroup.tag} AxoChat message")
         } else {
             chat(prefix, playerPrefix, message, metadata = messageData)
         }
     }
+
+    private fun setAxochatAvailable(available: Boolean) {
+        ClientChatTabs.setAvailable(ChatNetwork.AXOCHAT, available)
+        if (!available) {
+            ClientChatTabs.setConnectionStatus(ChatNetwork.AXOCHAT, ChatConnectionStatus.DISCONNECTED)
+        }
+    }
+
+    private val ClientChatStateChange.State.connectionStatus
+        get() = when (this) {
+            ClientChatStateChange.State.LOGGED_IN -> ChatConnectionStatus.CONNECTED
+            ClientChatStateChange.State.DISCONNECTED,
+            ClientChatStateChange.State.AUTHENTICATION_FAILED,
+            -> ChatConnectionStatus.DISCONNECTED
+            else -> ChatConnectionStatus.CONNECTING
+        }
 
     private fun clearRecentChatUsers() =
         ExternalClientUsers.clear(
             client = ExternalClient.LIQUIDBOUNCE_FDP,
             evidence = ExternalClientEvidence.RECENT_CHAT,
         )
+
+    override fun prepareDeserialize(jsonObject: JsonObject) {
+        super.prepareDeserialize(jsonObject)
+        ClientChatSettingsMigration.migrate(jsonObject)
+    }
 
     /**
      * Overwrites the condition requirement for being in-game

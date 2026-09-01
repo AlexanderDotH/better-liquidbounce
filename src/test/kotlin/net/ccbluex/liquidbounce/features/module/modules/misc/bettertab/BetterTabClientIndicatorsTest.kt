@@ -34,6 +34,8 @@ class BetterTabClientIndicatorsTest {
             ExternalClient.WURST to "Wurst",
             ExternalClient.FEATHER to "Feather",
             ExternalClient.LABYMOD to "LabyMod",
+            ExternalClient.OPTIFINE to "OptiFine",
+            ExternalClient.ESSENTIAL to "Essential",
         )
         val shortLabels = mapOf(
             ExternalClient.LIQUIDBOUNCE to "LB",
@@ -42,6 +44,8 @@ class BetterTabClientIndicatorsTest {
             ExternalClient.WURST to "WUR",
             ExternalClient.FEATHER to "FTH",
             ExternalClient.LABYMOD to "LABY",
+            ExternalClient.OPTIFINE to "OF",
+            ExternalClient.ESSENTIAL to "ESS",
         )
 
         fullLabels.forEach { (client, label) ->
@@ -57,9 +61,10 @@ class BetterTabClientIndicatorsTest {
         val users = listOf(
             user(ExternalClient.LIQUIDBOUNCE, ExternalClientEvidence.CAPE),
             user(ExternalClient.METEOR, ExternalClientEvidence.ACCOUNT),
+            user(ExternalClient.OPTIFINE, ExternalClientEvidence.CAPE),
         )
 
-        assertEquals(" [LiquidBounce?] [Meteor?]", badges(*users.toTypedArray()).string)
+        assertEquals(" [LiquidBounce?] [Meteor?] [OptiFine?]", badges(*users.toTypedArray()).string)
         assertNull(
             BetterTabClientIndicators.playerBadges(
                 users = users,
@@ -76,9 +81,10 @@ class BetterTabClientIndicatorsTest {
         val users = listOf(
             user(ExternalClient.FEATHER, ExternalClientEvidence.NETWORK_ONLINE),
             user(ExternalClient.LIQUIDBOUNCE_FDP, ExternalClientEvidence.RECENT_CHAT),
+            user(ExternalClient.ESSENTIAL, ExternalClientEvidence.NETWORK_ONLINE),
         )
 
-        assertEquals(" [LiquidBounce/FDP] [Feather]", badges(*users.toTypedArray()).string)
+        assertEquals(" [LiquidBounce/FDP] [Feather] [Essential]", badges(*users.toTypedArray()).string)
     }
 
     @Test
@@ -146,6 +152,8 @@ class BetterTabClientIndicatorsTest {
         assertEquals(Color4b.fromHex("#BF5E01"), BetterTabClientIndicators.color(ExternalClient.WURST, LB_COLOR))
         assertEquals(Color4b.fromHex("#D73232"), BetterTabClientIndicators.color(ExternalClient.FEATHER, LB_COLOR))
         assertEquals(Color4b.fromHex("#2563EB"), BetterTabClientIndicators.color(ExternalClient.LABYMOD, LB_COLOR))
+        assertEquals(Color4b.fromHex("#5168CF"), BetterTabClientIndicators.color(ExternalClient.OPTIFINE, LB_COLOR))
+        assertEquals(Color4b.fromHex("#2997FF"), BetterTabClientIndicators.color(ExternalClient.ESSENTIAL, LB_COLOR))
     }
 
     @Test

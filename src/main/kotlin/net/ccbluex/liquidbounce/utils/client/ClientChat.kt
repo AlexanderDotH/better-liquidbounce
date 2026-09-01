@@ -23,6 +23,7 @@ package net.ccbluex.liquidbounce.utils.client
 
 import net.ccbluex.liquidbounce.event.EventManager
 import net.ccbluex.liquidbounce.event.events.NotificationEvent
+import net.ccbluex.liquidbounce.features.chat.ChatNetwork
 import net.ccbluex.liquidbounce.features.command.Command
 import net.ccbluex.liquidbounce.features.module.ClientModule
 import net.ccbluex.liquidbounce.injection.mixins.minecraft.gui.MixinChatScreenAccessor
@@ -187,7 +188,8 @@ data class MessageMetadata(
     val prefix: Boolean = true,
     val id: String? = null,
     val remove: Boolean = true,
-    val count: Int = 1
+    val count: Int = 1,
+    val network: ChatNetwork = ChatNetwork.MINECRAFT,
 ) {
     companion object {
         @JvmStatic
@@ -202,17 +204,21 @@ fun chat(text: Component, metadata: MessageMetadata = defaultMessageMetadata) {
     val realText = if (metadata.prefix) clientPrefix.copy().append(text) else text
 
     if (mc.player == null) {
-        logger.info("(Chat) ${realText.string}")
+        if (metadata.network == ChatNetwork.MINECRAFT) {
+            logger.info("(Chat) ${realText.string}")
+        } else {
+            logger.info("(Chat) Received ${metadata.network.label} message")
+        }
         return
     }
 
     val chatHud = mc.gui.hud.chat
 
     if (metadata.remove && !metadata.id.isNullOrEmpty()) {
-        chatHud.removeMessage(metadata.id)
+        chatHud.removeMessage(metadata.id, metadata.network)
     }
 
-    chatHud.addMessage(realText, metadata.id, metadata.count)
+    chatHud.addMessage(realText, metadata.id, metadata.count, metadata.network)
 }
 
 /**

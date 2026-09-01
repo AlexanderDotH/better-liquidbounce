@@ -20,22 +20,53 @@ package net.ccbluex.liquidbounce.injection.mixins.minecraft.gui;
 
 import net.ccbluex.liquidbounce.event.EventManager;
 import net.ccbluex.liquidbounce.event.events.ChatSendEvent;
+import net.ccbluex.liquidbounce.features.chat.ChatSubmission;
+import net.ccbluex.liquidbounce.features.chat.ChatTabBounds;
+import net.ccbluex.liquidbounce.features.chat.ChatTabLayout;
+import net.ccbluex.liquidbounce.features.chat.ChatTabSpec;
+import net.ccbluex.liquidbounce.features.chat.ChatTabTransition;
+import net.ccbluex.liquidbounce.features.chat.ClientChatScreenBridge;
 import net.ccbluex.liquidbounce.features.module.modules.misc.betterchat.ModuleBetterChat;
+import net.ccbluex.liquidbounce.features.module.modules.misc.ModuleBetterTab;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.screens.ChatScreen;
+import net.minecraft.client.input.KeyEvent;
 import net.minecraft.client.input.MouseButtonEvent;
 import net.minecraft.client.multiplayer.chat.GuiMessage;
 import net.minecraft.util.ArrayListDeque;
 import org.spongepowered.asm.mixin.Mixin;
+import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.OptionalInt;
 
 @Mixin(ChatScreen.class)
 public abstract class MixinChatScreen extends MixinScreen {
+
+    @Shadow
+    protected EditBox input;
+
+    @Shadow
+    public abstract String normalizeChatMessage(String message);
+
+    @Unique
+    private static final int MAIN_TAB_TOP_OFFSET = 27;
+
+    @Unique
+    private static final int ESSENTIAL_TAB_TOP_OFFSET = 40;
+
+    @Unique
+    private ChatSubmission liquidbounce$lastSubmission;
+
+    @Unique
+    private boolean liquidbounce$suppressDraftSync;
 
     /**
      * Handle user chat messages
@@ -44,14 +75,102 @@ public abstract class MixinChatScreen extends MixinScreen {
      */
     @Inject(method = "handleChatInput", at = @At("HEAD"), cancellable = true)
     private void handleChatMessage(String chatText, boolean addToHistory, CallbackInfo ci) {
-        if (EventManager.INSTANCE.callEvent(new ChatSendEvent(chatText)).isCancelled()) {
-            minecraft.gui.hud.getChat().addRecentChat(chatText);
-            ci.cancel();
+        var event = EventManager.INSTANCE.callEvent(new ChatSendEvent(chatText));
+        var normalized = normalizeChatMessage(chatText);
+        liquidbounce$lastSubmission = ClientChatScreenBridge.routeInput(normalized, event.isCancelled());
+
+        switch (liquidbounce$lastSubmission) {
+            case VANILLA -> {
+                return;
+            }
+            case CLIENT_COMMAND -> minecraft.gui.hud.getChat().addRecentChat(chatText);
+            case EXTERNAL_SENT -> {
+                if (addToHistory) {
+                    minecraft.gui.hud.getChat().addRecentChat(normalized);
+                }
+            }
+            case EXTERNAL_FAILED -> {
+                // Keep the current input and screen open in keyPressed.
+            }
+        }
+        ci.cancel();
+    }
+
+    @Inject(method = "init", at = @At("TAIL"))
+    private void initializeChatTabs(CallbackInfo ci) {
+        liquidbounce$lastSubmission = null;
+        ClientChatScreenBridge.refreshEssentialChat();
+        liquidbounce$applyTransition(ClientChatScreenBridge.initialState(input.getValue()));
+    }
+
+    @Inject(method = "onEdited", at = @At("TAIL"))
+    private void saveActiveDraft(String value, CallbackInfo ci) {
+        if (liquidbounce$suppressDraftSync) {
+            return;
+        }
+        ClientChatScreenBridge.saveDraft(value);
+        if (!value.isEmpty()) {
+            liquidbounce$lastSubmission = null;
         }
     }
 
-    @Inject(method = "mouseClicked", at = @At("HEAD"))
+    @Inject(method = "removed", at = @At("HEAD"))
+    private void saveActiveTab(CallbackInfo ci) {
+        boolean clearDraft = liquidbounce$lastSubmission != null && !liquidbounce$lastSubmission.getKeepDraft();
+        String vanillaDraft = ClientChatScreenBridge.finish(input.getValue(), liquidbounce$currentScroll(), clearDraft);
+        if (vanillaDraft != null) {
+            liquidbounce$setInput(vanillaDraft);
+        }
+    }
+
+    @Inject(method = "keyPressed", at = @At("HEAD"), cancellable = true)
+    private void cycleChatTab(KeyEvent event, CallbackInfoReturnable<Boolean> cir) {
+        liquidbounce$lastSubmission = null;
+        int direction = ClientChatScreenBridge.cycleDirection(
+            event.key() == 258,
+            event.hasControlDown(),
+            event.hasShiftDown()
+        );
+        if (direction == 0) {
+            return;
+        }
+
+        liquidbounce$applyTransition(ClientChatScreenBridge.cycle(
+            direction,
+            input.getValue(),
+            liquidbounce$currentScroll()
+        ));
+        cir.setReturnValue(true);
+    }
+
+    @Inject(
+        method = "keyPressed",
+        at = @At(
+            value = "INVOKE",
+            target = "Lnet/minecraft/client/gui/screens/ChatScreen;handleChatInput(Ljava/lang/String;Z)V",
+            shift = At.Shift.AFTER
+        ),
+        cancellable = true
+    )
+    private void keepFailedExternalDraft(KeyEvent event, CallbackInfoReturnable<Boolean> cir) {
+        if (liquidbounce$lastSubmission == ChatSubmission.EXTERNAL_FAILED) {
+            cir.setReturnValue(true);
+        }
+    }
+
+    @Inject(method = "extractRenderState", at = @At("HEAD"))
+    private void renderChatTabs(GuiGraphicsExtractor graphics, int mouseX, int mouseY, float delta, CallbackInfo ci) {
+        liquidbounce$renderTabRow(graphics, liquidbounce$essentialTabBounds());
+        liquidbounce$renderTabRow(graphics, liquidbounce$networkTabBounds());
+    }
+
+    @Inject(method = "mouseClicked", at = @At("HEAD"), cancellable = true)
     private void hookMouseClicked(MouseButtonEvent click, boolean doubled, CallbackInfoReturnable<Boolean> cir) {
+        if (click.button() == 0 && liquidbounce$handleTabClick(click.x(), click.y())) {
+            cir.setReturnValue(true);
+            return;
+        }
+
         if (!(ModuleBetterChat.INSTANCE.getRunning() && ModuleBetterChat.Copy.INSTANCE.getRunning())) {
             return;
         }
@@ -75,6 +194,108 @@ public abstract class MixinChatScreen extends MixinScreen {
             return;
 
         ModuleBetterChat.Copy.copyMessage(messageParts, click.button());
+    }
+
+    @Unique
+    private boolean liquidbounce$handleTabClick(double mouseX, double mouseY) {
+        String target = ChatTabLayout.hitTest(liquidbounce$essentialTabBounds(), mouseX, mouseY);
+        if (target != null && ClientChatScreenBridge.selectEssentialTarget(target)) {
+            return true;
+        }
+
+        String network = ChatTabLayout.hitTest(liquidbounce$networkTabBounds(), mouseX, mouseY);
+        if (network == null) {
+            return false;
+        }
+        var transition = ClientChatScreenBridge.switchTo(
+            network,
+            input.getValue(),
+            liquidbounce$currentScroll()
+        );
+        if (transition == null) {
+            return false;
+        }
+        liquidbounce$applyTransition(transition);
+        return true;
+    }
+
+    @Unique
+    private List<ChatTabBounds> liquidbounce$networkTabBounds() {
+        ClientChatScreenBridge.refreshAvailability();
+        var tabs = new ArrayList<ChatTabSpec>();
+        for (var tab : ClientChatScreenBridge.visibleTabs(ModuleBetterTab.ClientPlayers.INSTANCE.getColor())) {
+            tabs.add(new ChatTabSpec(
+                tab.getId(),
+                tab.getLabel(),
+                font.width(tab.getLabel()),
+                tab.getSelected(),
+                tab.getColor(),
+                tab.getStatus()
+            ));
+        }
+        return ChatTabLayout.arrange(tabs, width, height - MAIN_TAB_TOP_OFFSET);
+    }
+
+    @Unique
+    private List<ChatTabBounds> liquidbounce$essentialTabBounds() {
+        var tabs = new ArrayList<ChatTabSpec>();
+        for (var target : ClientChatScreenBridge.essentialTargets(ModuleBetterTab.ClientPlayers.INSTANCE.getColor())) {
+            tabs.add(new ChatTabSpec(
+                target.getId(),
+                target.getLabel(),
+                font.width(target.getLabel()),
+                target.getSelected(),
+                target.getColor(),
+                net.ccbluex.liquidbounce.features.chat.ChatConnectionStatus.CONNECTED
+            ));
+        }
+        return ChatTabLayout.arrange(tabs, width, height - ESSENTIAL_TAB_TOP_OFFSET);
+    }
+
+    @Unique
+    private void liquidbounce$renderTabRow(GuiGraphicsExtractor graphics, List<ChatTabBounds> tabs) {
+        for (var tab : tabs) {
+            int background = tab.getSelected() ? 0xD0404040 : 0xA0000000;
+            int textColor = tab.getSelected() ? tab.getColor() : (tab.getColor() & 0x00FFFFFF) | 0xCC000000;
+            int statusColor = switch (tab.getStatus()) {
+                case CONNECTED -> 0xFF45C46A;
+                case CONNECTING -> 0xFFF0B84B;
+                case DISCONNECTED -> 0xFF777777;
+            };
+            graphics.fill(tab.getLeft(), tab.getTop(), tab.getRight(), tab.getBottom(), background);
+            if (tab.getSelected()) {
+                graphics.fill(tab.getLeft(), tab.getBottom() - 1, tab.getRight(), tab.getBottom(), tab.getColor());
+            }
+            graphics.fill(tab.getRight() - 3, tab.getTop() + 2, tab.getRight() - 1, tab.getTop() + 4, statusColor);
+            graphics.enableScissor(tab.getLeft(), tab.getTop(), tab.getRight(), tab.getBottom());
+            graphics.text(font, tab.getLabel(), tab.getLeft() + 4, tab.getTop() + 2, textColor, false);
+            graphics.disableScissor();
+        }
+    }
+
+    @Unique
+    private void liquidbounce$applyTransition(ChatTabTransition transition) {
+        liquidbounce$setInput(transition.getDraft());
+        var chat = minecraft.gui.hud.getChat();
+        chat.rescaleChat();
+        if (transition.getScrollPosition() > 0) {
+            chat.scrollChat(transition.getScrollPosition());
+        }
+    }
+
+    @Unique
+    private void liquidbounce$setInput(String value) {
+        liquidbounce$suppressDraftSync = true;
+        try {
+            input.setValue(value);
+        } finally {
+            liquidbounce$suppressDraftSync = false;
+        }
+    }
+
+    @Unique
+    private int liquidbounce$currentScroll() {
+        return ((MixinChatComponentAccessor) minecraft.gui.hud.getChat()).getChatScrollbarPos();
     }
 
     @Unique

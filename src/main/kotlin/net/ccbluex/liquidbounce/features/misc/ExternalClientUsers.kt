@@ -23,6 +23,8 @@ enum class ExternalClient(override val tag: String) : Tagged {
     METEOR("Meteor"),
     WURST("Wurst"),
     LABYMOD("LabyMod"),
+    OPTIFINE("OptiFine"),
+    ESSENTIAL("Essential"),
 }
 
 enum class ExternalClientEvidence(val strength: Int, val uncertain: Boolean) {

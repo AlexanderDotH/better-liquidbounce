@@ -24,6 +24,7 @@ package net.ccbluex.liquidbounce.features.chat
 import com.google.gson.GsonBuilder
 import com.mojang.authlib.exceptions.InvalidCredentialsException
 import io.netty.bootstrap.Bootstrap
+import io.netty.buffer.ByteBufAllocator
 import io.netty.channel.Channel
 import io.netty.channel.ChannelFutureListener
 import io.netty.channel.ChannelHandlerContext
@@ -43,8 +44,9 @@ import io.netty.handler.codec.http.websocketx.WebSocketClientHandshaker
 import io.netty.handler.codec.http.websocketx.WebSocketClientHandshakerFactory
 import io.netty.handler.codec.http.websocketx.WebSocketHandshakeException
 import io.netty.handler.codec.http.websocketx.WebSocketVersion
+import io.netty.handler.ssl.SslContext
 import io.netty.handler.ssl.SslContextBuilder
-import io.netty.handler.ssl.util.InsecureTrustManagerFactory
+import io.netty.handler.ssl.SslHandler
 import net.ccbluex.liquidbounce.api.thirdparty.lookupUuidByName
 import net.ccbluex.liquidbounce.event.EventManager
 import net.ccbluex.liquidbounce.event.events.ClientChatErrorEvent
@@ -53,6 +55,7 @@ import net.ccbluex.liquidbounce.event.events.ClientChatMessageEvent
 import net.ccbluex.liquidbounce.event.events.ClientChatStateChange
 import net.ccbluex.liquidbounce.features.chat.packet.AxochatPacket
 import net.ccbluex.liquidbounce.features.chat.packet.AxoChatClientId
+import net.ccbluex.liquidbounce.features.chat.packet.AxoUser
 import net.ccbluex.liquidbounce.features.chat.packet.AxoUserPresence
 import net.ccbluex.liquidbounce.features.chat.packet.C2SBanUserPacket
 import net.ccbluex.liquidbounce.features.chat.packet.C2SLoginJWTPacket
@@ -80,8 +83,21 @@ import net.ccbluex.liquidbounce.utils.netty.syncSuspend
 import java.net.URI
 import java.util.UUID
 
+internal fun createAxochatSslHandler(
+    sslContext: SslContext,
+    allocator: ByteBufAllocator,
+    uri: URI,
+): SslHandler = sslContext.newHandler(allocator, uri.host, uri.port).apply {
+    engine().sslParameters = engine().sslParameters.apply {
+        endpointIdentificationAlgorithm = "HTTPS"
+    }
+}
+
 class AxochatClient(
     private val onUserPresence: (List<AxoUserPresence>) -> Unit = {},
+    private val onMessage: (AxoUser, String, ClientChatMessageEvent.ChatGroup) -> Unit = { user, message, group ->
+        EventManager.callEvent(ClientChatMessageEvent(user, message, group))
+    },
 ) {
 
     private var channel: Channel? = null
@@ -130,7 +146,6 @@ class AxochatClient(
     /**
      * Connect to chat server via websocket.
      * Supports SSL and non-SSL connections.
-     * Be aware SSL takes insecure certificates.
      */
     suspend fun connect() = runCatching {
         if (isConnecting || isConnected) {
@@ -145,7 +160,7 @@ class AxochatClient(
 
         val ssl = uri.scheme.equals("wss", true)
         val sslContext = if (ssl) {
-            SslContextBuilder.forClient().trustManager(InsecureTrustManagerFactory.INSTANCE).build()
+            SslContextBuilder.forClient().build()
         } else {
             null
         }
@@ -177,7 +192,7 @@ class AxochatClient(
                     val pipeline = ch.pipeline()
 
                     if (sslContext != null) {
-                        pipeline.addLast(sslContext.newHandler(ch.alloc()))
+                        pipeline.addLast(createAxochatSslHandler(sslContext, ch.alloc(), uri))
                     }
 
                     pipeline.addLast(HttpClientCodec(), HttpObjectAggregator(65536), handler)
@@ -189,7 +204,10 @@ class AxochatClient(
         handler.handshakeFuture.syncSuspend()
     }.onFailure {
         EventManager.callEvent(ClientChatErrorEvent(it.localizedMessage ?: it.message ?: it.javaClass.name))
+        EventManager.callEvent(ClientChatStateChange(ClientChatStateChange.State.DISCONNECTED))
 
+        channel?.close()
+        channel = null
         isConnecting = false
     }.onSuccess {
         if (isConnected) {
@@ -305,10 +323,16 @@ class AxochatClient(
                 return
             }
 
-            is S2CMessagePacket -> EventManager.callEvent(ClientChatMessageEvent(packet.user, packet.content,
-                ClientChatMessageEvent.ChatGroup.PUBLIC_CHAT))
-            is S2CPrivateMessagePacket -> EventManager.callEvent(ClientChatMessageEvent(packet.user, packet.content,
-                ClientChatMessageEvent.ChatGroup.PRIVATE_CHAT))
+            is S2CMessagePacket -> onMessage(
+                packet.user,
+                packet.content,
+                ClientChatMessageEvent.ChatGroup.PUBLIC_CHAT,
+            )
+            is S2CPrivateMessagePacket -> onMessage(
+                packet.user,
+                packet.content,
+                ClientChatMessageEvent.ChatGroup.PRIVATE_CHAT,
+            )
             is S2CErrorPacket -> {
                 // TODO: Replace with translation
                 EventManager.callEvent(ClientChatErrorEvent(translateErrorMessage(packet)))
@@ -403,7 +427,7 @@ class AxochatClient(
          * Subclasses may override this method to change behavior.
          */
         override fun exceptionCaught(ctx: ChannelHandlerContext, cause: Throwable) {
-            logger.error("LiquidChat error", cause)
+            logger.error("LiquidChat error (${cause.javaClass.simpleName})")
             EventManager.callEvent(ClientChatErrorEvent(
                 cause.localizedMessage ?: cause.message ?: cause.javaClass.name
             ))

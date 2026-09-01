@@ -20,8 +20,12 @@ package net.ccbluex.liquidbounce.injection.mixins.minecraft.gui;
 
 import com.llamalad7.mixinextras.injector.ModifyExpressionValue;
 import com.llamalad7.mixinextras.sugar.Local;
+import net.ccbluex.liquidbounce.features.chat.ChatMessageRoutePolicy;
+import net.ccbluex.liquidbounce.features.chat.ChatNetwork;
+import net.ccbluex.liquidbounce.features.chat.ClientChatTabs;
 import net.ccbluex.liquidbounce.features.module.modules.misc.betterchat.ChatNameHighlightPolicy;
 import net.ccbluex.liquidbounce.features.module.modules.misc.betterchat.ModuleBetterChat;
+import net.ccbluex.liquidbounce.interfaces.GuiMessageAddition;
 import net.ccbluex.liquidbounce.interfaces.GuiMessageLineAddition;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
@@ -74,22 +78,28 @@ public abstract class MixinChatComponent {
         trimmedMessages = new ArrayListDeque<>(100);
     }
 
-    /**
-     * Spoofs the message size to be empty to avoid deletion.
-     * <pre>
-     * while(this.messages.size() > 100) {
-     *     this.messages.removeLast();
-     * }
-     * </pre>
-     */
-    @ModifyExpressionValue(method = "addMessageToQueue", at = @At(value = "INVOKE", target = "Ljava/util/List;size()I", ordinal = 0, remap = false))
-    public int hookGetSize2(int original) {
-        var betterChat = ModuleBetterChat.INSTANCE;
-        if (betterChat.getRunning() && betterChat.getInfiniteLength()) {
-            return 0;
-        }
+    @ModifyExpressionValue(
+        method = "addMessageToQueue",
+        at = @At(value = "INVOKE", target = "Ljava/util/List;size()I", ordinal = 0, remap = false)
+    )
+    public int hookQueuedMessageLimit(int original) {
+        return 0;
+    }
 
-        return original;
+    @Inject(method = "addMessageToQueue", at = @At("TAIL"))
+    public void hookAddMessageToQueue(GuiMessage message, CallbackInfo ci) {
+        var betterChat = ModuleBetterChat.INSTANCE;
+        ChatMessageRoutePolicy.prune(
+            allMessages,
+            betterChat.getRunning() && betterChat.getInfiniteLength(),
+            queuedMessage -> ((GuiMessageAddition) (Object) queuedMessage).liquid_bounce$getNetwork()
+        );
+
+        boolean accepted = allMessages.stream().anyMatch(queuedMessage -> queuedMessage == message);
+        var network = ((GuiMessageAddition) (Object) message).liquid_bounce$getNetwork();
+        if (accepted && network != ClientChatTabs.INSTANCE.getActiveNetwork()) {
+            ClientChatTabs.INSTANCE.incrementUnread(network, 1);
+        }
     }
 
     /**
@@ -100,7 +110,30 @@ public abstract class MixinChatComponent {
         var betterChat = ModuleBetterChat.INSTANCE;
         if (betterChat.getRunning() && betterChat.getAntiClear() && !betterChat.getAntiChatClearPaused()) {
             ci.cancel();
+            return;
         }
+
+        if (clearHistory) {
+            return;
+        }
+
+        var activeNetwork = ClientChatTabs.INSTANCE.getActiveNetwork();
+        if (activeNetwork == ChatNetwork.MINECRAFT) {
+            minecraft.gui.chatListener().flushQueue();
+        }
+        allMessages.removeIf(message -> ChatMessageRoutePolicy.shouldClear(
+            ((GuiMessageAddition) (Object) message).liquid_bounce$getNetwork(),
+            activeNetwork,
+            false
+        ));
+        trimmedMessages.removeIf(line -> ChatMessageRoutePolicy.shouldClear(
+            ((GuiMessageAddition) (Object) line.parent()).liquid_bounce$getNetwork(),
+            activeNetwork,
+            false
+        ));
+        chatScrollbarPos = 0;
+        newMessageSinceScroll = false;
+        ci.cancel();
     }
 
     /**
@@ -109,6 +142,12 @@ public abstract class MixinChatComponent {
      */
     @Inject(method = "addMessageToDisplayQueue", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/gui/components/ChatComponent;isChatFocused()Z", shift = At.Shift.BEFORE), cancellable = true)
     public void hookAddVisibleMessage(GuiMessage message, CallbackInfo ci, @Local(name = "lines") List<FormattedCharSequence> lines) {
+        var network = ((GuiMessageAddition) (Object) message).liquid_bounce$getNetwork();
+        if (!ChatMessageRoutePolicy.isVisible(network, ClientChatTabs.INSTANCE.getActiveNetwork())) {
+            ci.cancel();
+            return;
+        }
+
         var focused = isChatFocused();
         var removable = ((GuiMessageLineAddition) (Object) message);
         //noinspection DataFlowIssue

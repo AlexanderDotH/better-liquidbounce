@@ -18,6 +18,7 @@
  */
 package net.ccbluex.liquidbounce.interfaces;
 
+import net.ccbluex.liquidbounce.features.chat.ChatNetwork;
 import net.ccbluex.liquidbounce.features.module.modules.misc.betterchat.ModuleBetterChat;
 
 /**
@@ -36,5 +37,9 @@ public interface GuiMessageAddition {
      */
     @SuppressWarnings("unused")
     int liquid_bounce$getCount();
+
+    void liquid_bounce$setNetwork(ChatNetwork network);
+
+    ChatNetwork liquid_bounce$getNetwork();
 
 }

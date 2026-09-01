@@ -14,6 +14,8 @@ import net.ccbluex.liquidbounce.config.types.list.Tagged
 import net.ccbluex.liquidbounce.features.misc.ExternalClient
 import net.ccbluex.liquidbounce.features.misc.ExternalClientEvidence
 import net.ccbluex.liquidbounce.features.misc.ExternalClientUser
+import net.ccbluex.liquidbounce.features.misc.ClientBrand
+import net.ccbluex.liquidbounce.features.misc.ClientBrandColors
 import net.ccbluex.liquidbounce.render.engine.type.Color4b
 import net.ccbluex.liquidbounce.utils.text.PlainText
 import net.ccbluex.liquidbounce.utils.text.TextBuilder
@@ -86,14 +88,8 @@ internal object BetterTabClientIndicators {
         else -> TextBuilder(serverHeader).add(PlainText.NEW_LINE).add(legend).build()
     }
 
-    fun color(client: ExternalClient, liquidBounceColor: Color4b): Color4b = when (client) {
-        ExternalClient.LIQUIDBOUNCE,
-        ExternalClient.LIQUIDBOUNCE_FDP -> liquidBounceColor
-        ExternalClient.METEOR -> METEOR_COLOR
-        ExternalClient.WURST -> WURST_COLOR
-        ExternalClient.FEATHER -> FEATHER_COLOR
-        ExternalClient.LABYMOD -> LABYMOD_COLOR
-    }
+    fun color(client: ExternalClient, liquidBounceColor: Color4b): Color4b =
+        ClientBrandColors.color(client.brand, liquidBounceColor)
 
     private fun markers(
         users: Iterable<ExternalClientUser>,
@@ -137,6 +133,8 @@ internal object BetterTabClientIndicators {
         ExternalClient.WURST -> "Wurst"
         ExternalClient.FEATHER -> "Feather"
         ExternalClient.LABYMOD -> "LabyMod"
+        ExternalClient.OPTIFINE -> "OptiFine"
+        ExternalClient.ESSENTIAL -> "Essential"
     }
 
     private fun ExternalClient.shortLabel() = when (this) {
@@ -146,7 +144,22 @@ internal object BetterTabClientIndicators {
         ExternalClient.WURST -> "WUR"
         ExternalClient.FEATHER -> "FTH"
         ExternalClient.LABYMOD -> "LABY"
+        ExternalClient.OPTIFINE -> "OF"
+        ExternalClient.ESSENTIAL -> "ESS"
     }
+
+    private val ExternalClient.brand
+        get() = when (this) {
+            ExternalClient.LIQUIDBOUNCE,
+            ExternalClient.LIQUIDBOUNCE_FDP,
+            -> ClientBrand.LIQUIDBOUNCE
+            ExternalClient.METEOR -> ClientBrand.METEOR
+            ExternalClient.WURST -> ClientBrand.WURST
+            ExternalClient.FEATHER -> ClientBrand.FEATHER
+            ExternalClient.LABYMOD -> ClientBrand.LABYMOD
+            ExternalClient.OPTIFINE -> ClientBrand.OPTIFINE
+            ExternalClient.ESSENTIAL -> ClientBrand.ESSENTIAL
+        }
 
     private data class ClientMarker(val client: ExternalClient, val uncertain: Boolean)
 
@@ -154,8 +167,4 @@ internal object BetterTabClientIndicators {
         .thenBy { it.observedAt }
         .thenBy { it.expiresAt }
 
-    private val METEOR_COLOR = Color4b.fromHex("#913DE2")
-    private val WURST_COLOR = Color4b.fromHex("#BF5E01")
-    private val FEATHER_COLOR = Color4b.fromHex("#D73232")
-    private val LABYMOD_COLOR = Color4b.fromHex("#2563EB")
 }

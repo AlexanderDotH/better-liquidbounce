@@ -12,6 +12,9 @@ package net.ccbluex.liquidbounce.features.chat
 
 import com.google.gson.GsonBuilder
 import com.google.gson.JsonParser
+import io.netty.buffer.UnpooledByteBufAllocator
+import io.netty.handler.ssl.SslContextBuilder
+import net.ccbluex.liquidbounce.event.events.ClientChatMessageEvent
 import net.ccbluex.liquidbounce.features.chat.packet.AxoChatClientId
 import net.ccbluex.liquidbounce.features.chat.packet.AxoUserPresence
 import net.ccbluex.liquidbounce.features.chat.packet.AxochatPacket
@@ -19,9 +22,12 @@ import net.ccbluex.liquidbounce.features.chat.packet.C2SLoginJWTPacket
 import net.ccbluex.liquidbounce.features.chat.packet.C2SLoginMojangPacket
 import net.ccbluex.liquidbounce.features.chat.packet.C2SRequestUserPresencePacket
 import net.ccbluex.liquidbounce.features.chat.packet.PacketSerializer
+import java.net.URI
+import java.nio.file.Path
 import java.util.UUID
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertFailsWith
 
 class AxochatClientProtocolTest {
@@ -96,5 +102,56 @@ class AxochatClientProtocolTest {
         )
 
         assertEquals(listOf(AxoUserPresence(uuid, AxoChatClientId.FDPCLIENT)), received)
+    }
+
+    @Test
+    fun `public and private packets keep their distinct AxoChat groups`() {
+        val uuid = UUID.fromString("922ad8ba-4b1e-4c6c-b217-61dba0d21731")
+        val received = mutableListOf<Pair<ClientChatMessageEvent.ChatGroup, String>>()
+        val client = AxochatClient(onMessage = { _, message, group -> received += group to message })
+
+        client.handlePlainMessage(
+            """
+            {"m":"Message","c":{
+              "author_id":"1","author_info":{"name":"Alex","uuid":"$uuid"},"content":"public"
+            }}
+            """.trimIndent()
+        )
+        client.handlePlainMessage(
+            """
+            {"m":"PrivateMessage","c":{
+              "author_id":"1","author_info":{"name":"Alex","uuid":"$uuid"},"content":"private"
+            }}
+            """.trimIndent()
+        )
+
+        assertEquals(
+            listOf(
+                ClientChatMessageEvent.ChatGroup.PUBLIC_CHAT to "public",
+                ClientChatMessageEvent.ChatGroup.PRIVATE_CHAT to "private",
+            ),
+            received,
+        )
+    }
+
+    @Test
+    fun `TLS uses platform trust and verifies the AxoChat hostname`() {
+        val uri = URI("wss://chat.liquidbounce.net:7886/ws")
+        val handler = createAxochatSslHandler(
+            SslContextBuilder.forClient().build(),
+            UnpooledByteBufAllocator.DEFAULT,
+            uri,
+        )
+
+        try {
+            assertEquals(uri.host, handler.engine().peerHost)
+            assertEquals("HTTPS", handler.engine().sslParameters.endpointIdentificationAlgorithm)
+            assertFalse(
+                Path.of("src/main/kotlin/net/ccbluex/liquidbounce/features/chat/AxochatClient.kt")
+                    .toFile().readText().contains("InsecureTrustManagerFactory")
+            )
+        } finally {
+            handler.engine().closeOutbound()
+        }
     }
 }
