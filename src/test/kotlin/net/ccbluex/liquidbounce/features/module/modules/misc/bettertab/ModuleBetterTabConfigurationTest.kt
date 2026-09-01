@@ -34,11 +34,12 @@ class ModuleBetterTabConfigurationTest {
         assertTrue(lookup.enabled)
         assertTrue("LiquidBouncePlayers" in lookup.aliases)
         assertEquals(
-            listOf("Enabled", "Clients", "LabelStyle", "Legend", "OwnershipSignals", "Color"),
+            listOf("Enabled", "Clients", "LabelStyle", "Icons", "Legend", "OwnershipSignals", "Color"),
             lookup.inner.map { it.name },
         )
         assertEquals(ExternalClient.entries.toSet(), lookup.inner.single { it.name == "Clients" }.get())
         assertEquals(ClientLabelStyle.FULL, lookup.inner.single { it.name == "LabelStyle" }.get())
+        assertEquals(true, lookup.inner.single { it.name == "Icons" }.get())
         assertEquals(true, lookup.inner.single { it.name == "Legend" }.get())
         assertEquals(true, lookup.inner.single { it.name == "OwnershipSignals" }.get())
         assertEquals(Color4b.LIQUID_BOUNCE, lookup.inner.single { it.name == "Color" }.get())

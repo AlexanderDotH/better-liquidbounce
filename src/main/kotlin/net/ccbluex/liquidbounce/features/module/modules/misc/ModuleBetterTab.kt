@@ -94,6 +94,7 @@ object ModuleBetterTab : ClientModule("BetterTab", ModuleCategories.RENDER) {
     ) {
         val clients by multiEnumChoice("Clients", ExternalClient.entries)
         val labelStyle by enumChoice("LabelStyle", ClientLabelStyle.FULL)
+        val icons by boolean("Icons", true)
         val legend by boolean("Legend", true)
         val ownershipSignals by boolean("OwnershipSignals", true)
         val color by color("Color", Color4b.LIQUID_BOUNCE)
@@ -111,6 +112,7 @@ object ModuleBetterTab : ClientModule("BetterTab", ModuleCategories.RENDER) {
             ownershipSignals = ClientPlayers.ownershipSignals,
             enabledClients = ClientPlayers.clients,
             liquidBounceColor = ClientPlayers.color,
+            showIcons = ClientPlayers.icons,
         )
     }
 
@@ -127,6 +129,7 @@ object ModuleBetterTab : ClientModule("BetterTab", ModuleCategories.RENDER) {
             ownershipSignals = ClientPlayers.ownershipSignals,
             enabledClients = ClientPlayers.clients,
             liquidBounceColor = ClientPlayers.color,
+            showIcons = ClientPlayers.icons,
         )
         return BetterTabClientIndicators.appendLegend(serverHeader, legend)
     }

@@ -36,6 +36,7 @@ internal object BetterTabClientIndicators {
         ownershipSignals: Boolean,
         enabledClients: Set<ExternalClient>,
         liquidBounceColor: Color4b,
+        showIcons: Boolean = true,
     ): Component? {
         val markers = markers(users, ownershipSignals, enabledClients)
         if (markers.isEmpty()) {
@@ -45,7 +46,10 @@ internal object BetterTabClientIndicators {
         return TextBuilder().apply {
             markers.forEach { marker ->
                 add(PlainText.SPACE)
-                add(marker.icon(labelStyle, liquidBounceColor))
+                if (showIcons) {
+                    add(marker.icon(liquidBounceColor))
+                }
+                add(marker.label(labelStyle, liquidBounceColor))
             }
         }.build()
     }
@@ -56,6 +60,7 @@ internal object BetterTabClientIndicators {
         ownershipSignals: Boolean,
         enabledClients: Set<ExternalClient>,
         liquidBounceColor: Color4b,
+        showIcons: Boolean = true,
     ): Component? {
         val counts = users.groupBy(ExternalClientUser::uuid)
             .values
@@ -71,7 +76,10 @@ internal object BetterTabClientIndicators {
                 .sortedBy { it.key.client.ordinal }
                 .forEach { (marker, count) ->
                     add(PlainText.SPACE)
-                    add(marker.icon(labelStyle, liquidBounceColor))
+                    if (showIcons) {
+                        add(marker.icon(liquidBounceColor))
+                    }
+                    add(marker.label(labelStyle, liquidBounceColor))
                     add(PlainText.of(" $count", color(marker.client, liquidBounceColor).toTextColor()))
                 }
         }.build()
@@ -113,16 +121,18 @@ internal object BetterTabClientIndicators {
             .map { ClientMarker(it.client) }
     }
 
-    private fun ClientMarker.icon(style: ClientLabelStyle, liquidBounceColor: Color4b): Component {
-        val fallback = when (style) {
+    private fun ClientMarker.icon(liquidBounceColor: Color4b): Component = Component.`object`(
+        AtlasSprite(GUI_ATLAS, clientIconId(client)),
+        PlainText.EMPTY,
+    ).withStyle { it.withColor(color(client, liquidBounceColor).toTextColor()) }
+
+    private fun ClientMarker.label(style: ClientLabelStyle, liquidBounceColor: Color4b): Component = PlainText.of(
+        when (style) {
             ClientLabelStyle.FULL -> client.fullLabel()
             ClientLabelStyle.SHORT -> client.shortLabel()
-        }
-        return Component.`object`(
-            AtlasSprite(GUI_ATLAS, clientIconId(client)),
-            PlainText.of(fallback),
-        ).withStyle { it.withColor(color(client, liquidBounceColor).toTextColor()) }
-    }
+        },
+        color(client, liquidBounceColor).toTextColor(),
+    )
 
     private fun ExternalClient.fullLabel() = when (this) {
         ExternalClient.LIQUIDBOUNCE -> "LiquidBounce"

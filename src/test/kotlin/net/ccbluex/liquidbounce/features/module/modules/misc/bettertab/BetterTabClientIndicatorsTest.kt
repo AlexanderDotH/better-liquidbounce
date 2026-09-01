@@ -26,6 +26,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertSame
+import kotlin.test.assertTrue
 
 class BetterTabClientIndicatorsTest {
 
@@ -56,14 +57,42 @@ class BetterTabClientIndicatorsTest {
             val badge = badges(user(client), labelStyle = ClientLabelStyle.FULL)
 
             assertEquals(" $label", badge.string)
+            assertTrue(badge.siblings.any { it.string == label && it.contents !is ObjectContents })
             assertEquals(listOf(clientIconId(client)), iconSprites(badge))
         }
         shortLabels.forEach { (client, label) ->
             val badge = badges(user(client), labelStyle = ClientLabelStyle.SHORT)
 
             assertEquals(" $label", badge.string)
+            assertTrue(badge.siblings.any { it.string == label && it.contents !is ObjectContents })
             assertEquals(listOf(clientIconId(client)), iconSprites(badge))
         }
+    }
+
+    @Test
+    fun `icons can be hidden while the selected label remains visible`() {
+        val full = badges(user(ExternalClient.METEOR), showIcons = false)
+        val short = badges(
+            user(ExternalClient.METEOR),
+            labelStyle = ClientLabelStyle.SHORT,
+            showIcons = false,
+        )
+
+        val legend = BetterTabClientIndicators.legend(
+            users = listOf(user(ExternalClient.METEOR)),
+            labelStyle = ClientLabelStyle.FULL,
+            ownershipSignals = true,
+            enabledClients = ExternalClient.entries.toSet(),
+            liquidBounceColor = LB_COLOR,
+            showIcons = false,
+        )!!
+
+        assertEquals(" Meteor", full.string)
+        assertEquals(" MET", short.string)
+        assertEquals("Clients: Meteor 1", legend.string)
+        assertEquals(emptyList(), iconSprites(full))
+        assertEquals(emptyList(), iconSprites(short))
+        assertEquals(emptyList(), iconSprites(legend))
     }
 
     @Test
@@ -204,10 +233,12 @@ class BetterTabClientIndicatorsTest {
     private fun badges(
         vararg users: ExternalClientUser,
         labelStyle: ClientLabelStyle = ClientLabelStyle.FULL,
+        showIcons: Boolean = true,
     ): Component = checkNotNull(
         BetterTabClientIndicators.playerBadges(
             users = users.asList(),
             labelStyle = labelStyle,
+            showIcons = showIcons,
             ownershipSignals = true,
             enabledClients = ExternalClient.entries.toSet(),
             liquidBounceColor = LB_COLOR,
