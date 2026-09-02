@@ -67,6 +67,6 @@ class GlobalSettingsClientChatMigrationTest {
         assertFalse(source.contains("ChatNetwork.AXOCHAT"))
         assertTrue(source.contains("chatClient.supportsClientChannels"))
         assertFalse(source.contains("translation(\"liquidbounce.liquidchat.states.disconnected\")"))
-        assertTrue(source.contains("chatClient.connect()\n        }\n        delay(5.seconds)"))
+        assertTrue(source.contains("chatClient.connect()\n        }\n        delay(30.seconds)"))
     }
 }

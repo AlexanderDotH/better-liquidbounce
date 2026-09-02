@@ -443,7 +443,7 @@ class AxochatClient(
          * Subclasses may override this method to change behavior.
          */
         override fun exceptionCaught(ctx: ChannelHandlerContext, cause: Throwable) {
-            logger.error("LiquidChat error (${cause.javaClass.simpleName})", cause)
+            logger.warn("LiquidChat connection failed: ${cause.message ?: cause.javaClass.simpleName}")
             EventManager.callEvent(ClientChatErrorEvent(
                 cause.localizedMessage ?: cause.message ?: cause.javaClass.name
             ))

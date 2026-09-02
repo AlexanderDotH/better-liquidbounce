@@ -61,7 +61,7 @@ public abstract class MixinChatScreen extends MixinScreen {
     private static final int CHAT_BOTTOM_OFFSET = 40;
 
     @Unique
-    private static final int CHAT_SIDE_GAP = 6;
+    private static final int CHAT_SIDE_GAP = 14;
 
     @Unique
     private ChatSubmission liquidbounce$lastSubmission;

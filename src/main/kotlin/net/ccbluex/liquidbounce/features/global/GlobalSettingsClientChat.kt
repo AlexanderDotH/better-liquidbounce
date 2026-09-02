@@ -286,7 +286,7 @@ object GlobalSettingsClientChat : ToggleableValueGroup(
         if (!chatClient.isConnected) {
             chatClient.connect()
         }
-        delay(5.seconds)
+        delay(30.seconds)
     }
 
     @Suppress("unused")
