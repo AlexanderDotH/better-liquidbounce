@@ -42,9 +42,9 @@ data class ChatTabBounds(
 
 object ChatTabLayout {
 
-    const val ROW_HEIGHT = 18
-    const val ICON_SIZE = 10
-    const val ICON_GAP = 4
+    const val ROW_HEIGHT = 20
+    const val ICON_SIZE = 12
+    const val ICON_GAP = 5
     private const val EDGE_MARGIN = 2
     private const val TAB_GAP = 3
     private const val HORIZONTAL_PADDING = 10

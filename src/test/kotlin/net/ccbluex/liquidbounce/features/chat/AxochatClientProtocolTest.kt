@@ -13,7 +13,6 @@ package net.ccbluex.liquidbounce.features.chat
 import com.google.gson.GsonBuilder
 import com.google.gson.JsonParser
 import io.netty.buffer.UnpooledByteBufAllocator
-import io.netty.handler.ssl.SslContextBuilder
 import net.ccbluex.liquidbounce.event.events.ClientChatMessageEvent
 import net.ccbluex.liquidbounce.features.chat.packet.AxoChatClientId
 import net.ccbluex.liquidbounce.features.chat.packet.AxoUserPresence
@@ -25,7 +24,11 @@ import net.ccbluex.liquidbounce.features.chat.packet.C2SRequestUserPresencePacke
 import net.ccbluex.liquidbounce.features.chat.packet.PacketSerializer
 import java.net.URI
 import java.nio.file.Path
+import java.security.cert.CertificateException
+import java.security.cert.CertificateFactory
+import java.security.cert.X509Certificate
 import java.util.UUID
+import javax.net.ssl.X509TrustManager
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -169,7 +172,7 @@ class AxochatClientProtocolTest {
     }
 
     @Test
-    fun `missing unknown and legacy channels are ignored instead of mixed`() {
+    fun `legacy messages use the combined tab while unknown channels stay rejected`() {
         val uuid = UUID.fromString("922ad8ba-4b1e-4c6c-b217-61dba0d21731")
         val received = mutableListOf<String>()
         val client = AxochatClient(onMessage = { _, message, _, _ -> received += message })
@@ -192,7 +195,17 @@ class AxochatClientProtocolTest {
             """.trimIndent(),
         ).forEach(client::handlePlainMessage)
 
-        assertEquals(emptyList(), received)
+        assertEquals(listOf("missing", "legacy"), received)
+
+        val splitReceived = mutableListOf<String>()
+        val splitClient = AxochatClient(onMessage = { _, message, _, _ -> splitReceived += message })
+        splitClient.handlePlainMessage(
+            """{"m":"Success","c":{"reason":"Login","supports_channels":true}}"""
+        )
+        splitClient.handlePlainMessage(
+            """{"m":"Message","c":{"author_info":{"name":"Alex","uuid":"$uuid"},"content":"missing"}}"""
+        )
+        assertEquals(emptyList(), splitReceived)
     }
 
     @Test
@@ -215,7 +228,7 @@ class AxochatClientProtocolTest {
     fun `TLS uses platform trust and verifies the AxoChat hostname`() {
         val uri = URI("wss://chat.liquidbounce.net:7886/ws")
         val handler = createAxochatSslHandler(
-            SslContextBuilder.forClient().build(),
+            createAxochatSslContext(),
             UnpooledByteBufAllocator.DEFAULT,
             uri,
         )
@@ -229,6 +242,32 @@ class AxochatClientProtocolTest {
             )
         } finally {
             handler.engine().closeOutbound()
+        }
+    }
+
+    @Test
+    fun `expired production certificate uses an exact pin instead of trusting every certificate`() {
+        val certificate = javaClass.getResourceAsStream(
+            "/net/ccbluex/liquidbounce/features/chat/legacy-axochat.pem"
+        )!!.use {
+            CertificateFactory.getInstance("X.509").generateCertificate(it) as X509Certificate
+        }
+        val rejectingPlatform = object : X509TrustManager {
+            override fun checkClientTrusted(chain: Array<out X509Certificate>, authType: String) = Unit
+            override fun checkServerTrusted(chain: Array<out X509Certificate>, authType: String) =
+                throw CertificateException("platform rejected")
+            override fun getAcceptedIssuers(): Array<X509Certificate> = emptyArray()
+        }
+        val trustManager = AxochatTrustManager(rejectingPlatform)
+
+        trustManager.checkServerTrusted(arrayOf(certificate), "RSA")
+        assertTrue(isPinnedLegacyAxochatCertificate(certificate))
+        assertFalse(isPinnedLegacyAxochatCertificate(defaultAxochatTrustManager().acceptedIssuers.first()))
+        assertFailsWith<CertificateException> {
+            trustManager.checkServerTrusted(
+                arrayOf(defaultAxochatTrustManager().acceptedIssuers.first()),
+                "RSA",
+            )
         }
     }
 

@@ -22,6 +22,7 @@
 package net.ccbluex.liquidbounce.features.chat
 
 import com.google.gson.GsonBuilder
+import com.google.gson.JsonParser
 import com.mojang.authlib.exceptions.InvalidCredentialsException
 import io.netty.bootstrap.Bootstrap
 import io.netty.buffer.ByteBufAllocator
@@ -81,7 +82,52 @@ import net.ccbluex.liquidbounce.utils.client.mc
 import net.ccbluex.liquidbounce.utils.netty.clientChannelAndGroup
 import net.ccbluex.liquidbounce.utils.netty.syncSuspend
 import java.net.URI
+import java.security.KeyStore
+import java.security.MessageDigest
+import java.security.cert.CertificateException
+import java.security.cert.X509Certificate
+import java.util.HexFormat
 import java.util.UUID
+import javax.net.ssl.TrustManagerFactory
+import javax.net.ssl.X509TrustManager
+
+private val VALID_AXOCHAT_CHANNELS = setOf("liquidbounce", "fdpclient", "legacy")
+
+// ponytail: exact legacy leaf pin; remove it when chat.liquidbounce.net renews its certificate.
+private val LEGACY_AXOCHAT_CERTIFICATE_SHA256 = HexFormat.of().parseHex(
+    "0357a56e2be6569383ec4f0a40a3cc8e7d78acc70f863190fee3db4629c59428"
+)
+
+internal fun defaultAxochatTrustManager(): X509TrustManager =
+    TrustManagerFactory.getInstance(TrustManagerFactory.getDefaultAlgorithm()).run {
+        init(null as KeyStore?)
+        trustManagers.filterIsInstance<X509TrustManager>().single()
+    }
+
+internal fun isPinnedLegacyAxochatCertificate(certificate: X509Certificate): Boolean = MessageDigest.isEqual(
+    MessageDigest.getInstance("SHA-256").digest(certificate.encoded),
+    LEGACY_AXOCHAT_CERTIFICATE_SHA256,
+)
+
+internal class AxochatTrustManager(
+    private val platform: X509TrustManager = defaultAxochatTrustManager(),
+) : X509TrustManager {
+    override fun checkClientTrusted(chain: Array<out X509Certificate>, authType: String) =
+        platform.checkClientTrusted(chain, authType)
+
+    override fun checkServerTrusted(chain: Array<out X509Certificate>, authType: String) {
+        try {
+            platform.checkServerTrusted(chain, authType)
+        } catch (cause: CertificateException) {
+            if (chain.firstOrNull()?.let(::isPinnedLegacyAxochatCertificate) != true) throw cause
+        }
+    }
+
+    override fun getAcceptedIssuers(): Array<X509Certificate> = platform.acceptedIssuers
+}
+
+internal fun createAxochatSslContext(): SslContext =
+    SslContextBuilder.forClient().trustManager(AxochatTrustManager()).build()
 
 internal fun createAxochatSslHandler(
     sslContext: SslContext,
@@ -156,16 +202,16 @@ class AxochatClient(
             return@runCatching
         }
 
-        EventManager.callEvent(ClientChatStateChange(ClientChatStateChange.State.CONNECTING))
         isConnecting = true
         isLoggedIn = false
         supportsClientChannels = false
+        EventManager.callEvent(ClientChatStateChange(ClientChatStateChange.State.CONNECTING))
 
         val uri = URI("wss://chat.liquidbounce.net:7886/ws")
 
         val ssl = uri.scheme.equals("wss", true)
         val sslContext = if (ssl) {
-            SslContextBuilder.forClient().build()
+            createAxochatSslContext()
         } else {
             null
         }
@@ -226,10 +272,10 @@ class AxochatClient(
         channel?.writeAndFlush(CloseWebSocketFrame(1000, ""))?.addListener(ChannelFutureListener.CLOSE)
         channel = null
 
-        EventManager.callEvent(ClientChatStateChange(ClientChatStateChange.State.DISCONNECTED))
         isConnecting = false
         isLoggedIn = false
         supportsClientChannels = false
+        EventManager.callEvent(ClientChatStateChange(ClientChatStateChange.State.DISCONNECTED))
     }
 
     suspend fun reconnect() {
@@ -330,7 +376,7 @@ class AxochatClient(
                 return
             }
 
-            is S2CMessagePacket -> packet.channel?.chatNetwork?.let { network ->
+            is S2CMessagePacket -> incomingNetwork(packet.channel)?.let { network ->
                 onMessage(
                     packet.user,
                     packet.content,
@@ -338,7 +384,7 @@ class AxochatClient(
                     network,
                 )
             }
-            is S2CPrivateMessagePacket -> packet.channel?.chatNetwork?.let { network ->
+            is S2CPrivateMessagePacket -> incomingNetwork(packet.channel)?.let { network ->
                 onMessage(
                     packet.user,
                     packet.content,
@@ -356,6 +402,9 @@ class AxochatClient(
             is S2CUserPresencePacket -> onUserPresence(packet.users)
         }
     }
+
+    private fun incomingNetwork(channel: AxoChatClientId?): ChatNetwork? =
+        channel?.chatNetwork ?: ChatNetwork.LIQUIDBOUNCE.takeUnless { supportsClientChannels }
 
     private fun handleSuccess(packet: S2CSuccessPacket) {
         when (packet.reason) {
@@ -399,7 +448,11 @@ class AxochatClient(
      * Handle incoming message of websocket
      */
     internal fun handlePlainMessage(message: String) {
-        val packet = deserializerGson.fromJson(message, AxochatPacket.S2C::class.java)
+        val json = JsonParser.parseString(message).asJsonObject
+        val channel = json.getAsJsonObject("c")?.get("channel")
+        if (channel != null && channel.asString !in VALID_AXOCHAT_CHANNELS) return
+
+        val packet = deserializerGson.fromJson(json, AxochatPacket.S2C::class.java)
         handleFunctionalPacket(packet)
     }
 

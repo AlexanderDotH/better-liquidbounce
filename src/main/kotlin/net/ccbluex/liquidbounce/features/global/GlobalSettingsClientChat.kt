@@ -44,7 +44,7 @@ import net.ccbluex.liquidbounce.features.chat.AxochatClient
 import net.ccbluex.liquidbounce.features.chat.ChatConnectionStatus
 import net.ccbluex.liquidbounce.features.chat.ChatNetwork
 import net.ccbluex.liquidbounce.features.chat.ClientChatTabs
-import net.ccbluex.liquidbounce.features.chat.axoChatClientId
+import net.ccbluex.liquidbounce.features.chat.outboundAxoChatChannel
 import net.ccbluex.liquidbounce.features.chat.packet.C2SRequestJWTPacket
 import net.ccbluex.liquidbounce.features.command.CommandExecutor.suspendHandler
 import net.ccbluex.liquidbounce.features.command.CommandManager
@@ -258,10 +258,8 @@ object GlobalSettingsClientChat : ToggleableValueGroup(
 
     @JvmStatic
     fun sendAxochatMessage(network: ChatNetwork, message: String): Boolean {
-        val channel = network.axoChatClientId ?: return false
-        if (!running || !LiquidBounceFDP.enabled || !chatClient.isConnected || !chatClient.isLoggedIn ||
-            !chatClient.supportsClientChannels
-        ) {
+        val channel = network.outboundAxoChatChannel(chatClient.supportsClientChannels) ?: return false
+        if (!running || !LiquidBounceFDP.enabled || !chatClient.isConnected || !chatClient.isLoggedIn) {
             return false
         }
 
@@ -374,13 +372,13 @@ object GlobalSettingsClientChat : ToggleableValueGroup(
 
     @Suppress("unused")
     private val handleStateChange = suspendHandler<ClientChatStateChange>(behavior = CancelPrevious) {
-        val status = if (it.state == ClientChatStateChange.State.LOGGED_IN && !chatClient.supportsClientChannels) {
-            ChatConnectionStatus.DISCONNECTED
-        } else {
-            it.state.connectionStatus
-        }
+        setAxochatAvailable(running && LiquidBounceFDP.enabled)
+        val status = it.state.connectionStatus
         ClientChatTabs.setConnectionStatus(ChatNetwork.LIQUIDBOUNCE, status)
-        ClientChatTabs.setConnectionStatus(ChatNetwork.FDPCLIENT, status)
+        ClientChatTabs.setConnectionStatus(
+            ChatNetwork.FDPCLIENT,
+            status.takeIf { chatClient.supportsClientChannels } ?: ChatConnectionStatus.DISCONNECTED,
+        )
 
         if (it.state != ClientChatStateChange.State.LOGGED_IN) {
             clearRecentChatUsers()
@@ -439,7 +437,7 @@ object GlobalSettingsClientChat : ToggleableValueGroup(
 
     private fun setAxochatAvailable(available: Boolean) {
         ClientChatTabs.setAvailable(ChatNetwork.LIQUIDBOUNCE, available)
-        ClientChatTabs.setAvailable(ChatNetwork.FDPCLIENT, available)
+        ClientChatTabs.setAvailable(ChatNetwork.FDPCLIENT, available && chatClient.supportsClientChannels)
         if (!available) {
             ClientChatTabs.setConnectionStatus(ChatNetwork.LIQUIDBOUNCE, ChatConnectionStatus.DISCONNECTED)
             ClientChatTabs.setConnectionStatus(ChatNetwork.FDPCLIENT, ChatConnectionStatus.DISCONNECTED)

@@ -136,6 +136,16 @@ class ClientChatScreenBridgeTest {
     }
 
     @Test
+    fun `legacy AxoChat is one honest combined tab`() {
+        ClientChatTabs.setAvailable(ChatNetwork.LIQUIDBOUNCE, true)
+
+        assertEquals(
+            listOf("Minecraft", "LiquidBounce/FDP"),
+            ClientChatScreenBridge.visibleTabs().map(ChatTabView::label),
+        )
+    }
+
+    @Test
     fun `slash-prefilled chat always opens the Minecraft tab`() {
         ClientChatTabs.setAvailable(ChatNetwork.FDPCLIENT, true)
         ClientChatTabs.switchTo(ChatNetwork.FDPCLIENT)

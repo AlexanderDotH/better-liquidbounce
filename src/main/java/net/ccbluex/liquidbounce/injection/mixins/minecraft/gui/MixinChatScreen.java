@@ -271,8 +271,8 @@ public abstract class MixinChatScreen extends MixinScreen {
                 ChatTabLayout.ICON_SIZE,
                 ChatTabLayout.ICON_SIZE
             );
-            graphics.fill(tab.getRight() - 5, tab.getTop() + 3, tab.getRight() - 2, tab.getTop() + 6, statusColor);
-            graphics.enableScissor(textX, tab.getTop(), tab.getRight() - 7, tab.getBottom());
+            graphics.fill(tab.getRight() - 2, tab.getTop() + 3, tab.getRight(), tab.getBottom() - 3, statusColor);
+            graphics.enableScissor(textX, tab.getTop(), tab.getRight() - 5, tab.getBottom());
             graphics.text(font, tab.getLabel(), textX, textY, textColor, false);
             graphics.disableScissor();
         }

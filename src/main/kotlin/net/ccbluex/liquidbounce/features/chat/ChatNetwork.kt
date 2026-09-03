@@ -14,7 +14,7 @@ import net.ccbluex.liquidbounce.features.chat.packet.AxoChatClientId
 import net.minecraft.resources.Identifier
 
 enum class ChatNetwork(val id: String, val label: String, val icon: Identifier) {
-    MINECRAFT("minecraft", "Minecraft", Identifier.withDefaultNamespace("icon/draft_report")),
+    MINECRAFT("minecraft", "Minecraft", Identifier.withDefaultNamespace("pause_menu/social_interactions")),
     LIQUIDBOUNCE(
         "liquidbounce",
         "LiquidBounce",
@@ -40,3 +40,8 @@ val ChatNetwork.axoChatClientId: AxoChatClientId?
         ChatNetwork.LIQUIDBOUNCE -> AxoChatClientId.LIQUIDBOUNCE
         ChatNetwork.FDPCLIENT -> AxoChatClientId.FDPCLIENT
     }
+
+internal fun ChatNetwork.outboundAxoChatChannel(supportsClientChannels: Boolean): AxoChatClientId? {
+    val channel = axoChatClientId ?: return null
+    return channel.takeIf { supportsClientChannels || this == ChatNetwork.LIQUIDBOUNCE }
+}

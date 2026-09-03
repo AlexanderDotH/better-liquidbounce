@@ -16,6 +16,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class ClientChatChannelContractTest {
@@ -35,7 +36,7 @@ class ClientChatChannelContractTest {
         )
         assertEquals(
             listOf(
-                "minecraft:icon/draft_report",
+                "minecraft:pause_menu/social_interactions",
                 "liquidbounce:client_icons/liquidbounce",
                 "liquidbounce:client_icons/fdpclient",
             ),
@@ -83,6 +84,19 @@ class ClientChatChannelContractTest {
                 ChatNetwork.FDPCLIENT to "hello FDP",
             ),
             sent,
+        )
+    }
+
+    @Test
+    fun `legacy AxoChat sends only through the combined LiquidBounce tab`() {
+        assertEquals(
+            AxoChatClientId.LIQUIDBOUNCE,
+            ChatNetwork.LIQUIDBOUNCE.outboundAxoChatChannel(supportsClientChannels = false),
+        )
+        assertNull(ChatNetwork.FDPCLIENT.outboundAxoChatChannel(supportsClientChannels = false))
+        assertEquals(
+            AxoChatClientId.FDPCLIENT,
+            ChatNetwork.FDPCLIENT.outboundAxoChatChannel(supportsClientChannels = true),
         )
     }
 

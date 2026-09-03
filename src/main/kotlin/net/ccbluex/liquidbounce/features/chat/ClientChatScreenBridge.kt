@@ -43,7 +43,14 @@ object ClientChatScreenBridge {
     fun visibleTabs(liquidBounceColor: Color4b = Color4b.LIQUID_BOUNCE): List<ChatTabView> =
         ClientChatTabs.visibleNetworks.map { network ->
             val unread = ClientChatTabs.unreadCount(network)
-            val label = if (unread == 0) network.label else "${network.label} ($unread)"
+            val baseLabel = if (network == ChatNetwork.LIQUIDBOUNCE &&
+                !ClientChatTabs.isAvailable(ChatNetwork.FDPCLIENT)
+            ) {
+                "LiquidBounce/FDP"
+            } else {
+                network.label
+            }
+            val label = if (unread == 0) baseLabel else "$baseLabel ($unread)"
             ChatTabView(
                 network.id,
                 label,
